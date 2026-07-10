@@ -10,6 +10,7 @@ import { sleep } from "../media/utils.js";
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
 const DEEPSEEK_BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro";
+const TAG = "[xhs]";
 
 const TEMPLATES = {
   "知识分享": {
@@ -56,6 +57,8 @@ async function callLLM(prompt, style) {
     throw new Error(`「${style}」模板尚未实现，当前可用：${Object.keys(TEMPLATES).filter(k => TEMPLATES[k].systemPrompt !== "（待实现）").join("、")}`);
   }
 
+  console.log(`${TAG} callLLM: style=${style} model=${DEEPSEEK_MODEL} maxTokens=${template.maxTokens || 2000} prompt=${prompt.length}字`);
+
   const systemContent = `${template.systemPrompt}
 
 返回严格的 JSON 格式（不要包含 markdown 代码块标记）：
@@ -76,6 +79,7 @@ async function callLLM(prompt, style) {
 - 所有 prompt 用英文，描述具体画面内容
 - 涉及具体数据或关键信息要准确，不要编造`;
 
+  const tStart = Date.now();
   const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
     method: "POST",
     headers: {
@@ -95,29 +99,47 @@ async function callLLM(prompt, style) {
 
   const data = await res.json();
   const text = data.choices?.[0]?.message?.content || "";
+  const usage = data.usage || {};
+  const elapsed = ((Date.now() - tStart) / 1000).toFixed(1);
+
+  let noteData;
   try {
-    return JSON.parse(text);
+    noteData = JSON.parse(text);
   } catch {
     const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
-    return JSON.parse(cleaned);
+    noteData = JSON.parse(cleaned);
   }
+
+  console.log(`${TAG} callLLM: 耗时=${elapsed}s tokens=${usage.totalTokens} title="${noteData.title}" 段落=${noteData.content?.length} 插画=${noteData.illustrationPrompts?.length} 标签=${noteData.tags?.length}`);
+  return noteData;
 }
 
 async function generateAllImages(taskId, workDir, images) {
   const state = JSON.parse(fs.readFileSync(path.join(workDir, "task.json"), "utf-8"));
 
+  console.log(`${TAG} images: 开始生成 taskId=${taskId} 共${images.length}张`);
+
+  let doneCount = 0;
+  let failedCount = 0;
+
   for (const img of images) {
+    console.log(`${TAG} image[${img.index}] ${img.type}: prompt="${img.prompt.slice(0, 60)}..."`);
+    const tStart = Date.now();
     try {
       const aspectRatio = img.type === "cover" ? "3:4" : "1:1";
       const url = await generateImage(img.prompt, { aspectRatio });
 
       state.images[img.index].url = url;
       state.images[img.index].status = "done";
+      doneCount++;
       writeTaskState(workDir, state);
+      console.log(`${TAG} image[${img.index}] ${img.type}: 成功 耗时=${((Date.now() - tStart) / 1000).toFixed(1)}s`);
     } catch (err) {
       state.images[img.index].status = "failed";
       state.images[img.index].error = err.message;
+      failedCount++;
       writeTaskState(workDir, state);
+      console.error(`${TAG} image[${img.index}] ${img.type}: 失败 ${err.message}`);
     }
   }
 
@@ -126,6 +148,8 @@ async function generateAllImages(taskId, workDir, images) {
 
   state.status = allDone ? "ready" : hasFailed ? "partial" : "ready";
   writeTaskState(workDir, state);
+
+  console.log(`${TAG} images: 完成 taskId=${taskId} done=${doneCount} failed=${failedCount} status=${state.status}`);
 }
 
 export function register(server) {
@@ -139,6 +163,8 @@ export function register(server) {
     },
     async ({ topic, context, style }) => {
       try {
+        console.log(`${TAG} generate: topic="${topic}" style=${style} context=${context?.length || 0}字`);
+
         const deepseekKey = process.env.DEEPSEEK_API_KEY;
         const minimaxKey = process.env.MINIMAX_API_KEY;
         if (!deepseekKey) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
@@ -150,6 +176,8 @@ export function register(server) {
         }
 
         const knowledge = await searchChroma(topic);
+        console.log(`${TAG} searchChroma: 结果=${knowledge?.length || 0}字`);
+
         const prompt = `主题：${topic}\n${context ? `对话内容：${context}\n` : ""}相关知识：${knowledge || "无"}`;
         const noteData = await callLLM(prompt, style);
 
@@ -181,8 +209,11 @@ export function register(server) {
         writeTaskState(workDir, state);
 
         generateAllImages(taskId, workDir, images).catch((err) => {
+          console.error(`${TAG} generate: taskId=${taskId} 图片生成异常 ${err.message}`);
           updateTask(workDir, { status: "failed", error: err.message });
         });
+
+        console.log(`${TAG} generate: taskId=${taskId} 已提交 共${images.length}张图`);
 
         return {
           content: [{
@@ -211,6 +242,8 @@ export function register(server) {
     },
     async ({ taskId, field, value }) => {
       try {
+        console.log(`${TAG} update: taskId=${taskId} field=${field} value="${value.slice(0, 80)}"`);
+
         const workDir = path.join(TASK_DIR, taskId);
         const taskFile = path.join(workDir, "task.json");
         if (!fs.existsSync(taskFile)) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "笔记任务不存在" }) }] };
@@ -283,6 +316,7 @@ export function register(server) {
         let wait = base;
         for (let i = 0; i < count; i++) wait = Math.max(wait * 0.9, min);
         updateTask(workDir, { checkCount: count + 1 });
+        console.log(`${TAG} checkProgress: taskId=${taskId} status=${state.status} count=${count} wait=${(wait / 1000).toFixed(1)}s`);
         await sleep(wait);
         const updated = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
         return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, note: { title: updated.title, content: updated.content, tags: updated.tags, images: updated.images } }, null, 2) }] };
@@ -349,6 +383,9 @@ ${state.images[0]?.url ? `<img class="cover" src="${state.images[0].url}" alt="�
         const safeName = state.title.replace(/[\/\\:*?"<>|]/g, "_");
         const htmlPath = path.join(downloadsDir, `${safeName}.html`);
         fs.writeFileSync(htmlPath, html, "utf-8");
+
+        const size = (fs.statSync(htmlPath).size / 1024).toFixed(1);
+        console.log(`${TAG} export: taskId=${taskId} path="${htmlPath}" size=${size}KB`);
 
         return {
           content: [{

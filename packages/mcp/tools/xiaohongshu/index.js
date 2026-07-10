@@ -80,6 +80,7 @@ async function callLLM(prompt, style, subcategory) {
 返回严格的 JSON 格式（不要包含 markdown 代码块标记）：
 {
   "title": "笔记标题（10-20字，吸引人）",
+  "excerpt": "精彩摘要，≤30字，吸引读者点击阅读",
   "content": ["段落1", "[插图-1]", "段落2", "[插图-2]", "段落3"],
   "tags": ["#标签1", "#标签2", "#标签3"],
   "coverPrompt": "封面图英文 prompt",
@@ -126,7 +127,7 @@ async function callLLM(prompt, style, subcategory) {
     noteData = JSON.parse(cleaned);
   }
 
-  console.log(`${TAG} callLLM: 耗时=${elapsed}s tokens=${usage.totalTokens} title="${noteData.title}" 段落=${noteData.content?.length} 插画=${noteData.illustrationPrompts?.length} 标签=${noteData.tags?.length}`);
+  console.log(`${TAG} callLLM: 耗时=${elapsed}s tokens=${usage.totalTokens} title="${noteData.title}" excerpt="${noteData.excerpt}" 段落=${noteData.content?.length} 插画=${noteData.illustrationPrompts?.length} 标签=${noteData.tags?.length}`);
   return noteData;
 }
 
@@ -221,6 +222,7 @@ export function register(server) {
           style,
           subcategory: subcategory || null,
           title: noteData.title,
+          excerpt: noteData.excerpt || "",
           content: noteData.content,
           tags: noteData.tags,
           images,
@@ -242,7 +244,7 @@ export function register(server) {
               ok: true,
               taskId,
               status: "generating",
-              note: { title: noteData.title, content: noteData.content, tags: noteData.tags, images },
+              note: { title: noteData.title, excerpt: noteData.excerpt, content: noteData.content, tags: noteData.tags, images },
             }, null, 2),
           }],
         };
@@ -257,7 +259,7 @@ export function register(server) {
     "修改已生成的小红书笔记。可修改标题、正文、标签，或替换某张图片（重新生成）。",
     {
       taskId: z.string().min(1).describe("笔记任务 ID"),
-      field: z.string().min(1).describe("要修改的字段: title, content, tags, 或 image_0, image_1 等"),
+      field: z.string().min(1).describe("要修改的字段: title, excerpt, content, tags, 或 image_0, image_1 等"),
       value: z.string().min(1).describe("新值。字段为 image_N 时是新 prompt，content 时是 JSON 数组字符串"),
     },
     async ({ taskId, field, value }) => {
@@ -306,7 +308,7 @@ export function register(server) {
         return {
           content: [{
             type: "text",
-            text: JSON.stringify({ ok: true, note: { title: state.title, content: state.content, tags: state.tags, images: state.images } }, null, 2),
+            text: JSON.stringify({ ok: true, note: { title: state.title, excerpt: state.excerpt, content: state.content, tags: state.tags, images: state.images } }, null, 2),
           }],
         };
       } catch (err) {
@@ -339,10 +341,10 @@ export function register(server) {
         console.log(`${TAG} checkProgress: taskId=${taskId} status=${state.status} count=${count} wait=${(wait / 1000).toFixed(1)}s`);
         await sleep(wait);
         const updated = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-        return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, note: { title: updated.title, content: updated.content, tags: updated.tags, images: updated.images } }, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, note: { title: updated.title, excerpt: updated.excerpt, content: updated.content, tags: updated.tags, images: updated.images } }, null, 2) }] };
       }
 
-      return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: state.taskId, status: state.status, note: { title: state.title, content: state.content, tags: state.tags, images: state.images } }, null, 2) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: state.taskId, status: state.status, note: { title: state.title, excerpt: state.excerpt, content: state.content, tags: state.tags, images: state.images } }, null, 2) }] };
     },
   );
 
@@ -430,6 +432,7 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封�
 
         const mdContent = [
           `# ${state.title}`,
+          state.excerpt ? `> ${state.excerpt}` : "",
           "",
           ...(state.tags || []).map((t) => `\`${t}\``),
           "",

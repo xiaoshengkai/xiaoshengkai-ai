@@ -41,6 +41,7 @@ import { register as registerSkill } from "./tools/skill/index.js";
 import { register as registerExec } from "./tools/exec/index.js";
 import { register as registerMedia } from "./tools/media/index.js";
 import { register as registerDiagram } from "./tools/diagram/index.js";
+import { register as registerXiaohongshu } from "./tools/xiaohongshu/index.js";
 
 console.error(`[mcp] server-id: ${Date.now().toString(36)}`);
 
@@ -55,6 +56,7 @@ const modules = [
   { name: "chroma", register: registerChroma },
   { name: "media", register: registerMedia },
   { name: "diagram", register: registerDiagram },
+  { name: "xiaohongshu", register: registerXiaohongshu },
 ];
 
 let totalTools = 0;

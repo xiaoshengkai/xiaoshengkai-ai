@@ -41,6 +41,12 @@ const TOOLS_PROMPT = `
 
 - 其他: 时间/待办/文件/网页爬取
 
+- 小红书笔记: generateXiaohongshuNote → checkXiaohongshuNoteProgress | updateXiaohongshuNote | exportXiaohongshuNote
+  用户说"生成笔记"、"整理成小红书"、"导出笔记"时调用
+  generateXiaohongshuNote 返回 taskId → checkXiaohongshuNoteProgress(taskId, interval=3) 轮询等 ready
+  修改笔记用 updateXiaohongshuNote({ taskId, field, value })，field 取值: title/content/tags/image_N
+  导出用 exportXiaohongshuNote({ taskId })
+
 使用规则:
 - 用户说"画图"/"流程图"等 → 调用 generateDiagram，不确定类型时询问用户
 - generateDiagram 返回 taskId → checkDiagramProgress(taskId, interval=20) 轮询等 done

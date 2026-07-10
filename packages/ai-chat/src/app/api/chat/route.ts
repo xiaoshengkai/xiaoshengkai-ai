@@ -43,9 +43,10 @@ const TOOLS_PROMPT = `
 
 - 小红书笔记: generateXiaohongshuNote → checkXiaohongshuNoteProgress | updateXiaohongshuNote | exportXiaohongshuNote
   用户说"生成笔记"、"整理成小红书"、"导出笔记"时调用
-  generateXiaohongshuNote({ topic, context, style }) 返回 taskId → checkXiaohongshuNoteProgress(taskId, interval=3) 轮询等 ready
+  generateXiaohongshuNote({ topic, context, style, subcategory }) 返回 taskId → checkXiaohongshuNoteProgress(taskId, interval=3) 轮询等 ready
   topic 从对话中提取主题，context 提取当前对话的关键讨论内容（必传，确保笔记内容包含对话信息）
-  style 可选: 知识分享/好物推荐/经验复盘/观点讨论，默认自动推断，目前仅「知识分享」完整实现
+  style: knowledge=知识分享/product_review=好物推荐/experience=经验复盘/opinion=观点讨论，默认 automatic
+  subcategory: 二级类目，如 finance=金融知识，目前仅 knowledge 下支持，LLM 自动推断
   修改笔记用 updateXiaohongshuNote({ taskId, field, value })，field 取值: title/content/tags/image_N
   导出用 exportXiaohongshuNote({ taskId })
 

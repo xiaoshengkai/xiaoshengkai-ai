@@ -20,15 +20,23 @@ function loadTemplate(name) {
 }
 
 const TEMPLATES = {
-  "知识分享": {
-    maxTokens: 4000,
-    systemPrompt: loadTemplate("知识分享"),
-    coverStyle: "lively hand-drawn illustration, warm colors, playful, 3:4 vertical",
-    illustrationStyle: "lively hand-drawn illustration, warm colors, playful, 1:1 square",
+  knowledge: {
+    finance: {
+      maxTokens: 4000,
+      systemPrompt: loadTemplate("knowledge/finance"),
+      coverStyle: "lively hand-drawn illustration, warm gold and navy blue palette, 3:4 vertical",
+      illustrationStyle: "lively hand-drawn illustration, warm gold and navy blue palette, 1:1 square",
+    },
+    _default: {
+      maxTokens: 4000,
+      systemPrompt: loadTemplate("knowledge"),
+      coverStyle: "lively hand-drawn illustration, warm colors, playful, 3:4 vertical",
+      illustrationStyle: "lively hand-drawn illustration, warm colors, playful, 1:1 square",
+    },
   },
-  "好物推荐": { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
-  "经验复盘": { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
-  "观点讨论": { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
+  product_review: { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
+  experience: { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
+  opinion: { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
 };
 
 function writeTaskState(workDir, state) {
@@ -44,16 +52,28 @@ function updateTask(workDir, update) {
   fs.writeFileSync(taskFile, JSON.stringify(state, null, 2));
 }
 
-async function callLLM(prompt, style) {
+async function callLLM(prompt, style, subcategory) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("未配置 DEEPSEEK_API_KEY");
 
-  const template = TEMPLATES[style];
-  if (!template || !template.systemPrompt) {
-    throw new Error(`「${style}」模板尚未实现，当前可用：${Object.keys(TEMPLATES).filter(k => TEMPLATES[k].systemPrompt !== "（待实现）").join("、")}`);
+  const category = TEMPLATES[style];
+  if (!category) throw new Error(`未知模板: ${style}`);
+
+  let template;
+  if (subcategory && category[subcategory] && category[subcategory].systemPrompt) {
+    template = category[subcategory];
+  } else if (category._default) {
+    template = category._default;
+  } else {
+    template = category;
   }
 
-  console.log(`${TAG} callLLM: style=${style} model=${DEEPSEEK_MODEL} maxTokens=${template.maxTokens || 2000} prompt=${prompt.length}字`);
+  if (!template.systemPrompt || template.systemPrompt === "（待实现）") {
+    const available = category._default ? Object.keys(category).filter(k => k !== "_default" && category[k].systemPrompt !== "（待实现）").join("、") : "无";
+    throw new Error(`「${style}」${subcategory ? `/${subcategory}` : ""}模板尚未实现，当前可用：${available}`);
+  }
+
+  console.log(`${TAG} callLLM: style=${style}${subcategory ? "/" + subcategory : ""} model=${DEEPSEEK_MODEL} maxTokens=${template.maxTokens || 2000} prompt=${prompt.length}字`);
 
   const systemContent = `${template.systemPrompt}
 
@@ -155,27 +175,30 @@ export function register(server) {
     {
       topic: z.string().min(1).max(200).describe("笔记主题，从对话中提取，如 'React 性能优化技巧'"),
       context: z.string().optional().describe("对话内容摘要，提取当前对话中涉及的关键讨论内容、关键结论等"),
-      style: z.enum(["知识分享", "好物推荐", "经验复盘", "观点讨论"]).optional().default("知识分享").describe("笔记模板。LLM 根据对话内容自动推断，用户也可手动指定。目前仅「知识分享」完整实现"),
+      style: z.enum(["knowledge", "product_review", "experience", "opinion"]).optional().default("knowledge").describe("笔记模板。knowledge=知识分享, product_review=好物推荐, experience=经验复盘, opinion=观点讨论。LLM 自动推断，用户也可手动指定"),
+      subcategory: z.string().optional().describe("二级类目，如 'finance'（金融知识）。LLM 自动推断，目前仅 knowledge 下支持"),
     },
-    async ({ topic, context, style }) => {
+    async ({ topic, context, style, subcategory }) => {
       try {
-        console.log(`${TAG} generate: topic="${topic}" style=${style} context=${context?.length || 0}字`);
+        console.log(`${TAG} generate: topic="${topic}" style=${style}${subcategory ? "/" + subcategory : ""} context=${context?.length || 0}字`);
 
         const deepseekKey = process.env.DEEPSEEK_API_KEY;
         const minimaxKey = process.env.MINIMAX_API_KEY;
         if (!deepseekKey) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
         if (!minimaxKey) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
 
-        const template = TEMPLATES[style];
-        if (!template || template.systemPrompt === "（待实现）") {
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `「${style}」模板尚未实现，当前可用：${Object.keys(TEMPLATES).filter(k => TEMPLATES[k].systemPrompt !== "（待实现）").join("、")}` }) }] };
+        const category = TEMPLATES[style];
+        if (!category) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `未知模板: ${style}` }) }] };
+
+        if (subcategory && category[subcategory] && category[subcategory].systemPrompt === "（待实现）") {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `「${style}/${subcategory}」模板尚未实现` }) }] };
         }
 
         const knowledge = await searchChroma(topic);
         console.log(`${TAG} searchChroma: 结果=${knowledge?.length || 0}字`);
 
         const prompt = `主题：${topic}\n${context ? `对话内容：${context}\n` : ""}相关知识：${knowledge || "无"}`;
-        const noteData = await callLLM(prompt, style);
+        const noteData = await callLLM(prompt, style, subcategory);
 
         const taskId = crypto.randomUUID().slice(0, 8);
         const workDir = path.join(TASK_DIR, taskId);
@@ -196,6 +219,7 @@ export function register(server) {
           status: "generating",
           topic,
           style,
+          subcategory: subcategory || null,
           title: noteData.title,
           content: noteData.content,
           tags: noteData.tags,

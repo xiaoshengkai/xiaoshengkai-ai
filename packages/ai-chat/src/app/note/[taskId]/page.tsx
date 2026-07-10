@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { Download } from "lucide-react";
 
 interface NoteImage {
@@ -108,7 +111,13 @@ export default function NotePreviewPage() {
                   </div>
                 );
               }
-              return <p key={i}>{seg}</p>;
+              return (
+              <div key={i} className="prose prose-sm max-w-none [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:border-l-4 [&_h3]:border-red-400 [&_h3]:pl-3 [&_h3]:text-red-600 [&_blockquote]:border-l-4 [&_blockquote]:border-orange-300 [&_blockquote]:bg-orange-50 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-2 [&_blockquote]:rounded-r [&_blockquote]:text-orange-800 [&_blockquote]:not-italic [&_strong]:text-gray-900 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                  {seg}
+                </ReactMarkdown>
+              </div>
+            );
             })}
           </div>
 

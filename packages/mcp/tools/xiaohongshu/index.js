@@ -298,7 +298,7 @@ export function register(server) {
 
   server.tool(
     "checkXiaohongshuNoteProgress",
-    "查询小红书笔记生成任务进度。返回 progress 和 status 字段。status=ready 时所有图片已生成完毕。",
+    "查询小红书笔记生成任务进度。返回 status 字段。status=ready 时所有图片已生成完毕。",
     {
       taskId: z.string().min(1).describe("笔记任务 ID"),
       interval: z.number().optional().default(3).describe("初始查询间隔（秒），后续每次递减 10%，最低为初始值的 60%"),
@@ -319,10 +319,10 @@ export function register(server) {
         updateTask(workDir, { checkCount: count + 1 });
         await sleep(wait);
         const updated = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-        return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, note: { title: updated.title, content: updated.content, tags: updated.tags, images: updated.images } }, null, 2) }] };
       }
 
-      return { content: [{ type: "text", text: JSON.stringify(state, null, 2) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: state.taskId, status: state.status, note: { title: state.title, content: state.content, tags: state.tags, images: state.images } }, null, 2) }] };
     },
   );
 

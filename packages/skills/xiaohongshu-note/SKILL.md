@@ -20,8 +20,8 @@ description: 小红书笔记自动生成技能，将当前对话内容+记忆库
    - field: title/content/tags 或 image_N（N 是图片索引）
    - 修改 image_N 时会重新生成该图片，需再次轮询进度
 5. 用户要导出 → 调用 exportXiaohongshuNote({ taskId })
-   - 开发模式下告诉用户 HTML 文件路径
-   - 生产模式下打开预览页 /note/[taskId]
+   - 打开预览页 /note/[taskId] 查看完整效果
+   - 同时告知用户导出文件夹路径，包含 index.html、note.md 和图片
 
 ## 模板
 

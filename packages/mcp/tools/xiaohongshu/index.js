@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { generateImage } from "../../lib/minimax.js";
 import { sleep } from "../media/utils.js";
@@ -12,21 +13,16 @@ const DEEPSEEK_BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro";
 const TAG = "[xhs]";
 
+const TEMPLATES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "templates");
+
+function loadTemplate(name) {
+  return fs.readFileSync(path.join(TEMPLATES_DIR, `${name}.md`), "utf-8");
+}
+
 const TEMPLATES = {
   "知识分享": {
     maxTokens: 4000,
-    systemPrompt: `你是专业的小红书知识分享创作者。
-
-结构要求：
-- 开头用一个问题/痛点钩子吸引读者，引发好奇
-- 正文用大白话+生活例子解释概念，循序渐进，娓娓道来
-- 每个知识点充分展开，详实不啰嗦
-- 每讲完一个概念配一张活泼手绘插画
-- 结尾一句话总结今日分享内容，点睛收尾
-
-配图：活泼手绘插画风格（lively hand-drawn illustration style, warm colors, playful）
-封面：3:4竖版，突出主题关键词
-插画：1:1方形，配合正文概念做可视化`,
+    systemPrompt: loadTemplate("知识分享"),
     coverStyle: "lively hand-drawn illustration, warm colors, playful, 3:4 vertical",
     illustrationStyle: "lively hand-drawn illustration, warm colors, playful, 1:1 square",
   },
@@ -328,7 +324,7 @@ export function register(server) {
 
   server.tool(
     "exportXiaohongshuNote",
-    "将小红书笔记导出为 HTML 文件，保存到 Downloads 目录。",
+    "将小红书笔记导出为本地文件夹（含 HTML、MD 文件和图片），保存到 Downloads 目录。",
     {
       taskId: z.string().min(1).describe("笔记任务 ID"),
     },
@@ -340,13 +336,38 @@ export function register(server) {
 
         const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
         const downloadsDir = path.join(os.homedir(), "Downloads");
+        const safeName = state.title.replace(/[\/\\:*?"<>|]/g, "_");
+
+        let exportDir = path.join(downloadsDir, safeName);
+        if (fs.existsSync(exportDir)) {
+          exportDir = path.join(downloadsDir, `${safeName}_${Date.now()}`);
+        }
+        const imgDir = path.join(exportDir, "images");
+        fs.mkdirSync(imgDir, { recursive: true });
+
+        // 下载图片
+        let imgCount = 0;
+        for (const img of state.images) {
+          if (!img.url) continue;
+          try {
+            const filename = img.type === "cover" ? "cover.png" : `illustration-${img.index}.png`;
+            const imgPath = path.join(imgDir, filename);
+            const res = await fetch(img.url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            fs.writeFileSync(imgPath, Buffer.from(await res.arrayBuffer()));
+            imgCount++;
+            console.log(`${TAG} export: 图片[${img.index}] 下载成功 ${filename}`);
+          } catch (err) {
+            console.error(`${TAG} export: 图片[${img.index}] 下载失败 ${err.message}`);
+          }
+        }
 
         const contentHtml = state.content
           .map((seg) => {
             const match = seg.match(/^\[插图-(\d+)\]$/);
             if (match) {
               const img = state.images[parseInt(match[1], 10)];
-              if (img?.url) return `<img src="${img.url}" alt="插图" style="width:100%;border-radius:8px;margin:12px 0">`;
+              if (img?.url) return `<img src="./images/${img.type === "cover" ? "cover" : `illustration-${img.index}`}.png" alt="插图" style="width:100%;border-radius:8px;margin:12px 0">`;
               return `<div style="background:#f0f0f0;height:200px;display:flex;align-items:center;justify-content:center;color:#999;border-radius:8px;margin:12px 0">[插图生成失败]</div>`;
             }
             return `<p style="line-height:1.8;margin:8px 0;color:#333">${seg}</p>`;
@@ -371,7 +392,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;m
 </style>
 </head>
 <body>
-${state.images[0]?.url ? `<img class="cover" src="${state.images[0].url}" alt="封面">` : ""}
+${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封面">` : ""}
 <div class="header">
   <h1 class="title">${state.title}</h1>
   <div class="tags">${(state.tags || []).map((t) => `<span class="tag">${t}</span>`).join("")}</div>
@@ -380,17 +401,42 @@ ${state.images[0]?.url ? `<img class="cover" src="${state.images[0].url}" alt="�
 </body>
 </html>`;
 
-        const safeName = state.title.replace(/[\/\\:*?"<>|]/g, "_");
-        const htmlPath = path.join(downloadsDir, `${safeName}.html`);
+        const htmlPath = path.join(exportDir, "index.html");
         fs.writeFileSync(htmlPath, html, "utf-8");
 
-        const size = (fs.statSync(htmlPath).size / 1024).toFixed(1);
-        console.log(`${TAG} export: taskId=${taskId} path="${htmlPath}" size=${size}KB`);
+        const mdContent = [
+          `# ${state.title}`,
+          "",
+          ...(state.tags || []).map((t) => `\`${t}\``),
+          "",
+          ...state.content.map((seg) => {
+            const match = seg.match(/^\[插图-(\d+)\]$/);
+            if (match) {
+              const img = state.images[parseInt(match[1], 10)];
+              const filename = img.type === "cover" ? "cover" : `illustration-${img.index}`;
+              return img?.url ? `![插图](./images/${filename}.png)` : "_[插图生成失败]_";
+            }
+            return seg;
+          }),
+          "",
+          "---",
+          "> 由小盛开AI自动生成",
+        ].join("\n");
+
+        const mdPath = path.join(exportDir, "note.md");
+        fs.writeFileSync(mdPath, mdContent, "utf-8");
+
+        console.log(`${TAG} export: taskId=${taskId} dir="${exportDir}" html=${(fs.statSync(htmlPath).size / 1024).toFixed(1)}KB md=${(fs.statSync(mdPath).size / 1024).toFixed(1)}KB images=${imgCount}`);
 
         return {
           content: [{
             type: "text",
-            text: JSON.stringify({ ok: true, htmlPath, note: `笔记已导出到 ${htmlPath}` }, null, 2),
+            text: JSON.stringify({
+              ok: true,
+              exportDir,
+              files: { html: htmlPath, md: mdPath, images: imgCount },
+              note: `笔记已导出到 ${exportDir}`,
+            }, null, 2),
           }],
         };
       } catch (err) {

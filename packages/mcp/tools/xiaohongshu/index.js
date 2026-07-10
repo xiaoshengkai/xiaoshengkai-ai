@@ -437,8 +437,7 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封�
             const match = seg.match(/^\[插图-(\d+)\]$/);
             if (match) {
               const img = state.images[parseInt(match[1], 10)];
-              const filename = img.type === "cover" ? "cover" : `illustration-${img.index}`;
-              return img?.url ? `![插图](./images/${filename}.png)` : "_[插图生成失败]_";
+              return img?.url ? `![插图](${img.url})` : "_[插图生成失败]_";
             }
             return seg;
           }),

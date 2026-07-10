@@ -1,0 +1,138 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { ExternalLink } from "lucide-react";
+
+interface NoteImage {
+  index: number;
+  type: "cover" | "illustration";
+  prompt: string;
+  url: string | null;
+  status: "pending" | "done" | "failed";
+}
+
+interface NoteData {
+  taskId: string;
+  status: "generating" | "ready" | "failed" | "partial";
+  title: string;
+  content: string[];
+  tags: string[];
+  images: NoteImage[];
+}
+
+export default function NotePreviewCard({ taskId }: { taskId: string }) {
+  const [note, setNote] = useState<NoteData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let attempts = 0;
+
+    async function poll() {
+      while (!cancelled && attempts < 30) {
+        try {
+          const res = await fetch(`/api/note/${taskId}/status`);
+          const data = await res.json();
+          if (!cancelled) {
+            setNote(data);
+            if (data.status === "ready" || data.status === "partial" || data.status === "failed") {
+              return;
+            }
+          }
+        } catch {
+          // retry
+        }
+        attempts++;
+        const wait = Math.max(3000 * Math.pow(0.9, attempts), 1800);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+      if (!cancelled && !note) setError("笔记生成超时");
+    }
+
+    poll();
+    return () => { cancelled = true; };
+  }, [taskId]);
+
+  if (error) {
+    return (
+      <div className="pixel-card p-4 my-2 text-sm text-red-500">
+        {error}
+      </div>
+    );
+  }
+
+  if (!note) {
+    return (
+      <div className="pixel-card p-4 my-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="pixel-loading-dots" />
+          小红书笔记生成中...
+        </div>
+      </div>
+    );
+  }
+
+  const cover = note.images?.[0];
+  const illustrations = note.images?.filter((img) => img.type === "illustration") || [];
+
+  return (
+    <div className="pixel-card my-2 overflow-hidden">
+      {/* 封面 */}
+      {cover?.url ? (
+        <img src={cover.url} alt={note.title} className="w-full aspect-[3/4] object-cover" />
+      ) : (
+        <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center text-sm text-muted-foreground">
+          封面生成中...
+        </div>
+      )}
+
+      {/* 标题 + 正文 */}
+      <div className="p-4">
+        <h3 className="text-base font-bold mb-3">{note.title}</h3>
+        <div className="text-sm space-y-2">
+          {note.content?.map((seg, i) => {
+            const match = seg.match(/^\[插图-(\d+)\]$/);
+            if (match) {
+              const img = illustrations[parseInt(match[1], 10) - 1];
+              if (img?.url) {
+                return <img key={i} src={img.url} alt="插画" className="w-full rounded pixel-img my-2" />;
+              }
+              return (
+                <div key={i} className="h-32 bg-muted flex items-center justify-center text-xs text-muted-foreground my-2">
+                  插画生成中...
+                </div>
+              );
+            }
+            return <p key={i} className="leading-relaxed">{seg}</p>;
+          })}
+        </div>
+
+        {/* 标签 */}
+        <div className="flex flex-wrap gap-2 mt-3">
+          {note.tags?.map((tag) => (
+            <span key={tag} className="text-xs text-[#ff2442]">{tag}</span>
+          ))}
+        </div>
+
+        {/* 操作栏 */}
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+          <a
+            href={`/note/${taskId}`}
+            target="_blank"
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            rel="noreferrer"
+          >
+            <ExternalLink className="size-3" />
+            打开预览
+          </a>
+          {note.status === "generating" && (
+            <span className="text-xs text-muted-foreground ml-auto">
+              {note.images?.filter((img) => img.status === "done").length}/{note.images?.length} 张图片
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

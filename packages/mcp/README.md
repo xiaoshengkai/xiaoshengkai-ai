@@ -16,6 +16,7 @@ flowchart TB
     FILE["tools/file.js<br/>文件操作（10 tools）"]
     TODO["tools/todo.js<br/>待办管理（6 tools）"]
     FETCH["tools/fetch.js<br/>网页抓取（2 tools）"]
+    XHS["tools/xiaohongshu/<br/>小红书笔记（4 tools）"]
     ENTRY --> SKILL
     ENTRY --> EXEC
     ENTRY --> MEDIA
@@ -23,6 +24,7 @@ flowchart TB
     ENTRY --> FILE
     ENTRY --> TODO
     ENTRY --> FETCH
+    ENTRY --> XHS
   end
 
   subgraph SKILLS["📚 Skills 知识库（packages/skills/）"]
@@ -57,7 +59,9 @@ Skill = 知识（What）  ← 静态文件，描述"怎么做得好"（规则、
 mcp/
 ├── index.js              # 统一入口，注册所有工具
 ├── lib/
-│   └── env.js            # 统一 dotenv 加载
+│   ├── env.js            # 统一 dotenv 加载
+│   ├── chroma.js         # 共享 Chroma 搜索逻辑
+│   └── minimax.js        # 共享 MiniMax 图片生成
 ├── tools/
 │   ├── skill/index.js     # 技能加载（1 tool）
 │   ├── exec/index.js      # Shell 命令执行（1 tool）
@@ -66,6 +70,12 @@ mcp/
 │   ├── file/index.js      # 文件系统操作（10 tools）
 │   ├── chroma/index.js    # 知识库 CRUD（5 tools）
 │   ├── fetch/index.js     # 网页爬取（2 tools）
+│   ├── xiaohongshu/        # 小红书笔记（4 tools）
+│   │   ├── index.js
+│   │   └── templates/
+│   │       ├── knowledge.md
+│   │       └── knowledge/
+│   │           └── finance.md
 │   └── media/             # 多模态生成（7 tools）
 │       ├── image.js      # 图片生成（2 tools）
 │       ├── video.js      # 视频/语音（5 tools）
@@ -143,7 +153,16 @@ mcp/
 |------|------|------|
 | `generateDiagram` | ✅ | 根据描述生成图表，Mermaid（流程图/时序图/ER图等）+ D2（架构图/拓扑图等）双引擎，3 套主题，4 层校验，失败自修复 |
 
-**总计：33 个工具（31 已实现，2 预留）**
+**总计：37 个工具（35 已实现，2 预留）**
+
+### 小红书笔记（xiaohongshu）
+
+| 工具 | 状态 | 说明 |
+|------|------|------|
+| `generateXiaohongshuNote` | ✅ | 根据主题和模板生成笔记（含封面/插画/标签），自动检索记忆库，异步生成配图 |
+| `updateXiaohongshuNote` | ✅ | 修改已生成的笔记（标题/摘要/正文/标签/替换图片） |
+| `checkXiaohongshuNoteProgress` | ✅ | 查询笔记生成进度，轮询等图片就绪 |
+| `exportXiaohongshuNote` | ✅ | 导出笔记为本地文件夹（HTML + MD + 图片下载） |
 
 ## 运行
 
@@ -158,16 +177,22 @@ node index.js
 ```bash
 DEEPSEEK_API_KEY=sk-xxx
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+DEEPSEEK_PRO_MODEL=deepseek-v4-pro
+DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
 GLM_API_KEY=xxx
 GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+GLM_EMBEDDING_MODEL=embedding-3
 MINIMAX_API_KEY=xxx
-MINIMAX_BASE_URL=https://api.minimaxi.com
+MINIMAX_BASE_URL=https://api.minimaxi.com/v1
+MINIMAX_IMAGE_MODEL=image-01
 ```
 
 | 模块 | 依赖的 Key |
 |------|-----------|
-| chroma | GLM_API_KEY, GLM_BASE_URL |
-| media | MINIMAX_API_KEY, MINIMAX_BASE_URL, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL |
+| chroma | GLM_API_KEY, GLM_BASE_URL, GLM_EMBEDDING_MODEL |
+| media | MINIMAX_API_KEY, MINIMAX_BASE_URL, MINIMAX_IMAGE_MODEL, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_FLASH_MODEL |
+| xiaohongshu | DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_PRO_MODEL, MINIMAX_API_KEY, MINIMAX_BASE_URL, MINIMAX_IMAGE_MODEL |
+| diagram | DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_FLASH_MODEL |
 
 ## 技术栈
 

@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.5.1 (2026-07-10) — 小红书笔记自动生成
+
+### 新增
+- **小红书笔记 MCP 工具**：`generateXiaohongshuNote` / `updateXiaohongshuNote` / `checkXiaohongshuNoteProgress` / `exportXiaohongshuNote`（4 tools）
+- **模板系统**：`templates/knowledge.md`（通用知识分享）+ `templates/knowledge/finance.md`（金融知识，五段式：场景代入→概念拆解→数据论证→算账冲击→金句收尾）
+- **二级类目**：`knowledge` 大类下支持 `finance` 等二级类目，LLM 自动推断
+- **excerpt 摘要**：LLM 自动生成 ≤30 字精彩摘要，嵌入 `note.md` 标题下
+- **NotePreviewCard**：聊天内嵌预览卡片，ReactMarkdown 渲染（h3 红色左边框、blockquote 暖橙底、**加粗**、列表）
+- **独立预览页**：`/note/[taskId]`，完整笔记预览 + 导出按钮
+- **导出文件夹**：HTML + MD + 图片下载到 `~/Downloads/{笔记标题}/`
+- **15 个日志点**：`[xhs]` 前缀，全链路追踪（LLM 耗时/token/图片生成/搜索/导出）
+- **Skill**：`packages/skills/xiaohongshu-note/SKILL.md`，LLM 自动加载
+
+### 重构
+- **模型名 env 化**：新增 `DEEPSEEK_PRO_MODEL`/`DEEPSEEK_FLASH_MODEL`/`GLM_EMBEDDING_MODEL`/`MINIMAX_IMAGE_MODEL` 环境变量，替代全部硬编码模型名
+- **共享 lib 抽取**：`packages/mcp/lib/chroma.js`（`searchChroma`/`embedText`/`getCollection`）+ `packages/mcp/lib/minimax.js`（`generateImage`），消除 chroma/image/xiaohongshu 之间的重复代码
+- **模板 prompt 抽取**：`systemPrompt` 从代码中移到 `templates/*.md`，`loadTemplate()` 读取
+- **TEMPLATES 英文 key**：`knowledge`/`product_review`/`experience`/`opinion`，二级类目嵌套结构
+
+### 修复
+- `loadSkill` 路径 bug：`skill/index.js` SKILLS_DIR `../../skills` → `../../../skills`
+- xiaohongshu 用错 MiniMax URL：`api.minimax.chat` → `api.minimaxi.com`
+- xiaohongshu 搜索未用 GLM embedding：`new ChromaClient` → `searchChroma`（GLM embedding-3）
+- `deepseek-chat` 模型废弃：替换为 `DEEPSEEK_PRO_MODEL` 环境变量
+- `DEEPSEEK_BASE` 硬编码：改为 `process.env.DEEPSEEK_BASE_URL`
+- `updateXiaohongshuNote` content JSON 解析失败：返回错误而非降级为 string
+- `generateXiaohongshuNote` 缺对话上下文：新增 `context` 参数
+- 知识分享长内容截断：`maxTokens: 2000` → `4000`，正文 3-5 段 → 5-8 段，插画 1-3 张 → 3-5 张
+
+### 变更文件
+- `packages/mcp/tools/xiaohongshu/index.js` — 新建（~480 行，4 tools）
+- `packages/mcp/tools/xiaohongshu/templates/knowledge.md` — 新建（通用知识分享模板）
+- `packages/mcp/tools/xiaohongshu/templates/knowledge/finance.md` — 新建（金融知识模板）
+- `packages/mcp/lib/chroma.js` — 新建（共享 Chroma 搜索逻辑）
+- `packages/mcp/lib/minimax.js` — 新建（共享 MiniMax 图片生成）
+- `packages/ai-chat/src/components/chat/note-preview-card.tsx` — 新建（聊天内嵌预览）
+- `packages/ai-chat/src/app/note/[taskId]/page.tsx` — 新建（独立预览页）
+- `packages/ai-chat/src/app/api/note/[taskId]/status/route.ts` — 新建（状态查询 API）
+- `packages/skills/xiaohongshu-note/SKILL.md` — 新建（Skill 定义）
+- `packages/mcp/index.js` — 注册 xiaohongshu 模块
+- `packages/mcp/tools/skill/index.js` — SKILLS_DIR 路径修复
+- `packages/mcp/tools/chroma/index.js` — 改用 lib/chroma.js
+- `packages/mcp/tools/diagram/index.js` — 模型名 env 化
+- `packages/mcp/tools/media/video.js` — 模型名 env 化
+- `packages/ai-chat/src/app/api/chat/route.ts` — TOOLS_PROMPT + 模型名 env 化
+- `packages/ai-chat/src/app/api/chat/compress/route.ts` — 模型名 env 化
+- `packages/ai-chat/src/app/api/memory/route.ts` — 模型名 env 化
+- `packages/ai-chat/src/lib/model-router.ts` — 模型名 env 化
+- `packages/ai-chat/src/lib/vector-store.ts` — 模型名 env 化
+- `packages/ai-chat/src/components/chat/message-item.tsx` — 识别 xhs 任务渲染卡片
+- `.env` / `.env.example` — 新增 4 个模型名环境变量
+- `docs/superpowers/specs/2026-07-10-xiaohongshu-note-design.md` — 设计文档
+- `docs/superpowers/plans/2026-07-10-xiaohongshu-note.md` — 实现计划
+
 ## v0.5.0 (2026-07-10) — 图片生成异步化 + 停止生成 + 风格库
 
 ### 新增

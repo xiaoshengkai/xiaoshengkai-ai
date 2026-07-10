@@ -52,7 +52,7 @@ R5["⑤ getMCPClient<br/>skill + exec + chroma + file + ..."]
     A1["ai-chat (Next.js)"]
     A2["chromadb (standalone)<br/>:8000, data/chroma/"]
     A3["chroma-server (stdio MCP)"]
-    A4["mcp (stdio MCP)<br/>32 tools: skill/exec/todo/file/chroma/fetch/media"]
+    A4["mcp (stdio MCP)<br/>37 tools: skill/exec/todo/file/chroma/fetch/media/xiaohongshu"]
     A1 -->|"spawn"| A3
     A1 -->|"HTTP :8000"| A2
     A3 -->|"HTTP :8000"| A2
@@ -110,7 +110,7 @@ R5["⑤ getMCPClient<br/>skill + exec + chroma + file + ..."]
 2. 智谱 `embedding-3` 生成查询向量
 3. Chroma cosine 检索 Top-3 知识片段
 4. 注入 `knowledgeContext` + `SKILL_LIST` 到 system prompt
-5. 启动/复用 1 个 MCP client（统一 mcp 入口，32 tools）
+5. 启动/复用 1 个 MCP client（统一 mcp 入口，37 tools）
 6. `streamText` 调用 DeepSeek V4 Pro，LLM 可自主调工具（含 loadSkill/exec）
 7. SSE 流式返回，图表/视频通过 iframe 预览
 
@@ -121,10 +121,14 @@ API Key 统一在项目根目录 `.env` 配置：
 ```bash
 DEEPSEEK_API_KEY=sk-xxx
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+DEEPSEEK_PRO_MODEL=deepseek-v4-pro
+DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
 GLM_API_KEY=xxx
 GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+GLM_EMBEDDING_MODEL=embedding-3
 MINIMAX_API_KEY=xxx
 MINIMAX_BASE_URL=https://api.minimaxi.com/v1
+MINIMAX_IMAGE_MODEL=image-01
 ```
 
 CHROMA_URL 和 CHROMA_AUTO_START 有默认值，无需配置。
@@ -201,6 +205,11 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 skills/
 ├── greet/                       # 问候技能
 │   └── SKILL.md
+├── image-styles/                # 图片风格库（73 种风格）
+│   ├── SKILL.md
+│   └── styles/
+└── xiaohongshu-note/            # 小红书笔记
+    └── SKILL.md
 ```
 ```
 
@@ -247,6 +256,8 @@ ai-engineer-journey/
 │   │   │       ├── page.tsx
 │   │   │       ├── api/chat/route.ts
 │   │   │       ├── api/admin/chroma/route.ts
+│   │   │       ├── api/note/[taskId]/status/route.ts
+│   │   │       ├── note/[taskId]/page.tsx
 │   │   │       └── preview/[taskId]/route.ts
 │   │   ├── scripts/
 │   │   ├── data/chroma/
@@ -255,6 +266,8 @@ ai-engineer-journey/
 │       ├── package.json
 │       ├── index.js             # 统一入口
 │       ├── lib/env.js           # 统一 dotenv 加载
+│       ├── lib/chroma.js        # 共享 Chroma 搜索
+│       ├── lib/minimax.js       # 共享 MiniMax 图片生成
 │       ├── templates/
 │       │   ├── animation.html   # 动画骨架模板
 │       │   ├── default.md       # Neo-Brutalist 风格描述
@@ -267,6 +280,9 @@ ai-engineer-journey/
 │           ├── file/index.js      # 10 tools
 │           ├── chroma/index.js    # 5 tools
 │           ├── fetch/index.js     # 2 tools
+│           ├── xiaohongshu/      # 4 tools（小红书笔记）
+│           │   ├── index.js
+│           │   └── templates/
 │           └── media/             # 7 tools
 │               ├── image.js     # 图片生成
 │               ├── video.js     # 视频/语音

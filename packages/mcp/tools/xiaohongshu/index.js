@@ -452,16 +452,7 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封�
         const mdPath = path.join(exportDir, "note.md");
         fs.writeFileSync(mdPath, mdContent, "utf-8");
 
-        const excerptPath = path.join(exportDir, "excerpt.md");
-        const excerptContent = [
-          `# ${state.title}`,
-          state.excerpt ? `> ${state.excerpt}` : "",
-          "",
-          ...(state.tags || []).map((t) => `\`${t}\``),
-        ].filter(Boolean).join("\n");
-        fs.writeFileSync(excerptPath, excerptContent, "utf-8");
-
-        console.log(`${TAG} export: taskId=${taskId} dir="${exportDir}" html=${(fs.statSync(htmlPath).size / 1024).toFixed(1)}KB md=${(fs.statSync(mdPath).size / 1024).toFixed(1)}KB excerpt=${(fs.statSync(excerptPath).size / 1024).toFixed(1)}KB images=${imgCount}`);
+        console.log(`${TAG} export: taskId=${taskId} dir="${exportDir}" html=${(fs.statSync(htmlPath).size / 1024).toFixed(1)}KB md=${(fs.statSync(mdPath).size / 1024).toFixed(1)}KB images=${imgCount}`);
 
         return {
           content: [{
@@ -469,7 +460,7 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封�
             text: JSON.stringify({
               ok: true,
               exportDir,
-              files: { html: htmlPath, md: mdPath, excerpt: excerptPath, images: imgCount },
+              files: { html: htmlPath, md: mdPath, images: imgCount },
               note: `笔记已导出到 ${exportDir}`,
             }, null, 2),
           }],

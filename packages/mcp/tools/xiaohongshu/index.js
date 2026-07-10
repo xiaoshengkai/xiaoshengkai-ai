@@ -9,6 +9,27 @@ const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
 const DEEPSEEK_BASE = "https://api.deepseek.com/v1";
 const MINIMAX_BASE = "https://api.minimax.chat/v1";
 
+const TEMPLATES = {
+  "知识分享": {
+    systemPrompt: `你是专业的小红书知识分享创作者。
+
+结构要求：
+- 开头用一个问题/痛点钩子吸引读者，引发好奇
+- 正文用大白话+生活例子解释概念，循序渐进，娓娓道来
+- 每讲完一个概念配一张活泼手绘插画
+- 结尾一句话总结今日分享内容，点睛收尾
+
+配图：活泼手绘插画风格（lively hand-drawn illustration style, warm colors, playful）
+封面：3:4竖版，突出主题关键词
+插画：1:1方形，配合正文概念做可视化`,
+    coverStyle: "lively hand-drawn illustration, warm colors, playful, 3:4 vertical",
+    illustrationStyle: "lively hand-drawn illustration, warm colors, playful, 1:1 square",
+  },
+  "好物推荐": { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
+  "经验复盘": { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
+  "观点讨论": { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
+};
+
 function writeTaskState(workDir, state) {
   fs.mkdirSync(workDir, { recursive: true });
   fs.writeFileSync(path.join(workDir, "task.json"), JSON.stringify(state, null, 2));
@@ -54,9 +75,34 @@ async function searchKnowledgeBase(query) {
   }
 }
 
-async function callLLM(prompt) {
+async function callLLM(prompt, style) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("未配置 DEEPSEEK_API_KEY");
+
+  const template = TEMPLATES[style];
+  if (!template || !template.systemPrompt) {
+    throw new Error(`「${style}」模板尚未实现，当前可用：${Object.keys(TEMPLATES).filter(k => TEMPLATES[k].systemPrompt !== "（待实现）").join("、")}`);
+  }
+
+  const systemContent = `${template.systemPrompt}
+
+返回严格的 JSON 格式（不要包含 markdown 代码块标记）：
+{
+  "title": "笔记标题（10-20字，吸引人）",
+  "content": ["段落1", "[插图-1]", "段落2", "[插图-2]", "段落3"],
+  "tags": ["#标签1", "#标签2", "#标签3"],
+  "coverPrompt": "封面图英文 prompt",
+  "illustrationPrompts": ["插画1英文prompt", "插画2英文prompt"]
+}
+
+规则：
+- 正文3-5段，每段2-4句，中文
+- 插画数量根据内容决定（1-3张），穿插在段落之间
+- content 数组用 "[插图-N]" 标记插画位置
+- 封面 prompt 要求：${template.coverStyle}
+- 插画 prompt 要求：${template.illustrationStyle}
+- 所有 prompt 用英文，描述具体画面内容
+- 涉及具体数据或关键信息要准确，不要编造`;
 
   const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
     method: "POST",
@@ -67,27 +113,7 @@ async function callLLM(prompt) {
     body: JSON.stringify({
       model: "deepseek-chat",
       messages: [
-        {
-          role: "system",
-          content: `你是专业的小红书内容创作者。根据用户提供的主题和知识素材，生成一篇小红书笔记。
-
-返回严格的 JSON 格式（不要包含 markdown 代码块标记）：
-{
-  "title": "笔记标题（10-20字，吸引人）",
-  "content": ["段落1", "[插图-1]", "段落2", "[插图-2]", "段落3"],
-  "tags": ["#标签1", "#标签2", "#标签3"],
-  "coverPrompt": "封面图英文 prompt，插画风格，3:4竖版，突出主题，色彩温暖",
-  "illustrationPrompts": ["插画1英文prompt，1:1方形，插画风格", "插画2英文prompt"]
-}
-
-规则：
-- 正文3-5段，每段2-4句，中文
-- 插画数量根据内容决定（1-3张），穿插在段落之间
-- content 数组用 "[插图-N]" 标记插画位置
-- 封面和插画都用插画风格（illustration style），封面更突出主题，插画更轻量
-- 所有 prompt 用英文，描述具体画面内容
-- 涉及具体数据或关键信息要准确，不要编造`
-        },
+        { role: "system", content: systemContent },
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
@@ -173,20 +199,26 @@ async function generateAllImages(taskId, workDir, images) {
 export function register(server) {
   server.tool(
     "generateXiaohongshuNote",
-    "根据主题生成小红书笔记（含封面、插画、标签）。自动检索记忆库补充内容，异步生成所有配图。返回 taskId 后用 checkXiaohongshuNoteProgress 查询进度。",
+    "根据主题和模板生成小红书笔记（含封面、插画、标签）。自动检索记忆库补充内容，异步生成所有配图。返回 taskId 后用 checkXiaohongshuNoteProgress 查询进度。",
     {
       topic: z.string().min(1).max(200).describe("笔记主题，从对话中提取，如 'React 性能优化技巧'"),
+      style: z.enum(["知识分享", "好物推荐", "经验复盘", "观点讨论"]).optional().default("知识分享").describe("笔记模板。LLM 根据对话内容自动推断，用户也可手动指定。目前仅「知识分享」完整实现"),
     },
-    async ({ topic }) => {
+    async ({ topic, style }) => {
       try {
         const deepseekKey = process.env.DEEPSEEK_API_KEY;
         const minimaxKey = process.env.MINIMAX_API_KEY;
         if (!deepseekKey) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
         if (!minimaxKey) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
 
+        const template = TEMPLATES[style];
+        if (!template || template.systemPrompt === "（待实现）") {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `「${style}」模板尚未实现，当前可用：${Object.keys(TEMPLATES).filter(k => TEMPLATES[k].systemPrompt !== "（待实现）").join("、")}` }) }] };
+        }
+
         const knowledge = await searchKnowledgeBase(topic);
         const prompt = `主题：${topic}\n\n相关知识：${knowledge || "无"}`;
-        const noteData = await callLLM(prompt);
+        const noteData = await callLLM(prompt, style);
 
         const taskId = crypto.randomUUID().slice(0, 8);
         const workDir = path.join(TASK_DIR, taskId);
@@ -206,6 +238,7 @@ export function register(server) {
           taskId,
           status: "generating",
           topic,
+          style,
           title: noteData.title,
           content: noteData.content,
           tags: noteData.tags,

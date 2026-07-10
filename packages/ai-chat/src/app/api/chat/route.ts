@@ -43,7 +43,8 @@ const TOOLS_PROMPT = `
 
 - 小红书笔记: generateXiaohongshuNote → checkXiaohongshuNoteProgress | updateXiaohongshuNote | exportXiaohongshuNote
   用户说"生成笔记"、"整理成小红书"、"导出笔记"时调用
-  generateXiaohongshuNote 返回 taskId → checkXiaohongshuNoteProgress(taskId, interval=3) 轮询等 ready
+  generateXiaohongshuNote({ topic, style }) 返回 taskId → checkXiaohongshuNoteProgress(taskId, interval=3) 轮询等 ready
+  style 可选: 知识分享/好物推荐/经验复盘/观点讨论，默认自动推断，目前仅「知识分享」完整实现
   修改笔记用 updateXiaohongshuNote({ taskId, field, value })，field 取值: title/content/tags/image_N
   导出用 exportXiaohongshuNote({ taskId })
 

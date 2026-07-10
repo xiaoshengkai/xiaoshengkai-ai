@@ -1,0 +1,25 @@
+{
+  "name": "mcp",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "统一 MCP 服务器 - 时间/文件/知识库/多模态生成",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.48",
+    "@chroma-core/default-embed": "^0.1.7",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ai": "^6.0.198",
+    "axios": "^1.18.0",
+    "cheerio": "^1.2.0",
+    "chromadb": "^3.4.3",
+    "dotenv": "^16.4.7",
+    "gsap": "^3.15.0",
+    "hyperframes": "0.7.26",
+    "puppeteer": "^25.3.0",
+    "zod": "^4.4.3"
+  }
+}

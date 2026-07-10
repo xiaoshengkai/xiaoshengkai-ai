@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
-import { ChromaClient } from "chromadb";
-import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { embed } from "ai";
+import { embedText, getCollection, searchCollection, listChatCollections } from "../../lib/chroma.js";
 
 const SHARED_DB = process.env.CHROMA_SHARED_DB || "shared";
 const CHAT_DB = process.env.CHROMA_CHAT_DB || "chat";
@@ -12,99 +9,8 @@ const CODE_DB = process.env.CHROMA_CODE_DB || "code";
 const SHARED_COLLECTION = "base_knowledge";
 const CHAT_COLLECTION = "chat_knowledge";
 
-const CHROMA_URL = process.env.CHROMA_URL || "http://localhost:8000";
 const SOFT_DELETE_WINDOW_MS = parseInt(process.env.SOFT_DELETE_WINDOW_MS || "3000", 10);
 const TOP_K_DEFAULT = 3;
-const DISTANCE_FUNCTION = "cosine";
-const EMBEDDING_MODEL = "embedding-3";
-const EMBED_MAX_RETRIES = 3;
-const GLM_BASE_URL = process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
-
-const embeddingFunction = new DefaultEmbeddingFunction();
-
-const glm = createOpenAICompatible({
-  name: "glm",
-  baseURL: GLM_BASE_URL,
-  apiKey: process.env.GLM_API_KEY,
-});
-
-// ─── 多库客户端缓存 ──────────────────────────────────────────────────
-
-const clientCache = new Map();
-const collectionCache = new Map();
-// chat 库 collection 列表缓存（60s），用于 searchKnowledge 默认搜索所有表
-let chatCollectionsCache = { data: null, ts: 0 };
-
-async function listChatCollections() {
-  if (chatCollectionsCache.data && Date.now() - chatCollectionsCache.ts < 60000) {
-    console.error(`[chroma:listChatCollections] cached, count=${chatCollectionsCache.data.length}`);
-    return chatCollectionsCache.data;
-  }
-  const client = getChromaClient(CHAT_DB);
-  const cols = await client.listCollections();
-  chatCollectionsCache.data = (cols || []).map(c => c.name);
-  chatCollectionsCache.ts = Date.now();
-  console.error(`[chroma:listChatCollections] fetched, collections=${JSON.stringify(chatCollectionsCache.data)}`);
-  return chatCollectionsCache.data;
-}
-
-function getChromaClient(database = SHARED_DB) {
-  if (!clientCache.has(database)) {
-    clientCache.set(database, new ChromaClient({
-      host: "localhost", port: 8000, ssl: false,
-      database,
-    }));
-  }
-  return clientCache.get(database);
-}
-
-async function getCollection(database = SHARED_DB, collectionName = SHARED_COLLECTION) {
-  const key = `${database}:${collectionName}`;
-  console.error(`[chroma:mcp:getCollection] db=${database} col=${collectionName} cached=${collectionCache.has(key)}`);
-  if (collectionCache.has(key)) return collectionCache.get(key);
-  const client = getChromaClient(database);
-  const col = await client.getOrCreateCollection({
-    name: collectionName,
-    metadata: { "hnsw:space": DISTANCE_FUNCTION },
-    embeddingFunction,
-  });
-  collectionCache.set(key, col);
-  return col;
-}
-
-async function embedText(text) {
-  let lastErr;
-  for (let attempt = 1; attempt <= EMBED_MAX_RETRIES; attempt++) {
-    try {
-      const { embedding } = await embed({
-        model: glm.embeddingModel(EMBEDDING_MODEL),
-        value: text,
-      });
-      return embedding;
-    } catch (err) {
-      lastErr = err;
-      const waitMs = 1000 * Math.pow(2, attempt - 1);
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-  }
-  throw new Error(`智谱 embedding 调用失败(已重试 ${EMBED_MAX_RETRIES} 次): ${lastErr?.message}`);
-}
-
-async function searchCollection(queryVec, database, collectionName, nResults) {
-  const col = await getCollection(database, collectionName);
-  const res = await col.query({
-    queryEmbeddings: [queryVec],
-    nResults,
-    where: { deleted: { $ne: true } },
-  });
-  const documents = res.documents?.[0] ?? [];
-  const distances = res.distances?.[0] ?? [];
-  const ids = res.ids?.[0] ?? [];
-  console.error(`[chroma:searchCollection] db=${database} col=${collectionName} results=${documents.length} maxSimilarity=${documents.length > 0 ? (1 - (distances[0] ?? 0)).toFixed(3) : "N/A"}`);
-  return documents.map((content, i) => ({
-    id: ids[i], content, similarity: 1 - (distances[i] ?? 0), database, collection: collectionName,
-  }));
-}
 
 // ponytail: basename(process.cwd()) 在子目录启动时会取到子目录名而非项目名，后续优化为向上查找 .git/package.json 定位项目根
 function defaultCollection(db) {

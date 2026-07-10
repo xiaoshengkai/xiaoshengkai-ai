@@ -3,19 +3,22 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import { ChromaClient } from "chromadb";
+import { searchChroma } from "../../lib/chroma.js";
+import { generateImage } from "../../lib/minimax.js";
+import { sleep } from "../media/utils.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
 const DEEPSEEK_BASE = "https://api.deepseek.com/v1";
-const MINIMAX_BASE = "https://api.minimax.chat/v1";
 
 const TEMPLATES = {
   "知识分享": {
+    maxTokens: 4000,
     systemPrompt: `你是专业的小红书知识分享创作者。
 
 结构要求：
 - 开头用一个问题/痛点钩子吸引读者，引发好奇
 - 正文用大白话+生活例子解释概念，循序渐进，娓娓道来
+- 每个知识点充分展开，详实不啰嗦
 - 每讲完一个概念配一张活泼手绘插画
 - 结尾一句话总结今日分享内容，点睛收尾
 
@@ -43,38 +46,6 @@ function updateTask(workDir, update) {
   fs.writeFileSync(taskFile, JSON.stringify(state, null, 2));
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-async function searchKnowledgeBase(query) {
-  try {
-    const client = new ChromaClient({ path: "http://localhost:8000" });
-    const results = [];
-
-    const collections = [
-      { name: "chat_knowledge", db: "chat" },
-      { name: "base_knowledge", db: "shared" },
-    ];
-
-    for (const { name } of collections) {
-      try {
-        const col = await client.getCollection({ name });
-        const r = await col.query({ queryTexts: [query], nResults: 5 });
-        const docs = r.documents?.[0] || [];
-        results.push(...docs);
-      } catch {
-        // collection may not exist
-      }
-    }
-
-    return results.slice(0, 8).join("\n\n");
-  } catch (err) {
-    console.error("[xhs] searchKnowledgeBase error:", err.message);
-    return "";
-  }
-}
-
 async function callLLM(prompt, style) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("未配置 DEEPSEEK_API_KEY");
@@ -96,8 +67,8 @@ async function callLLM(prompt, style) {
 }
 
 规则：
-- 正文3-5段，每段2-4句，中文
-- 插画数量根据内容决定（1-3张），穿插在段落之间
+- 正文5-8段，每段3-6句，中文
+- 插画3-5张，穿插在段落之间，长内容多配图降低阅读压力
 - content 数组用 "[插图-N]" 标记插画位置
 - 封面 prompt 要求：${template.coverStyle}
 - 插画 prompt 要求：${template.illustrationStyle}
@@ -117,7 +88,7 @@ async function callLLM(prompt, style) {
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: template.maxTokens || 2000,
     }),
   });
 
@@ -131,53 +102,13 @@ async function callLLM(prompt, style) {
   }
 }
 
-async function generateImageAsync(taskId, imageIndex, prompt, aspectRatio) {
-  try {
-    const apiKey = process.env.MINIMAX_API_KEY;
-    if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
-
-    const res = await fetch(`${MINIMAX_BASE}/image_generation`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "image-01",
-        prompt,
-        aspect_ratio: aspectRatio,
-        n: 1,
-        prompt_optimizer: true,
-        response_format: "url",
-      }),
-    });
-
-    const result = await res.json();
-    if (result.base_resp?.status_code !== 0) {
-      throw new Error(result.base_resp?.status_msg || "图片生成失败");
-    }
-
-    const url = result.data?.image_urls?.[0];
-    if (!url) throw new Error("未获取到图片 URL");
-
-    return url;
-  } catch (err) {
-    throw new Error(`图片 ${imageIndex} 生成失败: ${err.message}`);
-  }
-}
-
 async function generateAllImages(taskId, workDir, images) {
   const state = JSON.parse(fs.readFileSync(path.join(workDir, "task.json"), "utf-8"));
 
   for (const img of images) {
     try {
-      updateTask(workDir, {
-        [`images.${img.index}.status`]: null,
-        [`images.${img.index}.url`]: null,
-      });
-      // ponytail: 就地更新单个 image 状态，task.json 结构简单够用
       const aspectRatio = img.type === "cover" ? "3:4" : "1:1";
-      const url = await generateImageAsync(taskId, img.index, img.prompt, aspectRatio);
+      const url = await generateImage(img.prompt, { aspectRatio });
 
       state.images[img.index].url = url;
       state.images[img.index].status = "done";
@@ -216,7 +147,7 @@ export function register(server) {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `「${style}」模板尚未实现，当前可用：${Object.keys(TEMPLATES).filter(k => TEMPLATES[k].systemPrompt !== "（待实现）").join("、")}` }) }] };
         }
 
-        const knowledge = await searchKnowledgeBase(topic);
+        const knowledge = await searchChroma(topic);
         const prompt = `主题：${topic}\n\n相关知识：${knowledge || "无"}`;
         const noteData = await callLLM(prompt, style);
 

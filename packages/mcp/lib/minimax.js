@@ -1,6 +1,7 @@
 const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
+const MINIMAX_IMAGE_MODEL = process.env.MINIMAX_IMAGE_MODEL || "image-01";
 
-export async function generateImage(prompt, { aspectRatio = "1:1", model = "image-01" } = {}) {
+export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIMAX_IMAGE_MODEL } = {}) {
   const apiKey = process.env.MINIMAX_API_KEY;
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 

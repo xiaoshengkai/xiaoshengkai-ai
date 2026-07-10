@@ -35,7 +35,7 @@ Examples:
 export async function classifyTask(query: string): Promise<ClassifyResult> {
   try {
     const { text, finishReason, usage } = await generateText({
-      model: deepseek("deepseek-v4-flash"),
+      model: deepseek(process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash"),
       maxOutputTokens: 200,
       prompt: `${CLASSIFY_INSTRUCTIONS}
 

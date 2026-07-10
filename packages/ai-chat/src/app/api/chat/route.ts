@@ -43,7 +43,8 @@ const TOOLS_PROMPT = `
 
 - 小红书笔记: generateXiaohongshuNote → checkXiaohongshuNoteProgress | updateXiaohongshuNote | exportXiaohongshuNote
   用户说"生成笔记"、"整理成小红书"、"导出笔记"时调用
-  generateXiaohongshuNote({ topic, style }) 返回 taskId → checkXiaohongshuNoteProgress(taskId, interval=3) 轮询等 ready
+  generateXiaohongshuNote({ topic, context, style }) 返回 taskId → checkXiaohongshuNoteProgress(taskId, interval=3) 轮询等 ready
+  topic 从对话中提取主题，context 提取当前对话的关键讨论内容（必传，确保笔记内容包含对话信息）
   style 可选: 知识分享/好物推荐/经验复盘/观点讨论，默认自动推断，目前仅「知识分享」完整实现
   修改笔记用 updateXiaohongshuNote({ taskId, field, value })，field 取值: title/content/tags/image_N
   导出用 exportXiaohongshuNote({ taskId })
@@ -238,12 +239,12 @@ export async function POST(req: Request) {
     const modelMessages = await convertToModelMessages(cleanMessages);
 
     console.log("用户查询:", userQuery);
-    console.log(`[router] 模型: ${tier === "pro" ? "deepseek-v4-pro" : "deepseek-v4-flash"}`);
+    console.log(`[router] 模型: ${tier === "pro" ? (process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro") : (process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash")}`);
     console.log("检索到的知识片段:", retrieved.map(r => `[${r.index}] ${r.content.slice(0, 50)}...`));
     console.log("可用工具:", Object.keys(tools));
 console.log("[system] SKILL_LIST in prompt:", SKILL_LIST ? "有内容" : "空");
 
-    const modelName = tier === "pro" ? "deepseek-v4-pro" : "deepseek-v4-flash";
+    const modelName = tier === "pro" ? (process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro") : (process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash");
 
     const result = streamText({
       tools: tools as unknown as Parameters<typeof streamText>[0]["tools"],

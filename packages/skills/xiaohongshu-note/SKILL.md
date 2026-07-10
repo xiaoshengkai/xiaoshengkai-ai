@@ -10,8 +10,9 @@ description: 小红书笔记自动生成技能，将当前对话内容+记忆库
 
 ## 使用流程
 
-1. 用户说"生成小红书笔记"、"整理成笔记"、"导出笔记"等 → 先调用 generateXiaohongshuNote({ topic, style }) 生成笔记
+1. 用户说"生成小红书笔记"、"整理成笔记"、"导出笔记"等 → 先调用 generateXiaohongshuNote({ topic, context, style }) 生成笔记
    - topic 从当前对话中提取，概括主题
+   - context 从当前对话中提取关键讨论内容（必传，确保笔记内容包含对话信息）
    - style 根据对话内容自动推断，用户也可手动指定模板
 2. 用 checkXiaohongshuNoteProgress(taskId, interval=3) 轮询进度，等 status=ready
 3. 笔记就绪后展示预览

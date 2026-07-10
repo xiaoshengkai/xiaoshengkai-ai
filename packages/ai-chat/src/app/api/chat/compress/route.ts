@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     console.log(`[compress] ${messages.length} messages, prevSummary: ${previousSummary ? previousSummary.length + " chars" : "none"}`);
 
     const { text, usage } = await generateText({
-      model: deepseek("deepseek-v4-pro"),
+      model: deepseek(process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro"),
       prompt: `${COMPRESS_PROMPT}\n\n${fullContext}`,
     });
 

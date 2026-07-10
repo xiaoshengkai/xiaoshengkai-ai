@@ -8,7 +8,8 @@ import { generateImage } from "../../lib/minimax.js";
 import { sleep } from "../media/utils.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
-const DEEPSEEK_BASE = "https://api.deepseek.com/v1";
+const DEEPSEEK_BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro";
 
 const TEMPLATES = {
   "知识分享": {
@@ -82,7 +83,7 @@ async function callLLM(prompt, style) {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: DEEPSEEK_MODEL,
       messages: [
         { role: "system", content: systemContent },
         { role: "user", content: prompt },
@@ -133,9 +134,10 @@ export function register(server) {
     "根据主题和模板生成小红书笔记（含封面、插画、标签）。自动检索记忆库补充内容，异步生成所有配图。返回 taskId 后用 checkXiaohongshuNoteProgress 查询进度。",
     {
       topic: z.string().min(1).max(200).describe("笔记主题，从对话中提取，如 'React 性能优化技巧'"),
+      context: z.string().optional().describe("对话内容摘要，提取当前对话中涉及的关键讨论内容、关键结论等"),
       style: z.enum(["知识分享", "好物推荐", "经验复盘", "观点讨论"]).optional().default("知识分享").describe("笔记模板。LLM 根据对话内容自动推断，用户也可手动指定。目前仅「知识分享」完整实现"),
     },
-    async ({ topic, style }) => {
+    async ({ topic, context, style }) => {
       try {
         const deepseekKey = process.env.DEEPSEEK_API_KEY;
         const minimaxKey = process.env.MINIMAX_API_KEY;
@@ -148,7 +150,7 @@ export function register(server) {
         }
 
         const knowledge = await searchChroma(topic);
-        const prompt = `主题：${topic}\n\n相关知识：${knowledge || "无"}`;
+        const prompt = `主题：${topic}\n${context ? `对话内容：${context}\n` : ""}相关知识：${knowledge || "无"}`;
         const noteData = await callLLM(prompt, style);
 
         const taskId = crypto.randomUUID().slice(0, 8);
@@ -233,7 +235,7 @@ export function register(server) {
           try {
             state.content = JSON.parse(value);
           } catch {
-            state.content = value;
+            return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "content 必须是 JSON 数组字符串，如 [\"段落1\",\"[插图-1]\",\"段落2\"]" }) }] };
           }
           writeTaskState(workDir, state);
         } else if (field === "tags") {

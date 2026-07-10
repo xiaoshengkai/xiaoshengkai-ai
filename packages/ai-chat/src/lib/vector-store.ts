@@ -513,7 +513,7 @@ export async function compactCollection(
       }).join("\n\n");
 
       const { text } = await generateText({
-        model: deepseek("deepseek-v4-flash"),
+        model: deepseek(process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash"),
         maxOutputTokens: 200,
         prompt: `分析以下知识条目，标记需要删除的。删除条件：无意义（太短、无信息量）、纯英文、碎片化、格式错误。返回 JSON：{"remove": ["id1", "id2"]}
 

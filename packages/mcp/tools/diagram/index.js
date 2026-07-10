@@ -27,6 +27,7 @@ console.log(`${TAG} Chrome 路径: ${CHROME_PATH || "未找到"}`);
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash";
 const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
 
@@ -185,7 +186,7 @@ async function generateCode(prompt, opts) {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEEPSEEK_API_KEY}` },
     body: JSON.stringify({
-      model: "deepseek-v4-flash",
+      model: DEEPSEEK_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },

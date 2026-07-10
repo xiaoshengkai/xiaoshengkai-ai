@@ -8,7 +8,7 @@ const CHAT_DB = "chat";
 const SHARED_COLLECTION = "base_knowledge";
 const CHAT_COLLECTION = "chat_knowledge";
 const DISTANCE_FUNCTION = "cosine";
-const EMBEDDING_MODEL = "embedding-3";
+const EMBEDDING_MODEL = process.env.GLM_EMBEDDING_MODEL || "embedding-3";
 const EMBED_MAX_RETRIES = 3;
 const GLM_BASE_URL = process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
 

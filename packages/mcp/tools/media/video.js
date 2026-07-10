@@ -11,6 +11,7 @@ import { createTTSTask, pollTTSTask, generateBGM, getAudioDuration } from "./aud
 import { downloadSubtitles, renderSubtitles } from "./html-builder.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash";
 
 const ROOT_DIR = path.resolve(path.dirname(path.dirname(new URL(import.meta.url).pathname)), "..", "..", "..");
 const GSAP_GSAP = path.join(ROOT_DIR, "node_modules", "gsap", "dist", "gsap.min.js");
@@ -225,7 +226,7 @@ ${styleMD}
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEEPSEEK_API_KEY}` },
     body: JSON.stringify({
-      model: "deepseek-v4-flash",
+      model: DEEPSEEK_MODEL,
       messages: [
         { role: "system", content: SCRIPT_SYSTEM_PROMPT },
         { role: "user", content: userContent },

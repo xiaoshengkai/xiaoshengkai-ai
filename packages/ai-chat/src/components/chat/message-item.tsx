@@ -12,6 +12,7 @@ import { BookmarkPlus, Check, X, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import TooltipIcon from "@/components/ui/tooltip-icon";
 import { useMarkdownComponents } from "@/components/chat/markdown-components";
+import NotePreviewCard from "@/components/chat/note-preview-card";
 
 export default function MessageItem({
   msg,
@@ -153,7 +154,16 @@ toast.error("保存失败，请重试", {
                   );
                 }
                 if (part.type && isToolUIPart(part)) {
-                  return <span key={i} className="text-xs text-muted-foreground/50">[{(part as { toolName: string }).toolName}]</span>;
+                  const toolPart = part as { toolName: string; state: string; output: string };
+                  if (toolPart.toolName === "generateXiaohongshuNote" && toolPart.state === "result") {
+                    try {
+                      const output = JSON.parse(toolPart.output);
+                      if (output?.ok && output?.taskId) {
+                        return <NotePreviewCard key={i} taskId={output.taskId} />;
+                      }
+                    } catch { /* fall through to tool label */ }
+                  }
+                  return <span key={i} className="text-xs text-muted-foreground/50">[{toolPart.toolName}]</span>;
                 }
                 return null;
               })}

@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const SKILLS_DIR = path.resolve(SCRIPT_DIR, "../../skills");
+const SKILLS_DIR = path.resolve(SCRIPT_DIR, "../../../skills");
 
 function parseFrontmatter(content) {
   const match = content.match(/^---\n([\s\S]*?)\n---/);

@@ -52,6 +52,16 @@ function updateTask(workDir, update) {
   fs.writeFileSync(taskFile, JSON.stringify(state, null, 2));
 }
 
+function parseJSON(text) {
+  let cleaned = text.replace(/```\w*\n?|\n?```/g, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    cleaned = cleaned.slice(start, end + 1);
+  }
+  return JSON.parse(cleaned);
+}
+
 async function callLLM(prompt, style, subcategory) {
   const category = TEMPLATES[style];
   if (!category) throw new Error(`未知模板: ${style}`);
@@ -105,11 +115,10 @@ async function callLLM(prompt, style, subcategory) {
 
   let noteData;
   try {
-    noteData = JSON.parse(text);
-  } catch {
+    noteData = parseJSON(text);
+  } catch (err) {
     console.error(`${TAG} callLLM: JSON 解析失败，原始内容(${text.length}字):\n${text.slice(0, 500)}`);
-    const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
-    noteData = JSON.parse(cleaned);
+    throw err;
   }
 
   console.log(`${TAG} callLLM: 耗时=${elapsed}s tokens=${usage.totalTokens} title="${noteData.title}" excerpt="${noteData.excerpt}" 段落=${noteData.content?.length} 插画=${noteData.illustrationPrompts?.length} 标签=${noteData.tags?.length}`);

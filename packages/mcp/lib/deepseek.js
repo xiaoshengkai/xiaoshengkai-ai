@@ -1,6 +1,6 @@
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
 
-export async function callDeepSeekLLM({ system, user, model, temperature = 0.7, maxTokens = 2000 }) {
+export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000 }) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("未配置 DEEPSEEK_API_KEY");
 
@@ -24,6 +24,6 @@ export async function callDeepSeekLLM({ system, user, model, temperature = 0.7, 
   const data = await res.json();
   return {
     text: data.choices?.[0]?.message?.content || "",
-    usage: data.usage || {},
+    usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },
   };
 }

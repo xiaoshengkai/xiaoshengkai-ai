@@ -5,7 +5,7 @@ import os from "node:os";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import puppeteer from "puppeteer";
-import { callDeepSeekLLM } from "../../lib/deepseek.js";
+import { callLLM } from "../../lib/llm.js";
 
 const TAG = "[diagram]";
 
@@ -182,7 +182,7 @@ async function generateCode(prompt, opts) {
   const systemPrompt = buildSystemPrompt(theme, audience, engine, diagramType);
   const tStart = Date.now();
 
-  const { text: content } = await callDeepSeekLLM({
+  const { text: content } = await callLLM({
     system: systemPrompt,
     user: prompt,
     model: DEEPSEEK_MODEL,

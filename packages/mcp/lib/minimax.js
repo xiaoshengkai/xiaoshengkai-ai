@@ -1,5 +1,34 @@
 const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
 const MINIMAX_IMAGE_MODEL = process.env.MINIMAX_IMAGE_MODEL || "image-01";
+const MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M3";
+
+export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000 }) {
+  const apiKey = process.env.MINIMAX_API_KEY;
+  if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
+
+  const res = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: model || MINIMAX_CHAT_MODEL,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  });
+
+  const data = await res.json();
+  return {
+    text: data.choices?.[0]?.message?.content || "",
+    usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },
+  };
+}
 
 export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIMAX_IMAGE_MODEL } = {}) {
   const apiKey = process.env.MINIMAX_API_KEY;

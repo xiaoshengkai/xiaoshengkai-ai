@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { generateImage } from "../../lib/minimax.js";
-import { callDeepSeekLLM } from "../../lib/deepseek.js";
+import { callLLM as callProviderLLM } from "../../lib/llm.js";
 import { sleep } from "../media/utils.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
@@ -94,7 +94,7 @@ async function callLLM(prompt, style, subcategory) {
 - 涉及具体数据或关键信息要准确，不要编造`;
 
   const tStart = Date.now();
-  const { text, usage } = await callDeepSeekLLM({
+  const { text, usage } = await callProviderLLM({
     system: systemContent,
     user: prompt,
     model: DEEPSEEK_MODEL,

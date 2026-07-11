@@ -9,7 +9,7 @@ import { execSync, exec } from "node:child_process";
 import { loadStyleMD, loadAnimationTemplate, sleep, escHtml } from "./utils.js";
 import { createTTSTask, pollTTSTask, generateBGM, getAudioDuration } from "./audio.js";
 import { downloadSubtitles, renderSubtitles } from "./html-builder.js";
-import { callDeepSeekLLM } from "../../lib/deepseek.js";
+import { callLLM } from "../../lib/llm.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash";
@@ -222,7 +222,7 @@ ${styleMD}
 
   const userContent = [style && `风格: ${style}`, duration && `目标时长: ${duration}秒`, `内容: ${prompt}`].filter(Boolean).join("\n");
 
-  const { text: rawContent } = await callDeepSeekLLM({
+  const { text: rawContent } = await callLLM({
     system: SCRIPT_SYSTEM_PROMPT,
     user: userContent,
     model: DEEPSEEK_MODEL,

@@ -430,8 +430,7 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封�
             return seg + "\n";
           }),
           "",
-          "---",
-          "> 由小盛开AI自动生成",
+          "",
         ].join("\n");
 
         const mdPath = path.join(exportDir, "note.md");

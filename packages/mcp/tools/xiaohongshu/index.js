@@ -107,6 +107,7 @@ async function callLLM(prompt, style, subcategory) {
   try {
     noteData = JSON.parse(text);
   } catch {
+    console.error(`${TAG} callLLM: JSON 解析失败，原始内容(${text.length}字):\n${text.slice(0, 500)}`);
     const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
     noteData = JSON.parse(cleaned);
   }

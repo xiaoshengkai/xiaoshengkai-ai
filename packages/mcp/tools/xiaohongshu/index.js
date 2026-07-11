@@ -22,13 +22,13 @@ function loadTemplate(name) {
 const TEMPLATES = {
   knowledge: {
     finance: {
-      maxTokens: 4000,
+      maxTokens: 8000,
       systemPrompt: loadTemplate("knowledge/finance"),
       coverStyle: "lively hand-drawn illustration, warm gold and navy blue palette, 3:4 vertical",
       illustrationStyle: "lively hand-drawn illustration, warm gold and navy blue palette, 1:1 square",
     },
     _default: {
-      maxTokens: 4000,
+      maxTokens: 8000,
       systemPrompt: loadTemplate("knowledge"),
       coverStyle: "lively hand-drawn illustration, warm colors, playful, 3:4 vertical",
       illustrationStyle: "lively hand-drawn illustration, warm colors, playful, 1:1 square",

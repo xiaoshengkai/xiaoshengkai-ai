@@ -14,6 +14,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
     },
     body: JSON.stringify({
       model: model || MINIMAX_CHAT_MODEL,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },

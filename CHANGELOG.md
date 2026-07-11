@@ -14,16 +14,24 @@
 - **LLM Provider 路由**：`lib/llm.js` 统一入口，根据 `MCP_LLM_PROVIDER` 环境变量切换 deepseek/minimax
 - **`lib/minimax.js` 扩展**：新增 `callLLM`（MiniMax 文字生成），与 `generateImage`（图片生成）共存
 - **usage 字段统一**：`totalTokens` → `{ totalTokens }` 标准化，兼容 DeepSeek 和 MiniMax 差异
+- **调用方模型参数清理**：删除 xiaohongshu/diagram/video 中的 `DEEPSEEK_MODEL` 常量和 `model` 参数，由 provider 自行决定默认模型
+
+### 修复
+- **loadSkill 路径 bug**：`skill/index.js` SKILLS_DIR `../../skills` → `../../../skills`，修复后 loadSkill 能正确加载 skill 内容
+- **MiniMax JSON 解析**：`response_format: { type: "json_object" }` + `reasoning_split: true`，MiniMax 正确返回纯 JSON
+- **HTTP 错误处理**：`lib/deepseek.js` 和 `lib/minimax.js` 加 HTTP 状态码检查和错误日志
+- **JSON 解析增强**：`xiaohongshu/index.js` 新增 `parseJSON()` 函数，去 markdown 标记 + 提取 `{...}` 内容，兼容多模型
 
 ### 变更文件
 - `packages/mcp/lib/llm.js` — 新建（统一 LLM 路由）
-- `packages/mcp/lib/deepseek.js` — `callDeepSeekLLM` → `callLLM` + usage 统一
-- `packages/mcp/lib/minimax.js` — 新增 `callLLM`
-- `packages/mcp/tools/xiaohongshu/index.js` — 改用 lib/llm.js + maxTokens 8000 + MD 格式优化 + Token 精简
+- `packages/mcp/lib/deepseek.js` — `callDeepSeekLLM` → `callLLM` + usage 统一 + HTTP 检查 + `response_format`
+- `packages/mcp/lib/minimax.js` — 新增 `callLLM` + HTTP 检查 + `response_format` + `reasoning_split`
+- `packages/mcp/tools/xiaohongshu/index.js` — 改用 lib/llm.js + maxTokens 8000 + MD 格式优化 + Token 精简 + JSON 解析增强
 - `packages/mcp/tools/xiaohongshu/templates/knowledge.md` — Markdown 格式强制要求
 - `packages/mcp/tools/xiaohongshu/templates/knowledge/finance.md` — Markdown 格式强制要求
-- `packages/mcp/tools/diagram/index.js` — 改用 lib/deepseek.js callLLM
-- `packages/mcp/tools/media/video.js` — 改用 lib/deepseek.js callLLM
+- `packages/mcp/tools/diagram/index.js` — 改用 lib/llm.js + 删 DEEPSEEK_MODEL
+- `packages/mcp/tools/media/video.js` — 改用 lib/llm.js + 删 DEEPSEEK_MODEL
+- `packages/mcp/tools/skill/index.js` — SKILLS_DIR 路径修复
 - `packages/skills/xiaohongshu-note/SKILL.md` — 导出行为修正
 - `.env` / `.env.example` — 新增 `MCP_LLM_PROVIDER` / `MINIMAX_CHAT_MODEL`
 

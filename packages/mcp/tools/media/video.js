@@ -9,6 +9,7 @@ import { execSync, exec } from "node:child_process";
 import { loadStyleMD, loadAnimationTemplate, sleep, escHtml } from "./utils.js";
 import { createTTSTask, pollTTSTask, generateBGM, getAudioDuration } from "./audio.js";
 import { downloadSubtitles, renderSubtitles } from "./html-builder.js";
+import { callDeepSeekLLM } from "../../lib/deepseek.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash";
@@ -58,7 +59,6 @@ export function register(server) {
       const workDir = path.join(TASK_DIR, taskId);
       const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
       const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-      const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
 
       if (!MINIMAX_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
       if (!DEEPSEEK_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
@@ -70,7 +70,7 @@ export function register(server) {
         // 异步执行（不 await）
         startPreviewRender({
           taskId, workDir, prompt, style, template, duration, voice_id, bgm_volume, download, DOWNLOAD_DIR,
-          MINIMAX_API_KEY, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, width, height,
+          MINIMAX_API_KEY, width, height,
         }).catch(err => {
           console.error("[video] 预览生成失败:", err?.message || err);
           updateTask(workDir, { status: "failed", error: err.message });
@@ -163,7 +163,7 @@ export function register(server) {
 
 async function startPreviewRender(opts) {
   const { taskId, workDir, prompt, style, template, duration, voice_id, bgm_volume, download, DOWNLOAD_DIR,
-    MINIMAX_API_KEY, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, width, height } = opts;
+    MINIMAX_API_KEY, width, height } = opts;
   const timings = {};
   const tStart = Date.now();
 
@@ -222,22 +222,12 @@ ${styleMD}
 
   const userContent = [style && `风格: ${style}`, duration && `目标时长: ${duration}秒`, `内容: ${prompt}`].filter(Boolean).join("\n");
 
-  const scriptRes = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEEPSEEK_API_KEY}` },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages: [
-        { role: "system", content: SCRIPT_SYSTEM_PROMPT },
-        { role: "user", content: userContent },
-      ],
-      temperature: 0.7,
-    }),
+  const { text: rawContent } = await callDeepSeekLLM({
+    system: SCRIPT_SYSTEM_PROMPT,
+    user: userContent,
+    model: DEEPSEEK_MODEL,
   });
-  const scriptResult = await scriptRes.json();
-  if (!scriptRes.ok) throw new Error("脚本生成失败");
 
-  const rawContent = scriptResult.choices?.[0]?.message?.content?.trim() || "";
   const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("脚本解析失败");
   const script = JSON.parse(jsonMatch[0]);

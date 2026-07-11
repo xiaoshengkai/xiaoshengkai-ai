@@ -5,6 +5,7 @@ import os from "node:os";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import puppeteer from "puppeteer";
+import { callDeepSeekLLM } from "../../lib/deepseek.js";
 
 const TAG = "[diagram]";
 
@@ -25,7 +26,6 @@ const CHROME_PATH = (() => {
 console.log(`${TAG} Chrome 路径: ${CHROME_PATH || "未找到"}`);
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
-const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash";
 const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
@@ -182,23 +182,12 @@ async function generateCode(prompt, opts) {
   const systemPrompt = buildSystemPrompt(theme, audience, engine, diagramType);
   const tStart = Date.now();
 
-  const res = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEEPSEEK_API_KEY}` },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-    }),
+  const { text: content } = await callDeepSeekLLM({
+    system: systemPrompt,
+    user: prompt,
+    model: DEEPSEEK_MODEL,
   });
 
-  const result = await res.json();
-  if (!res.ok) throw new Error(`DeepSeek 调用失败: ${result.error?.message || res.status}`);
-
-  const content = result.choices?.[0]?.message?.content?.trim() || "";
   if (!content) throw new Error("DeepSeek 返回空内容");
 
   const diagrams = [];

@@ -6,10 +6,10 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { generateImage } from "../../lib/minimax.js";
+import { callDeepSeekLLM } from "../../lib/deepseek.js";
 import { sleep } from "../media/utils.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
-const DEEPSEEK_BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro";
 const TAG = "[xhs]";
 
@@ -53,9 +53,6 @@ function updateTask(workDir, update) {
 }
 
 async function callLLM(prompt, style, subcategory) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error("未配置 DEEPSEEK_API_KEY");
-
   const category = TEMPLATES[style];
   if (!category) throw new Error(`未知模板: ${style}`);
 
@@ -97,26 +94,13 @@ async function callLLM(prompt, style, subcategory) {
 - 涉及具体数据或关键信息要准确，不要编造`;
 
   const tStart = Date.now();
-  const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages: [
-        { role: "system", content: systemContent },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: template.maxTokens || 2000,
-    }),
+  const { text, usage } = await callDeepSeekLLM({
+    system: systemContent,
+    user: prompt,
+    model: DEEPSEEK_MODEL,
+    maxTokens: template.maxTokens || 2000,
   });
 
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "";
-  const usage = data.usage || {};
   const elapsed = ((Date.now() - tStart) / 1000).toFixed(1);
 
   let noteData;

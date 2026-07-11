@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.5.2 (2026-07-11) — 优化与重构
+
+### 优化
+- **maxTokens 8000**：knowledge 模板 `maxTokens: 4000` → `8000`，支持小红书 8000 字长文
+- **Token 大幅节省**：`generateXiaohongshuNote` 和 `checkProgress` 返回精简（-97%），只传 title + excerpt + imageCount，ready 状态保留完整 note
+- **MD 格式优化**：段落间加 `\n` 保底 + 模板 prompt 强制 Markdown 格式（###/ - /**/ >），防止"一坨"纯文本
+- **SKILL.md 导出行为**：统一为聊天展示预览链接 + 告知完整文件夹路径和文件列表
+- **去除 MD 底部"由小盛开AI自动生成"**
+
+### 重构
+- **共享 LLM 调用**：`lib/deepseek.js` 新增 `callLLM`，消除 xiaohongshu/diagram/video 3 处 fetch 重复
+- **LLM Provider 路由**：`lib/llm.js` 统一入口，根据 `MCP_LLM_PROVIDER` 环境变量切换 deepseek/minimax
+- **`lib/minimax.js` 扩展**：新增 `callLLM`（MiniMax 文字生成），与 `generateImage`（图片生成）共存
+- **usage 字段统一**：`totalTokens` → `{ totalTokens }` 标准化，兼容 DeepSeek 和 MiniMax 差异
+
+### 变更文件
+- `packages/mcp/lib/llm.js` — 新建（统一 LLM 路由）
+- `packages/mcp/lib/deepseek.js` — `callDeepSeekLLM` → `callLLM` + usage 统一
+- `packages/mcp/lib/minimax.js` — 新增 `callLLM`
+- `packages/mcp/tools/xiaohongshu/index.js` — 改用 lib/llm.js + maxTokens 8000 + MD 格式优化 + Token 精简
+- `packages/mcp/tools/xiaohongshu/templates/knowledge.md` — Markdown 格式强制要求
+- `packages/mcp/tools/xiaohongshu/templates/knowledge/finance.md` — Markdown 格式强制要求
+- `packages/mcp/tools/diagram/index.js` — 改用 lib/deepseek.js callLLM
+- `packages/mcp/tools/media/video.js` — 改用 lib/deepseek.js callLLM
+- `packages/skills/xiaohongshu-note/SKILL.md` — 导出行为修正
+- `.env` / `.env.example` — 新增 `MCP_LLM_PROVIDER` / `MINIMAX_CHAT_MODEL`
+
 ## v0.5.1 (2026-07-10) — 小红书笔记自动生成
 
 ### 新增

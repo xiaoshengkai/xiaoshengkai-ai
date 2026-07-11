@@ -1,4 +1,5 @@
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
+const DEEPSEEK_PRO_MODEL = process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro";
 
 export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000 }) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -11,7 +12,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model,
+model: model || DEEPSEEK_PRO_MODEL,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },

@@ -27,7 +27,6 @@ console.log(`${TAG} Chrome 路径: ${CHROME_PATH || "未找到"}`);
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash";
 const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
 
@@ -185,7 +184,6 @@ async function generateCode(prompt, opts) {
   const { text: content } = await callLLM({
     system: systemPrompt,
     user: prompt,
-    model: DEEPSEEK_MODEL,
   });
 
   if (!content) throw new Error("DeepSeek 返回空内容");

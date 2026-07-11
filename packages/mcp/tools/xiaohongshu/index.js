@@ -10,7 +10,6 @@ import { callLLM as callProviderLLM } from "../../lib/llm.js";
 import { sleep } from "../media/utils.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro";
 const TAG = "[xhs]";
 
 const TEMPLATES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "templates");
@@ -80,7 +79,7 @@ async function callLLM(prompt, style, subcategory) {
     throw new Error(`「${style}」${subcategory ? `/${subcategory}` : ""}模板尚未实现，当前可用：${available}`);
   }
 
-  console.log(`${TAG} callLLM: style=${style}${subcategory ? "/" + subcategory : ""} model=${DEEPSEEK_MODEL} maxTokens=${template.maxTokens || 2000} prompt=${prompt.length}字`);
+  console.log(`${TAG} callLLM: style=${style}${subcategory ? "/" + subcategory : ""} maxTokens=${template.maxTokens || 2000} prompt=${prompt.length}字`);
 
   const systemContent = `${template.systemPrompt}
 
@@ -107,7 +106,6 @@ async function callLLM(prompt, style, subcategory) {
   const { text, usage } = await callProviderLLM({
     system: systemContent,
     user: prompt,
-    model: DEEPSEEK_MODEL,
     maxTokens: template.maxTokens || 2000,
   });
 

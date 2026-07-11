@@ -12,7 +12,6 @@ import { downloadSubtitles, renderSubtitles } from "./html-builder.js";
 import { callLLM } from "../../lib/llm.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash";
 
 const ROOT_DIR = path.resolve(path.dirname(path.dirname(new URL(import.meta.url).pathname)), "..", "..", "..");
 const GSAP_GSAP = path.join(ROOT_DIR, "node_modules", "gsap", "dist", "gsap.min.js");
@@ -225,7 +224,6 @@ ${styleMD}
   const { text: rawContent } = await callLLM({
     system: SCRIPT_SYSTEM_PROMPT,
     user: userContent,
-    model: DEEPSEEK_MODEL,
   });
 
   const jsonMatch = rawContent.match(/\{[\s\S]*\}/);

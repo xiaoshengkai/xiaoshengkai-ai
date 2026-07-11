@@ -244,7 +244,7 @@ export function register(server) {
               ok: true,
               taskId,
               status: "generating",
-              note: { title: noteData.title, excerpt: noteData.excerpt, content: noteData.content, tags: noteData.tags, images },
+              note: { title: noteData.title, excerpt: noteData.excerpt, imageCount: images.length },
             }, null, 2),
           }],
         };
@@ -341,7 +341,8 @@ export function register(server) {
         console.log(`${TAG} checkProgress: taskId=${taskId} status=${state.status} count=${count} wait=${(wait / 1000).toFixed(1)}s`);
         await sleep(wait);
         const updated = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-        return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, note: { title: updated.title, excerpt: updated.excerpt, content: updated.content, tags: updated.tags, images: updated.images } }, null, 2) }] };
+        const doneCount = updated.images?.filter((img) => img.status === "done").length || 0;
+        return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, title: updated.title, readyCount: doneCount, totalCount: updated.images?.length || 0 }, null, 2) }] };
       }
 
       return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: state.taskId, status: state.status, note: { title: state.title, excerpt: state.excerpt, content: state.content, tags: state.tags, images: state.images } }, null, 2) }] };

@@ -27,11 +27,11 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
 
   const data = await res.json();
   if (!res.ok) {
-    console.error(`[minimax] callLLM: HTTP ${res.status} ${JSON.stringify(data).slice(0, 200)}`);
+    console.log(`[minimax] callLLM: HTTP ${res.status} ${JSON.stringify(data).slice(0, 200)}`);
     throw new Error(`MiniMax API 错误 (${res.status}): ${data.error?.message || "未知错误"}`);
   }
   const msg = data.choices?.[0]?.message || {};
-  console.error(`[minimax] usage: ${JSON.stringify(data.usage)}`);
+  console.log(`[minimax] usage: ${JSON.stringify(data.usage)}`);
   return {
     text: msg.reasoning_content || msg.content || "",
     usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },

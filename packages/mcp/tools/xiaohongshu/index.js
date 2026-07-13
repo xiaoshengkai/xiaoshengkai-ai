@@ -162,7 +162,7 @@ async function generateAllImages(taskId, workDir, images) {
       state.images[img.index].error = err.message;
       failedCount++;
       writeTaskState(workDir, state);
-      console.error(`${TAG} image[${img.index}] ${img.type}: 失败 ${err.message}`);
+      console.log(`${TAG} image[${img.index}] ${img.type}: 失败 ${err.message}`);
     }
   }
 

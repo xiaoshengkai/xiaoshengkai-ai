@@ -231,7 +231,7 @@ export async function POST(req: Request) {
     const cleanMessages = processedMessages.map((msg: any) => {
       const badParts = (msg.parts || []).filter((p: any) => p != null && !p.type);
       if (badParts.length > 0) {
-        console.log("[cleanMessages] 发现无 type 的 parts:", JSON.stringify(badParts));
+        console.warn("[cleanMessages] 发现无 type 的 parts:", JSON.stringify(badParts));
       }
       return {
         ...msg,
@@ -284,6 +284,10 @@ console.log("[system] SKILL_LIST in prompt:", SKILL_LIST ? "有内容" : "空");
             usage: part.totalUsage,
             modelTier: tier,
             classifyUsage: classifyResult.usage,
+            retrievedChunks: retrieved.map(c => ({
+              content: c.content.slice(0, 100),
+              source: `[${c.index}]`,
+            })),
           };
         }
       },

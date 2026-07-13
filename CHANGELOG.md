@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.5.4 (2026-07-13) — 三栏布局 + 统一日志系统 + 控制台整理
+
+### 新增
+- **三栏布局**：左侧菜单栏（240px）+ 中间内容区 + 右侧状态面板（280px），路由组 `(main)` 共享布局
+- **左侧菜单栏**：对话置顶（独立块），记忆库/工具库/工作流/定时任务/博客/设置（后续模块预留）
+- **右侧状态面板**：彩色卡片（模型/Token统计/检索记忆/运行日志），像素边框风格，`[ERR]` 红色/`[INFO]` 蓝色/`[WARN]` 黄色
+- **统一日志系统**：`packages/shared/logger.js` 共享日志模块，MCP + Next.js 合入 `app-YYYY-MM-DD.log`，倒序写入，7 天自动清理
+- **`/api/logs`**：返回最新 500 行日志，用于右侧面板实时展示
+- **检索记忆展示**：API `messageMetadata` 新增 `retrievedChunks` 字段，右侧面板实时显示当前上下文注入的知识库条目
+
+### 重构
+- **记忆库页面迁移**：`/admin/chroma/page.tsx` → `/(main)/memory/page.tsx`，像素风格适配
+- **日志系统抽取**：`packages/mcp/index.js`（32 行→1 行）+ `packages/ai-chat/src/instrumentation.ts`（45 行→1 行），统一调用 `createLogger(source)`
+- **控制台日志整理**：MCP 端 19 处 `console.error` → `console.log`（操作追踪类），Next.js 端信息日志同理，`[cleanMessages]` → `console.warn`，真实错误保持 `console.error`
+- **body-wrapper 简化**：移除 `/admin` 特殊处理
+- **对话页拆分**：根 `page.tsx` → `/(main)/page.tsx`，聊天区 + 右侧面板并排
+
+### 优化
+- 右侧面板：Token 统计加 label（本轮消耗总 token/本轮消耗金额），卡片彩色标题栏 + 分隔线 + 内容区
+- 运行日志卡片：`max-h-[500px]` + 内部滚动，API 返回 500 行
+- 检索记忆卡片：`max-h-[220px]` + 内部滚动
+- "整理数据"按钮：固定红色背景，去掉 hover 变色
+
+### 变更文件
+- `packages/shared/logger.js` — 新建
+- `packages/ai-chat/src/app/(main)/layout.tsx` — 新建
+- `packages/ai-chat/src/app/(main)/page.tsx` — 新建
+- `packages/ai-chat/src/app/(main)/memory/page.tsx` — 新建
+- `packages/ai-chat/src/components/layout/left-sidebar.tsx` — 新建
+- `packages/ai-chat/src/components/layout/right-panel.tsx` — 新建
+- `packages/ai-chat/src/app/api/logs/route.ts` — 新建
+- `packages/ai-chat/src/app/api/chat/route.ts` — messageMetadata 加 retrievedChunks
+- `packages/ai-chat/src/app/body-wrapper.tsx` — 简化
+- `packages/ai-chat/src/app/globals.css` — 新增 sidebar/panel 样式
+- `packages/ai-chat/tsconfig.json` — 新增 @shared/* 路径
+- `packages/mcp/index.js` — 日志系统改用共享模块
+- `packages/ai-chat/src/instrumentation.ts` — 日志系统改用共享模块
+- `packages/mcp/tools/*/index.js` — 19 处 console.error → console.log
+- `packages/ai-chat/src/app/page.tsx` — 删除
+- `packages/ai-chat/src/app/admin/chroma/page.tsx` — 删除
+
 ## v0.5.3 (2026-07-13) — 预览体验优化 + 内容丰富度 + MiniMax 稳定性
 
 ### 修复

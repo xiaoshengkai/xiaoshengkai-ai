@@ -244,6 +244,8 @@ ai-engineer-journey/
 ├── .env.example
 ├── design.md
 ├── packages/
+│   ├── shared/              # 共享模块
+│   │   └── logger.js        # 统一日志系统
 │   ├── ai-chat/                # 业务服务（Next.js）
 │   │   ├── src/
 │   │   │   ├── instrumentation.ts
@@ -253,9 +255,16 @@ ai-engineer-journey/
 │   │   │   │   ├── vector-store.ts
 │   │   │   │   └── chroma-server.ts
 │   │   │   └── app/
-│   │   │       ├── page.tsx
+│   │   │       ├── (main)/
+│   │   │       │   ├── layout.tsx       # 三栏共享布局
+│   │   │       │   ├── page.tsx         # 对话页
+│   │   │       │   └── memory/
+│   │   │       │       └── page.tsx     # 记忆库页
+│   │   │       ├── layout.tsx
+│   │   │       ├── body-wrapper.tsx
 │   │   │       ├── api/chat/route.ts
 │   │   │       ├── api/admin/chroma/route.ts
+│   │   │       ├── api/logs/route.ts
 │   │   │       ├── api/note/[taskId]/status/route.ts
 │   │   │       ├── note/[taskId]/page.tsx
 │   │   │       └── preview/[taskId]/route.ts

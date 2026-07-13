@@ -331,7 +331,7 @@ export function register(server) {
     },
     async ({ url, download, rootDir, cookies }) => {
       try {
-        console.error(`[fetch:fetchPage] url=${url} download=${download} cookies=${!!cookies}`);
+        console.log(`[fetch:fetchPage] url=${url} download=${download} cookies=${!!cookies}`);
         if (download) {
           const dir = rootDir || DEFAULT_DOWNLOAD_DIR;
           const stats = await fetchPageImpl(url, dir, cookies);
@@ -409,7 +409,7 @@ export function register(server) {
     },
     async ({ url, download, rootDir, maxDepth, maxPages, cookies }) => {
       try {
-        console.error(`[fetch:crawlSite] url=${url} download=${download} maxDepth=${maxDepth} maxPages=${maxPages}`);
+        console.log(`[fetch:crawlSite] url=${url} download=${download} maxDepth=${maxDepth} maxPages=${maxPages}`);
         if (download) {
           const dir = rootDir || DEFAULT_DOWNLOAD_DIR;
           const stats = await crawlSiteImpl(url, dir, maxDepth, maxPages, cookies);

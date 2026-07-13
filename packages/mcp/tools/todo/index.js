@@ -27,7 +27,7 @@ export function register(server) {
     },
     async ({ title, priority, deadline, done }) => {
       try {
-        console.error(`[todo:getList] title=${title} priority=${priority} deadline=${deadline} done=${done}`);
+        console.log(`[todo:getList] title=${title} priority=${priority} deadline=${deadline} done=${done}`);
         const { data: response } = await axios.get(`${TODO_BASE_URL}/getList`, {
           params: { title, priority, deadline, done },
         });
@@ -51,7 +51,7 @@ export function register(server) {
     },
     async ({ title, priority, deadline }) => {
       try {
-        console.error(`[todo:addTodo] title=${title} priority=${priority} deadline=${deadline}`);
+        console.log(`[todo:addTodo] title=${title} priority=${priority} deadline=${deadline}`);
         const { data: response } = await axios.post(`${TODO_BASE_URL}/addTodo`, {
           title, priority, deadline,
         });

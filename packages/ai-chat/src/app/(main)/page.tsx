@@ -9,6 +9,7 @@ import { Send, ChevronDown, Image, Square } from "lucide-react";
 import { toast } from "sonner";
 import MessageItem from "@/components/chat/message-item";
 import { ImageViewerProvider } from "@/components/ui/image-viewer";
+import RightPanel from "@/components/layout/right-panel";
 import { calculateCost, formatTokens } from "@/lib/cost";
 
 const STORAGE_KEY = "xsk-ai-chat-messages";
@@ -74,7 +75,7 @@ const EmptyState = React.memo(function EmptyState() {
   );
 });
 
-export default function Home() {
+export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const atBottomRef = useRef(true);
@@ -85,7 +86,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<{ data: string; name: string }[]>([]);
 
-const { messages, setMessages, sendMessage, status, stop } = useChat({
+  const { messages, setMessages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
   });
 
@@ -125,7 +126,6 @@ const { messages, setMessages, sendMessage, status, stop } = useChat({
     const value = inputRef.current?.value.trim();
     if (!value && images.length === 0) return;
 
-
     let text = value || "请看这张图";
 
     if (images.length > 0) {
@@ -159,8 +159,6 @@ const { messages, setMessages, sendMessage, status, stop } = useChat({
       .filter((t) => t.startsWith("[上下文摘要] "))
       .map((t) => t.replace("[上下文摘要] ", ""))
       .join("\n\n");
-
-    console.log(`[compress] sent ${messages.length} messages, prevSummary: ${prevSummary ? prevSummary.length + " chars" : "none"}`);
 
     try {
       const res = await fetch("/api/chat/compress", {
@@ -248,131 +246,140 @@ const { messages, setMessages, sendMessage, status, stop } = useChat({
 
   return (
     <ImageViewerProvider>
-      <div className="flex flex-col h-full max-w-3xl mx-auto pixel-bg overflow-hidden" suppressHydrationWarning>
-      <Virtuoso
-        ref={virtuosoRef}
-        className="flex-1 min-h-0"
-        followOutput="auto"
-        atBottomStateChange={(atBottom) => { atBottomRef.current = atBottom; setIsAtBottom(atBottom); }}
-        data={messages}
-        computeItemKey={(_, msg) => msg.id}
-        itemContent={(index, msg) => (
-          <div className="py-2">
-            <MessageItem msg={msg} isLoading={isLoading && index === messages.length - 1} />
-          </div>
-        )}
-        components={{
-          EmptyPlaceholder: () => <EmptyState />,
-          Footer: () => (
-            <>
-              {showFooter && (
-                <div className="py-2 px-4">
-                  <LoadingDots />
+      <div className="flex h-full">
+        {/* 聊天区 */}
+        <div className="flex-1 flex flex-col min-w-0 pixel-bg overflow-hidden">
+          <Virtuoso
+            ref={virtuosoRef}
+            className="flex-1 min-h-0"
+            followOutput="auto"
+            atBottomStateChange={(atBottom) => { atBottomRef.current = atBottom; setIsAtBottom(atBottom); }}
+            data={messages}
+            computeItemKey={(_, msg) => msg.id}
+            itemContent={(index, msg) => (
+              <div className="py-2 px-4">
+                <div className="max-w-3xl mx-auto">
+                  <MessageItem msg={msg} isLoading={isLoading && index === messages.length - 1} />
                 </div>
-              )}
-            </>
-          ),
-        }}
-      />
-
-      <div className="p-4">
-        {!isAtBottom && messages.length > 5 && (
-          <div className="max-w-3xl mx-auto">
-            <button
-              onClick={() => virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "smooth" })}
-              className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-muted-foreground/15 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer float-right relative bottom-[50px]"
-            >
-              <ChevronDown className="size-3.5 text-muted-foreground/50" />
-            </button>
-          </div>
-        )}
-        <div className="pixel-input-group max-w-3xl mx-auto">
-          {images.length > 0 && (
-            <div className="flex items-center gap-2 px-3 pt-2 pb-1 overflow-x-auto">
-              {images.map((img, i) => (
-                <div key={i} className="relative shrink-0 h-10 border-2 border-muted-foreground/15">
-                  <img src={img.data} className="w-auto h-10 object-contain" alt={img.name} />
-                  <button
-                    onClick={() => removeImage(i)}
-                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-muted-foreground/80 text-white text-[10px] flex items-center justify-center cursor-pointer"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          {hasMessages && (
-            <div className="flex items-center justify-between px-3 pt-2 pb-1">
-              <div className="flex items-center gap-1">
-                {/* TODO: 模型切换 */}
-                <button
-                  className="pixel-btn-ghost px-2 py-0.5 text-xs font-mono font-bold"
-                  onClick={handleCompress}
-                  disabled={compressState === "loading"}
-                >
-                  {compressState === "loading" ? "压缩中..." : "压缩对话"}
-                </button>
-                <button
-                  className="pixel-btn-danger px-2 py-0.5 text-xs font-mono font-bold"
-                  onClick={handleClear}
-                >
-                  重新开始
-                </button>
               </div>
-            </div>
-          )}
-          <textarea
-            ref={inputRef}
-            rows={1}
-            placeholder="输入消息..."
-            disabled={isLoading}
-            className="pixel-input w-full min-h-10 max-h-80 px-3 py-2 text-sm outline-none resize-none overflow-y-auto placeholder:text-muted-foreground/30"
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            onInput={handleInput}
-            onPaste={handlePaste}
-            onKeyDown={async (e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                await handleSend();
-              }
+            )}
+            components={{
+              EmptyPlaceholder: () => <EmptyState />,
+              Footer: () => (
+                <>
+                  {showFooter && (
+                    <div className="py-2 px-4">
+                      <div className="max-w-3xl mx-auto">
+                        <LoadingDots />
+                      </div>
+                    </div>
+                  )}
+                </>
+              ),
             }}
           />
-          <div className="flex items-center justify-between px-3 pt-1 pb-2">
-            <div className="flex items-center gap-1">
-              <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="pixel-btn-image px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"
-              >
-                <Image className="size-3.5" />
-              </button>
+
+          <div className="p-4">
+            <div className="max-w-3xl mx-auto">
+              {!isAtBottom && messages.length > 5 && (
+                <button
+                  onClick={() => virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "smooth" })}
+                  className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-muted-foreground/15 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer float-right mb-2"
+                >
+                  <ChevronDown className="size-3.5 text-muted-foreground/50" />
+                </button>
+              )}
             </div>
-            {isLoading ? (
-              <button
-                type="button"
-                onClick={stop}
-                style={{ background: "#000", color: "#000", border: "2px solid #000" }}
-                className="h-8 w-8 flex items-center justify-center cursor-pointer font-bold"
-                title="停止生成"
-              >
-                <Square className="size-3.5" style={{ background: "#fff" }}/>
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={false}
-                onClick={async () => await handleSend()}
-                className="pixel-btn h-8 w-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <Send className="size-3.5" />
-              </button>
-            )}
+            <div className="pixel-input-group max-w-3xl mx-auto">
+              {images.length > 0 && (
+                <div className="flex items-center gap-2 px-3 pt-2 pb-1 overflow-x-auto">
+                  {images.map((img, i) => (
+                    <div key={i} className="relative shrink-0 h-10 border-2 border-muted-foreground/15">
+                      <img src={img.data} className="w-auto h-10 object-contain" alt={img.name} />
+                      <button
+                        onClick={() => removeImage(i)}
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-muted-foreground/80 text-white text-[10px] flex items-center justify-center cursor-pointer"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {hasMessages && (
+                <div className="flex items-center justify-between px-3 pt-2 pb-1">
+                  <div className="flex items-center gap-1">
+                    <button
+                      className="pixel-btn-ghost px-2 py-0.5 text-xs font-mono font-bold"
+                      onClick={handleCompress}
+                      disabled={compressState === "loading"}
+                    >
+                      {compressState === "loading" ? "压缩中..." : "压缩对话"}
+                    </button>
+                    <button
+                      className="pixel-btn-danger px-2 py-0.5 text-xs font-mono font-bold"
+                      onClick={handleClear}
+                    >
+                      重新开始
+                    </button>
+                  </div>
+                </div>
+              )}
+              <textarea
+                ref={inputRef}
+                rows={1}
+                placeholder="输入消息..."
+                disabled={isLoading}
+                className="pixel-input w-full min-h-10 max-h-80 px-3 py-2 text-sm outline-none resize-none overflow-y-auto placeholder:text-muted-foreground/30"
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                onInput={handleInput}
+                onPaste={handlePaste}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    await handleSend();
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between px-3 pt-1 pb-2">
+                <div className="flex items-center gap-1">
+                  <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="pixel-btn-image px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"
+                  >
+                    <Image className="size-3.5" />
+                  </button>
+                </div>
+                {isLoading ? (
+                  <button
+                    type="button"
+                    onClick={stop}
+                    style={{ background: "#000", color: "#000", border: "2px solid #000" }}
+                    className="h-8 w-8 flex items-center justify-center cursor-pointer font-bold"
+                    title="停止生成"
+                  >
+                    <Square className="size-3.5" style={{ background: "#fff" }}/>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={false}
+                    onClick={async () => await handleSend()}
+                    className="pixel-btn h-8 w-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <Send className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* 右侧状态面板 */}
+        <RightPanel messages={messages} isLoading={isLoading} />
       </div>
-    </div>
     </ImageViewerProvider>
   );
 }

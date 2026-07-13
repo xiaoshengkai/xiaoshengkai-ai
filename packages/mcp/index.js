@@ -1,35 +1,10 @@
 import "./lib/env.js";
 import fs from "node:fs";
 import path from "node:path";
+import { createLogger } from "../shared/logger.js";
 
-// ─── 日志系统：重定向 console 到文件 + 终端 ───
-const LOG_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "..", "logs");
-fs.mkdirSync(LOG_DIR, { recursive: true });
-const LOG_FILE = path.join(LOG_DIR, `mcp-${new Date().toISOString().slice(0, 10)}.log`);
-
-// 清理 7 天前的日志
-const MAX_DAYS = 7;
-const files = fs.readdirSync(LOG_DIR).filter(f => f.endsWith(".log"));
-for (const f of files) {
-  const dateStr = f.match(/\d{4}-\d{2}-\d{2}/)?.[0];
-  if (dateStr && Date.now() - new Date(dateStr).getTime() > MAX_DAYS * 86400000) {
-    fs.unlinkSync(path.join(LOG_DIR, f));
-  }
-}
-
-const origLog = console.log;
-const origErr = console.error;
-const origWarn = console.warn;
-
-function writeLog(level, args) {
-  const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${level}] ${args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ")}\n`;
-  const old = fs.existsSync(LOG_FILE) ? fs.readFileSync(LOG_FILE, "utf-8") : "";
-  fs.writeFileSync(LOG_FILE, line + old);
-}
-
-console.log = (...args) => { origLog(...args); writeLog("LOG", args); };
-console.error = (...args) => { origErr(...args); writeLog("ERR", args); };
-console.warn = (...args) => { origWarn(...args); writeLog("WARN", args); };
+// ─── 日志系统 ───
+createLogger("MCP", path.join(path.dirname(new URL(import.meta.url).pathname), "..", "..", "logs"));
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -43,7 +18,7 @@ import { register as registerMedia } from "./tools/media/index.js";
 import { register as registerDiagram } from "./tools/diagram/index.js";
 import { register as registerXiaohongshu } from "./tools/xiaohongshu/index.js";
 
-console.error(`[mcp] server-id: ${Date.now().toString(36)}`);
+console.log(`[mcp] server-id: ${Date.now().toString(36)}`);
 
 const server = new McpServer({ name: "node-mcp", version: "2.0.0" });
 
@@ -68,7 +43,7 @@ for (const { name, register } of modules) {
     const after = Object.keys(server._registeredTools || {}).length;
     const count = after - before;
     totalTools += count;
-    console.error(`[mcp] ${name}: loaded (${count} tools)`);
+    console.log(`[mcp] ${name}: loaded (${count} tools)`);
   } catch (err) {
     console.error(`[mcp] ${name}: FAILED - ${err.message}`);
   }
@@ -77,4 +52,4 @@ for (const { name, register } of modules) {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-console.error(`[mcp] node-mcp 已启动 (v2.0.0 - ${totalTools} tools)`);
+console.log(`[mcp] node-mcp 已启动 (v2.0.0 - ${totalTools} tools)`);

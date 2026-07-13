@@ -37,7 +37,7 @@ export function register(server) {
       try {
         const db = database || CHAT_DB;
         const col = collection || defaultCollection(db);
-        console.error(`[chroma:addKnowledge] db=${db} col=${col} content="${content.slice(0, 80)}"`);
+        console.log(`[chroma:addKnowledge] db=${db} col=${col} content="${content.slice(0, 80)}"`);
         const id = randomUUID();
         const embedding = await embedText(content);
         const c = await getCollection(db, col);
@@ -83,7 +83,7 @@ export function register(server) {
             targets.push({ database: CHAT_DB, collection: col });
           }
         }
-        console.error(`[chroma:searchKnowledge] query="${query.slice(0, 50)}" database=${database} collection=${collection} targets=${JSON.stringify(targets.map(t => `${t.database}/${t.collection}`))}`);
+        console.log(`[chroma:searchKnowledge] query="${query.slice(0, 50)}" database=${database} collection=${collection} targets=${JSON.stringify(targets.map(t => `${t.database}/${t.collection}`))}`);
 
         // 每个 collection 取 topK*3，合并后截断，避免跨 collection 遗漏
         const perCollection = topK * 3;
@@ -92,7 +92,7 @@ export function register(server) {
         );
         const merged = allResults.flat().sort((a, b) => b.similarity - a.similarity).slice(0, topK);
         const perCollectionStats = allResults.map((r, i) => `${targets[i].collection}=${r.length}`);
-        console.error(`[chroma:searchKnowledge] per-collection: ${perCollectionStats.join(", ")} | merged=${merged.length}`);
+        console.log(`[chroma:searchKnowledge] per-collection: ${perCollectionStats.join(", ")} | merged=${merged.length}`);
         const hitLimit = merged.length >= topK;
         const note = hitLimit ? " 结果数已达到查询上限，可能还有更多。" : "";
         return toolResult({ ok: true, data: { results: merged }, note: note.trim() || undefined });

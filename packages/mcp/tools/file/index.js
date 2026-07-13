@@ -20,7 +20,7 @@ export function register(server) {
     async ({ filePath }) => {
       try {
         const fp = rp(filePath);
-        console.error(`[file:readFile] ${fp}`);
+        console.log(`[file:readFile] ${fp}`);
         const content = await fs.readFile(fp, "utf-8");
         return {
           content: [{ type: "text", text: `文件路径: ${fp}\n文件大小: ${content.length} 字符\n--- 内容开始 ---\n${content}\n--- 内容结束 ---` }],
@@ -142,7 +142,7 @@ export function register(server) {
     async ({ filePath, content }) => {
       try {
         const fp = rp(filePath);
-        console.error(`[file:writeFile] ${fp} size=${content.length}`);
+        console.log(`[file:writeFile] ${fp} size=${content.length}`);
         await fs.mkdir(path.dirname(fp), { recursive: true });
         await fs.writeFile(fp, content, "utf-8");
         return { content: [{ type: "text", text: `文件已写入: ${fp}\n写入大小: ${content.length} 字符` }] };
@@ -223,7 +223,7 @@ export function register(server) {
     async ({ filePath }) => {
       try {
         const fp = rp(filePath);
-        console.error(`[file:deleteFile] ${fp}`);
+        console.log(`[file:deleteFile] ${fp}`);
         await fs.unlink(fp);
         return { content: [{ type: "text", text: `文件已删除: ${fp}` }] };
       } catch (error) {
@@ -243,7 +243,7 @@ export function register(server) {
       try {
         const sp = rp(sourcePath);
         const tp = rp(targetPath);
-        console.error(`[file:moveFile] ${sp} → ${tp}`);
+        console.log(`[file:moveFile] ${sp} → ${tp}`);
         await fs.mkdir(path.dirname(tp), { recursive: true });
         await fs.rename(sp, tp);
         return { content: [{ type: "text", text: `已移动: ${sp} → ${tp}` }] };

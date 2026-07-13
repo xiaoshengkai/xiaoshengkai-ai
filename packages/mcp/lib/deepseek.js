@@ -25,10 +25,10 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
 
   const data = await res.json();
   if (!res.ok) {
-    console.error(`[deepseek] callLLM: HTTP ${res.status} ${JSON.stringify(data).slice(0, 200)}`);
+    console.log(`[deepseek] callLLM: HTTP ${res.status} ${JSON.stringify(data).slice(0, 200)}`);
     throw new Error(`DeepSeek API 错误 (${res.status})`);
   }
-  console.error(`[deepseek] usage: ${JSON.stringify(data.usage)}`);
+  console.log(`[deepseek] usage: ${JSON.stringify(data.usage)}`);
   return {
     text: data.choices?.[0]?.message?.content || '',
     usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },

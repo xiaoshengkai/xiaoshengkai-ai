@@ -337,7 +337,7 @@ export function register(server) {
         return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, title: updated.title, readyCount: doneCount, totalCount: updated.images?.length || 0 }, null, 2) }] };
       }
 
-      return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: state.taskId, status: state.status, note: { title: state.title, excerpt: state.excerpt, content: state.content, tags: state.tags, images: state.images } }, null, 2) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: state.taskId, status: state.status, previewUrl: `/note/${state.taskId}`, note: { title: state.title, excerpt: state.excerpt, content: state.content, tags: state.tags, images: state.images } }, null, 2) }] };
     },
   );
 

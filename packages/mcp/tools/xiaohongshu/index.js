@@ -21,13 +21,13 @@ function loadTemplate(name) {
 const TEMPLATES = {
   knowledge: {
     finance: {
-      maxTokens: 8000,
+      maxTokens: 10000,
       systemPrompt: loadTemplate("knowledge/finance"),
       coverStyle: "lively hand-drawn illustration, warm gold and navy blue palette, 3:4 vertical",
       illustrationStyle: "lively hand-drawn illustration, warm gold and navy blue palette, 1:1 square",
     },
     _default: {
-      maxTokens: 8000,
+      maxTokens: 10000,
       systemPrompt: loadTemplate("knowledge"),
       coverStyle: "lively hand-drawn illustration, warm colors, playful, 3:4 vertical",
       illustrationStyle: "lively hand-drawn illustration, warm colors, playful, 1:1 square",
@@ -54,11 +54,20 @@ function updateTask(workDir, update) {
 function parseJSON(text) {
   let cleaned = text.replace(/```\w*\n?|\n?```/g, "").trim();
   const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    cleaned = cleaned.slice(start, end + 1);
+  if (start < 0) throw new Error("未找到 JSON");
+
+  let depth = 0, inString = false, escape = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"' && !inString) { inString = true; continue; }
+    if (ch === '"' && inString) { inString = false; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    if (ch === "}") { depth--; if (depth === 0) return JSON.parse(cleaned.slice(start, i + 1)); }
   }
-  return JSON.parse(cleaned);
+  throw new Error("JSON 未闭合");
 }
 
 async function callLLM(prompt, style, subcategory) {

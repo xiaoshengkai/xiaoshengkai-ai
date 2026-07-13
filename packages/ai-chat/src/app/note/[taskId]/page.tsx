@@ -78,7 +78,7 @@ export default function NotePreviewPage() {
   const illustrations = note.images?.filter((img) => img.type === "illustration") || [];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white" style={{ height: "100dvh", overflow: "auto" }}>
       <div className="max-w-[600px] mx-auto">
         {cover?.url ? (
           <img src={cover.url} alt={note.title} className="w-full" style={{ aspectRatio: "3/4", objectFit: "cover" }} />

@@ -49,7 +49,7 @@ const TOOLS_PROMPT = `
   subcategory: 二级类目，如 finance=金融知识，目前仅 knowledge 下支持，LLM 自动推断
   修改笔记用 updateXiaohongshuNote({ taskId, field, value })，field 取值: title/content/tags/image_N
   导出用 exportXiaohongshuNote({ taskId })
-  注意：笔记生成后不要自动导出或打开浏览器，先展示预览链接。只有用户明确说"导出"时才调用 exportXiaohongshuNote
+  注意：笔记生成后不要自动导出或打开浏览器，直接输出 iframe 在聊天中嵌入预览。只有用户明确说"导出"时才调用 exportXiaohongshuNote
 
 使用规则:
 - 用户说"画图"/"流程图"等 → 调用 generateDiagram，不确定类型时询问用户

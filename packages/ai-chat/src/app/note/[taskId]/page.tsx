@@ -40,24 +40,6 @@ export default function NotePreviewPage() {
       .catch(() => setLoading(false));
   }, [taskId]);
 
-  const handleExport = async () => {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "user",
-            parts: [{ type: "text", text: `导出小红书笔记 ${taskId}` }],
-          },
-        ],
-      }),
-    });
-    // 触发 LLM 调用 exportXiaohongshuNote
-    const data = await res.json();
-    console.log("Export triggered:", data);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -119,16 +101,6 @@ export default function NotePreviewPage() {
               </div>
             );
             })}
-          </div>
-
-          <div className="mt-8 pt-4 border-t border-gray-100">
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-[#ff2442] text-white text-sm rounded-full hover:bg-[#e02038] transition-colors"
-            >
-              <Download className="size-4" />
-              导出 HTML
-            </button>
           </div>
         </div>
       </div>

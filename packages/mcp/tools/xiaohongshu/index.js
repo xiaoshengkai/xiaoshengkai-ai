@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
+import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { generateImage } from "../../lib/minimax.js";
@@ -395,17 +396,19 @@ export function register(server) {
           }
         }
 
-        const contentHtml = state.content
+        const markdown = state.content
           .map((seg) => {
             const match = seg.match(/^\[插图-(\d+)\]$/);
             if (match) {
               const img = state.images[parseInt(match[1], 10)];
-              if (img?.url) return `<img src="./images/${img.type === "cover" ? "cover" : `illustration-${img.index}`}.png" alt="插图" style="width:100%;border-radius:8px;margin:12px 0">`;
-              return `<div style="background:#f0f0f0;height:200px;display:flex;align-items:center;justify-content:center;color:#999;border-radius:8px;margin:12px 0">[插图生成失败]</div>`;
+              if (img?.url) return `<img src="./images/${img.type === "cover" ? "cover" : `illustration-${img.index}`}.png" alt="插图" class="img-block">`;
+              return `<div class="img-placeholder">[插图生成失败]</div>`;
             }
-            return `<p style="line-height:1.8;margin:8px 0;color:#333">${seg}</p>`;
+            return seg;
           })
-          .join("\n");
+          .join("\n\n");
+
+        const contentHtml = marked.parse(markdown);
 
         const html = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -415,13 +418,25 @@ export function register(server) {
 <title>${state.title}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:600px;margin:0 auto;padding:0;background:#fff}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:600px;margin:0 auto;padding:0;background:#fff;color:#333}
 .cover{width:100%;aspect-ratio:3/4;object-fit:cover}
 .header{padding:16px 20px}
 .title{font-size:20px;font-weight:700;color:#1a1a1a;line-height:1.4}
 .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .tag{color:#ff2442;font-size:13px}
-.content{padding:0 20px 40px;font-size:15px}
+.content{padding:0 20px 40px;font-size:15px;line-height:1.85}
+.content h3{font-size:18px;font-weight:700;margin:28px 0 12px;padding-left:12px;border-left:3px solid #ff2442;color:#1a1a1a}
+.content p{margin:10px 0}
+.content strong{color:#1a1a1a;font-weight:700}
+.content blockquote{margin:14px 0;padding:12px 16px;background:#fdf6f0;border-left:3px solid #f0a060;border-radius:0 8px 8px 0;color:#8b5e3c;font-size:14px}
+.content ul,.content ol{padding-left:20px;margin:8px 0}
+.content li{margin:4px 0}
+.content table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+.content th{background:#fdf6f0;padding:8px 12px;text-align:left;font-weight:700;border-bottom:2px solid #e0d0c0}
+.content td{padding:8px 12px;border-bottom:1px solid #f0e0d0}
+.content hr{border:none;border-top:1px solid #e0d0c0;margin:24px 0}
+.img-block{width:100%;border-radius:8px;margin:12px 0}
+.img-placeholder{height:200px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;border-radius:8px;margin:12px 0;font-size:14px}
 </style>
 </head>
 <body>

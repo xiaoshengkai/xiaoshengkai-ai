@@ -10,6 +10,7 @@
 - **MiniMax 推理分离**：`lib/minimax.js` 优先用 `reasoning_content` 字段，避免推理内容混入 JSON
 - **maxTokens 调整**：`8000` → `10000`，MiniMax 推理 token 不再挤占内容空间
 - **API Key 检查**：根据 `MCP_LLM_PROVIDER` 只检查当前 provider 的 key
+- **导出 HTML 样式**：使用 `marked` 库做 Markdown→HTML 转换，补齐 CSS（h3/blockquote/table/列表），与预览页视觉一致
 
 ### 优化
 - **内容丰富度**：正文 5-8段/3-6句 → 6-10段/3-5句，新增可用内容形式（表格/列表/引用/对比）
@@ -18,9 +19,10 @@
 
 ### 新增
 - **github-gem-seeker** skill：搜索 GitHub 开源项目替代重复造轮子
+- 新增依赖：`marked`（Markdown→HTML 转换）
 
 ### 变更文件
-- `packages/mcp/tools/xiaohongshu/index.js` — parseJSON 括号计数 + maxTokens 10000 + 内容丰富度 + API Key 检查
+- `packages/mcp/tools/xiaohongshu/index.js` — parseJSON 括号计数 + maxTokens 10000 + 内容丰富度 + API Key 检查 + marked 导出
 - `packages/mcp/tools/xiaohongshu/templates/knowledge.md` — 删除重复限制
 - `packages/mcp/tools/xiaohongshu/templates/knowledge/finance.md` — 删除重复限制
 - `packages/mcp/lib/minimax.js` — reasoning_content 优先 + usage 日志
@@ -29,6 +31,7 @@
 - `packages/skills/xiaohongshu-note/SKILL.md` — 预览行为修正
 - `packages/ai-chat/src/app/api/chat/route.ts` — TOOLS_PROMPT 更新
 - `packages/skills/github-gem-seeker/SKILL.md` — 新增 skill
+- `packages/mcp/package.json` — 新增 `marked` 依赖
 
 ## v0.5.2 (2026-07-11) — 优化与重构
 

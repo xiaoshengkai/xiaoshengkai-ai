@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { generateImage } from "../../lib/minimax.js";
-import { callLLM as callProviderLLM } from "../../lib/llm.js";
+import { callLLM as callProviderLLM, PROVIDER } from "../../lib/llm.js";
 import { sleep } from "../media/utils.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
@@ -94,7 +94,11 @@ async function callLLM(prompt, style, subcategory) {
 }
 
 规则：
-- 正文5-8段，每段3-6句，中文
+- 正文6-10段，每段3-5句，内容丰富但不啰嗦
+- 每个概念配一个具体、有画面感的例子，让读者看完就能记住
+- 如同类数据可做对比，能用表格表达的数据用表格
+- 可用内容形式：### 小标题分段、**加粗**强调、- 列表拆解、> 金句引用、表格对比
+- 每段根据内容选合适格式，不堆纯文字，段落间用空行隔开
 - 插画3-5张，穿插在段落之间，长内容多配图降低阅读压力
 - content 数组用 "[插图-N]" 标记插画位置
 - 封面 prompt 要求：${template.coverStyle}
@@ -175,10 +179,11 @@ export function register(server) {
       try {
         console.log(`${TAG} generate: topic="${topic}" style=${style}${subcategory ? "/" + subcategory : ""} context=${context?.length || 0}字`);
 
-        const deepseekKey = process.env.DEEPSEEK_API_KEY;
-        const minimaxKey = process.env.MINIMAX_API_KEY;
-        if (!deepseekKey) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
-        if (!minimaxKey) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
+        if (PROVIDER === "minimax") {
+          if (!process.env.MINIMAX_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
+        } else {
+          if (!process.env.DEEPSEEK_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
+        }
 
         const category = TEMPLATES[style];
         if (!category) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `未知模板: ${style}` }) }] };

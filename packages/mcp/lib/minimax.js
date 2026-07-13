@@ -31,7 +31,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
     throw new Error(`MiniMax API 错误 (${res.status}): ${data.error?.message || "未知错误"}`);
   }
   const msg = data.choices?.[0]?.message || {};
-  console.error(`[minimax] message keys: ${Object.keys(msg).join(", ")}, content=${msg.content?.length || 0}字, reasoning=${msg.reasoning_content?.length || 0}字`);
+  console.error(`[minimax] usage: ${JSON.stringify(data.usage)}`);
   return {
     text: msg.content || "",
     usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },

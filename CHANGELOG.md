@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.5.3 (2026-07-13) — 预览体验优化 + 内容丰富度 + MiniMax 稳定性
+
+### 修复
+- **预览页滚动**：`note/[taskId]/page.tsx` 容器加 `overflow: auto`，修复 `layout.tsx` 的 `overflow-hidden` 继承导致无法滚动
+- **iframe 嵌入预览**：`checkXiaohongshuNoteProgress` ready 返回加 `iframe` 字段，笔记直接内嵌在聊天中
+- **自动导出行为**：SKILL.md + TOOLS_PROMPT 明确"笔记生成后不要自动导出，先展示预览"
+- **JSON 解析增强**：`parseJSON()` 改为括号计数算法，精确匹配 `{...}` 边界，不受推理文本/JSON 示例干扰
+- **MiniMax 推理分离**：`lib/minimax.js` 优先用 `reasoning_content` 字段，避免推理内容混入 JSON
+- **maxTokens 调整**：`8000` → `10000`，MiniMax 推理 token 不再挤占内容空间
+- **API Key 检查**：根据 `MCP_LLM_PROVIDER` 只检查当前 provider 的 key
+
+### 优化
+- **内容丰富度**：正文 5-8段/3-6句 → 6-10段/3-5句，新增可用内容形式（表格/列表/引用/对比）
+- **模板去重**：删除 `knowledge.md` 和 `finance.md` 中的重复段落/例子限制，统一由 baseRules 控制
+- **Usage 追踪**：`lib/deepseek.js` 和 `lib/minimax.js` 加 `data.usage` 完整结构日志
+
+### 新增
+- **github-gem-seeker** skill：搜索 GitHub 开源项目替代重复造轮子
+
+### 变更文件
+- `packages/mcp/tools/xiaohongshu/index.js` — parseJSON 括号计数 + maxTokens 10000 + 内容丰富度 + API Key 检查
+- `packages/mcp/tools/xiaohongshu/templates/knowledge.md` — 删除重复限制
+- `packages/mcp/tools/xiaohongshu/templates/knowledge/finance.md` — 删除重复限制
+- `packages/mcp/lib/minimax.js` — reasoning_content 优先 + usage 日志
+- `packages/mcp/lib/deepseek.js` — usage 日志
+- `packages/ai-chat/src/app/note/[taskId]/page.tsx` — 预览页滚动修复
+- `packages/skills/xiaohongshu-note/SKILL.md` — 预览行为修正
+- `packages/ai-chat/src/app/api/chat/route.ts` — TOOLS_PROMPT 更新
+- `packages/skills/github-gem-seeker/SKILL.md` — 新增 skill
+
 ## v0.5.2 (2026-07-11) — 优化与重构
 
 ### 优化

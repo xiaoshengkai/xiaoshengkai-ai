@@ -33,7 +33,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   const msg = data.choices?.[0]?.message || {};
   console.log(`[minimax] usage: ${JSON.stringify(data.usage)}`);
   return {
-    text: msg.reasoning_content || msg.content || "",
+    text: msg.content || msg.reasoning_content || "",
     usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },
   };
 }

@@ -26,11 +26,13 @@ export default function MessageItem({
 
   const meta = msg.metadata as {
     usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
-    modelTier?: string;
+    provider?: string;
+    model?: string;
     classifyUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
   } | undefined;
 
-  const modelName = meta?.modelTier === "flash" ? "deepseek-v4-flash" : "deepseek-v4-pro";
+  const modelName = meta?.model || "deepseek-v4-pro";
+  const isMiniMax = meta?.provider === "minimax";
   const classifyName = "deepseek-v4-flash";
 
   const deduplicatedParts = useMemo(() => {
@@ -123,15 +125,35 @@ toast.error("保存失败，请重试", {
                       </span>
                     );
                   }
+
+                  const thinkingMatch = part.text.match(/<think[^>]*>([\s\S]*?)<\/think>/i);
+                  const partialThinking = !thinkingMatch && isLoading
+                    ? part.text.match(/<think[^>]*>([\s\S]*)/i)
+                    : null;
+                  const cleanText = part.text.replace(/<think[^>]*>[\s\S]*?<\/think>\n?/gi, "");
+                  const displayText = thinkingMatch ? cleanText : partialThinking ? "" : part.text;
+                  const thinkingContent = thinkingMatch?.[1]?.trim() || partialThinking?.[1]?.trim();
+
                   return (
-                    <ReactMarkdown
-                      key={i}
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw]}
-                      components={markdownComponents}
-                    >
-                      {part.text}
-                    </ReactMarkdown>
+                    <div key={i}>
+                      {thinkingContent && (
+                        <details open className="not-prose mb-2 text-xs opacity-70">
+                          <summary className="cursor-pointer hover:opacity-100">
+                            {partialThinking ? "思考中…" : "思考过程"}
+                          </summary>
+                          <div className="mt-1 pl-3 border-l-2 border-current/20 whitespace-pre-wrap italic">
+                            {thinkingContent}
+                          </div>
+                        </details>
+                      )}
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw]}
+                        components={markdownComponents}
+                      >
+                        {displayText}
+                      </ReactMarkdown>
+                    </div>
                   );
                 }
                 if (part.type === "file" && part.mediaType?.startsWith("image/")) {
@@ -173,8 +195,8 @@ toast.error("保存失败，请重试", {
                 <div>
                   {meta?.usage ? (
                     <div className="flex items-center gap-1 text-[11px] font-mono whitespace-nowrap">
-                      <span style={{ color: meta.modelTier === "flash" ? "var(--pixel-blue)" : "var(--pixel-purple)" }}>
-                        {meta.modelTier === "flash" ? "⚡ flash" : "🚀 pro"}
+                      <span style={{ color: isMiniMax ? "var(--pixel-yellow)" : modelName.includes("flash") ? "var(--pixel-blue)" : "var(--pixel-purple)" }}>
+                        {isMiniMax ? "🎨 M3" : modelName.includes("flash") ? "⚡ flash" : "🚀 pro"}
                       </span>
                       <span className="text-muted-foreground/30">·</span>
                       <span className="text-muted-foreground/50">

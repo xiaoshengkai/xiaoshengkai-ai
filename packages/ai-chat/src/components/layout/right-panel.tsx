@@ -12,6 +12,8 @@ interface RetrievedChunk {
 interface RightPanelProps {
   messages: UIMessage[];
   isLoading: boolean;
+  selectedProvider: "deepseek" | "minimax";
+  onProviderChange: (p: "deepseek" | "minimax") => void;
 }
 
 function getLogColor(line: string) {
@@ -21,7 +23,7 @@ function getLogColor(line: string) {
   return {};
 }
 
-export default function RightPanel({ messages, isLoading }: RightPanelProps) {
+export default function RightPanel({ messages, isLoading, selectedProvider, onProviderChange }: RightPanelProps) {
   const [logLines, setLogLines] = useState<string[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval>>(null);
 
@@ -44,16 +46,17 @@ export default function RightPanel({ messages, isLoading }: RightPanelProps) {
     let totalInput = 0;
     let totalOutput = 0;
     let totalTokens = 0;
-    const modelTiers = new Set<string>();
     let classifyTotal = 0;
     let classifyInput = 0;
     let classifyOutput = 0;
     let retrievedChunks: RetrievedChunk[] | null = null;
+    let displayModel = "";
 
     for (const msg of messages) {
       const meta = msg.metadata as {
         usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
-        modelTier?: string;
+        provider?: string;
+        model?: string;
         classifyUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
         retrievedChunks?: RetrievedChunk[];
       } | undefined;
@@ -62,7 +65,7 @@ export default function RightPanel({ messages, isLoading }: RightPanelProps) {
         totalInput += meta.usage.inputTokens ?? 0;
         totalOutput += meta.usage.outputTokens ?? 0;
         totalTokens += meta.usage.totalTokens ?? 0;
-        if (meta.modelTier) modelTiers.add(meta.modelTier);
+        if (!displayModel && meta.model) displayModel = meta.model;
       }
       if (meta?.classifyUsage) {
         classifyInput += meta.classifyUsage.inputTokens ?? 0;
@@ -74,12 +77,12 @@ export default function RightPanel({ messages, isLoading }: RightPanelProps) {
       }
     }
 
-    const modelName = modelTiers.has("pro") ? "deepseek-v4-pro" : "deepseek-v4-flash";
+    const modelName = displayModel || (selectedProvider === "minimax" ? "MiniMax-M3" : "deepseek-v4-pro");
     const cost = calculateCost(modelName, totalInput, totalOutput)
       + calculateCost("deepseek-v4-flash", classifyInput, classifyOutput);
 
     return { totalTokens, cost, modelName, retrievedChunks };
-  }, [messages]);
+  }, [messages, selectedProvider]);
 
   return (
     <aside className="pixel-panel w-[280px] shrink-0 h-full flex flex-col overflow-hidden border-l-2 border-border">
@@ -94,8 +97,28 @@ export default function RightPanel({ messages, isLoading }: RightPanelProps) {
             模型
           </div>
           <div className="pixel-panel-card-body">
-            <p className="text-xs font-[family-name:var(--font-pixel)]">
-              {stats.modelName === "deepseek-v4-pro" ? "🚀 DeepSeek V4 Pro" : "⚡ DeepSeek V4 Flash"}
+            <div className="flex gap-1">
+              <button
+                onClick={() => onProviderChange("deepseek")}
+                className={`flex-1 px-2 py-1 text-[11px] font-[family-name:var(--font-pixel)] cursor-pointer border
+                  ${selectedProvider === "deepseek"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-transparent text-muted-foreground border-border hover:bg-muted"}`}
+              >
+                DeepSeek
+              </button>
+              <button
+                onClick={() => onProviderChange("minimax")}
+                className={`flex-1 px-2 py-1 text-[11px] font-[family-name:var(--font-pixel)] cursor-pointer border
+                  ${selectedProvider === "minimax"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-transparent text-muted-foreground border-border hover:bg-muted"}`}
+              >
+                MiniMax
+              </button>
+            </div>
+            <p className="text-xs font-[family-name:var(--font-pixel)] mt-1.5 text-muted-foreground">
+              {selectedProvider === "minimax" ? "🎨 MiniMax M3" : stats.modelName === "deepseek-v4-pro" ? "🚀 DeepSeek V4 Pro" : "⚡ DeepSeek V4 Flash"}
             </p>
           </div>
         </div>
@@ -152,7 +175,7 @@ export default function RightPanel({ messages, isLoading }: RightPanelProps) {
           <div className="pixel-panel-card-header" style={{ background: "var(--pixel-yellow)", borderBottomColor: "var(--pixel-yellow-dark)" }}>
             运行日志 ({logLines.length})
           </div>
-          <div className="pixel-panel-card-body max-h-[400px] overflow-y-auto">
+          <div className="pixel-panel-card-body max-h-[370px] overflow-y-auto">
             <div className="space-y-0.5">
               {logLines.length === 0 && (
                 <p className="text-[11px] font-[family-name:var(--font-pixel)] text-muted-foreground/50">

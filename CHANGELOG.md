@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.5.5 (2026-07-14) — 多模型接入 + MiniMax 适配 + 体验优化
+
+### 新增
+- **多模型支持**：右侧面板切换 DeepSeek / MiniMax，选 DeepSeek 保持自动路由（classifyTask → pro/flash），选 MiniMax 固定 M3
+- **模型选择持久化**：`sessionStorage` 存/读 `selectedProvider`，刷新不丢失
+- **MiniMax 思考过程显示**：` think` 标签自动提取为可折叠「思考过程」块，流式传输中实时更新（思考中→思考过程→正文）
+
+### 修复
+- **MiniMax thinking 标签报错**：`ReactMarkdown` + `rehype-raw` 渲染 `< think>` 标签导致 React 崩溃，改为 regex 提取 + `<details>` 折叠块
+- **MiniMax 思考过程流式优化**：处理三种状态（思考中/思考完成/无思考），流式传输不再报错
+- **MiniMax JSON 解析失败**：`mcp/lib/minimax.js` `content` 优先于 `reasoning_content`，修复小红书笔记生成时 JSON 解析失败
+- **页面刷新崩溃**：`useChat` 加 `onError` 回调，`toast.error` 替代 `unhandledRejection`
+- **发送后自动滚动**：`handleSend` 后 `setTimeout 50ms` 滚动到底部，显示 AI 等待状态
+
+### 优化
+- **TOOLS_PROMPT**：小红书笔记触发词更全（写篇笔记/做成笔记/总结成笔记），参数说明结构化，轮询行为明确
+- **系统提示词**：强化中文指令（"所有思考过程必须用中文描述"）
+- **小红书笔记格式**：表格改为结构化列表（`- **方案A**：成本100元，收益200元`），小红书不支持 Markdown 表格
+- **MiniMax 定价**：`cost.ts` 新增 MiniMax M3（$0.55/$2.19 per 1M tokens）
+
+### 变更文件
+- `packages/ai-chat/src/app/api/chat/route.ts` — provider 参数 + MiniMax 模型 + 中文思考强化 + TOOLS_PROMPT 优化
+- `packages/ai-chat/src/app/(main)/page.tsx` — selectedProvider 状态 + sessionStorage + onError + 即时滚动
+- `packages/ai-chat/src/components/layout/right-panel.tsx` — 模型切换按钮 + provider/model 字段适配
+- `packages/ai-chat/src/components/chat/message-item.tsx` — MiniMax thinking 标签提取 + 流式思考显示 + provider/model 字段
+- `packages/ai-chat/src/lib/cost.ts` — MiniMax M3 定价
+- `packages/mcp/lib/minimax.js` — content 优先于 reasoning_content
+- `packages/mcp/tools/xiaohongshu/index.js` — 表格 → 结构化列表 prompt
+
 ## v0.5.4 (2026-07-13) — 三栏布局 + 统一日志系统 + 控制台整理
 
 ### 新增

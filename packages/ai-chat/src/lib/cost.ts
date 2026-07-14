@@ -1,7 +1,8 @@
-// ponytail: hardcoded pricing, update when DeepSeek changes rates
+// ponytail: hardcoded pricing, update when rates change
 const PRICING: Record<string, { input: number; output: number }> = {
   "deepseek-v4-pro":  { input: 1.10, output: 4.40 },
   "deepseek-v4-flash": { input: 0.27, output: 1.10 },
+  "MiniMax-M3":       { input: 0.55, output: 2.19 },
 };
 
 const USD_TO_CNY = 7.2;

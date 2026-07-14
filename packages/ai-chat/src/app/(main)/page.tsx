@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
@@ -85,9 +85,29 @@ export default function ChatPage() {
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<{ data: string; name: string }[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<"deepseek" | "minimax">(() => {
+    const saved = (typeof window !== "undefined" ? sessionStorage.getItem("xsk-provider") : null) as "deepseek" | "minimax" | null;
+    return saved || "deepseek";
+  });
+  const providerRef = useRef(selectedProvider);
+  providerRef.current = selectedProvider;
+
+  const handleProviderChange = useCallback((p: "deepseek" | "minimax") => {
+    sessionStorage.setItem("xsk-provider", p);
+    setSelectedProvider(p);
+  }, []);
+
+  const transport = useMemo(() => new DefaultChatTransport({
+    api: "/api/chat",
+    body: () => ({ provider: providerRef.current }),
+  }), []);
 
   const { messages, setMessages, sendMessage, status, stop } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport,
+    onError: (err) => {
+      console.error("[chat] error:", err.message);
+      toast.error("请求失败，请重试");
+    },
   });
 
   useEffect(() => {
@@ -139,6 +159,9 @@ export default function ChatPage() {
     setImages([]);
     inputRef.current!.value = "";
     inputRef.current!.style.height = "auto";
+    setTimeout(() => {
+      virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "smooth" });
+    }, 50);
   };
 
   const handleInput = () => {
@@ -378,7 +401,12 @@ export default function ChatPage() {
         </div>
 
         {/* 右侧状态面板 */}
-        <RightPanel messages={messages} isLoading={isLoading} />
+        <RightPanel
+          messages={messages}
+          isLoading={isLoading}
+          selectedProvider={selectedProvider}
+          onProviderChange={handleProviderChange}
+        />
       </div>
     </ImageViewerProvider>
   );

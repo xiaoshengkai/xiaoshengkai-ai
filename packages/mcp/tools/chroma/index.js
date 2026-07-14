@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
-import { embedText, getCollection, searchCollection, listChatCollections } from "../../lib/chroma.js";
+import { embedText, getCollection, searchCollection, listChatCollections, listCollectionsForDb } from "../../lib/chroma.js";
 
 const SHARED_DB = process.env.CHROMA_SHARED_DB || "shared";
 const CHAT_DB = process.env.CHROMA_CHAT_DB || "chat";
@@ -69,12 +69,15 @@ export function register(server) {
 
         const targets = [];
         if (database) {
-          const targetCol = collection || defaultCollection(database);
-          if (database === SHARED_DB && targetCol === SHARED_COLLECTION) {
+          if (collection) {
             targets.push({ database: SHARED_DB, collection: SHARED_COLLECTION });
+            targets.push({ database, collection });
           } else {
             targets.push({ database: SHARED_DB, collection: SHARED_COLLECTION });
-            targets.push({ database, collection: targetCol });
+            const dbCols = await listCollectionsForDb(database).catch(() => [defaultCollection(database)]);
+            for (const col of dbCols) {
+              targets.push({ database, collection: col });
+            }
           }
         } else {
           targets.push({ database: SHARED_DB, collection: SHARED_COLLECTION });

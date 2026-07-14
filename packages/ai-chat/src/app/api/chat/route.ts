@@ -214,7 +214,7 @@ export async function POST(req: Request) {
     // 检索相关知识 + 任务分类（并行）
     let knowledgeContext = '';
     const [retrieved, classifyResult] = await Promise.all([
-      retrieveRelevantChunks(userQuery, 3),
+      retrieveRelevantChunks(userQuery, 5),
       provider === 'minimax' ? Promise.resolve(null) : classifyTask(userQuery),
     ]);
     const tier = classifyResult?.tier ?? 'pro';

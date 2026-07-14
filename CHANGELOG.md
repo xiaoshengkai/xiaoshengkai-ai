@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.5.5 (2026-07-15) — 搜索增强 + 交互优化 + MiniMax 探索
+
+### 搜索增强
+- **MCP searchKnowledge**：`database` 指定且无 `collection` 时，搜该库所有 collection（新增 `listCollectionsForDb`），解决"聊天 AI 搜不到金融表"问题
+- **RAG 预检索**：`topK` 3 → 5，给跨 collection 内容更多命中机会
+- **记忆库批量删除**：删除后调用 `reloadList()` 从 API 验证，确保数据一致
+
+### 交互优化
+- **MiniMax 思考过程**：`details` 默认折叠，思考中自动展开，思考结束自动折叠
+- **记忆库按钮**：搜索/整理数据/批量删除统一为像素立体感 + 固定颜色 + `cursor-pointer`，移除 hover 变色
+
+### MiniMax 探索（未采纳）
+- 尝试 `@ai-sdk/anthropic` 接入 MiniMax Anthropic 端点：v4 版本不兼容 AI SDK v6，v3 版本构建通过但运行时未知，最终回退
+- 确认：`createOpenAICompatible` 下 MiniMax 不支持 tool calling（`[checkXiaohongshuNoteProgress]` 刷屏），只能客户端 regex 处理 thinking 标签
+
+### 变更文件
+- `packages/mcp/lib/chroma.js` — 新增 `listCollectionsForDb`
+- `packages/mcp/tools/chroma/index.js` — searchKnowledge 跨 collection 搜索
+- `packages/ai-chat/src/app/api/chat/route.ts` — RAG topK 3→5
+- `packages/ai-chat/src/app/(main)/memory/page.tsx` — 删除后 reloadList + 按钮样式统一
+- `packages/ai-chat/src/components/chat/message-item.tsx` — thinking 思考中展开/结束折叠
+
 ## v0.5.5 (2026-07-14) — 多模型接入 + MiniMax 适配 + 体验优化
 
 ### 新增

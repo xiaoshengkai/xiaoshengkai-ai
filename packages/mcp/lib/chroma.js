@@ -91,6 +91,12 @@ export async function listChatCollections() {
   return chatCollectionsCache.data;
 }
 
+export async function listCollectionsForDb(database) {
+  const client = getChromaClient(database);
+  const cols = await client.listCollections();
+  return (cols || []).map(c => c.name);
+}
+
 export async function searchChroma(query, topK = 8) {
   const queryVec = await embedText(query);
 

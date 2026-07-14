@@ -137,7 +137,7 @@ toast.error("保存失败，请重试", {
                   return (
                     <div key={i}>
                       {thinkingContent && (
-                        <details open className="not-prose mb-2 text-xs opacity-70">
+                        <details open={!!partialThinking} className="not-prose mb-2 text-xs opacity-70">
                           <summary className="cursor-pointer hover:opacity-100">
                             {partialThinking ? "思考中…" : "思考过程"}
                           </summary>

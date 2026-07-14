@@ -171,12 +171,8 @@ export default function MemoryLibraryPage() {
     setDeleting(false);
     if (res.ok) {
       setSelected(new Set());
-      if (searchResult) {
-        const remaining = searchResult.results.filter((r) => !ids.includes(r.id));
-        setSearchResult({ ...searchResult, results: remaining });
-      } else {
-        setChunks((prev) => prev.filter((c) => !ids.includes(c.id)));
-      }
+      setSearchResult(null);
+      void reloadList();
     } else {
       alert(`删除失败: ${res.error}`);
     }
@@ -309,7 +305,8 @@ export default function MemoryLibraryPage() {
             <button
               onClick={() => { if (searchInput.trim()) { void doSearch(); } else { void reloadList(); } }}
               disabled={searching}
-              className="pixel-btn px-5 py-2 text-sm"
+              className="px-5 py-2 text-sm text-white font-[family-name:var(--font-pixel)] cursor-pointer"
+              style={{ background: "var(--primary)", border: "3px solid var(--primary)", boxShadow: "3px 0 0 0 var(--primary), 0 3px 0 0 var(--primary), 3px 3px 0 0 var(--primary)" }}
             >
               {searching ? "搜索中…" : "搜索"}
             </button>
@@ -317,7 +314,7 @@ export default function MemoryLibraryPage() {
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogTrigger
                 className="px-5 py-2 text-sm text-white font-[family-name:var(--font-pixel)]"
-                style={{ background: "var(--pixel-red)" }}
+                style={{ background: "var(--pixel-red)", border: "3px solid var(--pixel-red)", boxShadow: "3px 0 0 0 var(--pixel-red-dark), 0 3px 0 0 var(--pixel-red-dark), 3px 3px 0 0 var(--pixel-red-dark)" }}
               >
                 整理数据
               </AlertDialogTrigger>
@@ -360,7 +357,10 @@ export default function MemoryLibraryPage() {
                 <>
                   <span className="text-xs text-destructive">已选 {selected.size} 条</span>
                   <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                    <AlertDialogTrigger className="pixel-btn-danger px-2 py-0.5 text-xs">
+                    <AlertDialogTrigger
+                      className="px-2 py-0.5 text-xs text-white font-[family-name:var(--font-pixel)] cursor-pointer"
+                      style={{ background: "var(--pixel-red)", border: "3px solid var(--pixel-red)", boxShadow: "3px 0 0 0 var(--pixel-red-dark), 0 3px 0 0 var(--pixel-red-dark), 3px 3px 0 0 var(--pixel-red-dark)" }}
+                    >
                       批量删除
                     </AlertDialogTrigger>
                     <AlertDialogContent>

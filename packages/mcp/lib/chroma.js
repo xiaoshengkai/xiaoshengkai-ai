@@ -48,6 +48,28 @@ export async function getCollection(database, collectionName) {
 }
 
 export async function embedText(text) {
+  const MAX_CHARS = 2000;
+  if (text.length <= MAX_CHARS) {
+    return embedSingle(text);
+  }
+  const chunks = [];
+  for (let i = 0; i < text.length; i += MAX_CHARS) {
+    chunks.push(text.slice(i, i + MAX_CHARS));
+  }
+  const embeddings = await Promise.all(
+    chunks.map(chunk => embedSingle(chunk))
+  );
+  const dims = embeddings[0].length;
+  const avg = new Array(dims).fill(0);
+  for (const emb of embeddings) {
+    for (let i = 0; i < dims; i++) {
+      avg[i] += emb[i] / embeddings.length;
+    }
+  }
+  return avg;
+}
+
+async function embedSingle(text) {
   let lastErr;
   for (let attempt = 1; attempt <= EMBED_MAX_RETRIES; attempt++) {
     try {
@@ -58,6 +80,7 @@ export async function embedText(text) {
       return embedding;
     } catch (err) {
       lastErr = err;
+      console.log(`[chroma:embedText] attempt ${attempt}/${EMBED_MAX_RETRIES} failed:`, err.message, "| cause:", err.cause, "| details:", JSON.stringify(err));
       const waitMs = 1000 * Math.pow(2, attempt - 1);
       await new Promise((r) => setTimeout(r, waitMs));
     }

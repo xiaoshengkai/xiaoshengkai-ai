@@ -13,14 +13,30 @@
 
 ### MiniMax 探索（未采纳）
 - 尝试 `@ai-sdk/anthropic` 接入 MiniMax Anthropic 端点：v4 版本不兼容 AI SDK v6，v3 版本构建通过但运行时未知，最终回退
-- 确认：`createOpenAICompatible` 下 MiniMax 不支持 tool calling（`[checkXiaohongshuNoteProgress]` 刷屏），只能客户端 regex 处理 thinking 标签
+- 确认：`createOpenAICompatible` 下 MiniMax 不支持 tool calling
+
+### MiniMax reasoning_split（采纳）
+- `providers.ts` 自定义 `fetch` 注入 `reasoning_split: true`，思考内容分离，正文干净
+- AI SDK 原生支持 `reasoning_content` → `isReasoningUIPart`，思考过程自动显示为折叠块
+- 删除 `message-item.tsx` 中 ~30 行 thinking regex 处理代码
+
+### GLM embedding 长文本优化
+- `embedText` 改为自动分段：≤2000 字直接 embedding，>2000 字分段并行 embedding 后取平均
+- 解决 `addKnowledge`/`updateKnowledge` 长文本（5000+ 字）embedding 失败问题
+- 删除 selftest 代码
+
+### 其他修复
+- **Hydration 不匹配**：`selectedProvider` 改用 `useEffect` 懒加载 `sessionStorage`
+- **滚动按钮**：改为 `absolute` 定位，浮在输入框上方
+- **Chroma 日志**：`updateKnowledge`/`deleteKnowledge` 加全链路日志
+- **旧日志清理**：删除 `mcp-*.log`、`nextjs-*.log`
 
 ### 变更文件
-- `packages/mcp/lib/chroma.js` — 新增 `listCollectionsForDb`
-- `packages/mcp/tools/chroma/index.js` — searchKnowledge 跨 collection 搜索
-- `packages/ai-chat/src/app/api/chat/route.ts` — RAG topK 3→5
-- `packages/ai-chat/src/app/(main)/memory/page.tsx` — 删除后 reloadList + 按钮样式统一
-- `packages/ai-chat/src/components/chat/message-item.tsx` — thinking 思考中展开/结束折叠
+- `packages/ai-chat/src/lib/providers.ts` — 自定义 fetch + reasoning_split
+- `packages/ai-chat/src/components/chat/message-item.tsx` — 删除 thinking regex
+- `packages/ai-chat/src/app/(main)/page.tsx` — hydration 修复 + 滚动按钮定位
+- `packages/mcp/lib/chroma.js` — 分段 embedding + 日志增强
+- `packages/mcp/tools/chroma/index.js` — updateKnowledge/deleteKnowledge 日志 + 删除 selftest
 
 ## v0.5.5 (2026-07-14) — 多模型接入 + MiniMax 适配 + 体验优化
 

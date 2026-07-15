@@ -118,16 +118,26 @@ export function register(server) {
       try {
         const db = database || CHAT_DB;
         const col = collection || defaultCollection(db);
+        console.log(`[chroma:updateKnowledge] id=${id.slice(0, 12)} db=${db} col=${col} contentLen=${newContent.length}`);
         const c = await getCollection(db, col);
         const existing = await c.get({ ids: [id], include: ["metadatas"] });
-        if (existing.ids.length === 0) return toolResult({ ok: false, error: `id 不存在: ${id}` });
+        if (existing.ids.length === 0) {
+          console.log(`[chroma:updateKnowledge] id 不存在: ${id}`);
+          return toolResult({ ok: false, error: `id 不存在: ${id}` });
+        }
         const meta = existing.metadatas?.[0] ?? {};
-        if (meta.deleted === true) return toolResult({ ok: false, error: "id 已软删，请先 restoreKnowledgeById 撤销" });
+        if (meta.deleted === true) {
+          console.log(`[chroma:updateKnowledge] id 已软删: ${id}`);
+          return toolResult({ ok: false, error: "id 已软删，请先 restoreKnowledgeById 撤销" });
+        }
         const newEmbedding = await embedText(newContent);
+        console.log(`[chroma:updateKnowledge] embedding 完成, dims=${newEmbedding.length}`);
         const updatedAt = Date.now();
         await c.update({ ids: [id], embeddings: [newEmbedding], documents: [newContent], metadatas: [{ ...meta, updatedAt }] });
+        console.log(`[chroma:updateKnowledge] 更新成功 id=${id.slice(0, 12)}`);
         return toolResult({ ok: true, data: { id, charCount: newContent.length, updatedAt } });
       } catch (err) {
+        console.log(`[chroma:updateKnowledge] 失败: ${err.message}`);
         return toolResult({ ok: false, error: `updateKnowledge 失败: ${err.message}` });
       }
     },
@@ -145,15 +155,24 @@ export function register(server) {
       try {
         const db = database || CHAT_DB;
         const col = collection || defaultCollection(db);
+        console.log(`[chroma:deleteKnowledge] id=${id.slice(0, 12)} db=${db} col=${col}`);
         const c = await getCollection(db, col);
         const existing = await c.get({ ids: [id], include: ["metadatas"] });
-        if (existing.ids.length === 0) return toolResult({ ok: false, error: `id 不存在: ${id}` });
+        if (existing.ids.length === 0) {
+          console.log(`[chroma:deleteKnowledge] id 不存在: ${id}`);
+          return toolResult({ ok: false, error: `id 不存在: ${id}` });
+        }
         const meta = existing.metadatas?.[0] ?? {};
-        if (meta.deleted === true) return toolResult({ ok: false, error: "id 已处于软删状态" });
+        if (meta.deleted === true) {
+          console.log(`[chroma:deleteKnowledge] id 已软删: ${id}`);
+          return toolResult({ ok: false, error: "id 已处于软删状态" });
+        }
         const deletedAt = Date.now();
         await c.update({ ids: [id], metadatas: [{ ...meta, deleted: true, deletedAt }] });
+        console.log(`[chroma:deleteKnowledge] 软删成功 id=${id.slice(0, 12)}`);
         return toolResult({ ok: true, data: { id, deletedAt, undoExpiresAt: deletedAt + SOFT_DELETE_WINDOW_MS, windowMs: SOFT_DELETE_WINDOW_MS } });
       } catch (err) {
+        console.log(`[chroma:deleteKnowledge] 失败: ${err.message}`);
         return toolResult({ ok: false, error: `deleteKnowledge 失败: ${err.message}` });
       }
     },

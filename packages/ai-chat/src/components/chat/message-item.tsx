@@ -126,34 +126,15 @@ toast.error("保存失败，请重试", {
                     );
                   }
 
-                  const thinkingMatch = part.text.match(/<think[^>]*>([\s\S]*?)<\/think>/i);
-                  const partialThinking = !thinkingMatch && isLoading
-                    ? part.text.match(/<think[^>]*>([\s\S]*)/i)
-                    : null;
-                  const cleanText = part.text.replace(/<think[^>]*>[\s\S]*?<\/think>\n?/gi, "");
-                  const displayText = thinkingMatch ? cleanText : partialThinking ? "" : part.text;
-                  const thinkingContent = thinkingMatch?.[1]?.trim() || partialThinking?.[1]?.trim();
-
                   return (
-                    <div key={i}>
-                      {thinkingContent && (
-                        <details open={!!partialThinking} className="not-prose mb-2 text-xs opacity-70">
-                          <summary className="cursor-pointer hover:opacity-100">
-                            {partialThinking ? "思考中…" : "思考过程"}
-                          </summary>
-                          <div className="mt-1 pl-3 border-l-2 border-current/20 whitespace-pre-wrap italic">
-                            {thinkingContent}
-                          </div>
-                        </details>
-                      )}
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw]}
-                        components={markdownComponents}
-                      >
-                        {displayText}
-                      </ReactMarkdown>
-                    </div>
+                    <ReactMarkdown
+                      key={i}
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
+                      components={markdownComponents}
+                    >
+                      {part.text}
+                    </ReactMarkdown>
                   );
                 }
                 if (part.type === "file" && part.mediaType?.startsWith("image/")) {

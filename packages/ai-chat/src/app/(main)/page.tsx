@@ -85,12 +85,14 @@ export default function ChatPage() {
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<{ data: string; name: string }[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<"deepseek" | "minimax">(() => {
-    const saved = (typeof window !== "undefined" ? sessionStorage.getItem("xsk-provider") : null) as "deepseek" | "minimax" | null;
-    return saved || "deepseek";
-  });
+  const [selectedProvider, setSelectedProvider] = useState<"deepseek" | "minimax">("deepseek");
   const providerRef = useRef(selectedProvider);
   providerRef.current = selectedProvider;
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("xsk-provider") as "deepseek" | "minimax" | null;
+    if (saved) setSelectedProvider(saved);
+  }, []);
 
   const handleProviderChange = useCallback((p: "deepseek" | "minimax") => {
     sessionStorage.setItem("xsk-provider", p);
@@ -303,11 +305,11 @@ export default function ChatPage() {
           />
 
           <div className="p-4">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto relative">
               {!isAtBottom && messages.length > 5 && (
                 <button
                   onClick={() => virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "smooth" })}
-                  className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-muted-foreground/15 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer float-right mb-2"
+                  className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-muted-foreground/15 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer absolute -top-12 right-0"
                 >
                   <ChevronDown className="size-3.5 text-muted-foreground/50" />
                 </button>

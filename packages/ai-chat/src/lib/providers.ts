@@ -16,4 +16,11 @@ export const minimax = createOpenAICompatible({
   name: "minimax",
   baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.chat/v1",
   apiKey: process.env.MINIMAX_API_KEY,
+  fetch: async (url, init) => {
+    const body = JSON.parse(init?.body as string || "{}");
+    return fetch(url, {
+      ...init,
+      body: JSON.stringify({ ...body, reasoning_split: true }),
+    });
+  },
 });

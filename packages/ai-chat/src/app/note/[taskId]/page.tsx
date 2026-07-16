@@ -81,7 +81,7 @@ export default function NotePreviewPage() {
 
           <div className="mt-4 text-[15px] leading-relaxed text-gray-800 space-y-3">
             {note.content?.map((seg, i) => {
-              const match = seg.match(/^\[插图-(\d+)\]$/);
+              const match = seg.match(/^\[IMG-(\d+)\]$/);
               if (match) {
                 const img = illustrations[parseInt(match[1], 10) - 1];
                 if (img?.url) {

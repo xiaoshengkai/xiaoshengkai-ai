@@ -95,7 +95,7 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
         <h3 className="text-base font-bold mb-3">{note.title}</h3>
         <div className="text-sm space-y-2">
           {note.content?.map((seg, i) => {
-            const match = seg.match(/^\[插图-(\d+)\]$/);
+            const match = seg.match(/^\[IMG-(\d+)\]$/);
             if (match) {
               const img = illustrations[parseInt(match[1], 10) - 1];
               if (img?.url) {

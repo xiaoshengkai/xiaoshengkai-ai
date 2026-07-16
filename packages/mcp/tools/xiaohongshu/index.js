@@ -97,7 +97,7 @@ async function callLLM(prompt, style, subcategory) {
 {
   "title": "笔记标题（10-20字，吸引人）",
   "excerpt": "精彩摘要，≤30字，吸引读者点击阅读",
-  "content": ["段落1", "[插图-1]", "段落2", "[插图-2]", "段落3"],
+  "content": ["段落1", "[IMG-1]", "段落2", "[IMG-2]", "段落3"],
   "tags": ["#标签1", "#标签2", "#标签3"],
   "coverPrompt": "封面图英文 prompt",
   "illustrationPrompts": ["插画1英文prompt", "插画2英文prompt"]
@@ -107,12 +107,12 @@ async function callLLM(prompt, style, subcategory) {
 - 正文6-10段，每段3-5句，内容丰富但不啰嗦
 - 每个概念配一个具体、有画面感的例子，让读者看完就能记住
 - 同类数据对比用结构化列表（不要用表格，小红书不支持），每项一行，格式示例：
-  - **信息差套利**：100元启动，1-2天回本，利润率50-100%，门槛低，复利⭐⭐
-  - **技能变现**：0元启动，1-3天回本，利润率200%+，门槛中高，复利⭐⭐⭐⭐⭐
+  - **信息差套利**：100元启动，1-2天回本，利润率50-100%，门槛低，复利2颗星
+  - **技能变现**：0元启动，1-3天回本，利润率200%+，门槛中高，复利4颗星
 - 可用内容形式：### 小标题分段、**加粗**强调、- 列表拆解、> 金句引用
 - 每段根据内容选合适格式，不堆纯文字，段落间用空行隔开
 - 插画3-5张，穿插在段落之间，长内容多配图降低阅读压力
-- content 数组用 "[插图-N]" 标记插画位置
+- content 数组用 "[IMG-N]" 标记插画位置
 - 封面 prompt 要求：${template.coverStyle}
 - 插画 prompt 要求：${template.illustrationStyle}
 - 所有 prompt 用英文，描述具体画面内容
@@ -299,7 +299,7 @@ export function register(server) {
           try {
             state.content = JSON.parse(value);
           } catch {
-            return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "content 必须是 JSON 数组字符串，如 [\"段落1\",\"[插图-1]\",\"段落2\"]" }) }] };
+            return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "content 必须是 JSON 数组字符串，如 [\"段落1\",\"[IMG-1]\",\"段落2\"]" }) }] };
           }
           writeTaskState(workDir, state);
         } else if (field === "tags") {
@@ -400,7 +400,7 @@ export function register(server) {
 
         const markdown = state.content
           .map((seg) => {
-            const match = seg.match(/^\[插图-(\d+)\]$/);
+            const match = seg.match(/^\[IMG-(\d+)\]$/);
             if (match) {
               const img = state.images[parseInt(match[1], 10)];
               if (img?.url) return `<img src="./images/${img.type === "cover" ? "cover" : `illustration-${img.index}`}.png" alt="插图" class="img-block">`;

@@ -10,9 +10,8 @@ import { toast } from "sonner";
 import MessageItem from "@/components/chat/message-item";
 import { ImageViewerProvider } from "@/components/ui/image-viewer";
 import RightPanel from "@/components/layout/right-panel";
+import { useConversation } from "@/components/layout/conversation-context";
 import { calculateCost, formatTokens } from "@/lib/cost";
-
-const STORAGE_KEY = "xsk-ai-chat-messages";
 
 const LoadingDots = React.memo(function LoadingDots() {
   return (
@@ -75,11 +74,14 @@ const EmptyState = React.memo(function EmptyState() {
   );
 });
 
+function generateId() {
+  return `conv-${Date.now().toString(36)}`;
+}
+
 export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const atBottomRef = useRef(true);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [compressState, setCompressState] = useState<"idle" | "loading">("idle");
   const [isFocused, setIsFocused] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -88,6 +90,14 @@ export default function ChatPage() {
   const [selectedProvider, setSelectedProvider] = useState<"deepseek" | "minimax">("deepseek");
   const providerRef = useRef(selectedProvider);
   providerRef.current = selectedProvider;
+  const { activeConversationId, setActiveConversationId, clearMessagesRef, triggerRefresh, newIdsRef } = useConversation();
+  const convIdRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+
+  clearMessagesRef.current = () => {
+    setMessages([]);
+    convIdRef.current = null;
+  };
 
   useEffect(() => {
     const saved = sessionStorage.getItem("xsk-provider") as "deepseek" | "minimax" | null;
@@ -112,41 +122,76 @@ export default function ChatPage() {
     },
   });
 
+  const saveConversation = useCallback(async () => {
+    if (!convIdRef.current || messages.length === 0 || savingRef.current) return;
+    savingRef.current = true;
+    const title = (messages[0]?.parts?.find((p: any) => p.type === "text") as any)?.text?.slice(0, 30) || "未命名对话";
+    try {
+      await fetch("/api/conversations/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: convIdRef.current,
+          title,
+          messages,
+          model: selectedProvider,
+        }),
+      });
+      triggerRefresh();
+      newIdsRef.current.delete(convIdRef.current);
+    } catch { /* ignore */ }
+    savingRef.current = false;
+  }, [messages, newIdsRef, selectedProvider, triggerRefresh]);
+
+  // 切换对话时加载新对话
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setMessages(JSON.parse(saved));
-      setTimeout(() => {
-        virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "auto" });
-      }, 100);
+    if (activeConversationId === convIdRef.current) return;
+
+    const switchConversation = async () => {
+      stop(); // 中断AI回答
+      if (activeConversationId && !newIdsRef.current.has(activeConversationId)) {
+        try {
+          const res = await fetch(`/api/conversations/getDetail?id=${activeConversationId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setMessages(data.messages || []);
+            convIdRef.current = activeConversationId;
+            setTimeout(() => {
+              virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "auto" });
+            }, 100);
+            return;
+          }
+        } catch { /* ignore */ }
+      }
+      // 新对话
+      setMessages([]);
+      convIdRef.current = null;
+    };
+
+    switchConversation();
+  }, [activeConversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // AI 回复完成后保存
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (prevStatusRef.current === "streaming" && status === "ready" && convIdRef.current && messages.length > 0) {
+      saveConversation();
     }
-  }, [setMessages]);
+    prevStatusRef.current = status;
+  }, [status, messages.length, saveConversation]);
 
   const isLoading = status === "streaming" || status === "submitted";
   const showFooter = isLoading && (messages.length === 0 || messages[messages.length - 1]?.role === "user");
   const hasMessages = messages.length > 0;
 
-  useEffect(() => {
-    if (!hasMessages) return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const cleaned = messages.map((m: any) => ({
-        ...m,
-        parts: (m.parts || []).map((p: any) => ({
-          ...p,
-          text: typeof p.text === "string" ? p.text.replace(/\[图片数据:data:image\/[^\]]+\]/g, "") : p.text,
-        })),
-      }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-    }, 300);
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [messages, hasMessages]);
-
   const handleSend = async () => {
     const value = inputRef.current?.value.trim();
     if (!value && images.length === 0) return;
+
+    // 发送前保存当前对话
+    if (convIdRef.current && messages.length > 0) {
+      await saveConversation();
+    }
 
     let text = value || "请看这张图";
 
@@ -155,6 +200,15 @@ export default function ChatPage() {
       const imgDataTag = images.map((img) => `[图片数据:${img.data}]`).join("\n");
       const imgTag = images.map((_, i) => `[上传图片:${i}]`).join("\n");
       text = imgDataTag + "\n" + imgTag + "\n\n" + text;
+    }
+
+    if (!convIdRef.current) {
+      const id = activeConversationId || generateId();
+      convIdRef.current = id;
+      if (!activeConversationId) {
+        newIdsRef.current.add(id);
+        setActiveConversationId(id);
+      }
     }
 
     sendMessage({ text });
@@ -203,7 +257,6 @@ export default function ChatPage() {
         metadata: { usage: data.usage, modelTier: "pro" },
       };
       setMessages([newMsg]);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([newMsg]));
       toast(`已压缩 · ${formatTokens(data.usage.totalTokens)} tokens · ¥${cost.toFixed(4)}`, { duration: 1500 });
     } catch {
       toast.error("压缩失败，请重试", { duration: 1000 });
@@ -211,11 +264,6 @@ export default function ChatPage() {
       setCompressState("idle");
     }
   }, [hasMessages, messages, setMessages]);
-
-  const handleClear = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setMessages([]);
-  }, [setMessages]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
@@ -340,12 +388,6 @@ export default function ChatPage() {
                       disabled={compressState === "loading"}
                     >
                       {compressState === "loading" ? "压缩中..." : "压缩对话"}
-                    </button>
-                    <button
-                      className="pixel-btn-danger px-2 py-0.5 text-xs font-mono font-bold"
-                      onClick={handleClear}
-                    >
-                      重新开始
                     </button>
                   </div>
                 </div>

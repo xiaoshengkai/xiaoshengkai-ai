@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.5.6 (2026-07-16) — 历史对话列表 + 保存逻辑简化
+
+### 新增
+- **历史对话列表**：左侧菜单栏新增对话列表，JSON 文件持久化（`data/conversations/`），支持新对话/切换/删除/置顶
+- **对话 API**：`/api/conversations/getList`、`getDetail`、`save`、`delete`、`pin`
+- **对话 Context**：`conversation-context.tsx` 管理对话状态，页面和侧边栏共享
+
+### 简化
+- **保存逻辑**：只在发送前 + AI 回复完成后保存，不再 debounce 自动保存
+- **删除"重新开始"按钮**：对话列表已替代"新对话"功能
+- **页面首次加载**：不再自动加载最新对话，从空白状态开始
+
+### 修复
+- **MiniMax thinking**：`reasoning_split: true` 后 AI SDK 原生处理思考过程，删除 ~30 行 regex 代码
+- **小红书笔记**：`[插图-N]` → `[IMG-N]` 英文占位符，避免中文误匹配
+- **cursor 不生效**：`.pixel-bg::after` 的 `z-index: 9999` 覆盖全屏拦截光标，改为 `z-index: 0`
+
+### 变更文件
+- `packages/ai-chat/src/app/api/conversations/` — 新增 5 个 API 路由
+- `packages/ai-chat/src/components/layout/conversation-context.tsx` — 新增
+- `packages/ai-chat/src/components/layout/left-sidebar.tsx` — 对话列表 + 置顶/删除
+- `packages/ai-chat/src/app/(main)/page.tsx` — 简化保存逻辑 + 删除 localStorage
+- `packages/ai-chat/src/app/(main)/layout.tsx` — 包裹 ConversationProvider
+- `packages/ai-chat/src/app/globals.css` — 修复 cursor
+- `packages/mcp/tools/xiaohongshu/index.js` — [IMG-N] 占位符
+
 ## v0.5.5 (2026-07-15) — 搜索增强 + 交互优化 + MiniMax 探索
 
 ### 搜索增强

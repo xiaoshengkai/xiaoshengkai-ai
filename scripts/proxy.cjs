@@ -27,7 +27,7 @@ const MIME = {
 };
 
 function serveStatic(req, res) {
-  let urlPath = req.url.replace(/^\/blog\/?/, '');
+  let urlPath = req.url.replace(/^\//, '');
   if (!urlPath) urlPath = 'index.html';
   let filePath = path.join(SITE_DIR, urlPath);
   if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
@@ -44,15 +44,15 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer((req, res) => {
-  if (req.url.startsWith('/blog')) {
-    serveStatic(req, res);
-  } else {
+  if (req.url.startsWith('/ai')) {
     proxy.web(req, res);
+  } else {
+    serveStatic(req, res);
   }
 });
 
 server.listen(4321, () => {
   console.log('代理已启动 → http://localhost:4321');
-  console.log('  /       → AI 工作台 (localhost:4567)');
-  console.log('  /blog/  → 博客 (site/)');
+  console.log('  /      → 博客 (site/)');
+  console.log('  /ai/   → AI 工作台 (localhost:4567)');
 });

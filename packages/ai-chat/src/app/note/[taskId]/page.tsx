@@ -1,5 +1,6 @@
 "use client";
 
+import { BASE } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -31,7 +32,7 @@ export default function NotePreviewPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/note/${taskId}/status`)
+    fetch(`${BASE}/api/note/${taskId}/status`)
       .then((r) => r.json())
       .then((data) => {
         setNote(data);

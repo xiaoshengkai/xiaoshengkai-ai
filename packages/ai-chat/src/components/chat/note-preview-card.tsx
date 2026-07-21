@@ -1,3 +1,5 @@
+
+import { BASE } from "@/lib/api-path";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -35,7 +37,7 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
     async function poll() {
       while (!cancelled && attempts < 30) {
         try {
-          const res = await fetch(`/api/note/${taskId}/status`);
+          const res = await fetch(`${BASE}/api/note/${taskId}/status`);
           const data = await res.json();
           if (!cancelled) {
             setNote(data);

@@ -1,3 +1,5 @@
+
+import { BASE } from "@/lib/api-path";
 "use client";
 
 import { useMemo, useEffect, useState, useRef } from "react";
@@ -30,7 +32,7 @@ export default function RightPanel({ messages, isLoading, selectedProvider, onPr
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const res = await fetch("/api/logs");
+        const res = await fetch(`${BASE}/api/logs`);
         if (res.ok) {
           const data = await res.json();
           setLogLines(data.lines);

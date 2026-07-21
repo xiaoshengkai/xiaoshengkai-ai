@@ -1,5 +1,7 @@
+
 "use client";
 
+import { BASE } from "@/lib/api-path";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
@@ -36,7 +38,7 @@ const menuItems = [
   { href: "/tools", label: "工具库", icon: Wrench, disabled: true },
   { href: "/workflow", label: "工作流", icon: GitBranch, disabled: true },
   { href: "/schedule", label: "定时任务", icon: Clock, disabled: true },
-  { href: "https://node.tailddce43.ts.net/blog/", label: "博客", icon: FileText },
+  { href: "https://node.tailddce43.ts.net", label: "博客", icon: FileText },
   { href: "/settings", label: "设置", icon: Settings, disabled: true },
 ];
 
@@ -54,7 +56,7 @@ export default function LeftSidebar({
 
   const fetchConversations = useCallback(async () => {
     try {
-      const res = await fetch("/api/conversations/getList");
+      const res = await fetch(`${BASE}/api/conversations/getList`);
       if (res.ok) {
         const data = await res.json();
         // 排序：置顶在前，然后按时间倒序
@@ -93,7 +95,7 @@ export default function LeftSidebar({
       onNewConversation();
     }
     try {
-      await fetch(`/api/conversations/delete?id=${id}`, { method: "DELETE" });
+      await fetch(`${BASE}/api/conversations/delete?id=${id}`, { method: "DELETE" });
       setConversations(prev => prev.filter(c => c.id !== id));
     } catch { /* ignore */ }
   };
@@ -101,7 +103,7 @@ export default function LeftSidebar({
   const handlePin = async (id: string, pinned: boolean) => {
     setMenuOpen(null);
     try {
-      await fetch(`/api/conversations/pin?id=${id}&pinned=${!pinned}`, { method: "POST" });
+      await fetch(`${BASE}/api/conversations/pin?id=${id}&pinned=${!pinned}`, { method: "POST" });
       setConversations(prev => prev.map(c => c.id === id ? { ...c, pinned: !pinned } : c));
     } catch { /* ignore */ }
   };

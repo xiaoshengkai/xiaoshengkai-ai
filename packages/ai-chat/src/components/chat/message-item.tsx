@@ -1,5 +1,7 @@
+
 "use client";
 
+import { BASE } from "@/lib/api-path";
 import { useMemo, useState, useCallback } from "react";
 import { isToolUIPart, isReasoningUIPart, type UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
@@ -58,7 +60,7 @@ export default function MessageItem({
 
     setSaveState("loading");
     try {
-      const res = await fetch("/api/memory", {
+      const res = await fetch(`${BASE}/api/memory`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
@@ -112,11 +114,11 @@ toast.error("保存失败，请重试", {
               {deduplicatedParts.map((part, i) => {
                 if (part.type === "text") {
                   if (msg.role === "user") {
-                    const segments = part.text.split(/(\[图片:\/api\/uploads\/[^\]]+\])/g);
+                    const segments = part.text.split(/(\[图片:[^\]]+\])/g);
                     return (
                       <span key={i}>
                         {segments.map((seg, j) => {
-                          const m = seg.match(/^\[图片:(\/api\/uploads\/.+)\]$/);
+                          const m = seg.match(/^\[图片:([^\]]+)\]$/);
                           if (m) {
                             const index = register(m[1]);
                             return <img key={j} src={m[1]} onClick={() => open(index)} className="max-w-full max-h-48 pixel-img mb-2 cursor-zoom-in" alt="图片" />;

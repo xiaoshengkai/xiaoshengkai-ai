@@ -132,8 +132,8 @@ async function preprocessImages(messages: any[]): Promise<{ messages: any[]; ima
     /^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(p.text?.trim()),
   );
 
-  // 检测 [图片:/api/uploads/...] 标记
-  const uploadParts = textParts.filter((p: any) => p.text?.includes('[图片:/api/uploads/'));
+  // 检测 [图片:...] 标记
+  const uploadParts = textParts.filter((p: any) => p.text?.includes('[图片:/'));
   const hasImages = uploadParts.length > 0 || imageUrlParts.length > 0;
   if (!hasImages) return { messages };
 
@@ -146,9 +146,10 @@ async function preprocessImages(messages: any[]): Promise<{ messages: any[]; ima
 
     if (uploadParts.length > 0) {
       for (const up of uploadParts) {
-        const match = up.text.match(/\[图片:(\/api\/uploads\/[^\]]+)\]/);
+        const match = up.text.match(/\[图片:([^\]]+)\]/);
         if (match) {
-          const filePath = path.resolve(process.cwd(), '..', '..', 'data', 'uploads', path.basename(match[1]));
+          const filename = path.basename(match[1]);
+          const filePath = path.resolve(process.cwd(), '..', '..', 'data', 'uploads', filename);
           if (fs.existsSync(filePath)) {
             const buffer = fs.readFileSync(filePath);
             const base64 = `data:image/png;base64,${buffer.toString('base64')}`;
@@ -186,12 +187,12 @@ async function preprocessImages(messages: any[]): Promise<{ messages: any[]; ima
     console.error('[preprocess] 图片描述失败:', (err as Error).message);
   }
 
-  // 剥离 [图片:/api/uploads/...] 前缀，只保留用户可见文本
+  // 剥离 [图片:...] 前缀，只保留用户可见文本
   const cleanedParts = last.parts.map((p: any) => {
     if (p?.type !== 'text') return p;
     return {
       ...p,
-      text: p.text.replace(/\[图片:\/api\/uploads\/[^\]]+\]\n?/g, ''),
+      text: p.text.replace(/\[图片:[^\]]+\]\n?/g, ''),
     };
   });
 
@@ -257,8 +258,8 @@ export async function POST(req: Request) {
     const llmMessages = cleanMessages.map((msg: any) => ({
       ...msg,
       parts: (msg.parts || []).map((p: any) => {
-        if (p.type === 'text' && p.text?.includes('[图片:/api/uploads/')) {
-          return { ...p, text: p.text.replace(/\[图片:\/api\/uploads\/[^\]]+\]/g, '[图片]') };
+        if (p.type === 'text' && p.text?.includes('[图片:/')) {
+          return { ...p, text: p.text.replace(/\[图片:[^\]]+\]/g, '[图片]') };
         }
         return p;
       }),

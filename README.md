@@ -49,8 +49,8 @@ npm run log    # 查看实时日志
 
 | 服务 | 本地端口 | 公网地址 |
 |------|---------|---------|
-| AI 工作台 | 4567（通过 4321 代理） | `https://node.tailddce43.ts.net` |
-| 博客 | 4321（代理静态文件） | `https://node.tailddce43.ts.net/blog/` |
+| AI 工作台 | 4567（通过 4321 代理） | `https://node.tailddce43.ts.net/ai/` |
+| 博客 | 4321（代理静态文件） | `https://node.tailddce43.ts.net` |
 | ChromaDB | 8000 | 仅本地 |
 
 本机部署，通过 [Tailscale](https://tailscale.com/) Funnel 将本地服务暴露到公网，无需公网 IP 或云服务器。反向代理（`scripts/proxy.js`）统一处理 `/`（AI 工作台）和 `/blog/`（博客）。
@@ -73,4 +73,4 @@ Next.js 16 / React 19 / AI SDK v6 / DeepSeek V4 Pro / MiniMax / Chroma / Tailwin
 - [mcp](packages/mcp/README.md)
 - [skills](packages/skills/README.md)
 - [设计文档](design.md)
-- [博客](https://node.tailddce43.ts.net/blog/)
+- [博客](https://node.tailddce43.ts.net)

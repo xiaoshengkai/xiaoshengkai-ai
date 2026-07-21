@@ -1,5 +1,6 @@
 "use client";
 
+import { BASE } from "@/lib/api-path";
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
@@ -111,7 +112,7 @@ export default function ChatPage() {
   }, []);
 
   const transport = useMemo(() => new DefaultChatTransport({
-    api: "/api/chat",
+    api: `${BASE}/api/chat`,
     body: () => ({ provider: providerRef.current }),
   }), []);
 
@@ -131,7 +132,7 @@ export default function ChatPage() {
     savingRef.current = true;
     const title = (messages[0]?.parts?.find((p: any) => p.type === "text") as any)?.text?.slice(0, 30) || "未命名对话";
     try {
-      await fetch("/api/conversations/save", {
+      await fetch(`${BASE}/api/conversations/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -155,7 +156,7 @@ export default function ChatPage() {
       stop(); // 中断AI回答
       if (activeConversationId && !newIdsRef.current.has(activeConversationId)) {
         try {
-          const res = await fetch(`/api/conversations/getDetail?id=${activeConversationId}`);
+          const res = await fetch(`${BASE}/api/conversations/getDetail?id=${activeConversationId}`);
           if (res.ok) {
             const data = await res.json();
             setMessages(data.messages || []);
@@ -245,7 +246,7 @@ export default function ChatPage() {
       .join("\n\n");
 
     try {
-      const res = await fetch("/api/chat/compress", {
+      const res = await fetch(`${BASE}/api/chat/compress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages, previousSummary: prevSummary }),
@@ -286,7 +287,7 @@ export default function ChatPage() {
             reader.onload = () => {
               const base64 = reader.result as string;
               const name = blob.name || "paste.png";
-              fetch("/api/upload", {
+              fetch(`${BASE}/api/upload`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ base64, name }),
@@ -312,7 +313,7 @@ export default function ChatPage() {
             const reader = new FileReader();
             reader.onload = () => {
               const base64 = reader.result as string;
-              fetch("/api/upload", {
+              fetch(`${BASE}/api/upload`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ base64, name: f.name }),

@@ -14,6 +14,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   distDir: process.env.BUILD_DIR || '.next',
+  basePath: process.env.NODE_ENV === 'production' ? '/ai' : '',
   /**
    * 服务端外部化依赖:不参与 webpack 打包,运行时由 Node 直接 require。
    *

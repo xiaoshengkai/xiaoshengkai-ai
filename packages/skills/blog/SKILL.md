@@ -23,4 +23,4 @@ description: 博客管理技能，将内容发布到开盛的博客（GitHub Pag
 
 ## 博客地址
 
-https://node.tailddce43.ts.net/blog/
+https://node.tailddce43.ts.net

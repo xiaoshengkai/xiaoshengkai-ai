@@ -1,5 +1,7 @@
+
 "use client";
 
+import { BASE } from "@/lib/api-path";
 import { useCallback, useEffect, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { toast } from "sonner";
@@ -49,7 +51,7 @@ interface SearchResult {
   embeddingDims: number;
 }
 
-const API_BASE = "/api/admin/chroma";
+const API_BASE = `${BASE}/api/admin/chroma`;
 const CONTENT_PREVIEW_LEN = 80;
 
 function relativeTime(epochMs: number | null): string {

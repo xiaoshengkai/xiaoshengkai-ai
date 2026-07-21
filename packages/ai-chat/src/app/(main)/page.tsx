@@ -86,7 +86,8 @@ export default function ChatPage() {
   const [isFocused, setIsFocused] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [images, setImages] = useState<{ data: string; name: string }[]>([]);
+  const [images, setImages] = useState<{ path: string; name: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<"deepseek" | "minimax">("deepseek");
   const providerRef = useRef(selectedProvider);
   providerRef.current = selectedProvider;
@@ -190,6 +191,7 @@ export default function ChatPage() {
   const handleSend = async () => {
     const value = inputRef.current?.value.trim();
     if (!value && images.length === 0) return;
+    if (uploading) return;
 
     // 发送前保存当前对话
     if (convIdRef.current && messages.length > 0) {
@@ -199,20 +201,7 @@ export default function ChatPage() {
     let text = value || "请看这张图";
 
     if (images.length > 0) {
-      const imagePaths = await Promise.all(
-        images.map(async (img) => {
-          try {
-            const res = await fetch("/api/upload", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ base64: img.data, name: img.name }),
-            });
-            const data = await res.json();
-            return data.path || null;
-          } catch { return null; }
-        })
-      );
-      const validPaths = imagePaths.filter(Boolean) as string[];
+      const validPaths = images.map((img) => img.path).filter(Boolean) as string[];
       if (validPaths.length > 0) {
         text = validPaths.map((p) => `[图片:${p}]`).join("\n") + "\n\n" + text;
       }
@@ -287,31 +276,56 @@ export default function ChatPage() {
     const imgItems = Array.from(items).filter((i) => i.type.startsWith("image/"));
     if (imgItems.length === 0) return;
     e.preventDefault();
+    setUploading(true);
     Promise.all(
       imgItems.map(
         (item) =>
-          new Promise<{ data: string; name: string }>((resolve) => {
+          new Promise<{ path: string; name: string }>((resolve) => {
             const blob = item.getAsFile()!;
             const reader = new FileReader();
-            reader.onload = () => resolve({ data: reader.result as string, name: blob.name || "paste.png" });
+            reader.onload = () => {
+              const base64 = reader.result as string;
+              const name = blob.name || "paste.png";
+              fetch("/api/upload", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ base64, name }),
+              }).then(r => r.json()).then(data => resolve({ path: data.path || "", name }))
+                .catch(() => resolve({ path: "", name }));
+            };
             reader.readAsDataURL(blob);
           })
       )
-    ).then((newImgs) => setImages((prev) => [...prev, ...newImgs]));
+    ).then((newImgs) => {
+      setImages((prev) => [...prev, ...newImgs.filter((i) => i.path)]);
+      setUploading(false);
+    });
   }, []);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    setUploading(true);
     Promise.all(
       files.map(
         (f) =>
-          new Promise<{ data: string; name: string }>((resolve) => {
+          new Promise<{ path: string; name: string }>((resolve) => {
             const reader = new FileReader();
-            reader.onload = () => resolve({ data: reader.result as string, name: f.name });
+            reader.onload = () => {
+              const base64 = reader.result as string;
+              fetch("/api/upload", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ base64, name: f.name }),
+              }).then(r => r.json()).then(data => resolve({ path: data.path || "", name: f.name }))
+                .catch(() => resolve({ path: "", name: f.name }));
+            };
             reader.readAsDataURL(f);
           })
       )
-    ).then((newImgs) => setImages((prev) => [...prev, ...newImgs]));
+    ).then((newImgs) => {
+      setImages((prev) => [...prev, ...newImgs.filter((i) => i.path)]);
+      setUploading(false);
+    });
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
@@ -384,7 +398,7 @@ export default function ChatPage() {
                 <div className="flex items-center gap-2 px-3 pt-2 pb-1 overflow-x-auto">
                   {images.map((img, i) => (
                     <div key={i} className="relative shrink-0 h-10 border-2 border-muted-foreground/15">
-                      <img src={img.data} className="w-auto h-10 object-contain" alt={img.name} />
+                      <img src={img.path} className="w-auto h-10 object-contain" alt={img.name} />
                       <button
                         onClick={() => removeImage(i)}
                         className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-muted-foreground/80 text-white text-[10px] flex items-center justify-center cursor-pointer"

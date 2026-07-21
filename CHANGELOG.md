@@ -10,6 +10,7 @@
 - **打字机效果**：首页副标题逐字出现
 - **文章导航**：sticky 顶部返回列表 + 右侧下一篇链接
 - **自动化嫁接**：`exportXiaohongshuNote` 导出时自动同步到 `site/{category}/` 并更新列表页
+- **博客 SKILL**：`packages/skills/blog/SKILL.md`，按需加载，AI 提到博客时自动加载
 - **侧边栏博客链接**：启用侧边栏「博客」菜单，点击跳转 GitHub Pages
 - **侧边栏版权**：`© 2026 开盛` 显示在底部
 - **GitHub Actions 部署**：推送 master 时自动部署 `site/` → `gh-pages`
@@ -33,6 +34,7 @@
 - **数据源统一**：`data/` 目录（chroma/、uploads/、conversations/），chroma 从 packages/ai-chat/data/ 迁出，uploads 从 packages/ai-chat/public/ 迁出
 
 ### 变更文件
+- `packages/skills/blog/SKILL.md` — 新增博客 SKILL
 - `site/` — 新增，完整博客静态文件
 - `packages/mcp/tools/xiaohongshu/index.js` — syncToBlog + updateBlogIndex（~100 行）
 - `packages/ai-chat/src/app/api/chat/route.ts` — 错误日志、图片剥离、新格式适配

@@ -16,7 +16,6 @@ description: 博客管理技能，将内容发布到开盛的博客（GitHub Pag
 
 1. 在对应类目下创建目录，放入 `index.html` + `images/`
 2. 更新该类目 `index.html` 列表页，插入新卡片
-3. 参考已有文章的结构和格式即可
 
 ## 自动同步
 

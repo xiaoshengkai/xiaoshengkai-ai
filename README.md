@@ -58,6 +58,17 @@ npm run blog   # 单独启动博客
 
 日志文件：`logs/app-YYYY-MM-DD.log`（按日轮转）
 
+### 内网穿透
+
+本机部署，通过 [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) 将本地服务暴露到公网，无需公网 IP 或云服务器。
+
+```bash
+# 启动时自动执行，也可手动控制
+tailscale funnel --bg --https=443 4321   # 博客 → https://node.tailddce43.ts.net
+tailscale funnel --bg --https=8443 4567  # AI 工作台 → https://node.tailddce43.ts.net:8443
+tailscale funnel reset                   # 关闭全部穿透
+```
+
 ## 技术栈
 
 Next.js 16 / React 19 / AI SDK v6 / DeepSeek V4 Pro / MiniMax / Chroma / Tailwind CSS 4 / shadcn/ui

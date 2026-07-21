@@ -39,7 +39,7 @@ uv tool install chromadb
 npm run dev
 ```
 
-### 生产模式
+### 部署
 
 ```bash
 npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 博客 :4321 + Tailscale Funnel）
@@ -48,19 +48,13 @@ npm run log    # 查看实时日志
 npm run blog   # 单独启动博客
 ```
 
-服务概览：
-
 | 服务 | 本地端口 | 公网地址 |
 |------|---------|---------|
 | AI 工作台 | 4567 | `https://node.tailddce43.ts.net:8443` |
 | 博客 | 4321 | `https://node.tailddce43.ts.net` |
 | ChromaDB | 8000 | 仅本地 |
 
-日志文件：`logs/app-YYYY-MM-DD.log`（按日轮转）
-
-### 内网穿透
-
-本机部署，通过 [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) 将本地服务暴露到公网，无需公网 IP 或云服务器。
+本机部署，通过 [Tailscale](https://tailscale.com/) Funnel 将本地服务暴露到公网，无需公网 IP 或云服务器。
 
 ```bash
 # 启动时自动执行，也可手动控制
@@ -68,6 +62,8 @@ tailscale funnel --bg --https=443 4321   # 博客 → https://node.tailddce43.ts
 tailscale funnel --bg --https=8443 4567  # AI 工作台 → https://node.tailddce43.ts.net:8443
 tailscale funnel reset                   # 关闭全部穿透
 ```
+
+日志文件：`logs/app-YYYY-MM-DD.log`（按日轮转）
 
 ## 技术栈
 

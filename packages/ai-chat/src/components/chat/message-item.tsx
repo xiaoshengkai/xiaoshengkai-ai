@@ -111,13 +111,16 @@ toast.error("保存失败，请重试", {
                 if (part.type === "text") {
                   if (msg.role === "user") {
                     const displayText = part.text.replace(/\[图片数据:data:image\/[^\]]+\]\n?/g, "");
-                    const segments = displayText.split(/(\[上传图片:\d+\])/g);
+                    const segments = displayText.split(/(\[图片:\/uploads\/[^\]]+\])/g);
                     return (
                       <span key={i}>
                         {segments.map((seg, j) => {
-                          const m = seg.match(/^\[上传图片:(\d+)\]$/);
-                          if (m) {
-                            const imgData = sessionStorage.getItem(`upload_img_${m[1]}`);
+                          const m = seg.match(/^\[图片:(\/uploads\/.+)\]$/);
+                          if (m) return <img key={j} src={m[1]} className="max-w-full max-h-48 pixel-img mb-2" alt="图片" />;
+                          // 兼容旧格式 [上传图片:N]
+                          const oldM = seg.match(/^\[上传图片:(\d+)\]$/);
+                          if (oldM) {
+                            const imgData = sessionStorage.getItem(`upload_img_${oldM[1]}`);
                             if (imgData) return <img key={j} src={imgData} className="max-w-full max-h-48 pixel-img mb-2" alt="上传图片" />;
                           }
                           return seg ? <span key={j}>{seg}</span> : null;

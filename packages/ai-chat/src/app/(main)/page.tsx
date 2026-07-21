@@ -199,10 +199,23 @@ export default function ChatPage() {
     let text = value || "请看这张图";
 
     if (images.length > 0) {
-      images.forEach((img, i) => sessionStorage.setItem(`upload_img_${i}`, img.data));
-      const imgDataTag = images.map((img) => `[图片数据:${img.data}]`).join("\n");
-      const imgTag = images.map((_, i) => `[上传图片:${i}]`).join("\n");
-      text = imgDataTag + "\n" + imgTag + "\n\n" + text;
+      const imagePaths = await Promise.all(
+        images.map(async (img) => {
+          try {
+            const res = await fetch("/api/upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ base64: img.data, name: img.name }),
+            });
+            const data = await res.json();
+            return data.path || null;
+          } catch { return null; }
+        })
+      );
+      const validPaths = imagePaths.filter(Boolean) as string[];
+      if (validPaths.length > 0) {
+        text = validPaths.map((p) => `[图片:${p}]`).join("\n") + "\n\n" + text;
+      }
     }
 
     if (!convIdRef.current) {

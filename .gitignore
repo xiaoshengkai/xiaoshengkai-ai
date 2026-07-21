@@ -17,6 +17,6 @@ yarn-error.log*
 .pnpm-debug.log*
 logs/data/conversations/
 
-ai-chat
-data
-logs
+# uploaded images
+packages/ai-chat/public/uploads/*
+!packages/ai-chat/public/uploads/.gitkeep

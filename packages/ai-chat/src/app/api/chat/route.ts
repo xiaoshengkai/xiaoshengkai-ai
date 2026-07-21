@@ -287,7 +287,14 @@ export async function POST(req: Request) {
         });
       },
       onError({ error }) {
-        console.error('streamText 错误:', error);
+        const err = error as any;
+        console.error('streamText 错误:', {
+          name: err.name,
+          message: err.message,
+          statusCode: err.statusCode,
+          responseBody: err.responseBody,
+          url: err.url,
+        });
       },
       abortSignal: req.signal,
     });
@@ -309,8 +316,10 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    console.error('POST /api/chat 错误:', (error as Error)?.stack || (error as Error)?.message || String(error));
-    return new Response(JSON.stringify({ error: '服务器内部错误,请重试' }), {
+    const err = error as any;
+    const msg = err.responseBody || err.message || '服务器内部错误';
+    console.error('POST /api/chat 错误:', err.stack || msg);
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

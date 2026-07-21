@@ -133,9 +133,8 @@ export default function LeftSidebar({
       </div>
 
       {/* 对话列表 */}
-      {conversations.length > 0 && (
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-1">
-          {conversations.map(conv => (
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-1">
+        {conversations.length > 0 && conversations.map(conv => (
             <div
               key={conv.id}
               onClick={() => {
@@ -183,7 +182,6 @@ export default function LeftSidebar({
             </div>
           ))}
         </div>
-      )}
 
       {/* 菜单项 */}
       <nav className="px-3 py-3 space-y-1 border-t-2 border-border">

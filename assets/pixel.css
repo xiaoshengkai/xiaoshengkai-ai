@@ -96,11 +96,9 @@ body {
 }
 
 .hero-cursor {
-  font-family: var(--font-pixel);
-  font-size: 14px;
+  font-size: inherit;
   color: var(--accent-amber);
   animation: blink 1s steps(1) infinite;
-  vertical-align: middle;
 }
 
 /* ===== Back Link ===== */

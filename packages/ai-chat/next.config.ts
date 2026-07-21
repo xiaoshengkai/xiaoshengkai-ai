@@ -13,6 +13,7 @@ dotenvConfig({ path: resolve(process.cwd(), "..", "..", ".env") });
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: process.env.BUILD_DIR || '.next',
   /**
    * 服务端外部化依赖:不参与 webpack 打包,运行时由 Node 直接 require。
    *

@@ -23,6 +23,9 @@ data/uploads/*
 data/chroma/
 
 ai-chat
+packages/ai-chat/.next
+packages/ai-chat/.next-prod
 data
 logs/
 site/
+docs/

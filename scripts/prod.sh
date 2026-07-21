@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
+export BUILD_DIR=.next-prod
+
 # 构建
-test -d packages/ai-chat/.next || npm run build
+test -d packages/ai-chat/.next-prod || npm run build
 
 # Chroma (8000)
 lsof -ti:8000 > /dev/null 2>&1 || chroma run --path data/chroma --port 8000 &
@@ -11,7 +13,7 @@ lsof -ti:8000 > /dev/null 2>&1 || chroma run --path data/chroma --port 8000 &
 if lsof -ti:4567 > /dev/null 2>&1; then
   echo 'AI 工作台已在运行 → http://localhost:4567'
 else
-  nohup npm run start -w packages/ai-chat -- -p 4567 > /tmp/xiaosheng-ai.log 2>&1 &
+  nohup env BUILD_DIR=.next-prod npm run start -w packages/ai-chat -- -p 4567 > /tmp/xiaosheng-ai.log 2>&1 &
   echo 'AI 工作台已启动 → http://localhost:4567'
 fi
 

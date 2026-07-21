@@ -289,6 +289,12 @@ export async function POST(req: Request) {
 
 工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。
 
+博客规则: 用户提到"博客"、"发到博客"、"放到博客"、"发布到博客"时，博客在项目根 site/ 目录。
+  结构: site/index.html(首页) site/finance/(金融) site/tech/(技术) site/life/(生活)
+  文章格式: 每个类目下创建目录(文章标题)，放入 index.html + images/，更新该类目 index.html 列表页。
+  自动同步: exportXiaohongshuNote 导出笔记后会自动同步到博客，无需手动操作。
+  博客地址: https://xiaoshengkai.github.io/xiaoshengkai-ai/
+
 技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
         ${SKILL_LIST}
         ${TOOLS_PROMPT}

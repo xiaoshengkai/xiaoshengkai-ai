@@ -245,7 +245,19 @@ export async function POST(req: Request) {
         parts: (msg.parts || []).filter((p: any) => p != null && p.type),
       };
     });
-    const modelMessages = await convertToModelMessages(cleanMessages);
+
+    // 剥离 base64 图片数据，防止发给 LLM 时撑爆上下文窗口
+    const llmMessages = cleanMessages.map((msg: any) => ({
+      ...msg,
+      parts: (msg.parts || []).map((p: any) => {
+        if (p.type === 'text' && p.text?.includes('[图片数据:data:image/')) {
+          return { ...p, text: p.text.replace(/\[图片数据:data:image\/[^;]+;base64,[^\]]+\]/g, '[图片]') };
+        }
+        return p;
+      }),
+    }));
+
+    const modelMessages = await convertToModelMessages(llmMessages);
 
     const isMiniMax = provider === 'minimax';
     const modelName = isMiniMax

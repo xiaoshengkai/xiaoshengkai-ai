@@ -6,8 +6,12 @@
     "dev": "npm run dev -w packages/ai-chat",
     "build": "npm run build -w packages/ai-chat",
     "lint": "npm run lint -w packages/ai-chat",
-    "prod": "(test -d packages/ai-chat/.next || npm run build) && (lsof -ti:8000 > /dev/null 2>&1 || chroma run --path data/chroma --port 8000 &) && (lsof -ti:4567 > /dev/null 2>&1 && echo '已在运行 → http://localhost:4567' || (nohup npm run start -w packages/ai-chat -- -p 4567 > /tmp/xiaosheng-ai.log 2>&1 & echo '已启动 → http://localhost:4567'))",
-    "stop": "kill $(lsof -t -i:4567) 2>/dev/null; kill $(lsof -t -i:8000) 2>/dev/null; echo '已停止'",
-    "log": "tail -f logs/app-$(date +%Y-%m-%d).log"
+    "prod": "bash scripts/prod.sh",
+    "stop": "bash scripts/stop.sh",
+    "blog": "bash scripts/blog.sh",
+    "log": "bash scripts/log.sh"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
   }
 }

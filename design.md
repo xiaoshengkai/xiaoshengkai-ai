@@ -226,14 +226,23 @@ skills/
 ## 生产部署
 
 ```bash
-npm run prod   # 构建 + 后台启动（端口 4567）
-npm run stop   # 停掉所有服务（:4567 + :8000）
+npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 博客 :4321 + Tailscale Funnel）
+npm run stop   # 停止全部服务 + 关闭内网穿透
+npm run blog   # 单独启动博客
 npm run log    # 查看实时日志
 ```
 
-- 服务地址：`http://localhost:4567`
-- 日志文件：`/tmp/xiaosheng-ai.log`
-- Chroma 后台运行在 `:8000`，dev/production 共用同一份数据
+服务端口：
+
+| 服务 | 本地端口 | 公网地址 |
+|------|---------|---------|
+| AI 工作台 | 4567 | `https://node.tailddce43.ts.net:8443` |
+| 博客 | 4321 | `https://node.tailddce43.ts.net` |
+| ChromaDB | 8000 | 仅本地 |
+
+- 日志文件：`logs/app-YYYY-MM-DD.log`（按日轮转）
+- 博客静态文件：`site/`，通过 `serve` 启动
+- Tailscale Funnel 提供内网穿透，无需公网 IP
 
 ## 目录结构
 

@@ -13,6 +13,7 @@
   --accent-blue: #3B82F6;
   --accent-green: #10B981;
   --accent-purple: #8B5CF6;
+  --accent-pink: #FF8FA3;
   --accent-amber: #F59E0B;
   --shadow: #1A1A1A;
   --font-pixel: 'Press Start 2P', monospace;
@@ -189,6 +190,7 @@ body {
 .card-blue::before  { background: var(--accent-blue); }
 .card-green::before { background: var(--accent-green); }
 .card-purple::before { background: var(--accent-purple); }
+.card-pink::before   { background: var(--accent-pink); }
 
 /* Card entrance stagger */
 .card:nth-child(1) { animation-delay: 0.2s; }
@@ -242,6 +244,7 @@ body {
 .card-blue .card-link:hover  { color: var(--accent-blue); }
 .card-green .card-link:hover { color: var(--accent-green); }
 .card-purple .card-link:hover { color: var(--accent-purple); }
+.card-pink .card-link:hover   { color: var(--accent-pink); }
 
 /* ===== Section Header Card ===== */
 .section-header {

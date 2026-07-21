@@ -287,6 +287,11 @@ body {
   align-items: stretch;
 }
 
+/* hide the left accent bar on article cards with thumbnails */
+.article-card::before {
+  display: none;
+}
+
 .card-thumb {
   width: 90px;
   flex-shrink: 0;
@@ -315,11 +320,6 @@ body {
   font-size: 15px;
   margin-bottom: 0;
   font-weight: 600;
-}
-
-.article-card .card-link {
-  margin-top: 8px;
-  align-self: flex-start;
 }
 
 @media (max-width: 767px) {

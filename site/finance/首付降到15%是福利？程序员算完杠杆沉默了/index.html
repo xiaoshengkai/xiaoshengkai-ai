@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>首付降到15%是福利？程序员算完杠杆沉默了</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:600px;margin:0 auto;padding:0;background:#fff;color:#333}
+.cover{width:100%;aspect-ratio:3/4;object-fit:cover}
+.header{padding:16px 20px}
+.title{font-size:20px;font-weight:700;color:#1a1a1a;line-height:1.4}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.tag{color:#ff2442;font-size:13px}
+.content{padding:0 20px 40px;font-size:15px;line-height:1.85}
+.content h3{font-size:18px;font-weight:700;margin:28px 0 12px;padding-left:12px;border-left:3px solid #ff2442;color:#1a1a1a}
+.content p{margin:10px 0}
+.content strong{color:#1a1a1a;font-weight:700}
+.content blockquote{margin:14px 0;padding:12px 16px;background:#fdf6f0;border-left:3px solid #f0a060;border-radius:0 8px 8px 0;color:#8b5e3c;font-size:14px}
+.content ul,.content ol{padding-left:20px;margin:8px 0}
+.content li{margin:4px 0}
+.content table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+.content th{background:#fdf6f0;padding:8px 12px;text-align:left;font-weight:700;border-bottom:2px solid #e0d0c0}
+.content td{padding:8px 12px;border-bottom:1px solid #f0e0d0}
+.content hr{border:none;border-top:1px solid #e0d0c0;margin:24px 0}
+.img-block{width:100%;border-radius:8px;margin:12px 0}
+.img-placeholder{height:200px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;border-radius:8px;margin:12px 0;font-size:14px}
+</style>
+</head>
+<body>
+<nav class="article-nav"><a href="../">← 返回列表</a></nav>
+<img class="cover" src="./images/cover.png" alt="封面">
+<div class="header">
+  <h1 class="title">首付降到15%是福利？程序员算完杠杆沉默了</h1>
+  <div class="tags"><span class="tag">#金融科普</span><span class="tag">#程序员买房</span><span class="tag">#信用杠杆</span><span class="tag">#房贷首付</span><span class="tag">#征信报告</span></div>
+</div>
+<div class="content"><h3>场景代入：刷到房贷首付降到15%，我第一反应是冲？</h3>
+<p>作为一个写代码又焦虑买房的前端，最近看到&quot;首付从30%降到15%&quot;的新闻，第一反应是——<strong>门槛砍一半，机会来了？</strong></p>
+<p>冷静三秒，程序员本能警觉：<strong>首付越低，杠杆越高</strong>。这哪是福利，这是一道数学题。今天用debug金融产品的思路拆一下，保证不堆术语。</p>
+<img src="./images/illustration-1.png" alt="插图" class="img-block"><h3>概念拆解一：信用 = 你的金融GitHub profile</h3>
+<p>银行看你能不能借钱，<strong>不看工资条，看征信报告</strong>。这东西就像你的GitHub：</p>
+<ul>
+<li><strong>提交记录</strong> = 借款历史</li>
+<li><strong>star数（绿点）</strong> = 按时还款</li>
+<li><strong>issue/bug</strong> = 逾期记录</li>
+<li><strong>一条逾期留5年</strong>，想merge掉？不可能</li>
+</ul>
+<p>央行给每个人建档，身份信息+借款历史+还款记录全在里面。关键结论很扎心：</p>
+<ul>
+<li>月薪5万但逾期3次 → 银行拒贷</li>
+<li>月薪1万但从不逾期 → 银行抢着给低息贷款</li>
+</ul>
+<blockquote>
+<p><strong>信用不是收入决定的，是还款记录决定的。</strong></p>
+</blockquote>
+<img src="./images/illustration-2.png" alt="插图" class="img-block"><h3>概念拆解二：杠杆 = 不挑方向的放大器</h3>
+<p>杠杆公式极简：<strong>杠杆倍数 = 1 ÷ 首付比例</strong></p>
+<ul>
+<li>30%首付 → 3.3倍杠杆</li>
+<li>15%首付 → <strong>6.67倍杠杆</strong></li>
+<li>不管房子100万还是700万，倍数只看首付比例</li>
+</ul>
+<p>同样100万的房子，房价涨10%：</p>
+<ul>
+<li><strong>全款买</strong>：赚10万（收益率10%）</li>
+<li><strong>30%首付</strong>：赚33万（收益率33%）</li>
+<li><strong>15%首付</strong>：赚67万（收益率<strong>67%</strong>）🚀</li>
+</ul>
+<p>但杠杆是放大器，<strong>不挑方向</strong>，反过来：</p>
+<ul>
+<li>房价跌10%，30%首付亏33%</li>
+<li>房价跌15%，15%首付本金<strong>直接归零</strong> 💀</li>
+</ul>
+<p>以前30%首付要跌30%才爆仓，现在15%首付只要跌15%就没了。<strong>门槛降了，风险也加倍了。</strong></p>
+<img src="./images/illustration-3.png" alt="插图" class="img-block"><h3>数据论证：100万的房子，三种剧本</h3>
+<table>
+<thead>
+<tr>
+<th>剧本</th>
+<th>30%首付</th>
+<th>15%首付</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>涨10%</td>
+<td>+33%</td>
+<td><strong>+67%</strong></td>
+</tr>
+<tr>
+<td>持平</td>
+<td>月供照还，机会成本</td>
+<td>月供照还，机会成本翻倍</td>
+</tr>
+<tr>
+<td>跌10%</td>
+<td>-33%</td>
+<td>-67%</td>
+</tr>
+<tr>
+<td><strong>跌15%</strong></td>
+<td>-50%</td>
+<td><strong>本金归零</strong></td>
+</tr>
+</tbody></table>
+<p>一句话：<strong>以前你能扛30%跌幅，现在只能扛15%。容错空间直接砍半。</strong></p>
+<img src="./images/illustration-4.png" alt="插图" class="img-block"><h3>算账冲击：假如你掏15万首付买了100万的房子</h3>
+<ul>
+<li><strong>涨10%</strong>：本金15万变25万，赚10万，<strong>收益率67%</strong></li>
+<li><strong>跌15%</strong>：本金15万变0，银行开始拍卖你的房子</li>
+<li>6.67倍杠杆意味着：<strong>涨了是天堂，跌了是地狱</strong></li>
+</ul>
+<p>这就是为什么政府以前坚持30%首付——不是不想让你买房，是怕你扛不住这个倍数。</p>
+<img src="./images/illustration-5.png" alt="插图" class="img-block"><h3>两个隐形杀手：硬查询 + 分期真实年化</h3>
+<p><strong>① 硬查询（征信杀手）</strong>：每次点&quot;测一测贷款额度&quot;，征信上多一条查询记录。一个月点5次网贷，银行直接判定&quot;这人到处借钱&quot;，反而拒贷。<strong>没事别乱点。</strong></p>
+<p><strong>② 分期的真实年化</strong>：花呗分12期表面手续费7.5%，<strong>实际年化约13.6%</strong>。因为每月还本金，利息却按全额算。</p>
+<ul>
+<li>信息差套利：0元启动，靠认知差，门槛低</li>
+<li>技能变现：1-3天回本，靠代码手艺，利润率200%+</li>
+<li>房贷加杠杆：3.3倍是政府给的福利，6.67倍是双刃剑</li>
+</ul>
+<p>背着13.6%的成本买一台3个月过时的手机——这叫<strong>负收益的杠杆</strong>，借钱买的东西在贬值，利息在升值，亏两次。</p>
+<img src="./images/illustration-6.png" alt="插图" class="img-block"><h3>信用 × 杠杆 = 金融世界的双生子</h3>
+<p>最后记住这一对关系：</p>
+<ul>
+<li><strong>信用是杠杆的门票</strong>：没信用，银行一分钱都不借你</li>
+<li><strong>杠杆是信用的放大器</strong>：信用越好，借款成本越低，能撬动的钱越多</li>
+<li>月薪5万但征信烂 → 有钱也借不到便宜钱</li>
+<li>月薪1万但征信好 → 银行抢着给低息房贷，用别人的钱给自己打工</li>
+</ul>
+<blockquote>
+<p><strong>信用是杠杆的门票，杠杆是信用的放大器。别乱点网贷，别乱加分期——你的GitHub profile比你想的值钱。</strong></p>
+</blockquote>
+</div>
+</body>
+</html>

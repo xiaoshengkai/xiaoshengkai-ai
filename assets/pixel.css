@@ -54,6 +54,9 @@ body {
   padding: 48px 24px;
   position: relative;
   z-index: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ===== Pixel Decorative Line ===== */
@@ -331,6 +334,7 @@ body {
 .footer {
   text-align: center;
   padding: 40px 0 0;
+  margin-top: auto;
   font-size: 12px;
   color: var(--text-secondary);
   opacity: 0;

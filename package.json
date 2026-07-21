@@ -8,10 +8,9 @@
     "lint": "npm run lint -w packages/ai-chat",
     "prod": "bash scripts/prod.sh",
     "stop": "bash scripts/stop.sh",
-    "blog": "bash scripts/blog.sh",
     "log": "bash scripts/log.sh"
   },
   "devDependencies": {
-    "serve": "^14.2.0"
+    "http-proxy": "^1.18.0"
   }
 }

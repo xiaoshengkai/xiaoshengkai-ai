@@ -42,25 +42,23 @@ npm run dev
 ### 部署
 
 ```bash
-npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 博客 :4321 + Tailscale Funnel）
+npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 反向代理 :4321 + Tailscale Funnel）
 npm run stop   # 停止全部服务 + 关闭内网穿透
 npm run log    # 查看实时日志
-npm run blog   # 单独启动博客
 ```
 
 | 服务 | 本地端口 | 公网地址 |
 |------|---------|---------|
-| AI 工作台 | 4567 | `https://node.tailddce43.ts.net:8443` |
-| 博客 | 4321 | `https://node.tailddce43.ts.net` |
+| AI 工作台 | 4567（通过 4321 代理） | `https://node.tailddce43.ts.net` |
+| 博客 | 4321（代理静态文件） | `https://node.tailddce43.ts.net/blog/` |
 | ChromaDB | 8000 | 仅本地 |
 
-本机部署，通过 [Tailscale](https://tailscale.com/) Funnel 将本地服务暴露到公网，无需公网 IP 或云服务器。
+本机部署，通过 [Tailscale](https://tailscale.com/) Funnel 将本地服务暴露到公网，无需公网 IP 或云服务器。反向代理（`scripts/proxy.js`）统一处理 `/`（AI 工作台）和 `/blog/`（博客）。
 
 ```bash
 # 启动时自动执行，也可手动控制
-tailscale funnel --bg --https=443 4321   # 博客 → https://node.tailddce43.ts.net
-tailscale funnel --bg --https=8443 4567  # AI 工作台 → https://node.tailddce43.ts.net:8443
-tailscale funnel reset                   # 关闭全部穿透
+tailscale funnel --bg --https=443 4321
+tailscale funnel reset                   # 关闭穿透
 ```
 
 日志文件：`logs/app-YYYY-MM-DD.log`（按日轮转）
@@ -75,4 +73,4 @@ Next.js 16 / React 19 / AI SDK v6 / DeepSeek V4 Pro / MiniMax / Chroma / Tailwin
 - [mcp](packages/mcp/README.md)
 - [skills](packages/skills/README.md)
 - [设计文档](design.md)
-- [博客](https://node.tailddce43.ts.net)
+- [博客](https://node.tailddce43.ts.net/blog/)

@@ -17,17 +17,16 @@ else
   echo 'AI 工作台已启动 → http://localhost:4567'
 fi
 
-# 博客 (4321)
+# 反向代理 (4321): AI 工作台 + 博客
 if lsof -ti:4321 > /dev/null 2>&1; then
-  echo '博客已在运行 → http://localhost:4321'
+  echo '代理已在运行 → http://localhost:4321'
 else
-  nohup npx serve site -l 4321 --no-clipboard > /tmp/blog.log 2>&1 &
-  echo '博客已启动 → http://localhost:4321'
+  nohup node scripts/proxy.js > /tmp/proxy.log 2>&1 &
+  echo '代理已启动 → http://localhost:4321'
 fi
 
-# Tailscale Funnel
+# Tailscale Funnel (仅 443)
 tailscale funnel --bg --https=443 4321
-tailscale funnel --bg --https=8443 4567
 echo '内网穿透已启动'
-echo '  博客: https://node.tailddce43.ts.net'
-echo '  AI:   https://node.tailddce43.ts.net:8443'
+echo '  AI 工作台: https://node.tailddce43.ts.net'
+echo '  博客:      https://node.tailddce43.ts.net/blog/'

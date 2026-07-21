@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.5.7 (2026-07-21) — 博客上线 + 自动化嫁接
+
+### 新增
+- **博客系统**：`site/` 目录，GitHub Pages 部署（https://xiaoshengkai.github.io/xiaoshengkai-ai/）
+- **精致像素风设计**：暖白纸底 + 新粗野主义（3px 黑边框 + 4px 硬阴影）+ 系统字体
+- **金融板块**：12 篇文章列表页，左图右文卡片（缩略图 + 标题 + 副标题）
+- **hover 三重反馈**：缩略图放大 1.08x + 标题变蓝 + 箭头滑入
+- **打字机效果**：首页副标题逐字出现
+- **文章导航**：sticky 顶部返回列表 + 右侧下一篇链接
+- **自动化嫁接**：`exportXiaohongshuNote` 导出时自动同步到 `site/{category}/` 并更新列表页
+- **侧边栏博客链接**：启用侧边栏「博客」菜单，点击跳转 GitHub Pages
+- **侧边栏版权**：`© 2026 开盛` 显示在底部
+- **GitHub Actions 部署**：推送 master 时自动部署 `site/` → `gh-pages`
+
+### 修复
+- 侧边栏版权不显示（flex-1 div 始终渲染）
+- 博客 footer 不贴底（min-height: 100dvh + flexbox）
+- finance/index.html 中 URL 编码（空格和中文标点）
+- 文章缩略图被卡片左侧色条遮挡
+
+### 变更文件
+- `site/` — 新增，完整博客静态文件
+- `packages/mcp/tools/xiaohongshu/index.js` — syncToBlog + updateBlogIndex（~100 行）
+- `packages/ai-chat/src/components/layout/left-sidebar.tsx` — 博客链接 + 版权
+- `.github/workflows/deploy.yml` — 新增
+- `CHANGELOG.md` — 本文
+
 ## v0.5.6 (2026-07-16) — 历史对话列表 + 保存逻辑简化
 
 ### 新增

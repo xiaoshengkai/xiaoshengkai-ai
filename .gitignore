@@ -20,3 +20,7 @@ logs/data/conversations/
 # uploaded images
 packages/ai-chat/public/uploads/*
 !packages/ai-chat/public/uploads/.gitkeep
+
+ai-chat
+data
+logs

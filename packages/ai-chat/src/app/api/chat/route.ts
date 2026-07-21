@@ -132,10 +132,9 @@ async function preprocessImages(messages: any[]): Promise<{ messages: any[]; ima
     /^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(p.text?.trim()),
   );
 
-  // 检测 [图片数据:base64] 标记（旧格式）和 [图片:/uploads/...] 标记（新格式）
-  const dataParts = textParts.filter((p: any) => p.text?.includes('[图片数据:data:image/'));
+  // 检测 [图片:/uploads/...] 标记
   const uploadParts = textParts.filter((p: any) => p.text?.includes('[图片:/uploads/'));
-  const hasImages = dataParts.length > 0 || uploadParts.length > 0 || imageUrlParts.length > 0;
+  const hasImages = uploadParts.length > 0 || imageUrlParts.length > 0;
   if (!hasImages) return { messages };
 
   let imageDescription = '';
@@ -145,12 +144,6 @@ async function preprocessImages(messages: any[]): Promise<{ messages: any[]; ima
   try {
     const imageContent: any[] = [];
 
-    if (dataParts.length > 0) {
-      for (const dp of dataParts) {
-        const match = dp.text.match(/\[图片数据:(data:image\/[^\]]+)\]/);
-        if (match) imageContent.push({ type: 'image' as const, image: match[1] });
-      }
-    }
     if (uploadParts.length > 0) {
       for (const up of uploadParts) {
         const match = up.text.match(/\[图片:(\/uploads\/[^\]]+)\]/);
@@ -193,12 +186,12 @@ async function preprocessImages(messages: any[]): Promise<{ messages: any[]; ima
     console.error('[preprocess] 图片描述失败:', (err as Error).message);
   }
 
-  // 剥离 [图片数据:...] 和 [图片:/uploads/...] 前缀，只保留用户可见文本
+  // 剥离 [图片:/uploads/...] 前缀，只保留用户可见文本
   const cleanedParts = last.parts.map((p: any) => {
     if (p?.type !== 'text') return p;
     return {
       ...p,
-      text: p.text.replace(/\[图片数据:data:image\/[^\]]+\]\n?/g, '').replace(/\[图片:\/uploads\/[^\]]+\]\n?/g, '').replace(/\[上传图片:\d+\]\n?/g, ''),
+      text: p.text.replace(/\[图片:\/uploads\/[^\]]+\]\n?/g, ''),
     };
   });
 
@@ -260,15 +253,12 @@ export async function POST(req: Request) {
       };
     });
 
-    // 剥离图片数据，防止发给 LLM 时撑爆上下文窗口
+    // 剥离图片路径，防止发给 LLM 时撑爆上下文窗口
     const llmMessages = cleanMessages.map((msg: any) => ({
       ...msg,
       parts: (msg.parts || []).map((p: any) => {
-        if (p.type === 'text' && (p.text?.includes('[图片数据:data:image/') || p.text?.includes('[图片:/uploads/'))) {
-          return { ...p, text: p.text
-            .replace(/\[图片数据:data:image\/[^;]+;base64,[^\]]+\]/g, '[图片]')
-            .replace(/\[图片:\/uploads\/[^\]]+\]/g, '[图片]')
-          };
+        if (p.type === 'text' && p.text?.includes('[图片:/uploads/')) {
+          return { ...p, text: p.text.replace(/\[图片:\/uploads\/[^\]]+\]/g, '[图片]') };
         }
         return p;
       }),

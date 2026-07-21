@@ -11,6 +11,7 @@
 - 📝 小红书笔记自动生成：对话内容 → 带封面/插画/标签的完整笔记，4 种模板 + 二级类目，聊天内嵌预览 + 独立页面，导出 HTML/MD/图片
 - 🔧 38 个 MCP 工具（时间/文件/知识库/图片/图表/短视频/小红书笔记/日志）
 - 🎨 像素复古风 UI（shadcn/ui + 自定义 CSS）
+- 📝 个人博客（GitHub Pages，新粗野主义像素风，笔记自动同步）
 - 🖼️ 文生图 + 图生图（MiniMax），异步模式，73 种视觉风格可选
 - 📊 图表生成：Mermaid + D2 双引擎，异步模式，支持 10 种图表类型（流程图/时序图/类图/状态图/ER图/甘特图/饼图/象限图/架构图/网络拓扑）
 - 🎬 短视频生成（MD 风格描述 + GSAP 动画 + HyperFrames 渲染，可发抖音）
@@ -46,7 +47,7 @@ npm run stop   # 停掉所有服务
 npm run log    # 查看实时日志
 ```
 
-服务地址：`http://localhost:4567`，日志文件：`/tmp/xiaosheng-ai.log`
+服务地址：`http://localhost:4567`，日志文件：`logs/app-YYYY-MM-DD.log`（按日轮转）
 
 ## 技术栈
 
@@ -58,3 +59,4 @@ Next.js 16 / React 19 / AI SDK v6 / DeepSeek V4 Pro / MiniMax / Chroma / Tailwin
 - [mcp](packages/mcp/README.md)
 - [skills](packages/skills/README.md)
 - [设计文档](design.md)
+- [博客](https://xiaoshengkai.github.io/xiaoshengkai-ai/)

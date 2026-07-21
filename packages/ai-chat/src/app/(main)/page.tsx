@@ -118,7 +118,10 @@ export default function ChatPage() {
     transport,
     onError: (err) => {
       console.error("[chat] error:", err.message);
-      toast.error("请求失败，请重试");
+      const msg = err.message && err.message !== "An error occurred."
+        ? err.message
+        : "请求失败，请重试";
+      toast.error(msg);
     },
   });
 

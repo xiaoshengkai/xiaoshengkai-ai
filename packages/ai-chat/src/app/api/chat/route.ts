@@ -286,7 +286,7 @@ export async function POST(req: Request) {
           toolResults: toolResults?.map((t) => t.toolName),
         });
       },
-      onError(error) {
+      onError({ error }) {
         console.error('streamText 错误:', error);
       },
       abortSignal: req.signal,

@@ -204,6 +204,11 @@ export default function LeftSidebar({
           );
         })}
       </nav>
+
+      {/* 版权 */}
+      <div className="px-3 pb-3 text-[10px] text-muted-foreground font-[family-name:var(--font-pixel)] text-center">
+        © 2026 开盛
+      </div>
     </aside>
   );
 }

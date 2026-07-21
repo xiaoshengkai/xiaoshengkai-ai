@@ -21,5 +21,5 @@ echo '代理已启动 → http://localhost:4321'
 # Tailscale Funnel
 tailscale funnel --bg --https=443 4321
 echo '内网穿透已启动'
-echo '  AI 工作台: https://node.tailddce43.ts.net'
-echo '  博客:      https://node.tailddce43.ts.net/blog/'
+echo '  博客:      https://node.tailddce43.ts.net'
+echo '  AI 工作台: https://node.tailddce43.ts.net/ai/'

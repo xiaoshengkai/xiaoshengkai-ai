@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.5.7 (2026-07-21) — 博客上线 + 自动化嫁接
+## v0.5.7 (2026-07-21) — 博客上线 + 错误处理 + 图片上传重构 + 数据源统一
 
 ### 新增
 - **博客系统**：`site/` 目录，GitHub Pages 部署（https://xiaoshengkai.github.io/xiaoshengkai-ai/）
@@ -13,17 +13,37 @@
 - **侧边栏博客链接**：启用侧边栏「博客」菜单，点击跳转 GitHub Pages
 - **侧边栏版权**：`© 2026 开盛` 显示在底部
 - **GitHub Actions 部署**：推送 master 时自动部署 `site/` → `gh-pages`
+- **图片上传重构**：base64 → 文件存储（`data/uploads/`），消息格式 `[图片:/api/uploads/uuid.png]`
+- **图片预览**：粘贴/选择时预上传，用户图片点击放大（useImageViewer 集成）
+- **文件读取 API**：`/api/uploads/[filename]` 支持任意文件类型
 
 ### 修复
+- **上下文窗口超限**：base64 图片数据剥离（1.3M tokens → 正常），发给 LLM 前替换为 `[图片]`
+- **错误信息不透明**：日志记录 statusCode/responseBody，前端 toast 显示具体原因
+- **发送闪屏**：saveConversation fire-and-forget，不阻塞 sendMessage
+- **日志响应过大**：/api/logs 截断到 200 行 × 500 字符
+- **日志文件膨胀**：base64 数据清理（17.6MB → 3.8MB）
 - 侧边栏版权不显示（flex-1 div 始终渲染）
 - 博客 footer 不贴底（min-height: 100dvh + flexbox）
 - finance/index.html 中 URL 编码（空格和中文标点）
 - 文章缩略图被卡片左侧色条遮挡
+- 旧格式兼容代码清理（`[图片数据:base64]`、`[上传图片:N]`）
+
+### 重构
+- **数据源统一**：`data/` 目录（chroma/、uploads/、conversations/），chroma 从 packages/ai-chat/data/ 迁出，uploads 从 packages/ai-chat/public/ 迁出
 
 ### 变更文件
 - `site/` — 新增，完整博客静态文件
 - `packages/mcp/tools/xiaohongshu/index.js` — syncToBlog + updateBlogIndex（~100 行）
+- `packages/ai-chat/src/app/api/chat/route.ts` — 错误日志、图片剥离、新格式适配
+- `packages/ai-chat/src/app/api/upload/route.ts` — 新增文件上传
+- `packages/ai-chat/src/app/api/uploads/[filename]/route.ts` — 新增文件读取
+- `packages/ai-chat/src/app/api/logs/route.ts` — 响应缩小
+- `packages/ai-chat/src/app/(main)/page.tsx` — 预上传、闪屏修复
+- `packages/ai-chat/src/components/chat/message-item.tsx` — 新格式渲染、图片放大
 - `packages/ai-chat/src/components/layout/left-sidebar.tsx` — 博客链接 + 版权
+- `packages/ai-chat/src/lib/chroma-server.ts` — chroma 路径
+- `package.json` — chroma 路径、log 命令
 - `.github/workflows/deploy.yml` — 新增
 - `CHANGELOG.md` — 本文
 

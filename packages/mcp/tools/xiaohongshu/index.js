@@ -39,6 +39,141 @@ const TEMPLATES = {
   opinion: { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
 };
 
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const SITE_DIR = path.join(PROJECT_ROOT, "site");
+
+const CATEGORY_META = {
+  finance: { label: "金融学习笔记", desc: "重塑金钱观，从第一课开始", color: "card-blue" },
+};
+
+function getCategoryMeta(category) {
+  return CATEGORY_META[category] || { label: category, desc: "", color: "card-blue" };
+}
+
+function syncToBlog(exportDir, state, category) {
+  const safeTitle = state.title.replace(/[\/\\:*?"<>|]/g, "_");
+  const blogDir = path.join(SITE_DIR, category, safeTitle);
+
+  if (fs.existsSync(blogDir)) {
+    fs.rmSync(blogDir, { recursive: true });
+  }
+
+  fs.cpSync(exportDir, blogDir, { recursive: true });
+
+  // 保存 task.json 到博客目录，供 updateBlogIndex 读取元数据
+  fs.writeFileSync(path.join(blogDir, "task.json"), JSON.stringify({
+    title: state.title,
+    excerpt: state.excerpt || "",
+    tags: state.tags || [],
+    topic: state.topic || "",
+    subcategory: state.subcategory || category,
+    imagery: state.images?.filter(img => img.status === "done").length || 0,
+  }, null, 2));
+
+  console.log(`${TAG} syncToBlog: category=${category} dir="${blogDir}"`);
+}
+
+function updateBlogIndex(category) {
+  const catDir = path.join(SITE_DIR, category);
+  if (!fs.existsSync(catDir)) return;
+
+  const meta = getCategoryMeta(category);
+
+  // 扫描所有文章目录
+  const entries = [];
+  for (const name of fs.readdirSync(catDir)) {
+    const entryDir = path.join(catDir, name);
+    if (!fs.statSync(entryDir).isDirectory()) continue;
+    const indexHtml = path.join(entryDir, "index.html");
+    if (!fs.existsSync(indexHtml)) continue;
+
+    let title = name;
+    let excerpt = "";
+
+    const taskFile = path.join(entryDir, "task.json");
+    if (fs.existsSync(taskFile)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
+        title = data.title || name;
+        excerpt = data.excerpt || "";
+      } catch {}
+    }
+
+    const coverPath = path.join(entryDir, "images", "cover.png");
+    const hasCover = fs.existsSync(coverPath);
+
+    entries.push({ name, title, excerpt, hasCover });
+  }
+
+  // 按修改时间倒序
+  entries.sort((a, b) => {
+    const aTime = fs.statSync(path.join(catDir, a.name)).mtimeMs;
+    const bTime = fs.statSync(path.join(catDir, b.name)).mtimeMs;
+    return bTime - aTime;
+  });
+
+  const cardsHtml = entries.map((entry) => {
+    const encodedName = encodeURIComponent(entry.name);
+    const thumbStyle = entry.hasCover
+      ? ` style="background-image:url(${encodedName}/images/cover.png)"`
+      : "";
+    const excerptHtml = entry.excerpt
+      ? `\n        <p class="card-sub">${entry.excerpt}</p>`
+      : "";
+
+    return `    <a href="${encodedName}/" target="_blank" class="card article-card ${meta.color}">
+      <div class="card-thumb"${thumbStyle}></div>
+      <div class="card-body">
+        <p class="card-desc">${entry.title}</p>${excerptHtml}
+      </div>
+    </a>`;
+  }).join("\n\n");
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${meta.label} · 开盛的博客</title>
+<meta name="description" content="${meta.desc}">
+<meta property="og:title" content="${meta.label} · 开盛的博客">
+<meta property="og:description" content="${meta.desc}">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="../assets/pixel.css">
+</head>
+<body>
+
+<div class="pixel-dots"></div>
+
+<div class="container">
+  <a href="../" class="back-link"><span class="arrow">←</span> 返回首页</a>
+
+  <div class="section-header">
+    <div class="card-body">
+      <p class="card-desc">${meta.label}</p>
+      <p class="card-meta">${meta.desc} · 共 ${entries.length} 篇笔记</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+
+${cardsHtml}
+
+  </div>
+
+  <footer class="footer">
+    <p>© 2026 开盛</p>
+  </footer>
+</div>
+
+</body>
+</html>`;
+
+  const indexPath = path.join(catDir, "index.html");
+  fs.writeFileSync(indexPath, html, "utf-8");
+  console.log(`${TAG} updateBlogIndex: category=${category} entries=${entries.length}`);
+}
+
 function writeTaskState(workDir, state) {
   fs.mkdirSync(workDir, { recursive: true });
   fs.writeFileSync(path.join(workDir, "task.json"), JSON.stringify(state, null, 2));
@@ -442,6 +577,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;m
 </style>
 </head>
 <body>
+<nav style="padding:14px 20px;border-bottom:3px solid #1A1A1A;background:#FFF;position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center"><a href="../" style="display:inline-flex;align-items:center;gap:6px;color:#1A1A1A;text-decoration:none;font-size:14px;font-weight:500;transition:transform 0.2s" onmouseenter="this.style.transform='translateX(-4px)'" onmouseleave="this.style.transform='translateX(0)'"><span>←</span> 返回列表</a></nav>
 ${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封面">` : ""}
 <div class="header">
   <h1 class="title">${state.title}</h1>
@@ -476,6 +612,16 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封�
         fs.writeFileSync(mdPath, mdContent, "utf-8");
 
         console.log(`${TAG} export: taskId=${taskId} dir="${exportDir}" html=${(fs.statSync(htmlPath).size / 1024).toFixed(1)}KB md=${(fs.statSync(mdPath).size / 1024).toFixed(1)}KB images=${imgCount}`);
+
+        // 同步到博客
+        const category = state.subcategory || "finance";
+        try {
+          syncToBlog(exportDir, state, category);
+          updateBlogIndex(category);
+          console.log(`${TAG} export: 已同步到博客 site/${category}/`);
+        } catch (blogErr) {
+          console.error(`${TAG} export: 同步到博客失败 ${blogErr.message}`);
+        }
 
         return {
           content: [{

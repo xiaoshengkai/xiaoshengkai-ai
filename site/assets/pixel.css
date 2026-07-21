@@ -298,6 +298,11 @@ body {
   background-size: cover;
   background-position: center;
   border-right: var(--border-width) solid var(--border);
+  transition: transform 0.3s ease;
+}
+
+.article-card:hover .card-thumb {
+  transform: scale(1.08);
 }
 
 /* fallback colors for missing images */
@@ -314,12 +319,42 @@ body {
   flex-direction: column;
   justify-content: center;
   padding: 16px 18px 16px 20px;
+  position: relative;
 }
 
 .article-card .card-body .card-desc {
   font-size: 15px;
-  margin-bottom: 0;
+  margin-bottom: 4px;
   font-weight: 600;
+  transition: color 0.2s;
+}
+
+.article-card:hover .card-body .card-desc {
+  color: var(--accent-blue);
+}
+
+.article-card .card-body .card-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* hover arrow */
+.article-card .card-body::after {
+  content: '→';
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  font-size: 16px;
+  color: var(--accent-blue);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.article-card:hover .card-body::after {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 @media (max-width: 767px) {

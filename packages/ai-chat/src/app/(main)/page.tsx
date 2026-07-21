@@ -193,9 +193,9 @@ export default function ChatPage() {
     if (!value && images.length === 0) return;
     if (uploading) return;
 
-    // 发送前保存当前对话
+    // 发送前保存当前对话（fire-and-forget，不阻塞发送）
     if (convIdRef.current && messages.length > 0) {
-      await saveConversation();
+      saveConversation();
     }
 
     let text = value || "请看这张图";

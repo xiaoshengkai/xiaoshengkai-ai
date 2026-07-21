@@ -12,6 +12,7 @@ import { BookmarkPlus, Check, X, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import TooltipIcon from "@/components/ui/tooltip-icon";
 import { useMarkdownComponents } from "@/components/chat/markdown-components";
+import { useImageViewer } from "@/components/ui/image-viewer";
 import NotePreviewCard from "@/components/chat/note-preview-card";
 
 export default function MessageItem({
@@ -22,6 +23,7 @@ export default function MessageItem({
   isLoading: boolean;
 }) {
   const markdownComponents = useMarkdownComponents(isLoading);
+  const { register, open } = useImageViewer();
   const [saveState, setSaveState] = useState<"idle" | "loading" | "success" | "error">("idle");
 
   const meta = msg.metadata as {
@@ -115,7 +117,10 @@ toast.error("保存失败，请重试", {
                       <span key={i}>
                         {segments.map((seg, j) => {
                           const m = seg.match(/^\[图片:(\/api\/uploads\/.+)\]$/);
-                          if (m) return <img key={j} src={m[1]} className="max-w-full max-h-48 pixel-img mb-2" alt="图片" />;
+                          if (m) {
+                            const index = register(m[1]);
+                            return <img key={j} src={m[1]} onClick={() => open(index)} className="max-w-full max-h-48 pixel-img mb-2 cursor-zoom-in" alt="图片" />;
+                          }
                           return seg ? <span key={j}>{seg}</span> : null;
                         })}
                       </span>

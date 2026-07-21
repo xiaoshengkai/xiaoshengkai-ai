@@ -6,12 +6,6 @@ export BUILD_DIR=.next-prod
 # 构建
 test -d packages/ai-chat/.next-prod || npm run build
 
-# Chroma (8000)
-kill $(lsof -t -i:8000) 2>/dev/null || true
-sleep 1
-chroma run --path data/chroma --port 8000 &
-echo 'Chroma 已启动 → http://localhost:8000'
-
 # AI 工作台 (4567)
 kill $(lsof -t -i:4567) 2>/dev/null || true
 sleep 1

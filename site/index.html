@@ -19,7 +19,7 @@
 
   <header class="hero">
     <h1 class="hero-title">开盛的博客</h1>
-    <p class="hero-subtitle">AI 工程实践 × 金融学习笔记 × 生活分享</p>
+    <p class="hero-subtitle"></p>
     <span class="hero-cursor">█</span>
   </header>
 
@@ -57,6 +57,18 @@
 
   <div class="pixel-line pixel-line-bottom">◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆ ◆</div>
 </div>
+
+<script>
+(function() {
+  var text = 'AI 工程实践 × 金融学习笔记 × 生活分享';
+  var el = document.querySelector('.hero-subtitle');
+  var i = 0;
+  var timer = setInterval(function() {
+    el.textContent = text.slice(0, ++i);
+    if (i >= text.length) clearInterval(timer);
+  }, 80);
+})();
+</script>
 
 </body>
 </html>

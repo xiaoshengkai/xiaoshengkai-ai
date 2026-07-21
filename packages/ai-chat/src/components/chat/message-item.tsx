@@ -110,11 +110,11 @@ toast.error("保存失败，请重试", {
               {deduplicatedParts.map((part, i) => {
                 if (part.type === "text") {
                   if (msg.role === "user") {
-                    const segments = part.text.split(/(\[图片:\/uploads\/[^\]]+\])/g);
+                    const segments = part.text.split(/(\[图片:\/api\/uploads\/[^\]]+\])/g);
                     return (
                       <span key={i}>
                         {segments.map((seg, j) => {
-                          const m = seg.match(/^\[图片:(\/uploads\/.+)\]$/);
+                          const m = seg.match(/^\[图片:(\/api\/uploads\/.+)\]$/);
                           if (m) return <img key={j} src={m[1]} className="max-w-full max-h-48 pixel-img mb-2" alt="图片" />;
                           return seg ? <span key={j}>{seg}</span> : null;
                         })}

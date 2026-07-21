@@ -21,7 +21,7 @@
 
 import { spawn, type ChildProcess } from "child_process";
 import { existsSync, mkdirSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 
 // ─── 常量(集中配置,便于阅读与调整) ──────────────────────────────────────
 
@@ -81,7 +81,7 @@ function getChromaBaseUrl(): string {
  * 默认 `<cwd>/data/chroma`,与 .gitignore 一致。
  */
 function getChromaDataDir(): string {
-  return join(process.cwd(), "data", CHROMA_DATA_DIR);
+  return resolve(process.cwd(), "..", "..", "data", CHROMA_DATA_DIR);
 }
 
 /**

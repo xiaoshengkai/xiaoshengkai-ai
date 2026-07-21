@@ -17,10 +17,11 @@ yarn-error.log*
 .pnpm-debug.log*
 logs/data/conversations/
 
-# uploaded images
-packages/ai-chat/public/uploads/*
-!packages/ai-chat/public/uploads/.gitkeep
+# uploaded files
+data/uploads/*
+!data/uploads/.gitkeep
+data/chroma/
 
 ai-chat
 data
-logs
+logs/

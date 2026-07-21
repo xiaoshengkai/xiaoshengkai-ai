@@ -21,7 +21,7 @@ echo 'AI 工作台已启动 → http://localhost:4567'
 # 反向代理 (4321): AI 工作台 + 博客
 kill $(lsof -t -i:4321) 2>/dev/null || true
 sleep 1
-nohup node scripts/proxy.js > /tmp/proxy.log 2>&1 &
+nohup node scripts/proxy.cjs > /tmp/proxy.log 2>&1 &
 echo '代理已启动 → http://localhost:4321'
 
 # Tailscale Funnel

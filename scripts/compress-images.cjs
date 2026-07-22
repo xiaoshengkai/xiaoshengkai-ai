@@ -27,6 +27,7 @@ async function compress(imgPath) {
   const before = fs.statSync(imgPath).size;
 
   const pipeline = sharp(imgPath)
+    .rotate()
     .resize(maxWidth, maxWidth, { fit: 'inside', withoutEnlargement: true });
 
   const outExt = isJpg ? ext : '.jpg';

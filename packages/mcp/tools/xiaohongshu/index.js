@@ -529,6 +529,7 @@ export function register(server) {
             // 压缩图片
             const sharp = (await import("sharp")).default;
             const compressed = await sharp(raw)
+              .rotate()
               .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
               .jpeg({ quality: 85 })
               .toBuffer();

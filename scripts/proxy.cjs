@@ -27,7 +27,7 @@ const MIME = {
 };
 
 function serveStatic(req, res) {
-  let urlPath = req.url.replace(/^\//, '');
+  let urlPath = decodeURIComponent(req.url.replace(/^\//, ''));
   if (!urlPath) urlPath = 'index.html';
   let filePath = path.join(SITE_DIR, urlPath);
   if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {

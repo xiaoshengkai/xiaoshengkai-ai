@@ -554,7 +554,7 @@ function DetailDrawer({
         aria-hidden="true"
       />
       <div className="fixed top-0 right-0 h-full w-full md:w-2/3 lg:w-1/2 bg-white dark:bg-gray-900 shadow-xl z-50 overflow-y-auto">
-        <div className="sticky top-0 bg-background border-b px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b px-6 py-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold font-[family-name:var(--font-pixel)]">
             Chunk 详情
           </h2>

@@ -36,7 +36,11 @@ function serveStatic(req, res) {
   }
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+    if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.mp3', '.mp4'].includes(ext)) {
+      headers['Cache-Control'] = 'public, max-age=86400, immutable';
+    }
+    res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);
   } else {
     res.writeHead(404, { 'Content-Type': 'text/html' });

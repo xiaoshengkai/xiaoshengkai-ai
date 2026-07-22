@@ -38,7 +38,7 @@ function serveStatic(req, res) {
     const ext = path.extname(filePath).toLowerCase();
     const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
     if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.mp3', '.mp4'].includes(ext)) {
-      headers['Cache-Control'] = 'public, max-age=86400, immutable';
+      headers['Cache-Control'] = 'public, max-age=1800, immutable';
     }
     res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);

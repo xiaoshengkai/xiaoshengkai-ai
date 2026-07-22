@@ -99,7 +99,7 @@ function updateBlogIndex(category) {
       } catch {}
     }
 
-    const coverPath = path.join(entryDir, "images", "cover.png");
+    const coverPath = path.join(entryDir, "images", "cover.jpg");
     const hasCover = fs.existsSync(coverPath);
 
     entries.push({ name, title, excerpt, hasCover });
@@ -115,7 +115,7 @@ function updateBlogIndex(category) {
   const cardsHtml = entries.map((entry) => {
     const encodedName = encodeURIComponent(entry.name);
     const thumbStyle = entry.hasCover
-      ? ` style="background-image:url(${encodedName}/images/cover.png)"`
+      ? ` style="background-image:url(${encodedName}/images/cover.jpg)"`
       : "";
     const excerptHtml = entry.excerpt
       ? `\n        <p class="card-sub">${entry.excerpt}</p>`
@@ -521,13 +521,20 @@ export function register(server) {
         for (const img of state.images) {
           if (!img.url) continue;
           try {
-            const filename = img.type === "cover" ? "cover.png" : `illustration-${img.index}.png`;
+            const filename = img.type === "cover" ? "cover.jpg" : `illustration-${img.index}.jpg`;
             const imgPath = path.join(imgDir, filename);
             const res = await fetch(img.url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            fs.writeFileSync(imgPath, Buffer.from(await res.arrayBuffer()));
+            const raw = Buffer.from(await res.arrayBuffer());
+            // 压缩图片
+            const sharp = (await import("sharp")).default;
+            const compressed = await sharp(raw)
+              .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+              .jpeg({ quality: 85 })
+              .toBuffer();
+            fs.writeFileSync(imgPath, compressed);
             imgCount++;
-            console.log(`${TAG} export: 图片[${img.index}] 下载成功 ${filename}`);
+            console.log(`${TAG} export: 图片[${img.index}] 下载成功 ${filename} (${(raw.length/1024).toFixed(0)}KB → ${(compressed.length/1024).toFixed(0)}KB)`);
           } catch (err) {
             console.error(`${TAG} export: 图片[${img.index}] 下载失败 ${err.message}`);
           }
@@ -538,7 +545,7 @@ export function register(server) {
             const match = seg.match(/^\[IMG-(\d+)\]$/);
             if (match) {
               const img = state.images[parseInt(match[1], 10)];
-              if (img?.url) return `<img src="./images/${img.type === "cover" ? "cover" : `illustration-${img.index}`}.png" alt="插图" class="img-block">`;
+              if (img?.url) return `<img src="./images/${img.type === "cover" ? "cover" : `illustration-${img.index}`}.jpg" alt="插图" class="img-block">`;
               return `<div class="img-placeholder">[插图生成失败]</div>`;
             }
             return seg;
@@ -578,7 +585,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;m
 </head>
 <body>
 <nav style="padding:14px 20px;border-bottom:3px solid #1A1A1A;background:#FFF;position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center"><a href="../" style="display:inline-flex;align-items:center;gap:6px;color:#1A1A1A;text-decoration:none;font-size:14px;font-weight:500;transition:transform 0.2s" onmouseenter="this.style.transform='translateX(-4px)'" onmouseleave="this.style.transform='translateX(0)'"><span>←</span> 返回列表</a></nav>
-${state.images[0]?.url ? `<img class="cover" src="./images/cover.png" alt="封面">` : ""}
+${state.images[0]?.url ? `<img class="cover" src="./images/cover.jpg" alt="封面">` : ""}
 <div class="header">
   <h1 class="title">${state.title}</h1>
   <div class="tags">${(state.tags || []).map((t) => `<span class="tag">${t}</span>`).join("")}</div>

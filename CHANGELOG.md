@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.5.8 (2026-07-21) — 本地博客 + 反向代理 + 照片墙
+
+### 重构
+- **本地博客**：GitHub Pages → 本地 `serve` + Tailscale Funnel 内网穿透
+- **反向代理**：`scripts/proxy.cjs`，统一 443 端口，`/` → 博客，`/ai/` → AI 工作台
+- **生产构建隔离**：`.next-prod` 目录，与 dev `.next` 互不冲突
+- **脚本精简**：`package.json` scripts 从 5 个减到 4 个，脚本逻辑移到 `scripts/`
+
+### 新增
+- **照片墙**：Page 9 翻牌卡片设计（polaroid 风格 + N° 编号 + 装饰线 + 3D 翻转）
+- **图片压缩管线**：`scripts/compress-images.cjs`（92 张 65MB → 20MB），xiaohongshu 导出自动压缩
+- **EXIF 方向修复**：sharp `.rotate()` 保留原始方向
+- **首屏优化**：`Cache-Control` 30 分钟 + `loading="lazy"` + `IntersectionObserver` 懒加载
+- **生产环境 basePath**：`.env.production` 隔离 `/ai` 前缀
+
+### 修复
+- 上下文窗口超限（base64 剥离，1.3M → 正常）
+- 发送闪屏（预上传 + fire-and-forget）
+- 错误信息不透明（日志 + 前端 toast）
+- 日志文件膨胀（17.6MB → 3.8MB）
+- `/api/logs` 响应缩小（200 行 × 500 字符）
+- 侧边栏版权 + 博客链接
+- 图片中文文件名 404（`decodeURIComponent`）
+- Chroma 权限冲突（交给 instrumentation 管理）
+
+### 变更文件
+- `scripts/proxy.cjs` — 新增反向代理
+- `scripts/prod.sh` — 先杀后启，反向代理启动
+- `scripts/stop.sh` — kill -9 强制杀
+- `scripts/compress-images.cjs` — 新增图片压缩
+- `packages/ai-chat/next.config.ts` — basePath + distDir
+- `packages/ai-chat/src/app/api/chat/route.ts` — base64 剥离 + 错误日志
+- `packages/ai-chat/src/app/api/upload/route.ts` — 文件上传
+- `packages/ai-chat/src/app/api/uploads/[filename]/route.ts` — 新增
+- `packages/ai-chat/src/app/(main)/page.tsx` — 预上传 + BASE 前缀
+- `packages/ai-chat/src/components/chat/message-item.tsx` — 图片放大 + 正则放宽
+- `packages/ai-chat/src/components/layout/left-sidebar.tsx` — 博客链接 + 版权
+- `packages/ai-chat/src/lib/api-path.ts` — 新增 BASE 工具
+- `packages/mcp/tools/xiaohongshu/index.js` — 图片压缩 + syncToBlog + updateBlogIndex
+- `packages/skills/blog/SKILL.md` — 新增
+- `.env.production` — 新增
+- `package.json` — 脚本精简
+- `README.md` — 部署说明更新
+- `design.md` — 架构更新
+- `CHANGELOG.md` — 本文
+
 ## v0.5.7 (2026-07-21) — 博客上线 + 错误处理 + 图片上传重构 + 数据源统一
 
 ### 新增

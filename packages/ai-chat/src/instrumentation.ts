@@ -18,7 +18,7 @@ import path from "node:path";
 import { createLogger } from "@shared/logger.js";
 
 // ─── 日志系统 ───
-createLogger("NEXT", path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..", "..", "logs"));
+createLogger("NEXT", path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..", "..", "logs", "app"));
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") {

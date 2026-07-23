@@ -15,6 +15,7 @@
 - 🖼️ 文生图 + 图生图（MiniMax），异步模式，73 种视觉风格可选
 - 📊 图表生成：Mermaid + D2 双引擎，异步模式，支持 10 种图表类型（流程图/时序图/类图/状态图/ER图/甘特图/饼图/象限图/架构图/网络拓扑）
 - 🎬 短视频生成（MD 风格描述 + GSAP 动画 + HyperFrames 渲染，可发抖音）
+- ⏰ 定时任务系统（node-cron 调度，独立进程，日志隔离，仪表盘预览）
 - 📦 npm workspaces monorepo
 
 ## 快速开始
@@ -45,6 +46,11 @@ npm run dev
 npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 反向代理 :4321 + Tailscale Funnel）
 npm run stop   # 停止全部服务 + 关闭内网穿透
 npm run log    # 查看实时日志
+
+# 定时任务
+npm run tasks:start   # 启动定时任务调度器
+npm run tasks:stop    # 停止调度器
+npm run tasks:run     # 手动执行某个任务（TASK=name）
 ```
 
 | 服务 | 本地端口 | 公网地址 |

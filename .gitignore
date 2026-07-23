@@ -22,10 +22,11 @@ data/uploads/*
 !data/uploads/.gitkeep
 data/chroma/
 
-ai-chat
+/ai-chat
 packages/ai-chat/.next
 packages/ai-chat/.next-prod
 data
 logs/
 site/
 docs/
+packages/.planning/

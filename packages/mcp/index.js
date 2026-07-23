@@ -4,7 +4,7 @@ import path from "node:path";
 import { createLogger } from "../shared/logger.js";
 
 // ─── 日志系统 ───
-createLogger("MCP", path.join(path.dirname(new URL(import.meta.url).pathname), "..", "..", "logs"));
+createLogger("MCP", path.join(path.dirname(new URL(import.meta.url).pathname), "..", "..", "logs", "app"));
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

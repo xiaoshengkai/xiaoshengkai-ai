@@ -1,14 +1,24 @@
 {
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "npm run dev -w packages/ai-chat",
+    "dev": "bash scripts/dev.sh",
     "build": "npm run build -w packages/ai-chat",
     "lint": "npm run lint -w packages/ai-chat",
     "prod": "bash scripts/prod.sh",
     "stop": "bash scripts/stop.sh",
-    "log": "bash scripts/log.sh"
+    "log": "bash scripts/log.sh",
+    "tasks:start": "node packages/tasks/scheduler.js",
+    "tasks:stop": "kill $(lsof -t -i:4568) 2>/dev/null || true",
+    "tasks:run": "node -e \"import('./packages/tasks/$TASK/index.js').then(m=>m.run())\""
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "dotenv": "^17.4.2",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
     "http-proxy": "^1.18.0"

@@ -211,6 +211,66 @@ skills/
 └── xiaohongshu-note/            # 小红书笔记
     └── SKILL.md
 ```
+
+## 定时任务系统
+
+### 设计理念
+
+定时任务与 AI Chat 解耦：scheduler 是独立进程，任务代码是纯 Node.js 脚本，不依赖 Next.js。
+
+### 架构
+
+```
+用户操作                        AI Chat 进程
+  │                                │
+  ├─ /schedule 页面               │
+  │   ├─ 查看任务列表（GET /api/tasks）     │
+  │   ├─ 立即执行（POST /api/tasks）       │
+  │   └─ 仪表盘（GET /api/tasks/[name]/dashboard）│
+  │                                │
+  └─ 手动重启                       │
+       │                           │
+       ▼                           │
+  scheduler 进程（常驻）            │
+  ├─ 扫描 packages/tasks/*/task.json       │
+  ├─ node-cron 注册每个 cron 表达式        │
+  └─ 触发时 → import task → run() → 写日志 │
+                                    │
+  logs/tasks/<name>.log             │
+  data/tasks/<name>.json            │
+  data/tasks/<name>.lock            │
+```
+
+### 目录结构
+
+```
+packages/tasks/
+├── scheduler.js                   # 常驻调度进程
+├── lib/
+│   └── logger.js                  # 任务日志工具
+└── <task-name>/
+    ├── task.json                  # { name, description, cron, enabled, html? }
+    └── index.js                   # export async function run()
+```
+
+### 任务约定
+
+- 每个任务一个目录，`task.json` 自描述元信息
+- `index.js` 必须 `export async function run()`，scheduler 负责 try/catch + 日志
+- 仪表盘必须用原生 HTML/CSS/JS（允许 CDN），禁止 React/Vue/构建工具
+- 任务执行互斥：同一任务不允许重叠执行（lock 文件）
+- 状态追踪：`data/tasks/<name>.json` 记录 lastRun/lastStatus/lastError
+- 日志隔离：`logs/tasks/<name>.log`，与应用日志 `logs/app/` 同级
+
+### 日志结构
+
+```
+logs/
+├── app/                           # 应用日志
+│   └── app-YYYY-MM-DD.log
+└── tasks/                         # 任务日志
+    └── <task-name>.log
+```
 ```
 
 ### RAG 预检索

@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback } from "react";
+import { usePathname } from "next/navigation";
 import LeftSidebar from "@/components/layout/left-sidebar";
 import { ConversationProvider, useConversation } from "@/components/layout/conversation-context";
 
 function MainLayoutInner({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { activeConversationId, setActiveConversationId, newConversation } = useConversation();
 
   const handleSelectConversation = useCallback((id: string) => {
@@ -13,11 +15,13 @@ function MainLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <LeftSidebar
-        activeConversationId={activeConversationId}
-        onNewConversation={newConversation}
-        onSelectConversation={handleSelectConversation}
-      />
+      {pathname === "/" && (
+        <LeftSidebar
+          activeConversationId={activeConversationId}
+          onNewConversation={newConversation}
+          onSelectConversation={handleSelectConversation}
+        />
+      )}
       <main className="flex-1 min-w-0 overflow-hidden">
         {children}
       </main>

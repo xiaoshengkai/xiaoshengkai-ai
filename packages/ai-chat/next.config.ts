@@ -9,6 +9,9 @@ import { config as dotenvConfig } from "dotenv";
 import { resolve } from "path";
 
 dotenvConfig({ path: resolve(process.cwd(), "..", "..", ".env") });
+if (process.env.NODE_ENV === 'production') {
+  dotenvConfig({ path: resolve(process.cwd(), "..", "..", ".env.production") });
+}
 
 import type { NextConfig } from "next";
 

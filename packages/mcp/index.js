@@ -9,7 +9,7 @@ createLogger("MCP", path.join(path.dirname(new URL(import.meta.url).pathname), "
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { register as registerFetch } from "./tools/fetch/index.js";
-import { register as registerTodo } from "./tools/todo/index.js";
+// import { register as registerTodo } from "./tools/todo/index.js";
 import { register as registerFile } from "./tools/file/index.js";
 import { register as registerChroma } from "./tools/chroma/index.js";
 import { register as registerSkill } from "./tools/skill/index.js";
@@ -26,7 +26,7 @@ const modules = [
   { name: "skill", register: registerSkill },
   { name: "exec", register: registerExec },
   { name: "fetch", register: registerFetch },
-  { name: "todo", register: registerTodo },
+  // { name: "todo", register: registerTodo },
   { name: "file", register: registerFile },
   { name: "chroma", register: registerChroma },
   { name: "media", register: registerMedia },

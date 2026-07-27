@@ -49,7 +49,10 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer((req, res) => {
-  if (req.url.startsWith('/ai')) {
+  if (req.url.startsWith('/ai') || req.url.startsWith('/note/') || req.url.startsWith('/preview/') || req.url.startsWith('/api/')) {
+    if (!req.url.startsWith('/ai')) {
+      req.url = '/ai' + req.url;
+    }
     proxy.web(req, res);
   } else {
     serveStatic(req, res);
@@ -58,6 +61,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(4321, () => {
   console.log('代理已启动 → http://localhost:4321');
-  console.log('  /      → 博客 (site/)');
-  console.log('  /ai/   → AI 工作台 (localhost:4567)');
+  console.log('  /             → 博客 (site/)');
+  console.log('  /ai/ /note/ /preview/ /api/ → AI 工作台 (localhost:4567)');
 });

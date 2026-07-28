@@ -1,4 +1,8 @@
-import { MINIMAX_BASE_URL, escHtml } from "./utils.js";
+const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
+
+function escHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 export async function downloadSubtitles(taskId) {
   const apiKey = process.env.MINIMAX_API_KEY;
@@ -13,7 +17,6 @@ export async function downloadSubtitles(taskId) {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   const fileResult = await fileRes.json();
-  console.log("[video] 字幕 file 完整响应:", JSON.stringify(fileResult));
   const subtitleUrl = fileResult.file?.subtitle_url;
   if (!subtitleUrl) return [];
 

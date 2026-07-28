@@ -2,7 +2,6 @@ import { callLLM as callDeepSeek } from "./deepseek.js";
 import { callLLM as callMiniMax } from "./minimax.js";
 
 const PROVIDER = process.env.MCP_LLM_PROVIDER || "deepseek";
-console.log(`[llm] provider=${PROVIDER}`);
 
 export { PROVIDER };
 

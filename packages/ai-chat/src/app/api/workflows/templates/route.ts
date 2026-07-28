@@ -10,10 +10,10 @@ export async function GET() {
     return NextResponse.json({ templates: [] });
   }
   const templates = fs.readdirSync(TEMPLATES_DIR)
-    .filter(f => f.endsWith(".json"))
+    .filter(f => fs.statSync(path.join(TEMPLATES_DIR, f)).isDirectory())
     .map(f => {
-      const t = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f), "utf-8"));
-      return { id: f.replace(".json", ""), ...t };
+      const t = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f, "template.json"), "utf-8"));
+      return { id: f, ...t };
     });
   return NextResponse.json({ templates });
 }

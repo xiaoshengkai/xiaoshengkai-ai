@@ -21,42 +21,33 @@
       "id": "tts",
       "name": "TTS 语音合成",
       "type": "tool",
-      "tool": "audio",
-      "params": {
-        "action": "tts",
-        "text": "{script.narration}",
-        "voice_id": "{voice_id}"
-      },
-      "timeout": 60000
+      "module": "./lib/tts.js",
+      "function": "createTTSTask",
+      "args": ["{script.narration}", "{voice_id}"]
     },
     {
       "id": "bgm",
       "name": "BGM 生成",
       "type": "tool",
-      "tool": "audio",
-      "params": {
-        "action": "bgm",
-        "prompt": "{script.bgm_prompt}"
-      },
-      "timeout": 60000
+      "module": "./lib/bgm.js",
+      "function": "generateBGM",
+      "args": ["{script.bgm_prompt}", "{executionDir}"]
     },
     {
       "id": "preview",
       "name": "构建 HTML 预览",
-      "type": "script",
-      "script": "const fs = require('fs'); const path = require('path'); const template = fs.readFileSync(path.join(__dirname, '..', '..', 'packages', 'mcp', 'templates', 'animation.html'), 'utf-8'); const html = template.replace('<!-- AI 在此处填充场景 -->', process.env.STEP_SCRIPT_HTML || '').replace('<!-- AI 在此处扩展样式 -->', '').replace('// AI 在此处填充 GSAP 动画代码', 'var tl = gsap.timeline({ paused: true }); tl.play();'); fs.writeFileSync('preview.html', html); process.stdout.write(JSON.stringify({ previewFile: 'preview.html' }));",
-      "timeout": 30000
+      "type": "tool",
+      "module": "./lib/preview.js",
+      "function": "buildPreviewHTML",
+      "args": ["{script.html}", "{executionDir}", "{style}", "{duration}"]
     },
     {
       "id": "render",
       "name": "渲染 MP4",
       "type": "tool",
-      "tool": "video",
-      "params": {
-        "action": "render",
-        "taskId": "{executionId}"
-      },
-      "timeout": 300000
+      "module": "./lib/render.js",
+      "function": "renderMP4",
+      "args": ["{executionDir}"]
     }
   ]
 }

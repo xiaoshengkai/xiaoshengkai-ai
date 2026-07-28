@@ -14,23 +14,23 @@ const STEP_TYPES = {
   tool: execToolStep,
 };
 
-export async function executeStep(step, vars, executionDir) {
+export async function executeStep(step, vars, executionDir, templateDir) {
   const executor = STEP_TYPES[step.type];
   if (!executor) throw new Error(`未知步骤类型: ${step.type}`);
-  return executor(step, vars, executionDir);
+  return executor(step, vars, executionDir, templateDir);
 }
 
 export function loadTemplate(name) {
-  const templatePath = path.join(TEMPLATES_DIR, `${name}.json`);
+  const templatePath = path.join(TEMPLATES_DIR, name, "template.json");
   return JSON.parse(fs.readFileSync(templatePath, "utf-8"));
 }
 
 export function loadTemplates() {
   if (!fs.existsSync(TEMPLATES_DIR)) return [];
   return fs.readdirSync(TEMPLATES_DIR)
-    .filter(f => f.endsWith(".json"))
+    .filter(f => fs.statSync(path.join(TEMPLATES_DIR, f)).isDirectory())
     .map(f => {
-      const t = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f), "utf-8"));
-      return { ...t, id: f.replace(".json", "") };
+      const t = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f, "template.json"), "utf-8"));
+      return { ...t, id: f };
     });
 }

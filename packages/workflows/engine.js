@@ -61,8 +61,9 @@ function readState(dir) {
 }
 
 async function runSteps(dir, state, template, params, logger) {
-  const vars = { ...params };
+  const vars = { ...params, executionDir: dir };
   const totalStart = Date.now();
+  const templateDir = path.resolve(__dirname, "templates", template.name);
 
   for (let i = 0; i < template.steps.length; i++) {
     const step = template.steps[i];
@@ -75,7 +76,7 @@ async function runSteps(dir, state, template, params, logger) {
     logger.info(`[${i + 1}/${template.steps.length}] ${step.name} 开始...`);
 
     try {
-      const output = await executeStep(step, vars, dir);
+      const output = await executeStep(step, vars, dir, templateDir);
       const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
       state.steps[i].status = "completed";
       state.steps[i].output = output;

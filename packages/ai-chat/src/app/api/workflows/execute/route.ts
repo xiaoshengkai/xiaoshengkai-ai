@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     }
 
     // 后台执行工作流
-    const child = spawn("node", [CLI_PATH, "run", JSON.stringify({ template, params: params || {} })], {
+    const child = spawn("node", [CLI_PATH, "run", JSON.stringify({ executionId: data.executionId })], {
       stdio: "ignore",
       detached: true,
     });

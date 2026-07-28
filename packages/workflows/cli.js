@@ -7,9 +7,9 @@ async function main() {
     const result = createExecution(template, params);
     process.stdout.write(JSON.stringify({ ok: true, executionId: result.executionId }));
   } else if (command === "run") {
-    const { template, params } = JSON.parse(args[0]);
-    const { startExecution } = await import("./engine.js");
-    await startExecution(template, params);
+    const { executionId } = JSON.parse(args[0]);
+    const { runExecution } = await import("./engine.js");
+    await runExecution(executionId);
     // startExecution 不 await 工作流，立即返回
   } else if (command === "get") {
     const { getExecution } = await import("./engine.js");

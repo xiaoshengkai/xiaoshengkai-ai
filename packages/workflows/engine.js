@@ -137,6 +137,34 @@ async function runSteps(dir, state, template, params, logger) {
   logger.info(`工作流执行完成，总耗时: ${totalElapsed}s`);
 }
 
+export async function runExecution(executionId) {
+  const dir = path.join(DATA_DIR, executionId);
+  const stateFile = path.join(dir, "state.json");
+  if (!fs.existsSync(stateFile)) throw new Error("执行记录不存在");
+
+  const state = readState(dir);
+  const template = loadTemplate(state.template);
+  const logger = createWorkflowLogger(executionId);
+
+  logger.info(`开始执行工作流: ${state.template} (${executionId})`);
+  logger.info(`参数: ${JSON.stringify(state.params)}`);
+  logger.info(`共 ${template.steps.length} 步: ${template.steps.map(s => s.name).join(" → ")}`);
+
+  state.status = "running";
+  state.steps[0].status = "running";
+  state.steps[0].startedAt = new Date().toISOString();
+  state.startedAt = new Date().toISOString();
+  writeState(dir, state);
+
+  runSteps(dir, state, template, state.params, logger).catch(err => {
+    logger.error(`工作流执行失败: ${err.message}`);
+    const s = readState(dir);
+    s.status = "failed";
+    s.error = err.message;
+    writeState(dir, s);
+  });
+}
+
 export function getExecution(executionId) {
   const dir = path.join(DATA_DIR, executionId);
   const stateFile = path.join(dir, "state.json");

@@ -14,6 +14,8 @@
       "id": "script",
       "name": "AI 生成脚本",
       "type": "ai",
+      "previewType": "code",
+      "previewField": "html",
       "prompt": "你是一个专业短视频脚本生成器。根据用户输入的主题，生成完整的短视频脚本。\n\n视频规格：1080×1920 竖屏，面向抖音等自媒体平台。\n风格：{style}\n目标时长：{duration}秒\n\n输出格式必须是严格的 JSON：\n{\n  \"html\": \"完整 HTML 内容（包含 CSS 和 GSAP 动画）\",\n  \"narration\": \"完整旁白文本，口语化、自然\",\n  \"bgm_prompt\": \"背景音乐风格描述，用于 AI 生成 BGM\",\n  \"title\": \"视频标题\"\n}\n\n要求：\n1. 开头必须有钩子（前3秒用动态大字+悬念/问题）\n2. 信息密度高，每个场景4-5秒\n3. 转场用双层wipe\n4. 图表用内联SVG+GSAP动画\n5. 禁止使用jQuery，用GSAP内置选择器\n6. 每条旁白≤20字\n7. 输出纯JSON，不要用markdown代码块包裹",
       "timeout": 120000
     },
@@ -21,14 +23,18 @@
       "id": "tts",
       "name": "TTS 语音合成",
       "type": "tool",
+      "previewType": "audio",
+      "previewField": "narration.mp3",
       "module": "./lib/tts.js",
-      "function": "createTTSTask",
-      "args": ["{script.narration}", "{voice_id}"]
+      "function": "generateTTS",
+      "args": ["{script.narration}", "{voice_id}", "{executionDir}"]
     },
     {
       "id": "bgm",
       "name": "BGM 生成",
       "type": "tool",
+      "previewType": "audio",
+      "previewField": "bgm.mp3",
       "module": "./lib/bgm.js",
       "function": "generateBGM",
       "args": ["{script.bgm_prompt}", "{executionDir}"]
@@ -37,14 +43,18 @@
       "id": "preview",
       "name": "构建 HTML 预览",
       "type": "tool",
+      "previewType": "iframe",
+      "previewField": "preview.html",
       "module": "./lib/preview.js",
       "function": "buildPreviewHTML",
-      "args": ["{script.html}", "{executionDir}", "{style}", "{duration}"]
+      "args": ["{script.html}", "{executionDir}"]
     },
     {
       "id": "render",
       "name": "渲染 MP4",
       "type": "tool",
+      "previewType": "video",
+      "previewField": "output.mp4",
       "module": "./lib/render.js",
       "function": "renderMP4",
       "args": ["{executionDir}"]

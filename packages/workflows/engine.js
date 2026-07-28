@@ -280,6 +280,10 @@ export async function runNextStep(executionId) {
 
     writeState(dir, state);
     logger.info(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 完成 (${elapsed}s)`);
+    if (output) {
+      const preview = typeof output === "string" ? output.slice(0, 200) : JSON.stringify(output).slice(0, 200);
+      logger.info(`[${nextIdx + 1}/${template.steps.length}] 输出: ${preview}`);
+    }
     return { ok: true, stepIndex: nextIdx, stepStatus: "completed" };
   } catch (err) {
     const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
@@ -300,6 +304,23 @@ export async function runAllSteps(executionId) {
     if (!state || state.status === "completed" || state.status === "failed") return result;
   }
   return { ok: true, status: "all_done" };
+}
+
+export function retryStep(executionId, stepId) {
+  const dir = path.join(DATA_DIR, executionId);
+  const state = readState(dir);
+  const stepIdx = state.steps.findIndex(s => s.id === stepId);
+  if (stepIdx < 0) throw new Error("步骤不存在");
+
+  state.steps[stepIdx].status = "pending";
+  state.steps[stepIdx].output = null;
+  state.steps[stepIdx].error = null;
+  state.steps[stepIdx].startedAt = null;
+
+  state.status = "running";
+  state.currentStep = stepIdx;
+  state.error = null;
+  writeState(dir, state);
 }
 
 export function editStepOutput(executionId, stepId, output) {

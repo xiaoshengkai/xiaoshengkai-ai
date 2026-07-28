@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { execSync } from "node:child_process";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 
 const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
 
@@ -26,4 +28,12 @@ export async function generateBGM(bgmPrompt, workDir) {
   const outPath = `${workDir}/bgm.mp3`;
   fs.writeFileSync(outPath, buffer);
   return outPath;
+}
+
+export function getAudioDuration(filePath) {
+  const ffmpegPath = ffmpegInstaller.path;
+  const stdout = execSync(`"${ffmpegPath}" -i "${filePath}" -f null - 2>&1`, { encoding: "utf-8" });
+  const match = stdout.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/);
+  if (!match) return 60;
+  return parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]) + parseInt(match[4]) / 100;
 }

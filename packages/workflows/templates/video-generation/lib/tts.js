@@ -57,3 +57,8 @@ export async function pollTTSTask(taskId, workDir) {
   }
   throw new Error("TTS 任务超时");
 }
+
+export async function generateTTS(text, voiceId, workDir) {
+  const taskId = await createTTSTask(text, voiceId);
+  return await pollTTSTask(taskId, workDir);
+}

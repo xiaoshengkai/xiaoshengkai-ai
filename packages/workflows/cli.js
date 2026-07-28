@@ -43,6 +43,11 @@ async function main() {
     const { deleteExecution } = await import("./engine.js");
     deleteExecution(executionId);
     process.stdout.write(JSON.stringify({ ok: true }));
+  } else if (command === "retry") {
+    const { executionId, stepId } = JSON.parse(args[0]);
+    const { retryStep } = await import("./engine.js");
+    retryStep(executionId, stepId);
+    process.stdout.write(JSON.stringify({ ok: true }));
   } else {
     process.stdout.write(JSON.stringify({ error: "unknown command" }));
     process.exit(1);

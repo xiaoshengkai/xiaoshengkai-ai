@@ -104,6 +104,14 @@ export default function WorkflowPage() {
     return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
 
+  const statusPriority: Record<string, number> = { failed: 0, running: 1, pending: 2, completed: 3 };
+  const sortedExecutions = [...executions].sort((a, b) => {
+    const pa = statusPriority[a.status] ?? 99;
+    const pb = statusPriority[b.status] ?? 99;
+    if (pa !== pb) return pa - pb;
+    return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+  });
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -124,39 +132,54 @@ export default function WorkflowPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {executions.map(exe => (
+            {sortedExecutions.map(exe => (
               <div key={exe.executionId}
-                className="pixel-card bg-white rounded-lg p-3 cursor-pointer"
+                className="pixel-card bg-white rounded-lg p-2.5 cursor-pointer transition-transform hover:-translate-y-0.5"
                 style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}
                 onClick={() => { window.location.href = `/workflow/execution/${exe.executionId}`; }}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <span className={`inline-block w-2.5 h-2.5 rounded-full ${exe.status === "completed" ? "bg-green-400" : exe.status === "running" ? "bg-yellow-400 animate-pulse" : exe.status === "failed" ? "bg-red-400" : "bg-gray-400"}`} />
+                    <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${
+                      exe.status === "completed" ? "bg-green-400" :
+                      exe.status === "running" ? "bg-yellow-400 animate-pulse" :
+                      exe.status === "failed" ? "bg-red-400" : "bg-gray-400"
+                    }`} />
                     <span className="text-sm font-bold text-gray-800">{exe.templateLabel}</span>
-                    <span className={`text-xs ${exe.status === "failed" ? "text-red-400" : "text-gray-400"}`}>
-                      {exe.status === "completed" ? "完成" : exe.status === "running" ? "执行中" : exe.status === "failed" ? "失败" : "待执行"}
+                    <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded ${
+                      exe.status === "failed" ? "bg-red-100 text-red-600" :
+                      exe.status === "running" ? "bg-yellow-100 text-yellow-700" :
+                      exe.status === "completed" ? "bg-green-100 text-green-700" :
+                      "bg-gray-100 text-gray-500"
+                    }`}>
+                      {exe.status === "completed" ? "✅ 完成" :
+                       exe.status === "running" ? "🔄 执行中" :
+                       exe.status === "failed" ? "❌ 失败" : "⏸️ 待执行"}
                     </span>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(exe.executionId); }}
-                    className="text-xs text-gray-300 hover:text-red-400 cursor-pointer">
+                    className="text-xs text-gray-500 hover:text-red-500 cursor-pointer">
                     删除
                   </button>
                 </div>
-                <p className="text-xs text-gray-400 mb-1">{formatDate(exe.startedAt)}</p>
+                <p className="text-xs text-gray-500 mb-1">{formatDate(exe.startedAt)}</p>
                 {exe.failedStep && (
-                  <p className="text-xs text-red-500 mb-1 truncate">{exe.failedStep}: {exe.failedError}</p>
+                  <p className="text-xs text-red-500 mb-1 truncate" title={`${exe.failedStep}: ${exe.failedError}`}>
+                    <span className="font-medium">{exe.failedStep}:</span> {exe.failedError}
+                  </p>
                 )}
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-gray-100 rounded overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-gray-200 rounded overflow-hidden">
                     <div className="h-full rounded transition-all"
                       style={{
                         width: `${Math.round((exe.completedSteps / exe.totalSteps) * 100)}%`,
-                        background: exe.status === "failed" ? "#f87171" : "#4ade80",
+                        background: exe.status === "failed" ? "#f87171" :
+                          exe.status === "running" ? "#fbbf24" :
+                          exe.status === "completed" ? "#4ade80" : "#9ca3af",
                       }} />
                   </div>
-                  <span className="text-xs text-gray-400">{exe.completedSteps}/{exe.totalSteps}</span>
+                  <span className="text-xs text-gray-500">{exe.completedSteps}/{exe.totalSteps}</span>
                 </div>
               </div>
             ))}

@@ -5,6 +5,11 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Play, ChevronRight, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ExecutionStep {
   id: string; name: string; type: string;
@@ -23,6 +28,7 @@ export default function ExecutionDetailPage() {
   const [execution, setExecution] = useState<Execution | null>(null);
   const [nextLoading, setNextLoading] = useState(false);
   const [autoLoading, setAutoLoading] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   const fetchExecution = useCallback(async () => {
     try {
@@ -61,7 +67,6 @@ export default function ExecutionDetailPage() {
   }, [id]);
 
   const handleDelete = useCallback(async () => {
-    if (!confirm("确定要删除这条执行记录吗？")) return;
     try {
       const res = await fetch(`${BASE}/api/workflows/execution/${id}`, { method: "DELETE" });
       if (res.ok) {
@@ -85,8 +90,10 @@ export default function ExecutionDetailPage() {
           <ArrowLeft className="w-4 h-4" />
         </a>
         <h2 className="text-lg font-bold text-gray-800 flex-1">{execution.template}</h2>
-        <button onClick={handleDelete} className="text-gray-300 hover:text-red-400 cursor-pointer">
-          <Trash2 className="w-4 h-4" />
+        <button onClick={() => setShowDelete(true)}
+          className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
+          style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#FF6B6B", boxShadow: "2px 2px 0 #1A1A1A" }}>
+          <Trash2 className="w-3 h-3" />删除
         </button>
         <span className={`text-xs px-2 py-0.5 rounded ${
           execution.status === "completed" ? "bg-green-100 text-green-700" :
@@ -166,6 +173,19 @@ export default function ExecutionDetailPage() {
           </button>
         </div>
       )}
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条执行记录吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

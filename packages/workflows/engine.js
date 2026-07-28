@@ -19,12 +19,15 @@ export function listExecutions() {
     .map(id => {
       try {
         const state = readState(path.join(DATA_DIR, id));
+        const failedStep = state.steps.find(s => s.status === "failed");
         return {
           executionId: id,
           template: state.template,
           status: state.status,
           totalSteps: state.steps.length,
           completedSteps: state.steps.filter(s => s.status === "completed").length,
+          failedStep: failedStep ? failedStep.name : null,
+          failedError: failedStep ? failedStep.error : null,
           startedAt: state.startedAt,
         };
       } catch { return null; }

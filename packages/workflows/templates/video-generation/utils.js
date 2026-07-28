@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_DIR = path.resolve(__dirname, "..", "templates");
+const TEMPLATES_DIR = path.resolve(__dirname, "templates");
 
 export function loadStyleMD(name) {
   const p = path.join(TEMPLATES_DIR, `${name || "default"}.md`);

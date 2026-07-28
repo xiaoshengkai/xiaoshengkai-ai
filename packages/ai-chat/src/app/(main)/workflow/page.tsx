@@ -4,6 +4,11 @@ import { BASE } from "@/lib/api-path";
 import { useEffect, useState, useCallback } from "react";
 import { Play, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Template {
   id: string; label: string; description: string;
@@ -14,6 +19,7 @@ interface Template {
 interface Execution {
   executionId: string; template: string; status: string;
   totalSteps: number; completedSteps: number; startedAt: string;
+  failedStep: string | null; failedError: string | null;
 }
 
 export default function WorkflowPage() {
@@ -23,6 +29,7 @@ export default function WorkflowPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [executing, setExecuting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const fetchExecutions = useCallback(async () => {
     try {
@@ -65,10 +72,10 @@ export default function WorkflowPage() {
     setExecuting(false);
   }, [selectedTemplate, formValues]);
 
-  const handleDelete = useCallback(async (executionId: string) => {
-    if (!confirm("确定要删除这条执行记录吗？此操作不可撤销。")) return;
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
     try {
-      const res = await fetch(`${BASE}/api/workflows/execution/${executionId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE}/api/workflows/execution/${deleteTarget}`, { method: "DELETE" });
       if (res.ok) {
         toast("🟢 已删除");
         fetchExecutions();
@@ -76,7 +83,8 @@ export default function WorkflowPage() {
         toast("🔴 删除失败");
       }
     } catch { toast("🔴 请求失败"); }
-  }, [fetchExecutions]);
+    setDeleteTarget(null);
+  }, [deleteTarget, fetchExecutions]);
 
   const openCreate = useCallback(() => {
     setShowCreate(true);
@@ -113,16 +121,10 @@ export default function WorkflowPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {executions.map(exe => (
               <div key={exe.executionId}
-                className="pixel-card bg-white rounded-lg p-4 cursor-pointer relative"
+                className="pixel-card bg-white rounded-lg p-4 cursor-pointer"
                 style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}
                 onClick={() => { window.location.href = `/workflow/execution/${exe.executionId}`; }}
               >
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(exe.executionId); }}
-                  className="absolute top-2 right-2 text-gray-300 hover:text-red-400 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold text-gray-800">{exe.template}</span>
                   <span className={`inline-block w-2 h-2 rounded-full ${
@@ -131,14 +133,25 @@ export default function WorkflowPage() {
                     exe.status === "failed" ? "bg-red-400" : "bg-gray-400"
                   }`} />
                 </div>
-                <p className="text-xs text-gray-400 mb-2">
+                <p className="text-xs text-gray-400 mb-1">
                   {new Date(exe.startedAt).toLocaleString("zh-CN", { hour12: false })}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 mb-1">
                   {exe.completedSteps}/{exe.totalSteps} 步完成
-                  {exe.status === "failed" && <span className="text-red-400 ml-1">❌</span>}
                   {exe.status === "completed" && <span className="text-green-400 ml-1">✅</span>}
+                  {exe.status === "failed" && <span className="text-red-400 ml-1">❌</span>}
                 </p>
+                {exe.failedStep && (
+                  <p className="text-xs text-red-500 mb-2 truncate">
+                    {exe.failedStep}: {exe.failedError}
+                  </p>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(exe.executionId); }}
+                  className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-2"
+                  style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#FF6B6B", boxShadow: "2px 2px 0 #1A1A1A" }}>
+                  <Trash2 className="w-3 h-3" />删除
+                </button>
               </div>
             ))}
           </div>
@@ -202,6 +215,20 @@ export default function WorkflowPage() {
           </div>
         </div>
       )}
+
+      {/* 删除确认 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条执行记录吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

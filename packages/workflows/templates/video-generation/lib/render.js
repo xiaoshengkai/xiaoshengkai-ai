@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { cpus } from "node:os";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import ffprobeInstaller from "@ffprobe-installer/ffprobe";
 import { getAudioDuration } from "./bgm.js";
@@ -57,7 +58,7 @@ narration.addEventListener('ended', () => {
   fs.writeFileSync(htmlPath, html);
 
   // HyperFrames 渲染
-  const cpuCores = require("node:os").cpus().length;
+  const cpuCores = cpus().length;
   const cmd = `"${HYPERFRAMES_BIN}" render "${htmlPath}" --output "${path.join(workDir, "output.mp4")}" --width 1080 --height 1920 --fps 24 --workers ${Math.min(cpuCores, 4)} --player-ready-timeout=5000 --protocol-timeout=900000 --player-auto-start`;
   console.log("[render]", cmd);
   execSync(cmd, { stdio: "inherit" });

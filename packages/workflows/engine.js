@@ -9,38 +9,49 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const DATA_DIR = path.join(PROJECT_ROOT, "data", "workflows");
 
-export async function startExecution(templateName, params) {
+export function createExecution(templateName, params) {
   const template = loadTemplate(templateName);
   const executionId = crypto.randomBytes(6).toString("hex");
   const dir = path.join(DATA_DIR, executionId);
   fs.mkdirSync(dir, { recursive: true });
-  const logger = createWorkflowLogger(executionId);
-
-  logger.info(`开始执行工作流: ${templateName} (${executionId})`);
-  logger.info(`参数: ${JSON.stringify(params)}`);
-  logger.info(`共 ${template.steps.length} 步: ${template.steps.map(s => s.name).join(" → ")}`);
 
   const state = {
     executionId,
     template: templateName,
     params,
     startedAt: new Date().toISOString(),
-    status: "running",
-    steps: template.steps.map((s, i) => ({
+    status: "pending",
+    steps: template.steps.map(s => ({
       id: s.id,
       name: s.name,
       type: s.type,
-      status: i === 0 ? "running" : "pending",
+      status: "pending",
       output: null,
       error: null,
-      startedAt: i === 0 ? new Date().toISOString() : null,
+      startedAt: null,
     })),
     currentStep: 0,
   };
 
   writeState(dir, state);
+  return { executionId, dir, template };
+}
 
-  // 异步执行
+export async function startExecution(templateName, params) {
+  const { executionId, dir, template } = createExecution(templateName, params);
+  const logger = createWorkflowLogger(executionId);
+
+  logger.info(`开始执行工作流: ${templateName} (${executionId})`);
+  logger.info(`参数: ${JSON.stringify(params)}`);
+  logger.info(`共 ${template.steps.length} 步: ${template.steps.map(s => s.name).join(" → ")}`);
+
+  const state = readState(dir);
+  state.status = "running";
+  state.steps[0].status = "running";
+  state.steps[0].startedAt = new Date().toISOString();
+  state.startedAt = new Date().toISOString();
+  writeState(dir, state);
+
   runSteps(dir, state, template, params, logger).catch(err => {
     logger.error(`工作流执行失败: ${err.message}`);
     const s = readState(dir);
@@ -62,6 +73,11 @@ function readState(dir) {
 
 async function runSteps(dir, state, template, params, logger) {
   const vars = { ...params, executionDir: dir };
+  template.params.forEach(p => {
+    if (p.default !== undefined && (vars[p.name] === undefined || vars[p.name] === "")) {
+      vars[p.name] = String(p.default);
+    }
+  });
   const totalStart = Date.now();
   const templateDir = path.resolve(__dirname, "templates", template.name);
 

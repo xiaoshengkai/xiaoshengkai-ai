@@ -8,7 +8,9 @@ export async function execToolStep(step, vars, executionDir, templateDir) {
   const args = (step.args || []).map(a => {
     let val = a;
     for (const [k, v] of Object.entries(vars)) {
-      val = val.replace(new RegExp(`\\{${k}\\}`, "g"), String(v ?? ""));
+      if (v != null && v !== undefined) {
+        val = val.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+      }
     }
     return val;
   });

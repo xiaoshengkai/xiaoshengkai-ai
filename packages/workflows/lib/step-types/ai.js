@@ -3,7 +3,9 @@ import { callLLM } from "../../../mcp/lib/llm.js";
 export async function execAiStep(step, vars, executionDir) {
   let prompt = step.prompt;
   for (const [key, value] of Object.entries(vars)) {
-    prompt = prompt.replace(new RegExp(`\\{${key}\\}`, "g"), String(value));
+    if (value != null) {
+      prompt = prompt.replace(new RegExp(`\\{${key}\\}`, "g"), String(value));
+    }
   }
 
   const { text } = await callLLM({
@@ -11,12 +13,17 @@ export async function execAiStep(step, vars, executionDir) {
     user: step.user || "",
   });
 
-  // 尝试解析 JSON 输出
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch {}
+    try { return JSON.parse(jsonMatch[0]); } catch {}
+  }
+
+  const mdMatch = text.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
+  if (mdMatch) {
+    const inner = mdMatch[1].match(/\{[\s\S]*\}/);
+    if (inner) {
+      try { return JSON.parse(inner[0]); } catch {}
+    }
   }
 
   return { output: text };

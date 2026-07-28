@@ -3,6 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { executeStep, loadTemplate } from "./lib/executor.js";
+import { createWorkflowLogger } from "./lib/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
@@ -13,6 +14,11 @@ export async function startExecution(templateName, params) {
   const executionId = crypto.randomBytes(6).toString("hex");
   const dir = path.join(DATA_DIR, executionId);
   fs.mkdirSync(dir, { recursive: true });
+  const logger = createWorkflowLogger(executionId);
+
+  logger.info(`开始执行工作流: ${templateName} (${executionId})`);
+  logger.info(`参数: ${JSON.stringify(params)}`);
+  logger.info(`共 ${template.steps.length} 步: ${template.steps.map(s => s.name).join(" → ")}`);
 
   const state = {
     executionId,
@@ -35,8 +41,8 @@ export async function startExecution(templateName, params) {
   writeState(dir, state);
 
   // 异步执行
-  runSteps(dir, state, template, params).catch(err => {
-    console.error(`[workflow] ${executionId} failed:`, err.message);
+  runSteps(dir, state, template, params, logger).catch(err => {
+    logger.error(`工作流执行失败: ${err.message}`);
     const s = readState(dir);
     s.status = "failed";
     s.error = err.message;
@@ -54,8 +60,9 @@ function readState(dir) {
   return JSON.parse(fs.readFileSync(path.join(dir, "state.json"), "utf-8"));
 }
 
-async function runSteps(dir, state, template, params) {
+async function runSteps(dir, state, template, params, logger) {
   const vars = { ...params };
+  const totalStart = Date.now();
 
   for (let i = 0; i < template.steps.length; i++) {
     const step = template.steps[i];
@@ -64,13 +71,23 @@ async function runSteps(dir, state, template, params) {
     state.currentStep = i;
     writeState(dir, state);
 
+    const stepStart = Date.now();
+    logger.info(`[${i + 1}/${template.steps.length}] ${step.name} 开始...`);
+
     try {
       const output = await executeStep(step, vars, dir);
+      const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
       state.steps[i].status = "completed";
       state.steps[i].output = output;
       vars[step.id] = output;
 
-      // 如果是 JSON 对象，展开字段到 vars
+      const outputPreview = typeof output === "string"
+        ? `${output.length} 字符`
+        : JSON.stringify(output).length > 200
+          ? `${JSON.stringify(output).length} 字符`
+          : JSON.stringify(output);
+      logger.info(`[${i + 1}/${template.steps.length}] ${step.name} 完成 (${elapsed}s) | 输出: ${outputPreview}`);
+
       if (output && typeof output === "object" && !Array.isArray(output)) {
         for (const [key, value] of Object.entries(output)) {
           if (typeof value === "string") {
@@ -84,19 +101,23 @@ async function runSteps(dir, state, template, params) {
         vars[`${step.id}.output`] = output.output;
       }
     } catch (err) {
+      const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
       state.steps[i].status = "failed";
       state.steps[i].error = err.message;
       state.status = "failed";
       writeState(dir, state);
+      logger.error(`[${i + 1}/${template.steps.length}] ${step.name} 失败 (${elapsed}s): ${err.message}`);
       throw err;
     }
 
     writeState(dir, state);
   }
 
+  const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1);
   state.status = "completed";
   state.completedAt = new Date().toISOString();
   writeState(dir, state);
+  logger.info(`工作流执行完成，总耗时: ${totalElapsed}s`);
 }
 
 export function getExecution(executionId) {

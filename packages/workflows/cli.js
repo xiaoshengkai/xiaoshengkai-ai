@@ -1,5 +1,11 @@
 const [command, ...args] = process.argv.slice(2);
 
+// 重定向 console 到 stderr，stdout 只输出 JSON
+const origLog = console.log;
+const origErr = console.error;
+console.log = (...a) => origErr(...a);
+console.error = (...a) => origErr(...a);
+
 async function main() {
   if (command === "start") {
     const { template, params } = JSON.parse(args[0]);
@@ -10,7 +16,16 @@ async function main() {
     const { executionId } = JSON.parse(args[0]);
     const { runExecution } = await import("./engine.js");
     await runExecution(executionId);
-    // startExecution 不 await 工作流，立即返回
+  } else if (command === "next") {
+    const { executionId } = JSON.parse(args[0]);
+    const { runNextStep } = await import("./engine.js");
+    const result = await runNextStep(executionId);
+    process.stdout.write(JSON.stringify(result));
+  } else if (command === "auto") {
+    const { executionId } = JSON.parse(args[0]);
+    const { runAllSteps } = await import("./engine.js");
+    const result = await runAllSteps(executionId);
+    process.stdout.write(JSON.stringify(result));
   } else if (command === "get") {
     const { getExecution } = await import("./engine.js");
     const state = getExecution(args[0]);
@@ -19,6 +34,13 @@ async function main() {
     } else {
       process.stdout.write(JSON.stringify({ error: "not found" }));
     }
+  } else if (command === "list") {
+    const { listExecutions } = await import("./engine.js");
+    const list = listExecutions();
+    process.stdout.write(JSON.stringify(list));
+  } else {
+    process.stdout.write(JSON.stringify({ error: "unknown command" }));
+    process.exit(1);
   }
 }
 

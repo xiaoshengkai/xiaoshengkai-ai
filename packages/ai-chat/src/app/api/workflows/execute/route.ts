@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 
 const CLI_PATH = path.resolve(process.cwd(), "..", "..", "packages", "workflows", "cli.js");
 
@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const { template, params } = await request.json();
   if (!template) return NextResponse.json({ error: "missing template" }, { status: 400 });
 
-  console.log(`[workflow] execute: template=${template} params=${JSON.stringify(params)}`);
+  console.log(`[workflow] create: template=${template}`);
 
   try {
     const result = await new Promise<string>((resolve, reject) => {
@@ -24,18 +24,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: data.error }, { status: 500 });
     }
 
-    // 后台执行工作流
-    const child = spawn("node", [CLI_PATH, "run", JSON.stringify({ executionId: data.executionId })], {
-      stdio: "ignore",
-      detached: true,
-    });
-    child.unref();
-
-    console.log(`[workflow] execute started: ${data.executionId}`);
+    console.log(`[workflow] created: ${data.executionId}`);
     return NextResponse.json({ ok: true, executionId: data.executionId });
-  } catch (err: unknown) {
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[workflow] execute error:`, message);
+    console.error(`[workflow] create error:`, message);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

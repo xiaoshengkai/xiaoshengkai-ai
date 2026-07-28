@@ -9,7 +9,39 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const DATA_DIR = path.join(PROJECT_ROOT, "data", "workflows");
 
+const MAX_EXECUTIONS = 50;
+
+export function listExecutions() {
+  if (!fs.existsSync(DATA_DIR)) return [];
+  const dirs = fs.readdirSync(DATA_DIR)
+    .filter(d => fs.statSync(path.join(DATA_DIR, d)).isDirectory());
+  return dirs
+    .map(id => {
+      try {
+        const state = readState(path.join(DATA_DIR, id));
+        return {
+          executionId: id,
+          template: state.template,
+          status: state.status,
+          totalSteps: state.steps.length,
+          completedSteps: state.steps.filter(s => s.status === "completed").length,
+          startedAt: state.startedAt,
+        };
+      } catch { return null; }
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+    .slice(0, MAX_EXECUTIONS);
+}
+
 export function createExecution(templateName, params) {
+  // 检查执行记录数量
+  if (fs.existsSync(DATA_DIR)) {
+    const count = fs.readdirSync(DATA_DIR).filter(d => fs.statSync(path.join(DATA_DIR, d)).isDirectory()).length;
+    if (count >= MAX_EXECUTIONS) {
+      throw new Error(`执行记录已达上限 (${MAX_EXECUTIONS}条)，请先清理旧记录`);
+    }
+  }
   const template = loadTemplate(templateName);
   const executionId = crypto.randomBytes(6).toString("hex");
   const dir = path.join(DATA_DIR, executionId);
@@ -172,9 +204,90 @@ export function getExecution(executionId) {
   return readState(dir);
 }
 
-export function retryStep(executionId, stepId) {
-  // TODO: 支持重试单步
-  return { ok: false, error: "未实现" };
+export async function runNextStep(executionId) {
+  const dir = path.join(DATA_DIR, executionId);
+  const state = readState(dir);
+  if (state.status === "completed" || state.status === "failed") {
+    return { ok: false, error: "工作流已结束" };
+  }
+
+  const nextIdx = state.steps.findIndex(s => s.status === "pending");
+  if (nextIdx < 0) return { ok: false, error: "所有步骤已执行" };
+
+  // 如果还没启动，先设 status=running
+  if (state.status === "pending" || state.status === "created") {
+    state.status = "running";
+    state.startedAt = new Date().toISOString();
+  }
+
+  const template = loadTemplate(state.template);
+  const templateDir = path.resolve(__dirname, "templates", template.name);
+  const logger = createWorkflowLogger(executionId);
+  const vars = { ...state.params, executionDir: dir };
+
+  // 收集已完成步骤的输出
+  state.steps.forEach(s => {
+    if (s.status === "completed" && s.output) {
+      if (typeof s.output === "object" && !Array.isArray(s.output)) {
+        for (const [k, v] of Object.entries(s.output)) {
+          if (typeof v === "string") vars[`${s.id}.${k}`] = v;
+        }
+        vars[`${s.id}.output`] = JSON.stringify(s.output);
+      } else if (typeof s.output === "string") {
+        vars[`${s.id}.output`] = s.output;
+      }
+    }
+  });
+
+  // 注入模板默认值
+  template.params.forEach(p => {
+    if (p.default !== undefined && (vars[p.name] === undefined || vars[p.name] === "")) {
+      vars[p.name] = String(p.default);
+    }
+  });
+
+  const step = template.steps[nextIdx];
+  state.steps[nextIdx].status = "running";
+  state.steps[nextIdx].startedAt = new Date().toISOString();
+  state.currentStep = nextIdx;
+  writeState(dir, state);
+
+  const stepStart = Date.now();
+  logger.info(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 开始...`);
+
+  try {
+    const output = await executeStep(step, vars, dir, templateDir);
+    const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
+    state.steps[nextIdx].status = "completed";
+    state.steps[nextIdx].output = output;
+
+    if (nextIdx === template.steps.length - 1) {
+      state.status = "completed";
+      state.completedAt = new Date().toISOString();
+    }
+
+    writeState(dir, state);
+    logger.info(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 完成 (${elapsed}s)`);
+    return { ok: true, stepIndex: nextIdx, stepStatus: "completed" };
+  } catch (err) {
+    const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
+    state.steps[nextIdx].status = "failed";
+    state.steps[nextIdx].error = err.message;
+    state.status = "failed";
+    writeState(dir, state);
+    logger.error(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 失败 (${elapsed}s): ${err.message}`);
+    return { ok: false, stepIndex: nextIdx, stepStatus: "failed", error: err.message };
+  }
+}
+
+export async function runAllSteps(executionId) {
+  for (let i = 0; i < 100; i++) {
+    const result = await runNextStep(executionId);
+    if (!result.ok) return result;
+    const state = getExecution(executionId);
+    if (!state || state.status === "completed" || state.status === "failed") return result;
+  }
+  return { ok: true, status: "all_done" };
 }
 
 export function editStepOutput(executionId, stepId, output) {

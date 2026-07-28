@@ -149,7 +149,7 @@ export default function WorkflowPage() {
                       exe.status === "running" ? "bg-yellow-400 animate-pulse" :
                       exe.status === "failed" ? "bg-red-500" : "bg-gray-400"
                     }`} />
-                    <span className="text-sm font-bold text-gray-800 flex-1 truncate">{exe.templateLabel}</span>
+                    <span className="text-sm font-bold text-gray-800 truncate">{exe.templateLabel}</span>
                     <span className={`inline-block text-xs px-1.5 py-0.5 rounded shrink-0 ${
                       exe.status === "failed" ? "bg-red-100 text-red-700" :
                       exe.status === "running" ? "bg-yellow-100 text-yellow-700" :
@@ -160,6 +160,7 @@ export default function WorkflowPage() {
                        exe.status === "running" ? "🔄 执行中" :
                        exe.status === "failed" ? "❌ 失败" : "⏸️ 待执行"}
                     </span>
+                    <div className="flex-1" />
                     <button
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(exe.executionId); }}
                       className="text-xs text-gray-400 hover:text-red-500 cursor-pointer shrink-0">

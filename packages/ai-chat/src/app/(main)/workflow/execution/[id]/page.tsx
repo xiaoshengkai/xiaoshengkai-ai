@@ -107,14 +107,16 @@ export default function ExecutionDetailPage() {
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 shrink-0">
         <a href="/workflow" className="text-gray-400 hover:text-gray-600"><ArrowLeft className="w-4 h-4" /></a>
-        <h2 className="text-sm font-bold text-gray-800 flex-1">{execution.template}</h2>
-        <span className={`text-xs px-2 py-0.5 rounded ${
-          execution.status === "completed" ? "bg-green-100 text-green-700" :
-          execution.status === "running" ? "bg-yellow-100 text-yellow-700" :
-          execution.status === "failed" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"
-        }`}>
-          {execution.status === "completed" ? "完成" : execution.status === "running" ? "执行中" : execution.status === "failed" ? "失败" : "待执行"}
-        </span>
+        <div className="flex items-center gap-2 flex-1">
+          <h2 className="text-sm font-bold text-gray-800">{execution.template}</h2>
+          <span className={`text-xs px-2 py-0.5 rounded ${
+            execution.status === "completed" ? "bg-green-100 text-green-700" :
+            execution.status === "running" ? "bg-yellow-100 text-yellow-700" :
+            execution.status === "failed" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"
+          }`}>
+            {execution.status === "completed" ? "完成" : execution.status === "running" ? "执行中" : execution.status === "failed" ? "失败" : "待执行"}
+          </span>
+        </div>
         <button onClick={() => setShowDelete(true)}
           className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
           style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#FF6B6B", boxShadow: "2px 2px 0 #1A1A1A" }}>

@@ -1,0 +1,62 @@
+{
+  "name": "video-generation",
+  "label": "短视频生成",
+  "description": "主题 → AI脚本生成 → TTS语音 → BGM → HTML预览 → 渲染MP4",
+  "params": [
+    { "name": "topic", "label": "视频主题", "type": "text", "required": true },
+    { "name": "style", "label": "视觉风格", "type": "select", "options": ["Neo-Brutalist", "奶油风", "极简黑白"], "default": "Neo-Brutalist" },
+    { "name": "duration", "label": "目标时长(秒)", "type": "number", "default": 40 },
+    { "name": "voice_id", "label": "TTS音色", "type": "text", "default": "male-qn-qingse" },
+    { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.3 }
+  ],
+  "steps": [
+    {
+      "id": "script",
+      "name": "AI 生成脚本",
+      "type": "ai",
+      "prompt": "你是一个专业短视频脚本生成器。根据用户输入的主题，生成完整的短视频脚本。\n\n视频规格：1080×1920 竖屏，面向抖音等自媒体平台。\n风格：{style}\n目标时长：{duration}秒\n\n输出格式必须是严格的 JSON：\n{\n  \"html\": \"完整 HTML 内容（包含 CSS 和 GSAP 动画）\",\n  \"narration\": \"完整旁白文本，口语化、自然\",\n  \"bgm_prompt\": \"背景音乐风格描述，用于 AI 生成 BGM\",\n  \"title\": \"视频标题\"\n}\n\n要求：\n1. 开头必须有钩子（前3秒用动态大字+悬念/问题）\n2. 信息密度高，每个场景4-5秒\n3. 转场用双层wipe\n4. 图表用内联SVG+GSAP动画\n5. 禁止使用jQuery，用GSAP内置选择器\n6. 每条旁白≤20字\n7. 输出纯JSON，不要用markdown代码块包裹",
+      "timeout": 120000
+    },
+    {
+      "id": "tts",
+      "name": "TTS 语音合成",
+      "type": "tool",
+      "tool": "audio",
+      "params": {
+        "action": "tts",
+        "text": "{script.narration}",
+        "voice_id": "{voice_id}"
+      },
+      "timeout": 60000
+    },
+    {
+      "id": "bgm",
+      "name": "BGM 生成",
+      "type": "tool",
+      "tool": "audio",
+      "params": {
+        "action": "bgm",
+        "prompt": "{script.bgm_prompt}"
+      },
+      "timeout": 60000
+    },
+    {
+      "id": "preview",
+      "name": "构建 HTML 预览",
+      "type": "script",
+      "script": "const fs = require('fs'); const path = require('path'); const template = fs.readFileSync(path.join(__dirname, '..', '..', 'packages', 'mcp', 'templates', 'animation.html'), 'utf-8'); const html = template.replace('<!-- AI 在此处填充场景 -->', process.env.STEP_SCRIPT_HTML || '').replace('<!-- AI 在此处扩展样式 -->', '').replace('// AI 在此处填充 GSAP 动画代码', 'var tl = gsap.timeline({ paused: true }); tl.play();'); fs.writeFileSync('preview.html', html); process.stdout.write(JSON.stringify({ previewFile: 'preview.html' }));",
+      "timeout": 30000
+    },
+    {
+      "id": "render",
+      "name": "渲染 MP4",
+      "type": "tool",
+      "tool": "video",
+      "params": {
+        "action": "render",
+        "taskId": "{executionId}"
+      },
+      "timeout": 300000
+    }
+  ]
+}

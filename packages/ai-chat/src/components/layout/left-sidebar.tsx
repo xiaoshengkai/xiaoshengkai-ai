@@ -36,7 +36,7 @@ interface LeftSidebarProps {
 const menuItems = [
   { href: "/memory", label: "记忆库", icon: Database },
   { href: "/tools", label: "工具库", icon: Wrench, disabled: true },
-  { href: "/workflow", label: "工作流", icon: GitBranch, disabled: true },
+  { href: "/workflow", label: "工作流", icon: GitBranch },
   { href: "/schedule", label: "定时任务", icon: Clock },
   { href: "https://node.tailddce43.ts.net", label: "博客", icon: FileText },
   { href: "/settings", label: "设置", icon: Settings, disabled: true },

@@ -49,7 +49,7 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer((req, res) => {
-  if (req.url.startsWith('/ai') || req.url.startsWith('/note/') || req.url.startsWith('/preview/') || req.url.startsWith('/api/')) {
+  if (req.url.startsWith('/ai') || req.url.startsWith('/note/') || req.url.startsWith('/preview/') || req.url.startsWith('/api/') || req.url === '/workflow' || req.url === '/memory' || req.url === '/schedule' || req.url === '/settings' || req.url === '/tools') {
     if (!req.url.startsWith('/ai')) {
       req.url = '/ai' + req.url;
     }

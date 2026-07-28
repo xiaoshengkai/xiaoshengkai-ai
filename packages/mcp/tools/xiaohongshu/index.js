@@ -39,7 +39,7 @@ const TEMPLATES = {
   opinion: { systemPrompt: "（待实现）", coverStyle: "", illustrationStyle: "" },
 };
 
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const SITE_DIR = path.join(PROJECT_ROOT, "site");
 
 const CATEGORY_META = {

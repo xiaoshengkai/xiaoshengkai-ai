@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "../../..");
+const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "../../../..");
 const SKILLS_DIR = path.resolve(PROJECT_ROOT, "packages/skills");
 
 function isAllowed(dir) {

@@ -38,6 +38,11 @@ async function main() {
     const { listExecutions } = await import("./engine.js");
     const list = listExecutions();
     process.stdout.write(JSON.stringify(list));
+  } else if (command === "delete") {
+    const { executionId } = JSON.parse(args[0]);
+    const { deleteExecution } = await import("./engine.js");
+    deleteExecution(executionId);
+    process.stdout.write(JSON.stringify({ ok: true }));
   } else {
     process.stdout.write(JSON.stringify({ error: "unknown command" }));
     process.exit(1);

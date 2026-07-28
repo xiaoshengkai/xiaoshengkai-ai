@@ -204,6 +204,13 @@ export function getExecution(executionId) {
   return readState(dir);
 }
 
+export function deleteExecution(executionId) {
+  const dir = path.join(DATA_DIR, executionId);
+  if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true });
+  const logFile = path.resolve(PROJECT_ROOT, "logs", "workflows", `${executionId}.log`);
+  if (fs.existsSync(logFile)) fs.unlinkSync(logFile);
+}
+
 export async function runNextStep(executionId) {
   const dir = path.join(DATA_DIR, executionId);
   const state = readState(dir);

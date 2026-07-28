@@ -2,7 +2,7 @@
 
 import { BASE } from "@/lib/api-path";
 import { useEffect, useState, useCallback } from "react";
-import { Play, Plus } from "lucide-react";
+import { Play, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Template {
@@ -65,6 +65,19 @@ export default function WorkflowPage() {
     setExecuting(false);
   }, [selectedTemplate, formValues]);
 
+  const handleDelete = useCallback(async (executionId: string) => {
+    if (!confirm("确定要删除这条执行记录吗？此操作不可撤销。")) return;
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${executionId}`, { method: "DELETE" });
+      if (res.ok) {
+        toast("🟢 已删除");
+        fetchExecutions();
+      } else {
+        toast("🔴 删除失败");
+      }
+    } catch { toast("🔴 请求失败"); }
+  }, [fetchExecutions]);
+
   const openCreate = useCallback(() => {
     setShowCreate(true);
     setSelectedTemplate(null);
@@ -82,11 +95,9 @@ export default function WorkflowPage() {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <h2 className="text-lg font-bold text-gray-800">⚙️ 工作流</h2>
-        <button
-          onClick={openCreate}
+        <button onClick={openCreate}
           className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
-          style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}
-        >
+          style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
           <Plus className="w-3 h-3" />新建工作流
         </button>
       </div>
@@ -99,14 +110,19 @@ export default function WorkflowPage() {
             <p className="text-xs text-gray-300">点击「新建工作流」开始</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {executions.map(exe => (
-              <a
-                key={exe.executionId}
-                href={`/workflow/execution/${exe.executionId}`}
-                className="block pixel-card bg-white rounded-lg p-4 cursor-pointer"
+              <div key={exe.executionId}
+                className="pixel-card bg-white rounded-lg p-4 cursor-pointer relative"
                 style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}
+                onClick={() => { window.location.href = `/workflow/execution/${exe.executionId}`; }}
               >
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(exe.executionId); }}
+                  className="absolute top-2 right-2 text-gray-300 hover:text-red-400 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold text-gray-800">{exe.template}</span>
                   <span className={`inline-block w-2 h-2 rounded-full ${
@@ -120,10 +136,10 @@ export default function WorkflowPage() {
                 </p>
                 <p className="text-xs text-gray-500">
                   {exe.completedSteps}/{exe.totalSteps} 步完成
-                  {exe.status === "failed" && <span className="text-red-400 ml-1">❌ 失败</span>}
-                  {exe.status === "completed" && <span className="text-green-400 ml-1">✅ 完成</span>}
+                  {exe.status === "failed" && <span className="text-red-400 ml-1">❌</span>}
+                  {exe.status === "completed" && <span className="text-green-400 ml-1">✅</span>}
                 </p>
-              </a>
+              </div>
             ))}
           </div>
         )}
@@ -134,10 +150,8 @@ export default function WorkflowPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowCreate(false)}>
           <div className="bg-white rounded-lg p-6 w-[480px] max-h-[80vh] overflow-auto"
             style={{ border: "3px solid #1A1A1A", boxShadow: "6px 6px 0 #1A1A1A" }}
-            onClick={e => e.stopPropagation()}
-          >
+            onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-gray-800 mb-4">新建工作流</h3>
-
             {!selectedTemplate ? (
               <div className="grid grid-cols-1 gap-2">
                 {templates.map(t => (
@@ -173,7 +187,7 @@ export default function WorkflowPage() {
                   </div>
                 ))}
                 <div className="flex gap-2 mt-4 justify-end">
-                  <button onClick={() => setShowCreate(false)} className="pixel-btn px-3 py-1 text-xs font-bold"
+                  <button onClick={() => setShowCreate(false)} className="pixel-btn px-3 py-1 text-xs font-bold cursor-pointer"
                     style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#1A1A1A", boxShadow: "2px 2px 0 #1A1A1A" }}>
                     取消
                   </button>

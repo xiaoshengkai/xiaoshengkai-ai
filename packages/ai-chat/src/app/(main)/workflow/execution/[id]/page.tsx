@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/api-path";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Play, ChevronRight, ArrowLeft } from "lucide-react";
+import { Play, ChevronRight, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface ExecutionStep {
@@ -60,6 +60,18 @@ export default function ExecutionDetailPage() {
     setAutoLoading(false);
   }, [id]);
 
+  const handleDelete = useCallback(async () => {
+    if (!confirm("确定要删除这条执行记录吗？")) return;
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        window.location.href = "/workflow";
+      } else {
+        toast("🔴 删除失败");
+      }
+    } catch { toast("🔴 请求失败"); }
+  }, [id]);
+
   if (!execution) return null;
 
   const isRunning = execution.status === "running";
@@ -73,6 +85,9 @@ export default function ExecutionDetailPage() {
           <ArrowLeft className="w-4 h-4" />
         </a>
         <h2 className="text-lg font-bold text-gray-800 flex-1">{execution.template}</h2>
+        <button onClick={handleDelete} className="text-gray-300 hover:text-red-400 cursor-pointer">
+          <Trash2 className="w-4 h-4" />
+        </button>
         <span className={`text-xs px-2 py-0.5 rounded ${
           execution.status === "completed" ? "bg-green-100 text-green-700" :
           execution.status === "running" ? "bg-yellow-100 text-yellow-700 animate-pulse" :

@@ -108,11 +108,6 @@ export default function ExecutionDetailPage() {
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 shrink-0">
         <a href="/workflow" className="text-gray-400 hover:text-gray-600"><ArrowLeft className="w-4 h-4" /></a>
         <h2 className="text-sm font-bold text-gray-800 flex-1">{execution.template}</h2>
-        <button onClick={() => setShowDelete(true)}
-          className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
-          style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#FF6B6B", boxShadow: "2px 2px 0 #1A1A1A" }}>
-          <Trash2 className="w-3 h-3" />删除
-        </button>
         <span className={`text-xs px-2 py-0.5 rounded ${
           execution.status === "completed" ? "bg-green-100 text-green-700" :
           execution.status === "running" ? "bg-yellow-100 text-yellow-700" :
@@ -120,36 +115,11 @@ export default function ExecutionDetailPage() {
         }`}>
           {execution.status === "completed" ? "完成" : execution.status === "running" ? "执行中" : execution.status === "failed" ? "失败" : "待执行"}
         </span>
-      </div>
-
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
-        <div className="flex items-center gap-1">
-          {execution.steps.map((step, i) => {
-            const isActive = step.id === activeStepId;
-            const done = step.status === "completed";
-            const fail = step.status === "failed";
-            const run = step.status === "running";
-            return (
-              <div key={step.id} className="flex items-center flex-1">
-                <button onClick={() => setActiveStepId(step.id)}
-                  className="flex flex-col items-center gap-1 w-full cursor-pointer"
-                  title={step.name}>
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    done ? "bg-green-500 text-white" : run ? "bg-yellow-400 text-white animate-pulse" :
-                    fail ? "bg-red-500 text-white" : isActive ? "bg-blue-500 text-white ring-2 ring-blue-300" : "bg-gray-300 text-gray-600"
-                  }`}>
-                    {done ? "✓" : fail ? "✗" : i + 1}
-                  </div>
-                  <span className="text-xs text-gray-600 truncate max-w-[80px]">{step.name}</span>
-                </button>
-                {i < total - 1 && (
-                  <div className={`flex-1 h-0.5 -mt-4 ${done ? "bg-green-400" : "bg-gray-200"}`} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-xs text-gray-500 mt-2 text-center">{completed}/{total} 步完成</p>
+        <button onClick={() => setShowDelete(true)}
+          className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
+          style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#FF6B6B", boxShadow: "2px 2px 0 #1A1A1A" }}>
+          <Trash2 className="w-3 h-3" />删除
+        </button>
       </div>
 
       <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]">

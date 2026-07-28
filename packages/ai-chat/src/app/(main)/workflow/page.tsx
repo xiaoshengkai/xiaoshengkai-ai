@@ -196,10 +196,13 @@ export default function WorkflowPage() {
               <div className="grid grid-cols-1 gap-2">
                 {templates.map(t => (
                   <div key={t.id} onClick={() => selectTemplate(t)}
-                    className="p-3 rounded border-2 border-gray-200 cursor-pointer hover:border-blue-300">
-                    <div className="text-sm font-bold text-gray-800">{t.label}</div>
-                    <div className="text-xs text-gray-500 mt-1">{t.description}</div>
-                    <div className="text-xs text-gray-400 mt-1">{t.steps.map(s => s.name).join(" → ")}</div>
+                    className="p-3 rounded border-2 border-gray-200 cursor-pointer transition-all hover:border-blue-400 hover:shadow-sm"
+                    title={t.description}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-bold text-gray-800">{t.label}</span>
+                      <span className="text-xs text-gray-400">{t.steps.length} 步</span>
+                    </div>
+                    <div className="text-xs text-gray-500">{t.description}</div>
                   </div>
                 ))}
               </div>

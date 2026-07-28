@@ -17,7 +17,7 @@ interface Template {
 }
 
 interface Execution {
-  executionId: string; template: string; status: string;
+  executionId: string; template: string; templateLabel: string; status: string;
   totalSteps: number; completedSteps: number; startedAt: string;
   failedStep: string | null; failedError: string | null;
 }
@@ -99,6 +99,11 @@ export default function WorkflowPage() {
     setFormValues(defaults);
   }, []);
 
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -121,37 +126,38 @@ export default function WorkflowPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {executions.map(exe => (
               <div key={exe.executionId}
-                className="pixel-card bg-white rounded-lg p-4 cursor-pointer"
+                className="pixel-card bg-white rounded-lg p-3 cursor-pointer"
                 style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}
                 onClick={() => { window.location.href = `/workflow/execution/${exe.executionId}`; }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-gray-800">{exe.template}</span>
-                  <span className={`inline-block w-2 h-2 rounded-full ${
-                    exe.status === "completed" ? "bg-green-400" :
-                    exe.status === "running" ? "bg-yellow-400 animate-pulse" :
-                    exe.status === "failed" ? "bg-red-400" : "bg-gray-400"
-                  }`} />
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-block w-2.5 h-2.5 rounded-full ${exe.status === "completed" ? "bg-green-400" : exe.status === "running" ? "bg-yellow-400 animate-pulse" : exe.status === "failed" ? "bg-red-400" : "bg-gray-400"}`} />
+                    <span className="text-sm font-bold text-gray-800">{exe.templateLabel}</span>
+                    <span className={`text-xs ${exe.status === "failed" ? "text-red-400" : "text-gray-400"}`}>
+                      {exe.status === "completed" ? "完成" : exe.status === "running" ? "执行中" : exe.status === "failed" ? "失败" : "待执行"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(exe.executionId); }}
+                    className="text-xs text-gray-300 hover:text-red-400 cursor-pointer">
+                    删除
+                  </button>
                 </div>
-                <p className="text-xs text-gray-400 mb-1">
-                  {new Date(exe.startedAt).toLocaleString("zh-CN", { hour12: false })}
-                </p>
-                <p className="text-xs text-gray-500 mb-1">
-                  {exe.completedSteps}/{exe.totalSteps} 步完成
-                  {exe.status === "completed" && <span className="text-green-400 ml-1">✅</span>}
-                  {exe.status === "failed" && <span className="text-red-400 ml-1">❌</span>}
-                </p>
+                <p className="text-xs text-gray-400 mb-1">{formatDate(exe.startedAt)}</p>
                 {exe.failedStep && (
-                  <p className="text-xs text-red-500 mb-2 truncate">
-                    {exe.failedStep}: {exe.failedError}
-                  </p>
+                  <p className="text-xs text-red-500 mb-1 truncate">{exe.failedStep}: {exe.failedError}</p>
                 )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(exe.executionId); }}
-                  className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-2"
-                  style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#FF6B6B", boxShadow: "2px 2px 0 #1A1A1A" }}>
-                  <Trash2 className="w-3 h-3" />删除
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded overflow-hidden">
+                    <div className="h-full rounded transition-all"
+                      style={{
+                        width: `${Math.round((exe.completedSteps / exe.totalSteps) * 100)}%`,
+                        background: exe.status === "failed" ? "#f87171" : "#4ade80",
+                      }} />
+                  </div>
+                  <span className="text-xs text-gray-400">{exe.completedSteps}/{exe.totalSteps}</span>
+                </div>
               </div>
             ))}
           </div>

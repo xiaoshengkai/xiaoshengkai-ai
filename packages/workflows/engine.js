@@ -20,9 +20,11 @@ export function listExecutions() {
       try {
         const state = readState(path.join(DATA_DIR, id));
         const failedStep = state.steps.find(s => s.status === "failed");
+        const template = loadTemplate(state.template);
         return {
           executionId: id,
           template: state.template,
+          templateLabel: template.label || state.template,
           status: state.status,
           totalSteps: state.steps.length,
           completedSteps: state.steps.filter(s => s.status === "completed").length,

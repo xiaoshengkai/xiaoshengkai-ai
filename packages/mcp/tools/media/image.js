@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import { MINIMAX_BASE_URL } from "./utils.js";
+
+const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
 

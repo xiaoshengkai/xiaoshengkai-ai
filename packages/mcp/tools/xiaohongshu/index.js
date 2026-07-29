@@ -6,9 +6,10 @@ import crypto from "node:crypto";
 import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
-import { generateImage } from "../../lib/minimax.js";
+import { generateImage } from "../../../shared/llm/providers/minimax.js";
 import { callLLM as callProviderLLM, PROVIDER } from "../../../shared/llm/index.js";
-import { sleep } from "../media/utils.js";
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
 const TAG = "[xhs]";

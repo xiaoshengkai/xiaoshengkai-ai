@@ -268,7 +268,8 @@ function getOutputValue(output: string | null, field: string): string | null {
     if (field === "output") return typeof obj === "string" ? obj : JSON.stringify(obj);
     const val = (obj as Record<string, unknown>)[field];
     if (val) return val as string;
-    return (obj as Record<string, unknown>).output as string || JSON.stringify(obj);
+    if ((obj as Record<string, unknown>).output) return (obj as Record<string, unknown>).output as string;
+    return JSON.stringify(obj);
   } catch {
     return output;
   }

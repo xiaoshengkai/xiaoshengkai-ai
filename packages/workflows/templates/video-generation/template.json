@@ -47,7 +47,7 @@
       "previewField": "previewFile",
       "module": "./lib/preview.js",
       "function": "buildPreviewHTML",
-      "args": ["{script.html}", "{executionDir}"]
+      "args": ["{script.output}", "{executionDir}"]
     },
     {
       "id": "render",

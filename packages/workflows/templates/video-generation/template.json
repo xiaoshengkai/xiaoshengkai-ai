@@ -16,7 +16,7 @@
       "type": "ai",
       "previewType": "code",
       "previewField": "html",
-      "prompt": "你是一个专业短视频脚本生成器。根据用户输入的主题，生成完整的短视频脚本。\n\n视频规格：1080×1920 竖屏，面向抖音等自媒体平台。\n风格：{style}\n目标时长：{duration}秒\n\n输出格式必须是严格的 JSON：\n{\n  \"html\": \"完整 HTML 内容（包含 CSS 和 GSAP 动画）\",\n  \"narration\": \"完整旁白文本，口语化、自然\",\n  \"bgm_prompt\": \"背景音乐风格描述，用于 AI 生成 BGM\",\n  \"title\": \"视频标题\"\n}\n\n要求：\n1. 开头必须有钩子（前3秒用动态大字+悬念/问题）\n2. 信息密度高，每个场景4-5秒\n3. 转场用双层wipe\n4. 图表用内联SVG+GSAP动画\n5. 禁止使用jQuery，用GSAP内置选择器\n6. 每条旁白≤20字\n7. 输出纯JSON，不要用markdown代码块包裹",
+      "prompt": "你是一个专业短视频脚本生成器。根据用户输入的主题，生成完整的短视频脚本内容。\n\n视频规格：1080×1920 竖屏，面向抖音等自媒体平台。\n风格：{style}\n目标时长：{duration}秒\n\n**重要：你只需要生成场景内容，不要生成 <html> <head> <body> 标签，也不要生成 <script> 标签。模板会自动包装你的内容。**\n\n每个场景用 <div class=\"scene s-xxx\"> 包裹（xxx 是场景描述，如 s-title, s-data, s-chart）。内联 CSS 写在 style 属性里，不要用 class。\n\n输出格式必须是严格的 JSON：\n{\n  \"html\": \"纯场景 HTML 字符串，由多个 <div class=\\\"scene s-xxx\\\">...</div> 组成，每个场景内容用中文\",\n  \"narration\": \"完整旁白文本，口语化、自然，每条 ≤20字\",\n  \"bgm_prompt\": \"背景音乐风格描述，如'轻快电子'、'史诗管弦'、'lo-fi 嘻哈'\",\n  \"title\": \"视频标题，10字以内\"\n}\n\n要求：\n1. 开头必须有钩子（前3秒用动态大字+悬念/问题）\n2. 信息密度高，每个场景4-5秒，共 {duration} 秒\n3. 图表用内联SVG（简单的柱状图/折线图）\n4. 禁止使用 jQuery、$ 符号\n5. 输出纯JSON，不要用 markdown 代码块包裹，不要有任何解释文字\n6. 所有文字必须用中文，场景数量 = Math.ceil(时长/5)",
       "timeout": 120000
     },
     {

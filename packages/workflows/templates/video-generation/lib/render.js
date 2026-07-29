@@ -6,7 +6,7 @@ import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import ffprobeInstaller from "@ffprobe-installer/ffprobe";
 import { getAudioDuration } from "./bgm.js";
 
-const ROOT_DIR = path.resolve(process.cwd(), "..", "..");
+const ROOT_DIR = process.cwd();
 const GSAP_GSAP = path.join(ROOT_DIR, "node_modules", "gsap", "dist", "gsap.min.js");
 const GSAP_DRAWSVG = path.join(ROOT_DIR, "node_modules", "gsap", "dist", "DrawSVGPlugin.min.js");
 const HYPERFRAMES_BIN = path.join(ROOT_DIR, "node_modules", ".bin", "hyperframes");

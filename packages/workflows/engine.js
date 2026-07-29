@@ -62,6 +62,8 @@ export function createExecution(templateName, params) {
       id: s.id,
       name: s.name,
       type: s.type,
+      previewType: s.previewType,
+      previewField: s.previewField,
       status: "pending",
       output: null,
       error: null,

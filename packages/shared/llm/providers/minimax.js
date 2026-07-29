@@ -15,7 +15,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
     body: JSON.stringify({
       model: model || MINIMAX_CHAT_MODEL,
       response_format: { type: "json_object" },
-      reasoning_split: true,
+      thinking: { type: "disabled" },
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -33,7 +33,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   const msg = data.choices?.[0]?.message || {};
   console.log(`[minimax] usage: ${JSON.stringify(data.usage)}`);
   return {
-    text: msg.content || msg.reasoning_content || "",
+    text: msg.content || "",
     usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },
   };
 }

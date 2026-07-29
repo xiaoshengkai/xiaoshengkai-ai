@@ -161,3 +161,33 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
 });
 
 console.log("[👻 开盛提醒] 扩展已加载");
+
+// ============================================================
+// 5. 监听 schedule 页面的"立即执行"消息 → 弹通知
+// ============================================================
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.action === "run-done") {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
+
+    if (msg.task === "daily-reminder-am") {
+      chrome.notifications.create(`manual-learn-${today}`, {
+        type: "basic",
+        iconUrl: "icon.png",
+        title: "👻 开盛！学习时间到！",
+        message: "摸鱼时间结束！现在、立刻、马上开始学习！\n📘 今日课程：从金融地图 v3.1 继续推进\n你不动，我就一直盯着你 👁",
+        priority: 2,
+        buttons: [
+          { title: "✅ 开始学！" },
+          { title: "⏳ 5 分钟后提醒" }
+        ],
+        requireInteraction: true
+      }, () => {
+        sendResponse({ ok: true });
+      });
+
+      // 保持通道打开，等通知创建完成
+      return true;
+    }
+  }
+});

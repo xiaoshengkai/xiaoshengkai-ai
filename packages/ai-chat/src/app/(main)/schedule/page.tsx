@@ -63,6 +63,9 @@ export default function SchedulePage() {
       const data = await res.json();
       if (data.ok) {
         toast("🟢 执行成功");
+        // 通知 Chrome 扩展弹通知
+        console.log("[schedule] 发送通知到扩展:", { type: "REMINDER_RUN", task: name });
+        window.postMessage({ type: "REMINDER_RUN", task: name }, "*");
       } else {
         toast(`🔴 执行失败: ${data.error}`);
       }

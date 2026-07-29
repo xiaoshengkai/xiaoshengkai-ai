@@ -5,7 +5,7 @@ import os from "node:os";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import puppeteer from "puppeteer";
-import { callLLM } from "../../../shared/llm.js";
+import { callLLM } from "../../../shared/llm/index.js";
 
 const TAG = "[diagram]";
 

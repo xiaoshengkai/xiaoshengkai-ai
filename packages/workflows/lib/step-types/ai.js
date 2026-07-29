@@ -1,4 +1,4 @@
-import { callLLM } from "../../../shared/llm.js";
+import { callLLM } from "../../../shared/llm/index.js";
 
 export async function execAiStep(step, vars, executionDir) {
   let prompt = step.prompt;

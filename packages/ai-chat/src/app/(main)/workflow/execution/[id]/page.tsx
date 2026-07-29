@@ -263,7 +263,9 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
 
 function getOutputValue(output: string | null, field: string): string | null {
   if (!output) return null;
-  if (typeof output === "string") return output;
+  if (typeof output === "string") {
+    return output.includes("/") ? output.split("/").pop() || output : output;
+  }
   try {
     const obj = typeof output === "object" ? output : JSON.parse(output);
     if (field === "output") return typeof obj === "string" ? obj : JSON.stringify(obj);

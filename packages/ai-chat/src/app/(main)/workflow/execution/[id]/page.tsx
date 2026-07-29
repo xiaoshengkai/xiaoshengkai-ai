@@ -223,14 +223,17 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
 
   const pt = step.previewType || "text";
   const pf = step.previewField || "output";
-  const output = step.output;
-  const value = getOutputValue(output, pf);
+  const fileTypes = ["audio", "video", "iframe"];
 
   return (
     <div className="space-y-3">
       <div className="pixel-card p-3" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}>
         <h3 className="text-xs font-bold text-gray-800 mb-2">{step.name}</h3>
-        <PreviewContent type={pt} value={value} fileBase={fileBase} />
+        {fileTypes.includes(pt) ? (
+          <PreviewContent type={pt} src={`${fileBase}/${pf}`} />
+        ) : (
+          <PreviewContent type={pt} value={getOutputValue(step.output, pf)} />
+        )}
       </div>
     </div>
   );
@@ -257,8 +260,13 @@ function EmptyState({ icon, text, animate }: { icon: string; text: string; anima
   );
 }
 
-function PreviewContent({ type, value, fileBase }: { type: string; value: string | null; fileBase: string }) {
-  if (!value) return <p className="text-xs text-gray-400">暂无输出</p>;
+function PreviewContent({ type, value, src }: { type: string; value?: string | null; src?: string }) {
+  if (type === "code" || type === "json" || type === "text") {
+    if (!value) return <p className="text-xs text-gray-400">暂无输出</p>;
+  }
+  if (type === "audio" || type === "video" || type === "iframe") {
+    if (!src) return <p className="text-xs text-gray-400">文件未生成</p>;
+  }
 
   switch (type) {
     case "code":
@@ -269,8 +277,7 @@ function PreviewContent({ type, value, fileBase }: { type: string; value: string
         </pre>
       );
 
-    case "iframe": {
-      const src = `${fileBase}/${value}`;
+    case "iframe":
       return (
         <div className="space-y-2">
           <div className="rounded-lg overflow-hidden" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
@@ -283,10 +290,8 @@ function PreviewContent({ type, value, fileBase }: { type: string; value: string
           </a>
         </div>
       );
-    }
 
-    case "video": {
-      const src = `${fileBase}/${value}`;
+    case "video":
       return (
         <div className="space-y-2">
           <div className="rounded-lg overflow-hidden bg-black" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
@@ -296,19 +301,16 @@ function PreviewContent({ type, value, fileBase }: { type: string; value: string
             className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
             style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
             下载视频
-</a>
+          </a>
         </div>
       );
-    }
 
-    case "audio": {
-      const src = `${fileBase}/${value}`;
+    case "audio":
       return (
         <div className="rounded-lg p-3" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}>
           <audio controls className="w-full" src={src} />
         </div>
       );
-    }
 
     case "json":
       return (

@@ -156,11 +156,12 @@ export default function ExecutionDetailPage() {
                 style={{ border: isActive ? "2px solid #60A5FA" : "2px solid transparent" }}
               >
                 <div className="flex items-center gap-2">
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 relative ${
                     done ? "bg-green-500 text-white" : run ? "bg-yellow-400 text-white" :
                     fail ? "bg-red-500 text-white" : skipped ? "bg-gray-400 text-white" : "bg-gray-300 text-gray-600"
                   }`}>
-                    {done ? "✓" : fail ? "✗" : skipped ? "−" : i + 1}
+                    {run && <span className="absolute inset-0 rounded-full bg-yellow-400 animate-ping opacity-75" />}
+                    <span className="relative z-10">{done ? "✓" : fail ? "✗" : skipped ? "−" : i + 1}</span>
                   </span>
                   <span className="text-xs font-bold text-gray-700 flex-1 truncate">{step.name}</span>
                   <div className="flex gap-1 shrink-0">
@@ -228,7 +229,7 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
     return <EmptyState icon="⏸️" text="等待执行..." />;
   }
   if (step.status === "running") {
-    return <EmptyState icon="🔄" text="正在执行..." animate />;
+    return <LoadingState text="正在执行..." />;
   }
   if (step.status === "skipped") {
     return <EmptyState icon="⏭️" text="已跳过" />;
@@ -283,6 +284,22 @@ function EmptyState({ icon, text, animate }: { icon: string; text: string; anima
     <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
       <span className={`text-2xl ${animate ? "animate-pulse" : ""}`}>{icon}</span>
       <p className="text-xs">{text}</p>
+    </div>
+  );
+}
+
+function LoadingState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4">
+      <div className="relative w-14 h-14">
+        <div className="absolute inset-0 border-[3px] border-gray-200 rounded-full" />
+        <div className="absolute inset-0 border-[3px] border-blue-500 rounded-full border-t-transparent animate-spin" />
+      </div>
+      <p className="text-sm text-gray-500 font-medium">{text}</p>
+      <div className="w-40 h-1 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-full w-1/2 bg-blue-500 rounded-full animate-[slide_1.5s_ease-in-out_infinite]" />
+      </div>
+      <style>{`@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`}</style>
     </div>
   );
 }

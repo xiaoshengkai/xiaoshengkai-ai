@@ -7,7 +7,7 @@ import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { generateImage } from "../../lib/minimax.js";
-import { callLLM as callProviderLLM, PROVIDER } from "../../lib/llm.js";
+import { callLLM as callProviderLLM, PROVIDER } from "../../../shared/llm.js";
 import { sleep } from "../media/utils.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");

@@ -12,7 +12,8 @@ export function createWorkflowLogger(executionId) {
 
   function writeln(level, args) {
     const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${level}] ${args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ")}\n`;
-    fs.appendFileSync(logFile, line);
+    const old = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf-8") : "";
+    fs.writeFileSync(logFile, line + old);
   }
 
   return {

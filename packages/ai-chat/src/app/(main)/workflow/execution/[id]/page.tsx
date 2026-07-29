@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/api-path";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Play, ChevronRight, ArrowLeft, Trash2, RefreshCw, SkipForward } from "lucide-react";
+import { Play, ChevronRight, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -267,7 +267,10 @@ function getOutputValue(output: string | null, field: string): string | null {
     const obj = typeof output === "object" ? output : JSON.parse(output);
     if (field === "output") return typeof obj === "string" ? obj : JSON.stringify(obj);
     const val = (obj as Record<string, unknown>)[field];
-    if (val) return val as string;
+    if (val) {
+      const s = String(val);
+      return s.includes("/") ? s.split("/").pop() || s : s;
+    }
     if ((obj as Record<string, unknown>).output) return (obj as Record<string, unknown>).output as string;
     return JSON.stringify(obj);
   } catch {

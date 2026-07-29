@@ -44,7 +44,7 @@
       "name": "构建 HTML 预览",
       "type": "tool",
       "previewType": "iframe",
-      "previewField": "preview.html",
+      "previewField": "previewFile",
       "module": "./lib/preview.js",
       "function": "buildPreviewHTML",
       "args": ["{script.html}", "{executionDir}"]
@@ -54,7 +54,7 @@
       "name": "渲染 MP4",
       "type": "tool",
       "previewType": "video",
-      "previewField": "output.mp4",
+      "previewField": "videoFile",
       "module": "./lib/render.js",
       "function": "renderMP4",
       "args": ["{executionDir}"]

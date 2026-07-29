@@ -2,11 +2,13 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { cpus } from "node:os";
+import { fileURLToPath } from "node:url";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import ffprobeInstaller from "@ffprobe-installer/ffprobe";
 import { getAudioDuration } from "./bgm.js";
 
-const ROOT_DIR = process.cwd();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = path.resolve(__dirname, "..", "..", "..", "..", "..", "..");
 const GSAP_GSAP = path.join(ROOT_DIR, "node_modules", "gsap", "dist", "gsap.min.js");
 const GSAP_DRAWSVG = path.join(ROOT_DIR, "node_modules", "gsap", "dist", "DrawSVGPlugin.min.js");
 const HYPERFRAMES_BIN = path.join(ROOT_DIR, "node_modules", ".bin", "hyperframes");
@@ -25,10 +27,13 @@ export async function renderMP4(workDir) {
   const htmlPath = path.join(workDir2, "index.html");
   let html = fs.readFileSync(previewPath, "utf-8");
 
-  // 注入 GSAP 脚本
-  html = html.replace('<script src="gsap.min.js"></script>', `<script>${fs.readFileSync(GSAP_GSAP, "utf-8")}</script>`);
-  html = html.replace('<script src="DrawSVGPlugin.min.js"></script>', "");
-  html = html.replace("</head>", `<script>${fs.readFileSync(GSAP_DRAWSVG, "utf-8")}</script></head>`);
+  // 注入 GSAP 脚本（替换 CDN 为本地文件，hyperframes 离线渲染需要）
+  if (fs.existsSync(GSAP_GSAP)) {
+    html = html.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/gsap.*?"><\/script>/, `<script>${fs.readFileSync(GSAP_GSAP, "utf-8")}</script>`);
+  }
+  if (fs.existsSync(GSAP_DRAWSVG)) {
+    html = html.replace("</head>", `<script>${fs.readFileSync(GSAP_DRAWSVG, "utf-8")}</script></head>`);
+  }
 
   // 注入音频
   const narrationDur = getAudioDuration(narrationPath);
@@ -61,7 +66,7 @@ narration.addEventListener('ended', () => {
   const cpuCores = cpus().length;
   const cmd = `"${HYPERFRAMES_BIN}" render "${htmlPath}" --output "${path.join(workDir, "output.mp4")}" --width 1080 --height 1920 --fps 24 --workers ${Math.min(cpuCores, 4)} --player-ready-timeout=5000 --protocol-timeout=900000 --player-auto-start`;
   console.log("[render]", cmd);
-  execSync(cmd, { stdio: "inherit" });
+  execSync(cmd, { stdio: "inherit", cwd: workDir2 });
 
   const outputPath = path.join(workDir, "output.mp4");
   return { videoFile: outputPath };

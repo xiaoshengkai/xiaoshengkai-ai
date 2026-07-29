@@ -325,6 +325,19 @@ export function retryStep(executionId, stepId) {
   writeState(dir, state);
 }
 
+export function skipStep(executionId, stepId) {
+  const dir = path.join(DATA_DIR, executionId);
+  const state = readState(dir);
+  const stepIdx = state.steps.findIndex(s => s.id === stepId);
+  if (stepIdx < 0) throw new Error("步骤不存在");
+  if (state.steps[stepIdx].status === "completed") throw new Error("步骤已完成，无法跳过");
+
+  state.steps[stepIdx].status = "skipped";
+  state.steps[stepIdx].output = null;
+  state.steps[stepIdx].error = null;
+  writeState(dir, state);
+}
+
 export function editStepOutput(executionId, stepId, output) {
   const dir = path.join(DATA_DIR, executionId);
   const state = readState(dir);

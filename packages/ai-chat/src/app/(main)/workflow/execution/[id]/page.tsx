@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/api-path";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Play, ChevronRight, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
+import { Play, ChevronRight, ArrowLeft, Trash2, RefreshCw, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -29,6 +29,7 @@ export default function ExecutionDetailPage() {
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [skipping, setSkipping] = useState<string | null>(null);
   const [nextLoading, setNextLoading] = useState(false);
   const [autoLoading, setAutoLoading] = useState(false);
 
@@ -88,6 +89,20 @@ export default function ExecutionDetailPage() {
     setRetrying(null);
   }, [id, fetchExecution]);
 
+  const handleSkip = useCallback(async (stepId: string) => {
+    setSkipping(stepId);
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${id}/skip`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepId }),
+      });
+      const data = await res.json();
+      if (data.ok) { toast("🟢 已跳过"); fetchExecution(); }
+      else toast(`🔴 ${data.error}`);
+    } catch { toast("🔴 请求失败"); }
+    setSkipping(null);
+  }, [id, fetchExecution]);
+
   const handleDelete = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}/api/workflows/execution/${id}`, { method: "DELETE" });
@@ -98,7 +113,6 @@ export default function ExecutionDetailPage() {
 
   if (!execution) return null;
 
-  const total = execution.steps.length;
   const completed = execution.steps.filter(s => s.status === "completed").length;
   const activeStep = execution.steps.find(s => s.id === activeStepId) || execution.steps[0];
   const isDone = execution.status === "completed" || execution.status === "failed";
@@ -131,6 +145,8 @@ export default function ExecutionDetailPage() {
             const done = step.status === "completed";
             const fail = step.status === "failed";
             const run = step.status === "running";
+            const skipped = step.status === "skipped";
+            const pending = step.status === "pending";
             return (
               <div key={step.id}
                 onClick={() => setActiveStepId(step.id)}
@@ -142,19 +158,23 @@ export default function ExecutionDetailPage() {
                 <div className="flex items-center gap-2">
                   <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                     done ? "bg-green-500 text-white" : run ? "bg-yellow-400 text-white" :
-                    fail ? "bg-red-500 text-white" : "bg-gray-300 text-gray-600"
+                    fail ? "bg-red-500 text-white" : skipped ? "bg-gray-400 text-white" : "bg-gray-300 text-gray-600"
                   }`}>
-                    {done ? "✓" : fail ? "✗" : i + 1}
+                    {done ? "✓" : fail ? "✗" : skipped ? "−" : i + 1}
                   </span>
                   <span className="text-xs font-bold text-gray-700 flex-1 truncate">{step.name}</span>
-                  {(done || fail) && (
-                    <button onClick={(e) => { e.stopPropagation(); handleRetry(step.id); }}
-                      disabled={retrying === step.id}
-                      className="text-xs text-gray-400 hover:text-blue-500 cursor-pointer shrink-0"
-                      title="重新执行">
-                      <RefreshCw className="w-3 h-3" />
-                    </button>
-                  )}
+                  <div className="flex gap-1 shrink-0">
+                    {pending && (
+                      <button onClick={(e) => { e.stopPropagation(); handleSkip(step.id); }}
+                        disabled={skipping === step.id} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
+                        title="跳过">{skipping === step.id ? "..." : "跳过"}</button>
+                    )}
+                    {(done || fail) && (
+                      <button onClick={(e) => { e.stopPropagation(); handleRetry(step.id); }}
+                        disabled={retrying === step.id} className="text-xs text-gray-400 hover:text-blue-500 cursor-pointer"
+                        title="重新执行"><RefreshCw className="w-3 h-3" /></button>
+                    )}
+                  </div>
                 </div>
                 {fail && step.error && (
                   <p className="text-xs text-red-500 mt-1 truncate ml-7">{step.error}</p>
@@ -162,6 +182,7 @@ export default function ExecutionDetailPage() {
               </div>
             );
           })}
+          <p className="text-xs text-gray-500 text-center pt-2">{completed}/{execution.steps.length} 步完成</p>
         </div>
 
         <div className="overflow-auto p-4">
@@ -209,6 +230,9 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
   if (step.status === "running") {
     return <EmptyState icon="🔄" text="正在执行..." animate />;
   }
+  if (step.status === "skipped") {
+    return <EmptyState icon="⏭️" text="已跳过" />;
+  }
   if (step.status === "failed") {
     return (
       <div className="space-y-3">
@@ -223,17 +247,14 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
 
   const pt = step.previewType || "text";
   const pf = step.previewField || "output";
+  const value = getOutputValue(step.output, pf);
   const fileTypes = ["audio", "video", "iframe"];
 
   return (
     <div className="space-y-3">
       <div className="pixel-card p-3" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}>
         <h3 className="text-xs font-bold text-gray-800 mb-2">{step.name}</h3>
-        {fileTypes.includes(pt) ? (
-          <PreviewContent type={pt} src={`${fileBase}/${pf}`} />
-        ) : (
-          <PreviewContent type={pt} value={getOutputValue(step.output, pf)} />
-        )}
+        <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}` : undefined} />
       </div>
     </div>
   );
@@ -245,7 +266,9 @@ function getOutputValue(output: string | null, field: string): string | null {
   try {
     const obj = typeof output === "object" ? output : JSON.parse(output);
     if (field === "output") return typeof obj === "string" ? obj : JSON.stringify(obj);
-    return (obj as Record<string, unknown>)[field] as string || null;
+    const val = (obj as Record<string, unknown>)[field];
+    if (val) return val as string;
+    return (obj as Record<string, unknown>).output as string || JSON.stringify(obj);
   } catch {
     return output;
   }
@@ -265,7 +288,7 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
     if (!value) return <p className="text-xs text-gray-400">暂无输出</p>;
   }
   if (type === "audio" || type === "video" || type === "iframe") {
-    if (!src) return <p className="text-xs text-gray-400">文件未生成</p>;
+    if (!src || !value) return <p className="text-xs text-gray-400">文件未生成</p>;
   }
 
   switch (type) {
@@ -273,15 +296,15 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
       return (
         <pre className="text-xs text-gray-700 bg-gray-50 p-3 rounded border border-gray-200 max-h-[60vh] overflow-auto whitespace-pre-wrap break-words font-mono"
           style={{ border: "2px solid #E5E7EB" }}>
-          {typeof value === "string" ? value.slice(0, 5000) : JSON.stringify(value, null, 2)}
+          {typeof value === "string" ? (value.length > 5000 ? value.slice(0, 5000) + "\n\n...（内容过长，已截断）" : value) : JSON.stringify(value, null, 2)}
         </pre>
       );
 
     case "iframe":
       return (
         <div className="space-y-2">
-          <div className="rounded-lg overflow-hidden" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
-            <iframe src={src} className="w-full h-[50vh] border-0" title="预览" />
+          <div className="rounded-lg overflow-hidden bg-white" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
+            <iframe src={src} className="w-full h-[50vh] border-0" title="预览" sandbox="allow-scripts allow-same-origin" />
           </div>
           <a href={src} target="_blank" rel="noopener noreferrer"
             className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
@@ -295,7 +318,9 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
       return (
         <div className="space-y-2">
           <div className="rounded-lg overflow-hidden bg-black" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
-            <video controls className="w-full max-h-[50vh]" src={src} />
+            <video controls className="w-full max-h-[50vh]" src={src} playsInline>
+              <p className="text-xs text-gray-400 p-3">您的浏览器不支持视频播放</p>
+            </video>
           </div>
           <a href={src} target="_blank" rel="noopener noreferrer"
             className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
@@ -307,8 +332,11 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
 
     case "audio":
       return (
-        <div className="rounded-lg p-3" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}>
-          <audio controls className="w-full" src={src} />
+        <div className="rounded-lg p-3 bg-gray-50" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
+          <p className="text-xs text-gray-500 mb-2">🎵 音频播放</p>
+          <audio controls className="w-full" src={src} preload="metadata">
+            <p className="text-xs text-gray-400">您的浏览器不支持音频播放</p>
+          </audio>
         </div>
       );
 

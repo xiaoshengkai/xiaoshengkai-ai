@@ -48,6 +48,11 @@ async function main() {
     const { retryStep } = await import("./engine.js");
     retryStep(executionId, stepId);
     process.stdout.write(JSON.stringify({ ok: true }));
+  } else if (command === "skip") {
+    const { executionId, stepId } = JSON.parse(args[0]);
+    const { skipStep } = await import("./engine.js");
+    skipStep(executionId, stepId);
+    process.stdout.write(JSON.stringify({ ok: true }));
   } else {
     process.stdout.write(JSON.stringify({ error: "unknown command" }));
     process.exit(1);

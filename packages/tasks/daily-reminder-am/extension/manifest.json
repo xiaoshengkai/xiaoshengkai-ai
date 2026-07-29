@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "👻 开盛每日提醒",
+  "version": "1.0",
+  "description": "督促开盛每日学习金融，提醒复盘",
+  "permissions": [
+    "notifications",
+    "alarms",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "开盛每日提醒"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}

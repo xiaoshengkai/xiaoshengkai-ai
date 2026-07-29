@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 320px;
+      min-height: 200px;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 16px;
+      margin: 0;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .emoji { font-size: 24px; }
+    .task-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .task-item {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .task-item .time {
+      color: #e94560;
+      font-weight: bold;
+      font-size: 13px;
+      min-width: 48px;
+    }
+    .task-item .label {
+      flex: 1;
+      font-size: 13px;
+    }
+    .task-item .toggle {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .done .label {
+      text-decoration: line-through;
+      opacity: 0.5;
+    }
+    .footer {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #666;
+      text-align: center;
+    }
+    .status {
+      background: #0f3460;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 12px;
+      margin-bottom: 12px;
+      color: #aaa;
+    }
+    .status strong {
+      color: #e94560;
+    }
+  </style>
+</head>
+<body>
+  <h1>
+    <span class="emoji">👻</span>
+    开盛每日提醒
+  </h1>
+
+  <div class="status" id="status">
+    最后汇报：<strong id="lastReport">暂无</strong>
+  </div>
+
+  <ul class="task-list">
+    <li class="task-item" id="task-am">
+      <span class="time">10:00</span>
+      <span class="label">📘 金融学习（开始）</span>
+      <input type="checkbox" class="toggle" id="check-am">
+    </li>
+    <li class="task-item" id="task-pm">
+      <span class="time">17:30</span>
+      <span class="label">📋 今日复盘（汇报）</span>
+      <input type="checkbox" class="toggle" id="check-pm">
+    </li>
+  </ul>
+
+  <div class="footer">
+    数据存于本地，永不泄露。
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

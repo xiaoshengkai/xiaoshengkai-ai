@@ -6,8 +6,16 @@ import { execFile } from "node:child_process";
 const TASKS_DIR = path.resolve(process.cwd(), "..", "..", "packages", "tasks");
 const DATA_DIR = path.resolve(process.cwd(), "..", "..", "data", "tasks");
 
+function getStatePath(name: string) {
+  return path.join(DATA_DIR, name, "index.json");
+}
+
+function getLockPath(name: string) {
+  return path.join(DATA_DIR, name, ".lock");
+}
+
 function readData(name: string) {
-  const p = path.join(DATA_DIR, `${name}.json`);
+  const p = getStatePath(name);
   const defaults = { description: "", cron: null, enabled: true, until: null, lastRun: null, lastStatus: null, lastError: null };
   if (fs.existsSync(p)) {
     return { ...defaults, ...JSON.parse(fs.readFileSync(p, "utf-8")) };
@@ -16,9 +24,11 @@ function readData(name: string) {
 }
 
 function writeData(name: string, partial: Record<string, unknown>) {
+  const p = getStatePath(name);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
   const current = readData(name);
   const updated = { ...current, ...partial };
-  fs.writeFileSync(path.join(DATA_DIR, `${name}.json`), JSON.stringify(updated, null, 2));
+  fs.writeFileSync(p, JSON.stringify(updated, null, 2));
 }
 
 function appendTaskLog(name: string, text: string) {
@@ -41,7 +51,7 @@ function loadTasks() {
     const name = meta.name || dir;
     const data = readData(name);
 
-    const lockPath = path.join(DATA_DIR, `${name}.lock`);
+    const lockPath = getLockPath(name);
     const running = fs.existsSync(lockPath);
 
     tasks.push({
@@ -75,12 +85,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "task not found" }, { status: 404 });
   }
 
-  const lockPath = path.join(DATA_DIR, `${name}.lock`);
+  const lockPath = getLockPath(name);
   if (fs.existsSync(lockPath)) {
     return NextResponse.json({ error: "task is running" }, { status: 409 });
   }
 
   const startTime = new Date();
+  fs.mkdirSync(path.dirname(lockPath), { recursive: true });
   fs.writeFileSync(lockPath, String(process.pid));
 
   try {
@@ -113,7 +124,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "task not found" }, { status: 404 });
   }
 
-  // 更新 data/tasks/<name>.json
+  // 更新 data/tasks/<name>/index.json
   const dataFields: Record<string, unknown> = {};
   if (cron !== undefined) dataFields.cron = cron;
   if (enabled !== undefined) dataFields.enabled = enabled;

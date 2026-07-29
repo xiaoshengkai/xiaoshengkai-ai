@@ -226,21 +226,44 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
   const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
 
   if (step.status === "pending") {
-    return <EmptyState icon="⏸️" text="等待执行..." />;
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3">
+        <div className="w-12 h-12 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
+          <span className="text-xl">⏸️</span>
+        </div>
+        <p className="text-sm text-gray-500 font-medium">等待执行</p>
+        <p className="text-xs text-gray-400">点击「下一步」开始执行</p>
+      </div>
+    );
   }
+
   if (step.status === "running") {
     return <LoadingState text="正在执行..." />;
   }
+
   if (step.status === "skipped") {
-    return <EmptyState icon="⏭️" text="已跳过" />;
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3">
+        <div className="w-12 h-12 rounded-full border-2 border-dashed border-gray-400 flex items-center justify-center">
+          <span className="text-xl text-gray-400">⏭️</span>
+        </div>
+        <p className="text-sm text-gray-500 font-medium">已跳过</p>
+        <p className="text-xs text-gray-400">该步骤已被跳过</p>
+      </div>
+    );
   }
+
   if (step.status === "failed") {
     return (
-      <div className="space-y-3">
-        <div className="p-3 rounded-lg border-2 border-red-200 bg-red-50"
-          style={{ borderColor: "#FCA5A5", boxShadow: "2px 2px 0 #FCA5A5" }}>
-          <p className="text-xs font-bold text-red-600 mb-1">错误信息</p>
-          <pre className="text-xs text-red-700 whitespace-pre-wrap break-words">{step.error || "未知错误"}</pre>
+      <div className="p-4 rounded-lg" style={{ border: "3px solid #FCA5A5", boxShadow: "4px 4px 0 #FCA5A5", background: "#FEF2F2" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs font-bold">✗</span>
+          <span className="text-sm font-bold text-red-700">执行失败</span>
+        </div>
+        <pre className="text-xs text-red-600 whitespace-pre-wrap break-words bg-red-100/50 p-2 rounded">{step.error || "未知错误"}</pre>
+        <div className="flex items-center gap-2 mt-3">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+          <p className="text-xs text-red-400">点击左侧「重做」按钮重新执行</p>
         </div>
       </div>
     );
@@ -254,7 +277,11 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
   return (
     <div className="space-y-3">
       <div className="pixel-card p-3" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}>
-        <h3 className="text-xs font-bold text-gray-800 mb-2">{step.name}</h3>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">✓</span>
+          <h3 className="text-xs font-bold text-gray-800">{step.name}</h3>
+          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✅ 完成</span>
+        </div>
         <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}` : undefined} />
       </div>
     </div>

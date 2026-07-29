@@ -17,16 +17,17 @@ let cronJobs = new Map();
 let taskMetas = new Map();
 
 function getStatePath(name) {
-  return path.join(DATA_DIR, `${name}.json`);
+  // 新结构: data/tasks/{name}/index.json
+  return path.join(DATA_DIR, name, "index.json");
 }
 
 function getLockPath(name) {
-  return path.join(DATA_DIR, `${name}.lock`);
+  return path.join(DATA_DIR, name, ".lock");
 }
 
 function readData(name) {
   const p = getStatePath(name);
-  const defaults = { cron: null, enabled: true, until: null, lastRun: null, lastStatus: null, lastError: null };
+  const defaults = { cron: null, crons: null, enabled: true, until: null, lastRun: null, lastStatus: null, lastError: null };
   if (fs.existsSync(p)) {
     return { ...defaults, ...JSON.parse(fs.readFileSync(p, "utf-8")) };
   }
@@ -34,9 +35,11 @@ function readData(name) {
 }
 
 function writeData(name, partial) {
+  const p = getStatePath(name);
   const current = readData(name);
   const updated = { ...current, ...partial };
-  fs.writeFileSync(getStatePath(name), JSON.stringify(updated, null, 2));
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(updated, null, 2));
 }
 
 function loadTasks() {
@@ -52,12 +55,15 @@ function loadTasks() {
     const name = meta.name || dir;
     const data = readData(name);
 
+    // 支持单个 cron 和 crons 数组
+    const crons = data.crons || (data.cron ? [data.cron] : []);
+
     tasks.push({
       name,
       description: data.description || "",
       html: meta.html || null,
       dir: taskDir,
-      cron: data.cron,
+      crons,
       enabled: data.enabled,
       until: data.until,
     });
@@ -126,28 +132,42 @@ async function runTask(task) {
 }
 
 function registerCron(task) {
-  if (!task.cron || !cron.validate(task.cron)) {
-    console.error(`  ✗ ${task.name}: cron 表达式无效 (${task.cron})`);
+  const validCrons = task.crons.filter(c => {
+    if (!c || !cron.validate(c)) {
+      console.error(`  ✗ ${task.name}: cron 表达式无效 (${c})`);
+      return false;
+    }
+    return true;
+  });
+
+  if (validCrons.length === 0) {
+    console.error(`  ✗ ${task.name}: 没有可用的 cron 表达式`);
     return;
   }
 
-  const job = cron.schedule(task.cron, () => {
-    if (isExpired(task.until)) return;
-    runTask(task);
-  }, { timezone: "Asia/Shanghai" });
+  for (const cronExpr of validCrons) {
+    const job = cron.schedule(cronExpr, () => {
+      if (isExpired(task.until)) return;
+      runTask(task);
+    }, { timezone: "Asia/Shanghai" });
 
-  cronJobs.set(task.name, job);
-  taskMetas.set(task.name, { cron: task.cron, enabled: task.enabled, until: task.until });
+    // 用 name + cron 表达式作为唯一 key
+    const key = `${task.name}::${cronExpr}`;
+    cronJobs.set(key, job);
+  }
+
+  // 存任务元信息
+  taskMetas.set(task.name, { crons: task.crons, enabled: task.enabled, until: task.until });
 
   const expired = isExpired(task.until) ? " [已到期]" : "";
-  console.log(`  ✓ ${task.name}: ${task.cron} — ${task.description || ""}${expired}`);
+  console.log(`  ✓ ${task.name}: ${validCrons.join(", ")} — ${task.description || ""}${expired}`);
 }
 
 function reloadCronJobs() {
   const tasks = loadTasks();
   const enabled = tasks.filter(t => t.enabled !== false);
 
-  for (const [name, job] of cronJobs) {
+  for (const [, job] of cronJobs) {
     job.stop();
   }
   cronJobs.clear();
@@ -165,7 +185,7 @@ function reloadCronJobs() {
   console.log("\n调度器已启动\n");
 }
 
-// 热重载：每 30s 检查 task.json 和数据文件是否变化
+// 热重载：每 30s 检查 task.json 和 index.json 是否变化
 function watchForChanges() {
   let lastMtimes = {};
   setInterval(() => {

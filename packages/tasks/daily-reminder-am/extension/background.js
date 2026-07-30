@@ -42,9 +42,7 @@ function checkAndNotify() {
         buttons: [
           { title: "✅ 开始学！" },
           { title: "⏳ 5 分钟后提醒" }
-        ],
-        requireInteraction: true
-      });
+        ]});
     }
   }
 
@@ -70,9 +68,7 @@ function checkAndNotify() {
           buttons: [
             { title: "✅ 做完了！" },
             { title: "⏳ 还没，再等等" }
-          ],
-          requireInteraction: true
-        });
+          ]});
       });
     }
   }
@@ -97,8 +93,8 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
   chrome.storage.local.get([`status-${dateKey}`], (result) => {
     const status = result[`status-${dateKey}`] || { learned: false, checked: false };
 
-    if (notificationId.startsWith("learn-")) {
-      // 10:00 学习提醒的按钮
+    if (notificationId.startsWith("learn-") || notificationId.startsWith("manual-")) {
+      // 10:00 或手动触发的学习提醒按钮
       if (buttonIndex === 0) {
         // ✅ 开始学
         status.learned = true;
@@ -124,9 +120,7 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
             iconUrl: "icon.png",
             title: "👻 5 分钟到了！",
             message: "别找借口了，现在开始学！",
-            priority: 2,
-            requireInteraction: true
-          });
+            priority: 2});
         }, 5 * 60 * 1000);
       }
     } else if (notificationId.startsWith("check-")) {
@@ -168,25 +162,25 @@ console.log("[👻 开盛提醒] 扩展已加载");
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.action === "run-done") {
     const now = new Date();
-    const today = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
+    const id = `manual-${msg.task}-${Date.now()}`;
+    console.log("[👻 bg] 收到消息，准备弹通知:", id);
 
     if (msg.task === "daily-reminder-am") {
-      chrome.notifications.create(`manual-learn-${today}`, {
+      chrome.notifications.create(id, {
         type: "basic",
         iconUrl: "icon.png",
         title: "👻 开盛！学习时间到！",
         message: "摸鱼时间结束！现在、立刻、马上开始学习！\n📘 今日课程：从金融地图 v3.1 继续推进\n你不动，我就一直盯着你 👁",
-        priority: 2,
         buttons: [
           { title: "✅ 开始学！" },
           { title: "⏳ 5 分钟后提醒" }
-        ],
-        requireInteraction: true
-      }, () => {
-        sendResponse({ ok: true });
+        ]
+      }, (notificationId) => {
+        const err = chrome.runtime.lastError;
+        console.log("[👻 bg] 通知结果:", notificationId, err?.message || "OK");
+        sendResponse({ ok: true, id: notificationId, error: err?.message || null });
       });
 
-      // 保持通道打开，等通知创建完成
       return true;
     }
   }

@@ -352,12 +352,16 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
 
     case "iframe":
       return (
-        <div className="space-y-2">
-          <div className="rounded-lg overflow-hidden bg-white" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
-            <iframe src={src} className="w-full h-[50vh] border-0" title="预览" sandbox="allow-scripts allow-same-origin" />
+        <div className="flex flex-col items-center">
+          <div className="rounded-[24px] border-[6px] border-gray-800 bg-black p-1 shadow-xl" style={{ width: "260px" }}>
+            <div className="w-16 h-4 bg-gray-800 rounded-full mx-auto mb-1" />
+            <div className="rounded-[18px] overflow-hidden bg-white" style={{ aspectRatio: "9/16" }}>
+              <iframe src={src} className="w-full h-full border-0" title="预览" sandbox="allow-scripts allow-same-origin" />
+            </div>
+            <div className="w-20 h-1 bg-gray-600 rounded-full mx-auto mt-2" />
           </div>
           <a href={src} target="_blank" rel="noopener noreferrer"
-            className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
+            className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-3"
             style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
             新窗口打开
           </a>
@@ -366,14 +370,16 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
 
     case "video":
       return (
-        <div className="space-y-2">
-          <div className="rounded-lg overflow-hidden bg-black" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
-            <video controls className="w-full max-h-[50vh]" src={src} playsInline>
-              <p className="text-xs text-gray-400 p-3">您的浏览器不支持视频播放</p>
-            </video>
+        <div className="flex flex-col items-center">
+          <div className="rounded-[24px] border-[6px] border-gray-800 bg-black p-1 shadow-xl" style={{ width: "260px" }}>
+            <div className="w-16 h-4 bg-gray-800 rounded-full mx-auto mb-1" />
+            <div className="rounded-[18px] overflow-hidden bg-black" style={{ aspectRatio: "9/16" }}>
+              <video controls className="w-full h-full object-contain" src={src} playsInline />
+            </div>
+            <div className="w-20 h-1 bg-gray-600 rounded-full mx-auto mt-2" />
           </div>
           <a href={src} target="_blank" rel="noopener noreferrer"
-            className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
+            className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-3"
             style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
             下载视频
           </a>
@@ -382,11 +388,17 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
 
     case "audio":
       return (
-        <div className="rounded-lg p-3 bg-gray-50" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}>
-          <p className="text-xs text-gray-500 mb-2">🎵 音频播放</p>
-          <audio controls className="w-full" src={src} preload="metadata">
-            <p className="text-xs text-gray-400">您的浏览器不支持音频播放</p>
-          </audio>
+        <div className="flex flex-col items-center">
+          <div className="rounded-[24px] border-[6px] border-gray-800 bg-black p-1 shadow-xl" style={{ width: "260px" }}>
+            <div className="w-16 h-4 bg-gray-800 rounded-full mx-auto mb-1" />
+            <div className="rounded-[18px] bg-gray-50 p-6" style={{ aspectRatio: "9/16" }}>
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <p className="text-xs text-gray-500">🎵 音频播放</p>
+                <audio controls className="w-full" src={src} preload="metadata" />
+              </div>
+            </div>
+            <div className="w-20 h-1 bg-gray-600 rounded-full mx-auto mt-2" />
+          </div>
         </div>
       );
 

@@ -2,44 +2,37 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<!-- 注意：SVG 图表中不要用 CSS 变量(如 var(--green))，直接使用实际颜色值(如 #1F8A4C) -->
 <style>
-:root { --cream: #EFE9D9; --ink: #0F0F0F; --ink-2: #2A2A2A; --green: #1F8A4C; --pink: #F06CA8; --orange: #E85A1F; --yellow: #F5C518; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #000; display: flex; align-items: center; justify-content: center; width: 100vw; height: 100vh; overflow: hidden; }
-#frame { width: 1080px; height: 1920px; max-width: calc(100vh * 9 / 16); max-height: 100vh; background: var(--cream); position: relative; overflow: hidden; }
-.scene { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; text-align: center; opacity: 0; overflow: hidden; word-break: break-word; container-type: inline-size; }
-.scene > * { max-width: 100%; flex-shrink: 1; min-width: 0; }
-.scene img, .scene svg { max-width: 100% !important; max-height: 60% !important; height: auto; }
-.scene table { font-size: clamp(10px, 2.5cqw, 20px); width: 100% !important; table-layout: fixed; }
-.scene td, .scene th { padding: 2px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#stage { position: relative; overflow: hidden; }
+.clip { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; text-align: center; opacity: 0; overflow: hidden; word-break: break-word; }
+.clip > * { max-width: 100%; flex-shrink: 1; min-width: 0; }
+.clip img, .clip svg { max-width: 100% !important; max-height: 60% !important; height: auto; }
+.clip table { font-size: clamp(10px, 2.5cqw, 20px); width: 100% !important; table-layout: fixed; }
+.clip td, .clip th { padding: 2px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* AI 在此处扩展样式 */
 </style>
 </head>
 <body>
-<div id="frame">
+<div id="stage" data-composition-id="main" data-start="0" data-width="1080" data-height="1920">
   <!-- AI 在此处填充场景 -->
 </div>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
 <script>
 (function() {
-  var scenes = document.querySelectorAll('.scene');
-  if (scenes.length === 0) return;
+  var clips = document.querySelectorAll('.clip[data-start]');
+  if (clips.length === 0) return;
   var tl = gsap.timeline({ paused: true });
-  scenes.forEach(function(s, i) {
-    var dur = 4.5;
-    var gap = 0.5;
-    if (i === 0) {
-      tl.set(s, { opacity: 1 }, '+=0');
-    } else {
-      tl.set(s, { opacity: 0, y: 40 }, '+=0');
-      tl.to(s, { opacity: 1, y: 0, duration: 0.5 }, '+=' + gap);
-    }
-    tl.to(s, { opacity: 0, duration: 0.3 }, '+=' + dur);
+  clips.forEach(function(s) {
+    var start = parseFloat(s.getAttribute('data-start')) || 0;
+    var dur = parseFloat(s.getAttribute('data-duration')) || 4;
+    tl.set(s, { opacity: 0 }, start);
+    tl.to(s, { opacity: 1, duration: 0.5 }, start);
+    tl.to(s, { opacity: 0, duration: 0.3 }, start + dur - 0.3);
   });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
   window.addEventListener('load', function() { tl.play(); });
 })();
 </script>

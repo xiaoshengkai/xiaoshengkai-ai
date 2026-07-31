@@ -11,8 +11,16 @@ export async function buildPreviewHTML(html, workDir) {
   let content = html;
   try {
     const obj = JSON.parse(html);
-    if (obj.html) content = obj.html;
-    else if (obj.output) content = obj.output;
+    if (obj.html) {
+      content = obj.html;
+    } else if (obj.output) {
+      try {
+        const inner = JSON.parse(obj.output);
+        content = inner.html || inner.output || obj.output;
+      } catch {
+        content = obj.output;
+      }
+    }
   } catch {}
 
   if (!content || content.trim() === "") {

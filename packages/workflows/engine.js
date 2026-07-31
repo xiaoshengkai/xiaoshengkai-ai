@@ -27,7 +27,7 @@ export function listExecutions() {
           templateLabel: template.label || state.template,
           status: state.status,
           totalSteps: state.steps.length,
-          completedSteps: state.steps.filter(s => s.status === "completed").length,
+          completedSteps: state.steps.filter(s => s.status === "completed" || s.status === "skipped").length,
           failedStep: failedStep ? failedStep.name : null,
           failedError: failedStep ? failedStep.error : null,
           startedAt: state.startedAt,

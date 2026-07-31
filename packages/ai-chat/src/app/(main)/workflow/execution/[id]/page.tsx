@@ -113,7 +113,7 @@ export default function ExecutionDetailPage() {
 
   if (!execution) return null;
 
-  const completed = execution.steps.filter(s => s.status === "completed").length;
+  const completed = execution.steps.filter(s => s.status === "completed" || s.status === "skipped").length;
   const activeStep = execution.steps.find(s => s.id === activeStepId) || execution.steps[0];
   const isDone = execution.status === "completed" || execution.status === "failed";
 

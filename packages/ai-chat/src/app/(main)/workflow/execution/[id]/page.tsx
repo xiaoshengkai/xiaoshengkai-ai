@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/api-path";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Play, ChevronRight, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
+import { Play, ChevronRight, ArrowLeft, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -132,9 +132,9 @@ export default function ExecutionDetailPage() {
           </span>
         </div>
         <button onClick={() => setShowDelete(true)}
-          className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
-          style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#FF6B6B", boxShadow: "2px 2px 0 #1A1A1A" }}>
-          <Trash2 className="w-3 h-3" />删除
+          className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer hover:text-red-500"
+          style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#6B7280", boxShadow: "2px 2px 0 #1A1A1A" }}>
+          删除
         </button>
       </div>
 

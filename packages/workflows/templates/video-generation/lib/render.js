@@ -70,7 +70,7 @@ narration.addEventListener('ended', () => {
 
   // HyperFrames 渲染
   const cpuCores = cpus().length;
-  const cmd = `"${HYPERFRAMES_BIN}" render "${htmlPath}" --output "${path.join(workDir, "output.mp4")}" --width 1080 --height 1920 --fps 24 --workers ${Math.min(cpuCores, 4)} --player-ready-timeout=5000 --protocol-timeout=900000 --player-auto-start`;
+  const cmd = `"${HYPERFRAMES_BIN}" render "${workDir2}" --output "${path.join(workDir, "output.mp4")}" --width 1080 --height 1920 --fps 24 --workers ${Math.min(cpuCores, 4)} --player-ready-timeout=5000 --protocol-timeout=900000 --player-auto-start`;
   console.log("[render]", cmd);
   execSync(cmd, { stdio: "inherit", cwd: workDir2 });
 

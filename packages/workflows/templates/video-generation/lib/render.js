@@ -19,7 +19,9 @@ export async function renderMP4(workDir) {
   const bgmPath = path.join(workDir, "bgm.mp3");
 
   if (!fs.existsSync(previewPath)) throw new Error("preview.html 不存在");
-  if (!fs.existsSync(narrationPath)) throw new Error("narration.mp3 不存在");
+
+  const hasNarration = fs.existsSync(narrationPath);
+  const hasBgm = fs.existsSync(bgmPath);
 
   const workDir2 = path.join(workDir, "render");
   fs.mkdirSync(workDir2, { recursive: true });
@@ -35,15 +37,18 @@ export async function renderMP4(workDir) {
     html = html.replace("</head>", `<script>${fs.readFileSync(GSAP_DRAWSVG, "utf-8")}</script></head>`);
   }
 
-  // 注入音频
-  const narrationDur = getAudioDuration(narrationPath);
-  html = html.replace("</head>", `<audio id="narration" src="${narrationPath}" preload="auto"></audio></head>`);
-  if (fs.existsSync(bgmPath)) {
+  // 注入音频（跳过不存在的文件）
+  if (hasNarration) {
+    const narrationDur = getAudioDuration(narrationPath);
+    html = html.replace("</head>", `<audio id="narration" src="${narrationPath}" preload="auto"></audio></head>`);
+  }
+  if (hasBgm) {
     html = html.replace("</head>", `<audio id="bgm" src="${bgmPath}" preload="auto" loop></audio></head>`);
   }
 
-  // 注入播放控制脚本
-  html = html.replace("</body>", `<script>
+  // 注入播放控制脚本（仅在有旁白时）
+  if (hasNarration) {
+    html = html.replace("</body>", `<script>
 const narration = document.getElementById('narration');
 const bgm = document.getElementById('bgm');
 let started = false;
@@ -59,6 +64,7 @@ narration.addEventListener('ended', () => {
   setTimeout(() => window.close(), 1000);
 });
 </script></body>`);
+  }
 
   fs.writeFileSync(htmlPath, html);
 

@@ -1,0 +1,122 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { callLLM } from "../../../../shared/llm/index.js";
+import { validateScript, getScriptStats } from "../schema.js";
+import { ERRORS } from "./errors.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function loadScriptRules() {
+  return fs.readFileSync(path.join(__dirname, "..", "script-rules.md"), "utf-8");
+}
+
+function loadExample() {
+  return fs.readFileSync(path.join(__dirname, "example-script.json"), "utf-8");
+}
+
+function parseJSON(text) {
+  let cleaned = text.replace(/```\w*\n?|\n?```/g, "").trim();
+  const start = cleaned.indexOf("{");
+  if (start < 0) throw new Error("未找到 JSON");
+
+  let depth = 0, inString = false, escape = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"' && !inString) { inString = true; continue; }
+    if (ch === '"' && inString) { inString = false; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    if (ch === "}") { depth--; if (depth === 0) return JSON.parse(cleaned.slice(start, i + 1)); }
+  }
+  throw new Error("JSON 未闭合");
+}
+
+export async function generateScript(title, style, content, brand) {
+  const startTime = Date.now();
+  const rules = loadScriptRules();
+  const example = loadExample();
+
+  const inputContent = content || title;
+  const brandLine = brand
+    ? `- 品牌名: ${brand}（hook 和 outro 模板的品牌位显示此文字）`
+    : "- 品牌名: 不显示（template 里 brand 元素留空）";
+
+  const prompt = `${rules}
+
+## 参考示例
+
+以下是一个高质量的 script.json 示例（基于"咖啡"主题）：
+
+\`\`\`json
+${example}
+\`\`\`
+
+## 本次任务
+
+请根据以下主题和内容，生成一个 script.json：
+
+- 视频标题: ${title}
+- 内容描述: ${inputContent}
+- 风格: ${style || "Neo-Brutalist"}
+${brandLine}
+
+## 输出要求
+
+- 严格 JSON，无其他文字
+- 数字必须拼读（narration 中）
+- 必须填满所有 inputs slot
+- 场景数 3-12 个
+- 第一场是 hook，最后一场是 outro
+${brand ? `- hook 和 outro 场景的 inputs 里必须包含 brand 字段，值为 "${brand}"` : ""}
+
+输出：`;
+
+  console.log(`[prompt-builder] 生成 script，标题: ${title}，风格: ${style}`);
+
+  const { text } = await callLLM({
+    system: "你是一个专业的短视频脚本策划，严格按规则输出 JSON。",
+    user: prompt,
+  });
+
+  try {
+    const script = parseJSON(text);
+    const result = validateScript(script);
+    if (!result.ok) {
+      console.warn(`[prompt-builder] 校验失败: ${result.error}`);
+      return { script: JSON.stringify(script, null, 2), validated: false, error: result.error };
+    }
+    const stats = getScriptStats(result.script);
+    console.log(`[prompt-builder] 完成: ${stats.sceneCount} 场景 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
+    return { script: JSON.stringify(result.script, null, 2), validated: true, stats };
+  } catch (err) {
+    console.warn(`[prompt-builder] 解析失败: ${err.message}，原文前200字: ${text.slice(0, 200)}`);
+    return { script: text, validated: false, error: `JSON 解析失败: ${err.message}` };
+  }
+}
+
+export async function validateScriptStep(input) {
+  let parsed;
+  if (typeof input === "string") {
+    try {
+      parsed = JSON.parse(input);
+    } catch {
+      throw ERRORS.SCRIPT_INVALID_JSON("解析失败");
+    }
+  } else {
+    parsed = input;
+  }
+
+  const result = validateScript(parsed);
+  if (!result.ok) {
+    throw ERRORS.SCRIPT_VALIDATION_FAILED(result.error);
+  }
+
+  const stats = getScriptStats(result.script);
+  return {
+    output: `✅ 校验通过: ${stats.sceneCount} 个场景，约 ${stats.estimatedDurationSec} 秒，使用模板: ${stats.templates.join(", ")}`,
+    script: result.script,
+  };
+}

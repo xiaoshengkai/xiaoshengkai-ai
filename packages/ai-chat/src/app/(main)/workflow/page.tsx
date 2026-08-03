@@ -12,13 +12,13 @@ import {
 
 interface Template {
   id: string; label: string; description: string;
-  params: { name: string; label: string; type: string; required?: boolean; default?: string; options?: string[] }[];
+  params: { name: string; label: string; type: string; required?: boolean; default?: string; options?: string[]; placeholder?: string }[];
   steps: { name: string }[];
 }
 
 interface Execution {
-  executionId: string; template: string; templateLabel: string; status: string;
-  totalSteps: number; completedSteps: number; startedAt: string;
+  executionId: string; title: string; template: string; templateLabel: string; status: string;
+  totalSteps: number; completedSteps: number; startedAt: string; completedAt: string | null;
   failedStep: string | null; failedError: string | null;
 }
 
@@ -30,6 +30,7 @@ export default function WorkflowPage() {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [executing, setExecuting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   const fetchExecutions = useCallback(async () => {
     try {
@@ -99,9 +100,34 @@ export default function WorkflowPage() {
     setFormValues(defaults);
   }, []);
 
+  const handleAiGenerate = useCallback(async () => {
+    const title = formValues["title"];
+    if (!title) { toast("请先填视频标题"); return; }
+    setAiGenerating(true);
+    try {
+      const res = await fetch(`${BASE}/api/workflows/generate-content`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const data = await res.json();
+      if (data.content) {
+        setFormValues({ ...formValues, content: data.content });
+        toast("🟢 内容已生成");
+      } else {
+        toast(`🔴 ${data.error || "生成失败"}`);
+      }
+    } catch { toast("🔴 请求失败"); }
+    setAiGenerating(false);
+  }, [formValues]);
+
   const formatDate = (iso: string) => {
     const d = new Date(iso);
-    return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
   };
 
   const statusPriority: Record<string, number> = { failed: 0, running: 1, pending: 2, completed: 3 };
@@ -149,7 +175,9 @@ export default function WorkflowPage() {
                       exe.status === "running" ? "bg-yellow-400 animate-pulse" :
                       exe.status === "failed" ? "bg-red-500" : "bg-gray-400"
                     }`} />
-                    <span className="text-sm font-bold text-gray-800 truncate">{exe.templateLabel}</span>
+                    <span className="text-sm font-bold text-gray-800 truncate flex-1">
+                      {exe.title || exe.templateLabel}
+                    </span>
                     <span className={`inline-block text-xs px-1.5 py-0.5 rounded shrink-0 ${
                       exe.status === "failed" ? "bg-red-100 text-red-700" :
                       exe.status === "running" ? "bg-yellow-100 text-yellow-700" :
@@ -167,7 +195,11 @@ export default function WorkflowPage() {
                       删除
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mb-1">{formatDate(exe.startedAt)}</p>
+                  <p className="text-xs text-gray-400 mb-1">工作流名称: {exe.templateLabel}</p>
+                  <p className="text-xs text-gray-500 mb-1">开始: {formatDate(exe.startedAt)}</p>
+                  {exe.completedAt && (
+                    <p className="text-xs text-gray-500 mb-1">完成: {formatDate(exe.completedAt)}</p>
+                  )}
                   {exe.failedStep && (
                     <p className="text-xs text-red-500 mb-1 truncate" title={`${exe.failedStep}: ${exe.failedError}`}>
                       <span className="font-medium">{exe.failedStep}</span>: {exe.failedError}
@@ -209,9 +241,6 @@ export default function WorkflowPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                <button onClick={() => setSelectedTemplate(null)} className="text-xs text-gray-400 hover:text-gray-600 mb-2">
-                  ← 重新选择模板
-                </button>
                 <div className="text-sm font-bold text-gray-800 mb-2">{selectedTemplate.label}</div>
                 {selectedTemplate.params.map(p => (
                   <div key={p.name}>
@@ -223,9 +252,41 @@ export default function WorkflowPage() {
                         className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded bg-white">
                         {p.options?.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
+                    ) : p.type === "textarea" ? (
+                      <div>
+                        {p.name === "content" && (
+                          <div className="flex gap-2">
+                            <textarea
+                              value={formValues[p.name] || ""}
+                              onChange={e => setFormValues({ ...formValues, [p.name]: e.target.value })}
+                              placeholder={p.placeholder || ""}
+                              rows={4}
+                              className="flex-1 px-2 py-1 text-xs border-2 border-gray-300 rounded resize-none"
+                            />
+                            <button
+                              onClick={handleAiGenerate}
+                              disabled={aiGenerating}
+                              className="pixel-btn shrink-0 px-2 py-1 text-xs font-bold cursor-pointer self-start"
+                              style={{ border: "2px solid #1A1A1A", background: aiGenerating ? "#e2e8f0" : "#5B8DEF", color: aiGenerating ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}
+                            >
+                              {aiGenerating ? "生成中..." : "✨ AI 智能生成"}
+                            </button>
+                          </div>
+                        )}
+                        {p.name !== "content" && (
+                          <textarea
+                            value={formValues[p.name] || ""}
+                            onChange={e => setFormValues({ ...formValues, [p.name]: e.target.value })}
+                            placeholder={p.placeholder || ""}
+                            rows={4}
+                            className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded resize-none"
+                          />
+                        )}
+                      </div>
                     ) : (
                       <input type={p.type === "number" ? "number" : "text"}
                         value={formValues[p.name] || ""} onChange={e => setFormValues({ ...formValues, [p.name]: e.target.value })}
+                        placeholder={p.placeholder || ""}
                         className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded" />
                     )}
                   </div>

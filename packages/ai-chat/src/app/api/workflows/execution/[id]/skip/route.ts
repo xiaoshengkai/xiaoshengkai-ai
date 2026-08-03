@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
 import { execFile } from "node:child_process";
+import { parseCliOutput } from "@/lib/cli-parser";
 
 const CLI_PATH = path.resolve(process.cwd(), "..", "..", "packages", "workflows", "cli.js");
 
@@ -21,7 +22,7 @@ export async function POST(
         else resolve(stdout.trim());
       });
     });
-    const data = JSON.parse(result);
+    const data = parseCliOutput(result);
     return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

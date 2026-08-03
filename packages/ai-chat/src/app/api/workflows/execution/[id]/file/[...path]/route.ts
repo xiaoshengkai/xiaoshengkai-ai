@@ -17,13 +17,15 @@ const MIME: Record<string, string> = {
   ".json": "application/json",
   ".css": "text/css",
   ".js": "application/javascript",
+  ".srt": "text/plain; charset=utf-8",
 };
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string; filename: string }> }
+  { params }: { params: Promise<{ id: string; path: string[] }> }
 ) {
-  const { id, filename } = await params;
+  const { id, path: pathSegments } = await params;
+  const filename = pathSegments.join("/");
   const filePath = path.join(DATA_DIR, id, filename);
 
   if (!fs.existsSync(filePath)) {

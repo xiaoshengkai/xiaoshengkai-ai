@@ -1,0 +1,103 @@
+{
+  "templates": {
+    "frame-liquid-bg-hero": {
+      "name_en": "Liquid BG Hero",
+      "name_zh": "极光液动背景钩子",
+      "description_en": "Aurora violet liquid background hero with floating blobs, gradient headline, and CTA button",
+      "description_zh": "极光紫液动背景钩子模板 - 浮动光斑 + 渐变色标题 + CTA 按钮",
+      "type": "hook",
+      "slots": ["kicker", "headline", "subheadline", "cta", "brand"],
+      "limits": { "headline": 30, "subheadline": 60, "kicker": 15, "cta": 20 }
+    },
+    "frame-bold-poster": {
+      "name_en": "Bold Poster",
+      "name_zh": "大胆海报",
+      "description_en": "1970s editorial poster with giant figure, multi-line headline, and red accent",
+      "description_zh": "1970s 编辑海报风格 - 大数字 + 多行标题 + 红色主视觉",
+      "type": "body",
+      "slots": ["kicker", "date", "figure", "headline", "standfirst", "footer_left", "footer_right"],
+      "limits": { "headline": 40, "standfirst": 120, "kicker": 15, "figure": 8 }
+    },
+    "frame-vignelli": {
+      "name_en": "Vignelli",
+      "name_zh": "维涅利数据卡",
+      "description_en": "Dark charcoal + red accent — single giant stat number",
+      "description_zh": "暗色炭黑 + 红色强调 - 单个大字数据展示",
+      "type": "body",
+      "slots": ["kicker", "number", "label", "note", "brand"],
+      "limits": { "number": 8, "label": 30, "kicker": 15, "note": 60 }
+    },
+    "frame-pentagram-stat": {
+      "name_en": "Pentagram Stat",
+      "name_zh": "五角星数据统计",
+      "description_en": "Dark neon with Swiss grid, glowing amber number, cyan bar chart",
+      "description_zh": "暗色霓虹风格 - 瑞士网格 + 发光数字 + 柱状图 + 青色强调",
+      "type": "body",
+      "slots": ["label", "headline", "subtitle", "anchor", "footer_left", "footer_right"],
+      "limits": { "headline": 8, "subtitle": 40, "label": 15, "anchor": 20 }
+    },
+    "frame-build-minimal": {
+      "name_en": "Build Minimal",
+      "name_zh": "极简逐字揭示",
+      "description_en": "Dark cinematic — one big word revealed letter-by-letter with amber glow",
+      "description_zh": "暗色极简风格 - 一字一字逐字揭示 + 琥珀色发光",
+      "type": "body",
+      "slots": ["eyebrow", "hero", "desc", "side_left", "side_right"],
+      "limits": { "hero": 8, "desc": 60, "eyebrow": 15 }
+    },
+    "frame-creative-voltage": {
+      "name_en": "Creative Voltage",
+      "name_zh": "创意电压",
+      "description_en": "Electric-blue split layout with handwriting accent",
+      "description_zh": "电光蓝 split 布局 + 手写体强调 - 创意标语展示",
+      "type": "body",
+      "slots": ["meta", "display_lines", "accent_index", "script", "caption"],
+      "limits": { "display_lines": 40, "script": 30, "caption": 60, "meta": 15 }
+    },
+    "frame-glitch-title": {
+      "name_en": "Glitch Title",
+      "name_zh": "故障标题",
+      "description_en": "Cyberpunk RGB-split glitch with scanlines",
+      "description_zh": "赛博朋克 RGB 撕裂 + 扫描线 - 标题冲击展示",
+      "type": "body",
+      "slots": ["title", "subtitle"],
+      "limits": { "title": 30, "subtitle": 60 }
+    },
+    "frame-aicoding-list": {
+      "name_en": "AI Coding List",
+      "name_zh": "AI 编程列表",
+      "description_en": "2-5 items with emoji icons and colored level tags",
+      "description_zh": "列表展示 - 2-5 项带 emoji 图标 + 彩色等级标签",
+      "type": "body",
+      "slots": ["title", "accent", "accent_from", "accent_to", "subtitle", "items"],
+      "limits": { "title": 30, "subtitle": 60, "items": 5 }
+    },
+    "frame-aicoding-comparison": {
+      "name_en": "AI Coding Comparison",
+      "name_zh": "AI 编程对比",
+      "description_en": "Head-to-head comparison — two gradient cards with WIN badge",
+      "description_zh": "对比展示 - 两栏渐变卡片 + WIN 徽章 + 数据对比",
+      "type": "body",
+      "slots": ["badge", "pre", "vs", "post", "left", "right"],
+      "limits": { "badge": 10, "pre": 15, "post": 15 }
+    },
+    "frame-logo-outro": {
+      "name_en": "Logo Outro",
+      "name_zh": "品牌结尾",
+      "description_en": "Deep-violet radial canvas — glowing logo with shimmer sweep",
+      "description_zh": "结尾品牌模板 - 发光 logo + 品牌名 + 标语 + 链接",
+      "type": "outro",
+      "slots": ["brand_name", "tagline", "primary_url"],
+      "limits": { "brand_name": 15, "tagline": 30, "primary_url": 30 }
+    },
+    "frame-statement-outro": {
+      "name_en": "Statement Outro",
+      "name_zh": "声明结尾",
+      "description_en": "Red statement card on paper background",
+      "description_zh": "结尾声明模板 - 红色声明卡片 + 纸纹背景",
+      "type": "outro",
+      "slots": ["statement", "source", "date"],
+      "limits": { "statement": 80, "source": 30, "date": 20 }
+    }
+  }
+}

@@ -1,12 +1,26 @@
 const [command, ...args] = process.argv.slice(2);
 
-// 重定向 console 到 stderr，stdout 只输出 JSON
+// 第 1 层：stdout 纯 JSON 契约 — 任何非 JSON 输出转到 stderr
+const realStdoutWrite = process.stdout.write.bind(process.stdout);
+process.stdout.write = function (chunk, encoding, cb) {
+  const s = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+  if ((s.startsWith("{") || s.startsWith("[")) && s.length > 1) {
+    return realStdoutWrite(chunk, encoding, cb);
+  }
+  return process.stderr.write(chunk, encoding, cb);
+};
+
+// 重定向 console 到 stderr
 const origLog = console.log;
 const origErr = console.error;
 console.log = (...a) => origErr(...a);
 console.error = (...a) => origErr(...a);
 
 async function main() {
+  // 第 2 层：动态导入 dotenv，在 console 重定向后加载
+  const { config } = await import("dotenv");
+  config({ path: new URL("../../.env", import.meta.url).pathname });
+
   if (command === "start") {
     const { template, params } = JSON.parse(args[0]);
     const { createExecution } = await import("./engine.js");

@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "renderer": "hyperframes-v2",
+  "title": "咖啡的奥秘",
+  "bgm_prompt": "轻快爵士 lo-fi",
+  "aspect": "9:16",
+  "scenes": [
+    {
+      "id": "hook",
+      "type": "hook",
+      "narration": "你知道吗？每天全世界喝掉二十亿杯咖啡。",
+      "templateId": "frame-liquid-bg-hero",
+      "inputs": {
+        "kicker": "☕ 冷知识",
+        "headline": "每天 20 亿杯咖啡",
+        "subheadline": "全球咖啡消费量揭秘",
+        "cta": "了解更多 →",
+        "brand": "小盛开AI"
+      }
+    },
+    {
+      "id": "body-1",
+      "type": "body",
+      "narration": "芬兰人平均每天喝四杯咖啡，排名全球第一。",
+      "templateId": "frame-pentagram-stat",
+      "inputs": {
+        "label": "🇫🇮 人均消费",
+        "headline": "4 杯",
+        "subtitle": "芬兰人均每日咖啡消费量",
+        "anchor": "全球第一",
+        "footer_left": "数据来源：ICO",
+        "footer_right": "2024"
+      }
+    },
+    {
+      "id": "body-2",
+      "type": "body",
+      "narration": "咖啡豆其实不是豆子，而是咖啡樱桃的种子。",
+      "templateId": "frame-build-minimal",
+      "inputs": {
+        "eyebrow": "冷知识",
+        "hero": "种子",
+        "desc": "咖啡豆其实是咖啡樱桃的种子，不是豆子",
+        "side_left": "☕",
+        "side_right": "🍒"
+      }
+    },
+    {
+      "id": "body-3",
+      "type": "body",
+      "narration": "阿拉比卡和罗布斯塔的区别：阿拉比卡更香醇，罗布斯塔更浓烈。",
+      "templateId": "frame-aicoding-comparison",
+      "inputs": {
+        "badge": "对比",
+        "pre": "阿拉比卡",
+        "vs": "VS",
+        "post": "罗布斯塔",
+        "left": {
+          "label": "阿拉比卡",
+          "from": "#C9A96E",
+          "to": "#8B6914",
+          "bullets": ["香气浓郁", "酸度适中", "口感细腻"],
+          "stat": "70%",
+          "stat_label": "全球产量占比"
+        },
+        "right": {
+          "label": "罗布斯塔",
+          "from": "#6B4226",
+          "to": "#3E2723",
+          "bullets": ["咖啡因高", "苦味重", "浓烈醇厚"],
+          "stat": "30%",
+          "stat_label": "全球产量占比"
+        }
+      }
+    },
+    {
+      "id": "outro",
+      "type": "outro",
+      "narration": "关注我，了解更多有趣的知识。",
+      "templateId": "frame-logo-outro",
+      "inputs": {
+        "brand_name": "小盛开AI",
+        "tagline": "每天一点新知识",
+        "primary_url": "关注公众号"
+      }
+    }
+  ]
+}

@@ -23,14 +23,16 @@ export function listExecutions() {
         const template = loadTemplate(state.template);
         return {
           executionId: id,
+          title: state.title || "",
           template: state.template,
           templateLabel: template.label || state.template,
           status: state.status,
           totalSteps: state.steps.length,
-          completedSteps: state.steps.filter(s => s.status === "completed" || s.status === "skipped").length,
+          completedSteps: state.steps.filter(s => s.status === "completed" || s.status === "skipped" || s.status === "warning").length,
           failedStep: failedStep ? failedStep.name : null,
           failedError: failedStep ? failedStep.error : null,
           startedAt: state.startedAt,
+          completedAt: state.completedAt || null,
         };
       } catch { return null; }
     })
@@ -55,6 +57,7 @@ export function createExecution(templateName, params) {
   const state = {
     executionId,
     template: templateName,
+    title: params.title || "",
     params,
     startedAt: new Date().toISOString(),
     status: "pending",
@@ -241,7 +244,7 @@ export async function runNextStep(executionId) {
 
   // 收集已完成步骤的输出
   state.steps.forEach(s => {
-    if (s.status === "completed" && s.output) {
+    if ((s.status === "completed" || s.status === "warning") && s.output) {
       if (typeof s.output === "object" && !Array.isArray(s.output)) {
         for (const [k, v] of Object.entries(s.output)) {
           if (typeof v === "string") vars[`${s.id}.${k}`] = v;
@@ -289,10 +292,19 @@ export async function runNextStep(executionId) {
     return { ok: true, stepIndex: nextIdx, stepStatus: "completed" };
   } catch (err) {
     const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
-    state.steps[nextIdx].status = "failed";
+    const isRetryable = err.retryable !== false;
+    state.steps[nextIdx].status = isRetryable ? "warning" : "failed";
     state.steps[nextIdx].error = err.message;
-    state.status = "failed";
+    state.steps[nextIdx].errorType = err.type || null;
+    state.steps[nextIdx].errorSuggestion = err.suggestion || null;
+    if (!isRetryable) {
+      state.status = "failed";
+    }
     writeState(dir, state);
+    if (isRetryable) {
+      logger.warn(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 警告 (${elapsed}s): ${err.message}`);
+      return { ok: true, stepIndex: nextIdx, stepStatus: "warning", error: err.message };
+    }
     logger.error(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 失败 (${elapsed}s): ${err.message}`);
     return { ok: false, stepIndex: nextIdx, stepStatus: "failed", error: err.message };
   }

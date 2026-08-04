@@ -1,4 +1,4 @@
-# video-generation-v2
+# tech-video
 
 script.json 驱动的逐场景视频生成管线，基于 11 套 HyperFrames 模板。
 
@@ -60,7 +60,7 @@ SFX 库不受 git 版本管理（参考越南项目做法）。目录已建好�
 
 首次使用需运行 SFX 下载器：
 ```bash
-node packages/workflows/templates/video-generation-v2/lib/sfx-downloader.js
+node packages/workflows/templates/tech-video/lib/sfx-downloader.js
 ```
 
 下载完成后 `lib/sfx/{transition,emphasis,...}/` 下会有 mp3 文件。没有 SFX 不影响 pipeline 运行，只是视频没有音效。

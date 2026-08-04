@@ -1,5 +1,5 @@
 {
-  "name": "video-generation-v2",
+  "name": "tech-video",
   "label": "科技风 短视频生成",
   "description": "script.json 驱动 + 逐场景渲染 + TTS + BGM + SFX + 硬字幕 + SRT",
   "params": [

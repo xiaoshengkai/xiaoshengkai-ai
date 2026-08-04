@@ -14,7 +14,7 @@
     "tasks:start": "node packages/tasks/scheduler.js",
     "tasks:stop": "kill $(lsof -t -i:4568) 2>/dev/null || true",
     "tasks:run": "node -e \"import('./packages/tasks/$TASK/index.js').then(m=>m.run())\"",
-    "test:video-v2": "node packages/workflows/templates/video-generation-v2/test.js"
+    "test:video-v2": "node packages/workflows/templates/tech-video/test.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

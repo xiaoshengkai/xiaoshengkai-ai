@@ -24,7 +24,7 @@ interface Execution {
 }
 
 const STEP_GROUPS: Record<string, { label: string; stepIds: string[] }> = {
-  "video-generation-v2": {
+  "tech-video": {
     label: "v2",
     stepIds: [],
   },
@@ -161,7 +161,7 @@ export default function ExecutionDetailPage() {
   const completed = execution.steps.filter(s => s.status === "completed" || s.status === "skipped" || s.status === "warning").length;
   const activeStep = execution.steps.find(s => s.id === activeStepId) || execution.steps[0];
   const isDone = execution.status === "completed" || execution.status === "failed";
-  const isV2 = execution.template === "video-generation-v2";
+  const isV2 = execution.template === "tech-video";
 
   // 解析场景信息
   let sceneList: { id: string; type: string; templateId: string; narration: string }[] = [];

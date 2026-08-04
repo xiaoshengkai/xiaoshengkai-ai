@@ -58,7 +58,7 @@ export function validateScript(json) {
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 const TEXT_FIELDS = [
   "title", "subtitle", "headline", "subheadline", "kicker",
-  "brand", "brand_name", "label", "note", "desc", "hero",
+  "label", "note", "desc", "hero",
   "eyebrow", "anchor", "figure", "number", "tagline", "primary_url",
   "statement", "source", "date", "meta", "caption", "script",
   "footer_left", "footer_right", "standfirst", "badge", "pre", "post", "vs",
@@ -76,10 +76,6 @@ function validateContent(script) {
       // accent 字段应该是强调词，不是颜色代码
       if (key === "accent" && typeof value === "string" && HEX_COLOR.test(value)) {
         errors.push(`  - scene ${scene.id}: inputs.accent 应该是强调词（如"常见误区"），不是颜色代码 "${value}"`);
-      }
-      // brand 字段不能是占位符
-      if ((key === "brand" || key === "brand_name") && typeof value === "string" && value.includes("{")) {
-        errors.push(`  - scene ${scene.id}: inputs.${key} 包含占位符 "${value}"，应填真实品牌名或留空`);
       }
     }
     if (scene.inputs.items && Array.isArray(scene.inputs.items)) {

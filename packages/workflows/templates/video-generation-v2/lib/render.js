@@ -17,7 +17,7 @@ const RENDER_FPS = 24;
 const RENDER_TIMEOUT_MS = 300000;
 const SCENE_GAP_SEC = 0.3;
 
-export async function renderScenes(scriptJson, executionDir, brand = "") {
+export async function renderScenes(scriptJson, executionDir) {
   const totalStart = Date.now();
   let script;
   if (typeof scriptJson === "string") {
@@ -66,7 +66,7 @@ export async function renderScenes(scriptJson, executionDir, brand = "") {
     }
 
     try {
-      const rawClip = await renderTemplateClip(scene, executionDir, i, brand);
+      const rawClip = await renderTemplateClip(scene, executionDir, i);
 
       await fitClipToDuration(rawClip, visualDuration, clipPath, RENDER_FPS);
 
@@ -107,7 +107,7 @@ export async function renderScenes(scriptJson, executionDir, brand = "") {
   };
 }
 
-async function renderTemplateClip(scene, executionDir, index, brand = "") {
+async function renderTemplateClip(scene, executionDir, index) {
   const templateDir = path.resolve(__dirname, "templates", scene.templateId);
   if (!fs.existsSync(path.join(templateDir, "index.html"))) {
     throw new Error(`模板不存在: ${scene.templateId}`);
@@ -143,10 +143,6 @@ async function renderTemplateClip(scene, executionDir, index, brand = "") {
   // 写变量文件（HyperFrames --variables-file 注入 window.__hyperframes.getVariables()）
   const varsFile = path.join(workDir, "variables.json");
   const vars = { ...scene.inputs };
-  if (scene.templateId === "frame-liquid-bg-hero" || scene.templateId === "frame-logo-outro") {
-    vars.brand = brand || "";
-    vars.brand_name = brand || "";
-  }
   fs.writeFileSync(varsFile, JSON.stringify(vars), "utf8");
 
   // 删除 HTML 里原始的 data-composition-variables（让 --variables-file 独占控制）

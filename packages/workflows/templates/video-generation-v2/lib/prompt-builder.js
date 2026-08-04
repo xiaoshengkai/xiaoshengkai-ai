@@ -34,15 +34,12 @@ function parseJSON(text) {
   throw new Error("JSON 未闭合");
 }
 
-export async function generateScript(title, style, content, brand) {
+export async function generateScript(title, style, content) {
   const startTime = Date.now();
   const rules = loadScriptRules();
   const example = loadExample();
 
   const inputContent = content || title;
-  const brandLine = brand
-    ? `- 品牌名: ${brand}（hook 和 outro 模板的品牌位显示此文字）`
-    : "- 品牌名: 不显示（template 里 brand 元素留空）";
 
   const prompt = `${rules}
 
@@ -61,7 +58,6 @@ ${example}
 - 视频标题: ${title}
 - 内容描述: ${inputContent}
 - 风格: ${style || "Neo-Brutalist"}
-${brandLine}
 
 ## 输出要求
 
@@ -70,7 +66,6 @@ ${brandLine}
 - 必须填满所有 inputs slot
 - 场景数 3-12 个
 - 第一场是 hook，最后一场是 outro
-${brand ? `- hook 和 outro 场景的 inputs 里必须包含 brand 字段，值为用户填的品牌名（不准输出 {brand} 这样的占位符）` : ""}
 
 输出：`;
 

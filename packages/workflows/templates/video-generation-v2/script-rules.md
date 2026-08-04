@@ -46,15 +46,30 @@
 ## 场景规划规则
 
 - 场景总数：3-12 个（推荐 5-8 个，节奏快）
-- 第一场：type=hook，必须用 frame-liquid-bg-hero 模板
-- 最后一场：type=outro，必须用 frame-logo-outro 或 frame-statement-outro 模板
+- 第一场：type=hook，从以下模板中选最合适的：
+  - frame-liquid-bg-hero：极光动效 + 渐变标题（适合知识/科普/通用类）
+  - frame-bold-poster：1970s 海报 + 大数字（适合冲击力强的开场）
+  - frame-glitch-title：赛博朋克故障效果（适合科技/数码/潮流类）
+- 最后一场：type=outro，从以下模板中选：
+  - frame-logo-outro：品牌结尾（发光 logo + 标语，适合大多数场景）
+  - frame-statement-outro：声明结尾（红色卡片 + 引用，适合观点/金句收尾）
 - 中间场：type=body，每个场景只表达一个核心观点，如果一段话有多个观点则拆成多个场景
+
+## 模板多样性约束
+
+- body 场景至少使用 4 种不同的 body 模板（如果场景数 ≥ 5）
+- 相邻场景不使用相同模板
+- 数据类和文字类模板交替使用，避免视觉疲劳
+- frame-creative-voltage / frame-glitch-title 至少出现 1 次（如果场景数 ≥ 6）
+- 同类型模板中随机选择（如数据展示可选 vignelli 或 pentagram-stat）
 
 ## 模板选择指南
 
 | 内容类型 | 推荐模板 | 说明 |
 |---------|---------|------|
-| 钩子/开场 | frame-liquid-bg-hero | 极光动效 + 渐变标题 + CTA |
+| 钩子/开场（通用） | frame-liquid-bg-hero | 极光动效 + 渐变标题 + CTA |
+| 钩子/开场（冲击） | frame-bold-poster | 1970s 海报 + 大数字（hook 可用） |
+| 钩子/开场（科技） | frame-glitch-title | 赛博朋克 RGB 撕裂 + 扫描线（hook 可用） |
 | 单个数据/统计 | frame-pentagram-stat | 暗色霓虹 + 发光数字 + 柱状图 |
 | 强调数字 | frame-vignelli | 暗色炭黑 + 红色强调 + 大字 |
 | 多行标题 | frame-bold-poster | 1970s 海报 + 大数字 + 多行标题 |
@@ -189,6 +204,9 @@
 - [ ] scenes[0].type = "hook"
 - [ ] scenes[最后].type = "outro"
 - [ ] 所有 templateId 都在上述列表中
+- [ ] body 场景至少用了 4 种不同模板（场景数 ≥ 5）
+- [ ] 相邻场景没有重复模板
+- [ ] frame-creative-voltage 或 frame-glitch-title 至少出现 1 次（场景数 ≥ 6）
 - [ ] 每个场景的 inputs 填满了模板的所有 slot
 - [ ] narration 中数字都拼读了
 - [ ] narration 中无 emoji

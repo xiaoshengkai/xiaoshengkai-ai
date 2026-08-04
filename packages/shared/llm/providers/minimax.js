@@ -2,9 +2,21 @@ const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.c
 const MINIMAX_IMAGE_MODEL = process.env.MINIMAX_IMAGE_MODEL || "image-01";
 const MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M3";
 
-export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000 }) {
+export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000, format = 'json_object' }) {
   const apiKey = process.env.MINIMAX_API_KEY;
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
+
+  const body = {
+    model: model || MINIMAX_CHAT_MODEL,
+    thinking: { type: "disabled" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature,
+    max_tokens: maxTokens,
+  };
+  if (format) body.response_format = { type: format };
 
   const res = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -12,17 +24,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model: model || MINIMAX_CHAT_MODEL,
-      response_format: { type: "json_object" },
-      thinking: { type: "disabled" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      temperature,
-      max_tokens: maxTokens,
-    }),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json();

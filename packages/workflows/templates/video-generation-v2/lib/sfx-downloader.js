@@ -43,11 +43,12 @@ async function downloadFile(url, destPath) {
   console.log(`  OK: ${path.basename(destPath)} (${buf.length} bytes)`);
 }
 
-async function main() {
+export async function downloadAllSfx(targetDir) {
+  const target = targetDir || SFX_DIR;
   console.log("SFX 下载器 - 从 myinstants.com 下载音效\n");
 
   for (const [category, keywords] of Object.entries(CATEGORIES)) {
-    const catDir = path.join(SFX_DIR, category);
+    const catDir = path.join(target, category);
     fs.mkdirSync(catDir, { recursive: true });
     console.log(`[${category}]`);
 
@@ -68,7 +69,10 @@ async function main() {
   console.log("\n下载完成！");
 }
 
-main().catch((e) => {
-  console.error("下载失败:", e.message);
-  process.exit(1);
-});
+// CLI 入口
+if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^\.\//, ""))) {
+  downloadAllSfx().catch((e) => {
+    console.error("下载失败:", e.message);
+    process.exit(1);
+  });
+}

@@ -54,6 +54,13 @@ export function createExecution(templateName, params) {
   const dir = path.join(DATA_DIR, executionId);
   fs.mkdirSync(dir, { recursive: true });
 
+  // 如果用户上传了 BGM 文件，提前拷贝到执行目录
+  if (params.bgm_file && fs.existsSync(params.bgm_file)) {
+    try {
+      fs.copyFileSync(params.bgm_file, path.join(dir, "bgm.mp3"));
+    } catch { /* ignore copy failure */ }
+  }
+
   const state = {
     executionId,
     template: templateName,

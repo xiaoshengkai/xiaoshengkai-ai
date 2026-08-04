@@ -9,17 +9,17 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function generateBGM(scriptJson, executionDir) {
+export async function generateBGM(scriptJson, executionDir, bgmFilePath) {
   const startTime = Date.now();
-  let bgmPrompt = "轻快电子";
-  if (scriptJson) {
-    try {
-      const script = typeof scriptJson === "string" ? JSON.parse(scriptJson) : scriptJson;
-      bgmPrompt = script.bgm_prompt || "轻快电子";
-    } catch { /* use default */ }
-  }
-
   const outPath = path.join(executionDir, "bgm.mp3");
+
+  // 用户上传了 BGM 文件
+  if (bgmFilePath && fs.existsSync(bgmFilePath)) {
+    fs.copyFileSync(bgmFilePath, outPath);
+    const dur = await getDurationSec(outPath);
+    console.log(`[bgm] 使用上传文件 (${dur.toFixed(2)}s, ${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
+    return { bgmFile: outPath, duration: dur, "bgm.mp3": path.basename(outPath) };
+  }
 
   if (fs.existsSync(outPath)) {
     try {
@@ -27,6 +27,14 @@ export async function generateBGM(scriptJson, executionDir) {
       console.log(`[bgm] 复用 (${dur.toFixed(2)}s, ${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
       return { bgmFile: outPath, duration: dur, "bgm.mp3": path.basename(outPath) };
     } catch { /* 文件损坏，重新生成 */ }
+  }
+
+  let bgmPrompt = "轻快电子";
+  if (scriptJson) {
+    try {
+      const script = typeof scriptJson === "string" ? JSON.parse(scriptJson) : scriptJson;
+      bgmPrompt = script.bgm_prompt || "轻快电子";
+    } catch { /* use default */ }
   }
 
   const apiKey = process.env.MINIMAX_API_KEY;

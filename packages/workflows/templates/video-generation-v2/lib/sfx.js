@@ -1,9 +1,28 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ERRORS } from "./errors.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SFX_DIR = path.resolve(__dirname, "sfx");
+
+async function ensureSfxLibrary() {
+  if (fs.existsSync(SFX_DIR)) {
+    const hasFiles = fs.readdirSync(SFX_DIR).some(d => {
+      const p = path.join(SFX_DIR, d);
+      return fs.statSync(p).isDirectory() && fs.readdirSync(p).some(f => f.endsWith(".mp3"));
+    });
+    if (hasFiles) return;
+  }
+  console.log("[sfx] SFX 库为空，自动下载...");
+  try {
+    const { downloadAllSfx } = await import("./sfx-downloader.js");
+    await downloadAllSfx(SFX_DIR);
+  } catch (e) {
+    console.error("[sfx] 下载失败:", e.message);
+    throw ERRORS.SFX_LIBRARY_EMPTY();
+  }
+}
 
 export function indexSfxLibrary() {
   const index = {};
@@ -107,14 +126,16 @@ export async function pickSfxForAllScenes(scriptJson, executionDir) {
   const startTime = Date.now();
   let script;
   if (typeof scriptJson === "string") {
-    try { script = JSON.parse(scriptJson); } catch { return { output: "script 解析失败" }; }
+    try { script = JSON.parse(scriptJson); } catch { throw ERRORS.SCRIPT_INVALID_JSON("解析失败"); }
   } else {
     script = scriptJson;
   }
 
+  await ensureSfxLibrary();
+
   const index = indexSfxLibrary();
   if (Object.keys(index).length === 0) {
-    return { output: "SFX 库为空，跳过（首次使用请运行 sfx-downloader.js 下载音效）" };
+    throw ERRORS.SFX_LIBRARY_EMPTY();
   }
 
   const results = [];

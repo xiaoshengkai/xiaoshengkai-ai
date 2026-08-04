@@ -1,8 +1,8 @@
 "use client";
 
 import { BASE } from "@/lib/api-path";
-import { useEffect, useState, useCallback } from "react";
-import { Play, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Play, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -31,6 +31,29 @@ export default function WorkflowPage() {
   const [executing, setExecuting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [bgmUploading, setBgmUploading] = useState(false);
+
+  const formValuesRef = useRef(formValues);
+  useEffect(() => { formValuesRef.current = formValues; }, [formValues]);
+
+  const handleBgmUpload = useCallback(async (file: File) => {
+    setBgmUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${BASE}/api/workflows/upload`, {
+        method: "POST", body: formData,
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setFormValues({ ...formValues, bgm_file: data.tempPath });
+        toast("🟢 BGM 已上传");
+      } else {
+        toast(`🔴 ${data.error || "上传失败"}`);
+      }
+    } catch { toast("🔴 上传失败"); }
+    setBgmUploading(false);
+  }, [formValues]);
 
   const fetchExecutions = useCallback(async () => {
     try {
@@ -59,7 +82,7 @@ export default function WorkflowPage() {
     try {
       const res = await fetch(`${BASE}/api/workflows/execute`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template: selectedTemplate.id, params: formValues }),
+        body: JSON.stringify({ template: selectedTemplate.id, params: formValuesRef.current }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -71,7 +94,7 @@ export default function WorkflowPage() {
       }
     } catch { toast("🔴 请求失败"); }
     setExecuting(false);
-  }, [selectedTemplate, formValues]);
+  }, [selectedTemplate]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
@@ -252,6 +275,24 @@ export default function WorkflowPage() {
                         className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded bg-white">
                         {p.options?.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
+                    ) : p.name === "bgm_file" ? (
+                      <div className="flex gap-2 items-center">
+                        <input type="text" value={formValues[p.name] || ""} readOnly
+                          placeholder="未选择文件"
+                          className="flex-1 px-2 py-1 text-xs border-2 border-gray-300 rounded bg-gray-50" />
+                        <label
+                          className="pixel-btn shrink-0 px-2 py-1 text-xs font-bold cursor-pointer"
+                          style={{ border: "2px solid #1A1A1A", background: bgmUploading ? "#e2e8f0" : "#F59E0B", color: bgmUploading ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}
+                        >
+                          <Upload className="w-3 h-3 inline mr-1" />
+                          {bgmUploading ? "上传中..." : "上传"}
+                          <input type="file" accept="audio/mp3,audio/wav,audio/m4a" className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) handleBgmUpload(file);
+                            }} />
+                        </label>
+                      </div>
                     ) : p.type === "textarea" ? (
                       <div>
                         {p.name === "content" && (

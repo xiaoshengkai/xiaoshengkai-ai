@@ -143,9 +143,9 @@ async function renderTemplateClip(scene, executionDir, index, brand = "") {
   // 写变量文件（HyperFrames --variables-file 注入 window.__hyperframes.getVariables()）
   const varsFile = path.join(workDir, "variables.json");
   const vars = { ...scene.inputs };
-  if (brand && ["frame-liquid-bg-hero", "frame-logo-outro"].includes(scene.templateId)) {
-    vars.brand = brand;
-    vars.brand_name = brand;
+  if (scene.templateId === "frame-liquid-bg-hero" || scene.templateId === "frame-logo-outro") {
+    vars.brand = brand || "";
+    vars.brand_name = brand || "";
   }
   fs.writeFileSync(varsFile, JSON.stringify(vars), "utf8");
 

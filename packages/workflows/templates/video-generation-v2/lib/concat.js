@@ -147,10 +147,11 @@ export async function concatFinalVideo(scriptJson, executionDir) {
   const step2Start = Date.now();
   console.log("[concat] 2/5 拼接音频...");
   const voiceRaw = path.join(executionDir, "voice-raw.mp3");
-  if (sceneAudioPaths.length === 1) {
+  if (sceneAudioPaths.length === 0) {
+    console.log("[concat] 2/5 无音频文件，跳过");
+  } else if (sceneAudioPaths.length === 1) {
     fs.copyFileSync(sceneAudioPaths[0], voiceRaw);
   } else if (sceneAudioPaths.length > 1) {
-    // Use ffmpeg concat filter
     const args = ["-y"];
     const filterParts = [];
     const labels = [];
@@ -164,9 +165,11 @@ export async function concatFinalVideo(scriptJson, executionDir) {
       "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100", voiceRaw);
     await run("ffmpeg", args);
   }
-  const voiceRawDuration = await getDurationSec(voiceRaw);
-  console.log(`[concat] 2/5 完成 (${((Date.now() - step2Start) / 1000).toFixed(1)}s)`);
-  steps.push({ name: "concatVoice", durationSec: voiceRawDuration, fileSize: fs.statSync(voiceRaw).size, command: "ffmpeg concat filter" });
+  if (fs.existsSync(voiceRaw)) {
+    const voiceRawDuration = await getDurationSec(voiceRaw);
+    console.log(`[concat] 2/5 完成 (${((Date.now() - step2Start) / 1000).toFixed(1)}s)`);
+    steps.push({ name: "concatVoice", durationSec: voiceRawDuration, fileSize: fs.statSync(voiceRaw).size, command: "ffmpeg concat filter" });
+  }
 
   // Step 3: mix SFX onto voice
   const step3Start = Date.now();
@@ -177,23 +180,35 @@ export async function concatFinalVideo(scriptJson, executionDir) {
     sfxList = (Array.isArray(raw) ? raw : []).filter((r) => r.sfx && r.sfx.path);
   }
   const voiceWithSfx = path.join(executionDir, "voice-with-sfx.mp3");
-  await mixSfxOntoVoice(voiceRaw, sfxList, voiceWithSfx);
-  console.log(`[concat] 3/5 完成 (${((Date.now() - step3Start) / 1000).toFixed(1)}s)`);
-  steps.push({ name: "mixSfx", durationSec: await getDurationSec(voiceWithSfx), fileSize: fs.statSync(voiceWithSfx).size, command: "ffmpeg amix" });
+  if (fs.existsSync(voiceRaw)) {
+    await mixSfxOntoVoice(voiceRaw, sfxList, voiceWithSfx);
+    console.log(`[concat] 3/5 完成 (${((Date.now() - step3Start) / 1000).toFixed(1)}s)`);
+    steps.push({ name: "mixSfx", durationSec: await getDurationSec(voiceWithSfx), fileSize: fs.statSync(voiceWithSfx).size, command: "ffmpeg amix" });
+  } else {
+    console.log("[concat] 3/5 无音频，跳过");
+  }
 
   // Step 4: mix BGM at low volume
   const step4Start = Date.now();
   console.log("[concat] 4/5 混入背景音乐...");
   const voiceFinal = path.join(executionDir, "voice-final.mp3");
-  await mixBgmAtLowVolume(voiceWithSfx, bgmPath, voiceFinal, 0.2);
-  console.log(`[concat] 4/5 完成 (${((Date.now() - step4Start) / 1000).toFixed(1)}s)`);
-  steps.push({ name: "mixBgm", durationSec: await getDurationSec(voiceFinal), fileSize: fs.statSync(voiceFinal).size, command: "ffmpeg amix" });
+  if (fs.existsSync(voiceWithSfx)) {
+    await mixBgmAtLowVolume(voiceWithSfx, bgmPath, voiceFinal, 0.2);
+    console.log(`[concat] 4/5 完成 (${((Date.now() - step4Start) / 1000).toFixed(1)}s)`);
+    steps.push({ name: "mixBgm", durationSec: await getDurationSec(voiceFinal), fileSize: fs.statSync(voiceFinal).size, command: "ffmpeg amix" });
+  } else {
+    console.log("[concat] 4/5 无音频，跳过");
+  }
 
   // Step 5: mux audio onto video
   const step5Start = Date.now();
   console.log("[concat] 5/5 合成最终视频...");
   const videoPath = path.join(executionDir, "video.mp4");
-  await muxAudioOntoVideo(silentVideo, voiceFinal, videoPath);
+  if (fs.existsSync(voiceFinal)) {
+    await muxAudioOntoVideo(silentVideo, voiceFinal, videoPath);
+  } else {
+    fs.copyFileSync(silentVideo, videoPath);
+  }
   const videoSize = fs.statSync(videoPath).size;
   const videoDuration = await getDurationSec(videoPath);
   console.log(`[concat] 5/5 完成 (${((Date.now() - step5Start) / 1000).toFixed(1)}s)`);

@@ -5,13 +5,13 @@ script.json 驱动的逐场景视频生成管线，基于 11 套 HyperFrames 模
 ## 架构
 
 ```
-8 步管线:
-script → validate → tts-scenes → bgm → sfx-pick → preview → render → concat
+7 步管线:
+script → validate → tts-scenes → bgm → sfx-pick → render → concat
 
 分组:
 准备: script + validate
 素材: tts-scenes + bgm + sfx-pick
-渲染: preview + render
+渲染: render
 合成: concat
 ```
 

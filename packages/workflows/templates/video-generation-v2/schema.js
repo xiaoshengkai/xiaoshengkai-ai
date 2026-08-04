@@ -77,6 +77,10 @@ function validateContent(script) {
       if (key === "accent" && typeof value === "string" && HEX_COLOR.test(value)) {
         errors.push(`  - scene ${scene.id}: inputs.accent 应该是强调词（如"常见误区"），不是颜色代码 "${value}"`);
       }
+      // brand 字段不能是占位符
+      if ((key === "brand" || key === "brand_name") && typeof value === "string" && value.includes("{")) {
+        errors.push(`  - scene ${scene.id}: inputs.${key} 包含占位符 "${value}"，应填真实品牌名或留空`);
+      }
     }
     if (scene.inputs.items && Array.isArray(scene.inputs.items)) {
       for (let i = 0; i < scene.inputs.items.length; i++) {

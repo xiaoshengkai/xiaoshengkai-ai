@@ -70,7 +70,7 @@ ${brandLine}
 - 必须填满所有 inputs slot
 - 场景数 3-12 个
 - 第一场是 hook，最后一场是 outro
-${brand ? `- hook 和 outro 场景的 inputs 里必须包含 brand 字段，值为 "${brand}"` : ""}
+${brand ? `- hook 和 outro 场景的 inputs 里必须包含 brand 字段，值为用户填的品牌名（不准输出 {brand} 这样的占位符）` : ""}
 
 输出：`;
 
@@ -79,6 +79,7 @@ ${brand ? `- hook 和 outro 场景的 inputs 里必须包含 brand 字段，值�
   const { text } = await callLLM({
     system: "你是一个专业的短视频脚本策划，严格按规则输出 JSON。",
     user: prompt,
+    maxTokens: 8000,
   });
 
   try {

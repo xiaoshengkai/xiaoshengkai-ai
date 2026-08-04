@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     const { text } = await callLLM({
       system: systemPrompt,
       user: `视频标题：${title}\n\n请生成内容描述（最大3000字）`,
+      format: 'text',
     });
 
     return NextResponse.json({ content: text });

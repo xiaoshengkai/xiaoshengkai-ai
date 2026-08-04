@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/api-path";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, Eye, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -33,7 +33,7 @@ const STEP_GROUPS: Record<string, { label: string; stepIds: string[] }> = {
 const V2_GROUPS = [
   { label: "准备", stepIds: ["script", "validate"] },
   { label: "素材", stepIds: ["tts-scenes", "bgm", "sfx-pick"] },
-  { label: "渲染", stepIds: ["preview", "render"] },
+  { label: "渲染", stepIds: ["render"] },
   { label: "合成", stepIds: ["concat"] },
 ];
 
@@ -436,15 +436,6 @@ function SceneListPanel({ scenes, executionId }: { scenes: { id: string; type: s
               </div>
               <p className="text-xs text-gray-500 truncate">{scene.narration}</p>
             </div>
-            <a
-              href={`${fileBase}/preview/scene-${scene.id}.html`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-blue-500 hover:text-blue-700 shrink-0"
-              title="预览场景"
-            >
-              <Eye className="w-3 h-3" />
-            </a>
           </div>
         ))}
       </div>
@@ -574,16 +565,15 @@ function getOutputValue(output: string | null, field: string, previewType?: stri
 }
 
 function normalizePath(value: string, previewType?: string): string {
-  // 智能处理绝对路径 → 提取 execution dir 之后的相对路径
   const m = value.match(/\/data\/workflows\/[^/]+\/(.+)$/);
   if (m) {
     const rel = m[1];
-    if (previewType && ["video", "audio", "iframe"].includes(previewType)) {
+    if (previewType && ["video", "audio"].includes(previewType)) {
       return rel.includes("/") ? rel.split("/").pop() || rel : rel;
     }
     return rel;
   }
-  if (previewType && ["video", "audio", "iframe"].includes(previewType) && value.includes("/")) {
+  if (previewType && ["video", "audio"].includes(previewType) && value.includes("/")) {
     return value.split("/").pop() || value;
   }
   return value;

@@ -1,9 +1,20 @@
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
 const DEEPSEEK_PRO_MODEL = process.env.DEEPSEEK_PRO_MODEL || 'deepseek-v4-pro';
 
-export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000 }) {
+export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000, format = 'json_object' }) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error('未配置 DEEPSEEK_API_KEY');
+
+  const body = {
+    model: model || DEEPSEEK_PRO_MODEL,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature,
+    max_tokens: maxTokens,
+  };
+  if (format) body.response_format = { type: format };
 
   const res = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
     method: 'POST',
@@ -11,16 +22,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model: model || DEEPSEEK_PRO_MODEL,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      temperature,
-      max_tokens: maxTokens,
-    }),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json();

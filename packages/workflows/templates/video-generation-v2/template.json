@@ -8,7 +8,8 @@
     { "name": "content", "label": "视频内容描述", "type": "textarea", "required": false, "placeholder": "详细描述视频内容（可选，不填则用标题生成）" },
     { "name": "brand", "label": "品牌名（可选）", "type": "text", "required": false, "placeholder": "如：小盛开AI" },
     { "name": "voice_id", "label": "TTS音色", "type": "text", "default": "male-qn-qingse" },
-    { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.2 }
+    { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.2 },
+    { "name": "bgm_file", "label": "BGM 音频（可选）", "type": "text", "required": false, "placeholder": "上传 mp3/wav 文件" }
   ],
   "steps": [
     {
@@ -49,7 +50,7 @@
       "previewField": "bgm.mp3",
       "module": "./lib/bgm.js",
       "function": "generateBGM",
-      "args": ["{script.script}", "{executionDir}"]
+      "args": ["{script.script}", "{executionDir}", "{bgm_file}"]
     },
     {
       "id": "sfx-pick",
@@ -59,16 +60,6 @@
       "previewField": "output",
       "module": "./lib/sfx.js",
       "function": "pickSfxForAllScenes",
-      "args": ["{script.script}", "{executionDir}"]
-    },
-    {
-      "id": "preview",
-      "name": "构建 HTML 预览",
-      "type": "tool",
-      "previewType": "iframe",
-      "previewField": "preview/full.html",
-      "module": "./lib/preview.js",
-      "function": "buildPreview",
       "args": ["{script.script}", "{executionDir}"]
     },
     {

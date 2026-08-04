@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.6.0 (2026-08-04) — 视频生成 v2 完整实现 + 10 项修复
+
+### 新增
+- **video-generation-v2**：8 步管线（script → validate → tts-scenes → bgm → sfx-pick → render → concat），7 步（删除 HTML 预览）
+- **11 套 HyperFrames 模板**：从越南项目迁移，全部翻译中文 + 本地字体（编译 352s → 36ms）
+- **工作流引擎**：step-by-step 执行、重试、跳过、auto 模式、warning 状态
+- **工作流创建表单**：视频标题 + 内容描述 + AI 智能生成内容 + BGM 上传 + 品牌名
+- **Drawer 抽屉**：场景列表 40% 右侧滑入，背景遮罩 + 淡入淡出
+- **渲染步骤预览**：单视频切换模式，手机壳播放器，逐场景视频卡片
+- **统一错误处理**：WorkflowError + retryable 区分 + warning 橙色三角 ⚠
+- **SFX 音效**：3 层语义匹配，自动下载（myinstants.com）
+- **本地字体**：Noto Sans SC + 9 种西方字体，共 83 个 woff2（9.7MB）
+- **20 个单元测试**：schema/sfx/audio/parseCliOutput
+
+### 修复
+- script 截断：maxTokens 2000 → 8000
+- BGM 上传：formValues 闭包修复（useRef）+ createExecution 预拷贝
+- DeepSeek format 参数：支持 format:'text' 用于内容生成
+- brand 占位符：prompt + render + schema 三层防护
+- retry 重试后自动执行当前步骤
+- concat 无音频时崩溃：voiceRaw 不存在时跳过 Step 2-4
+- 下载按钮只在 concat 步骤显示
+- CLI stdout 过滤：防止 dotenv 输出泄漏到 JSON
+- parseCliOutput：Math.max → Math.min 修复
+- normalizePath：iframe 不截断子目录
+
+### 变更文件
+- `packages/workflows/templates/video-generation-v2/` — 新增（~80 文件）
+- `packages/workflows/engine.js` — title 字段 + retryable 区分
+- `packages/workflows/cli.js` — stdout 过滤 + 动态 import dotenv
+- `packages/ai-chat/src/app/(main)/workflow/page.tsx` — 表单重构 + 列表 card 优化
+- `packages/ai-chat/src/app/(main)/workflow/execution/[id]/page.tsx` — Drawer + 步骤跟随 + 渲染预览
+- `packages/ai-chat/src/components/ui/drawer.tsx` — 新增
+- `packages/ai-chat/src/lib/cli-parser.ts` — 新增
+- `packages/ai-chat/src/lib/prompts/video-content.txt` — 新增
+- `packages/ai-chat/src/app/api/workflows/generate-content/route.ts` — 新增
+- `packages/ai-chat/src/app/api/workflows/upload/route.ts` — 新增
+- `packages/ai-chat/src/app/api/workflows/execution/[id]/file/[...path]/route.ts` — 新增
+- `packages/shared/llm/providers/deepseek.js` — format 参数
+- `packages/shared/llm/providers/minimax.js` — format 参数
+- `package.json` — test:video-v2 脚本
+- `.gitignore` — SFX mp3 排除
+
 ## v0.5.8 (2026-07-21) — 本地博客 + 反向代理 + 照片墙
 
 ### 重构

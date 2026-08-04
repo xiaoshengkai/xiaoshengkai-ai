@@ -10,6 +10,8 @@ export async function execToolStep(step, vars, executionDir, templateDir) {
     for (const [k, v] of Object.entries(vars)) {
       if (v != null && v !== undefined) {
         val = val.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+      } else {
+        val = val.replace(new RegExp(`\\{${k}\\}`, "g"), "");
       }
     }
     return val;

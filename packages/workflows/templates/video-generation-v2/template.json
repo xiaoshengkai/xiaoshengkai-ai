@@ -1,6 +1,6 @@
 {
   "name": "video-generation-v2",
-  "label": "短视频生成 v2",
+  "label": "科技风 短视频生成",
   "description": "script.json 驱动 + 逐场景渲染 + TTS + BGM + SFX + 硬字幕 + SRT",
   "params": [
     { "name": "title", "label": "视频标题", "type": "text", "required": true },

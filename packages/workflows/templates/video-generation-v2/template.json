@@ -4,7 +4,6 @@
   "description": "script.json 驱动 + 逐场景渲染 + TTS + BGM + SFX + 硬字幕 + SRT",
   "params": [
     { "name": "title", "label": "视频标题", "type": "text", "required": true },
-    { "name": "style", "label": "视觉风格", "type": "select", "options": ["Neo-Brutalist", "奶油风", "极简黑白"], "default": "Neo-Brutalist" },
     { "name": "content", "label": "视频内容描述", "type": "textarea", "required": false, "placeholder": "详细描述视频内容（可选，不填则用标题生成）" },
     { "name": "voice_id", "label": "TTS音色", "type": "text", "default": "male-qn-qingse" },
     { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.2 },
@@ -19,7 +18,7 @@
       "previewField": "script",
       "module": "./lib/prompt-builder.js",
       "function": "generateScript",
-      "args": ["{title}", "{style}", "{content}"]
+      "args": ["{title}", "{content}"]
     },
     {
       "id": "validate",

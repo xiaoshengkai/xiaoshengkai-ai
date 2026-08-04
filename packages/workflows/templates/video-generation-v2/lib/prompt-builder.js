@@ -34,7 +34,7 @@ function parseJSON(text) {
   throw new Error("JSON 未闭合");
 }
 
-export async function generateScript(title, style, content) {
+export async function generateScript(title, content) {
   const startTime = Date.now();
   const rules = loadScriptRules();
   const example = loadExample();
@@ -57,7 +57,6 @@ ${example}
 
 - 视频标题: ${title}
 - 内容描述: ${inputContent}
-- 风格: ${style || "Neo-Brutalist"}
 
 ## 输出要求
 
@@ -69,7 +68,7 @@ ${example}
 
 输出：`;
 
-  console.log(`[prompt-builder] 生成 script，标题: ${title}，风格: ${style}`);
+  console.log(`[prompt-builder] 生成 script，标题: ${title}`);
 
   const { text } = await callLLM({
     system: "你是一个专业的短视频脚本策划，严格按规则输出 JSON。",

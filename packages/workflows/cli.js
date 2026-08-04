@@ -4,6 +4,9 @@ const [command, ...args] = process.argv.slice(2);
 const realStdoutWrite = process.stdout.write.bind(process.stdout);
 process.stdout.write = function (chunk, encoding, cb) {
   const s = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+  if (s.includes("\x1b") || s.includes("\x9b")) {
+    return process.stderr.write(chunk, encoding, cb);
+  }
   if ((s.startsWith("{") || s.startsWith("[")) && s.length > 1) {
     return realStdoutWrite(chunk, encoding, cb);
   }

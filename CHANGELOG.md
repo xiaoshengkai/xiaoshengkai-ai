@@ -43,6 +43,94 @@
 - `package.json` — test:video-v2 脚本
 - `.gitignore` — SFX mp3 排除
 
+## v0.5.11 (2026-07-30~31) — 预览区手机样式 + Chrome 扩展 + shared/llm 模块
+
+### 新增
+- **预览区手机样式**：渲染预览改为手机壳模式（刘海屏 + 竖屏 9:16），视频/音频统一
+- **Chrome 扩展**：每日提醒（10:00 学习 / 17:30 复盘），alarms + notifications
+- scheduling task 支持 `crons` 数组，多个 cron 表达式
+
+### 修复
+- GSAP 自动计算 data-start，预览和渲染都兼容
+- preview.js 支持双层 JSON 解析
+- HyperFrames 渲染成功（render 参数从文件路径改为目录路径）
+- render.js ROOT_DIR 路径修正（5 层 `..`）
+- 跳过步骤计入完成计数
+- 删除按钮改为灰色
+
+### 变更文件
+- `packages/ai-chat/src/app/(main)/workflow/execution/[id]/page.tsx` — 手机壳预览
+- `packages/workflows/templates/video-generation/lib/preview.js` — 双层 JSON 解析
+- `packages/workflows/templates/video-generation/lib/render.js` — 路径修正 + 音频降级
+- `packages/workflows/templates/video-generation/templates/animation.html` — GSAP 自动计算
+- `packages/chrome-extension/` — 新增扩展
+- `packages/tasks/scheduler.js` — crons 数组支持
+
+## v0.5.10 (2026-07-29) — 视频流程重构 + MCP 修复 + LLM 模块重组
+
+### 重构
+- **视频生成流程**：AI 只输出场景 HTML → 模板自动包装 → 通用 GSAP 动画
+- **LLM 模块重组**：`shared/llm.js` → `shared/llm/index.js` + `providers/deepseek.js` + `providers/minimax.js`
+- **ai.js**：改用括号配对解析 JSON（复用小红书 parseJSON 算法）
+- template.json prompt 强约束：无论如何返回 JSON
+
+### 新增
+- **跳过步骤**：engine.js `skipStep()` + CLI `skip` 命令 + API 路由
+- 工作流详情页 4 种状态 UI 统一升级（pending/running/skipped/failed）
+- 步骤列表 loading 动画（旋转圈+进度条）
+
+### 修复
+- MCP 启动失败：xiaohongshu/image import 路径修复
+- MiniMax 禁用 thinking：`thinking: { type: "disabled" }`
+- 环境变量重命名：`MCP_LLM_PROVIDER` → `LLM_PROVIDER`
+- 代理路由前缀匹配：`/workflow` → 支持 `/workflow/execution/[id]`
+- getOutputValue 增强兜底：字段→output.output→整对象 JSON
+- 日志改为倒序
+
+### 变更文件
+- `packages/workflows/templates/video-generation/template.json` — prompt 强约束
+- `packages/workflows/lib/step-types/ai.js` — 括号配对解析
+- `packages/workflows/engine.js` — skipStep
+- `packages/workflows/cli.js` — skip 命令
+- `packages/shared/llm/` — 模块重组
+- `packages/ai-chat/src/app/api/workflows/execution/[id]/skip/route.ts` — 新增
+- `packages/mcp/tools/xiaohongshu/index.js` — import 路径修复
+- `packages/mcp/tools/media/image.js` — import 路径修复
+
+## v0.5.9 (2026-07-28) — 工作流系统 + 视频能力从 MCP 迁移
+
+### 新增
+- **工作流引擎**：`packages/workflows/engine.js`（createExecution/runSteps/runNextStep/runAllSteps/retryStep/listExecutions）
+- **CLI 调度**：`packages/workflows/cli.js`（start/run/next/auto/retry/delete/get/list）
+- **步骤类型**：ai（LLM 调用）/ script（Node 脚本）/ tool（模块调用）
+- **工作流日志**：`logs/workflows/<id>.log`，每步耗时+输出摘要
+- **API 路由**：8 个端点（templates/execute/executions/execution/next/auto/retry/skip）
+- **执行详情页**：3 区布局（左侧步骤列表+右侧预览区），6 种预览类型
+- **文件服务**：`/api/workflows/execution/[id]/file/[filename]`
+- 工作流列表页：响应式网格、状态徽章、进度条、删除
+
+### 迁移
+- **视频能力**：MCP `tools/media/video.js` → `workflows/templates/video-generation/`
+- 5 步：AI 脚本生成 → TTS → BGM → HTML 预览 → 渲染 MP4
+- 删除 MCP 视频/音频/HTML 工具，MCP 只保留 image 工具
+
+### 修复
+- preview.js 不再调用 LLM（直接使用 AI 步骤生成的 HTML）
+- tts.js 合并 create+poll（generateTTS 函数）
+- bgm.js 加 getAudioDuration
+- cli.js console→stderr 重定向（stdout 纯 JSON）
+- 50 条执行上限
+- 删除改为 AlertDialog
+
+### 变更文件
+- `packages/workflows/` — 新增引擎+CLI+步骤类型+模板
+- `packages/ai-chat/src/app/(main)/workflow/` — 新增页面
+- `packages/ai-chat/src/app/api/workflows/` — 新增 8 个 API 路由
+- `packages/mcp/tools/media/video.js` — 删除
+- `packages/mcp/tools/media/audio.js` — 删除
+- `packages/mcp/tools/media/html-builder.js` — 删除
+- `packages/mcp/templates/` — 迁移到 workflows
+
 ## v0.5.8 (2026-07-21) — 本地博客 + 反向代理 + 照片墙
 
 ### 重构

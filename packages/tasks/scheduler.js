@@ -2,7 +2,7 @@ import cron from "node-cron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createTaskLogger } from "./lib/logger.js";
+import { createItemLogger } from "../shared/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TASKS_DIR = __dirname;
@@ -78,7 +78,7 @@ function isExpired(until) {
 
 async function runTask(task) {
   const { name, dir } = task;
-  const logger = createTaskLogger(name);
+  const logger = createItemLogger(LOG_DIR, name);
 
   if (running.has(name)) {
     logger.warn(`任务 "${name}" 正在执行中，跳过本次触发`);

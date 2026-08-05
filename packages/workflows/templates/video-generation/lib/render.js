@@ -11,14 +11,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..", "..", "..", "..", "..");
 const GSAP_GSAP = path.join(ROOT_DIR, "node_modules", "gsap", "dist", "gsap.min.js");
 const HYPERFRAMES_BIN = path.join(ROOT_DIR, "node_modules", ".bin", "hyperframes");
+const ANIMATION_TEMPLATE = path.resolve(__dirname, "..", "templates", "animation.html");
 
-export async function renderMP4(workDir) {
+export async function renderMP4(workDir, allHtml) {
   const startTime = Date.now();
-  const previewPath = path.join(workDir, "preview.html");
   const narrationPath = path.join(workDir, "narration.mp3");
   const bgmPath = path.join(workDir, "bgm.mp3");
-
-  if (!fs.existsSync(previewPath)) throw new Error("preview.html 不存在");
 
   const hasNarration = fs.existsSync(narrationPath);
   const hasBgm = fs.existsSync(bgmPath);
@@ -26,8 +24,12 @@ export async function renderMP4(workDir) {
   const workDir2 = path.join(workDir, "render");
   fs.mkdirSync(workDir2, { recursive: true });
 
-  const htmlPath = path.join(workDir2, "index.html");
-  let html = fs.readFileSync(previewPath, "utf-8");
+  // 用 animation 模板包装场景 HTML
+  let html = allHtml || "";
+  if (html && !html.includes("<!DOCTYPE") && !html.trim().startsWith("<html")) {
+    const template = fs.readFileSync(ANIMATION_TEMPLATE, "utf-8");
+    html = template.replace("<!-- AI 在此处填充场景 -->", html);
+  }
 
   if (fs.existsSync(GSAP_GSAP)) {
     html = html.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/gsap.*?"><\/script>/, `<script>${fs.readFileSync(GSAP_GSAP, "utf-8")}</script>`);
@@ -55,6 +57,7 @@ export async function renderMP4(workDir) {
     html = html.replace("</body>", `<audio data-start="0" data-duration="${currentTime}" data-track-index="${trackIndex}" data-volume="0.3" src="bgm.mp3" preload="auto" loop></audio>\n</body>`);
   }
 
+  const htmlPath = path.join(workDir2, "index.html");
   fs.writeFileSync(htmlPath, html);
 
   const cpuCores = cpus().length;

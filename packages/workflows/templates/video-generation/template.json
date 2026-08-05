@@ -50,7 +50,7 @@
       "previewField": "videoFile",
       "module": "./lib/render.js",
       "function": "renderMP4",
-      "args": ["{executionDir}"]
+      "args": ["{executionDir}", "{script.allHtml}"]
     }
   ]
 }

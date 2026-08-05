@@ -30,3 +30,21 @@ export function createLogger(source, logDir) {
   console.warn = (...args) => { origWarn(...args); writeLog("WARN", args); };
   console.info = (...args) => { origInfo(...args); writeLog("INFO", args); };
 }
+
+export function createItemLogger(logDir, itemName) {
+  fs.mkdirSync(logDir, { recursive: true });
+  const logFile = path.join(logDir, `${itemName}.log`);
+
+  function writeln(level, args) {
+    const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${level}] ${args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ")}\n`;
+    const old = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf-8") : "";
+    fs.writeFileSync(logFile, line + old);
+  }
+
+  return {
+    log: (...args) => writeln("LOG", args),
+    info: (...args) => writeln("INFO", args),
+    error: (...args) => writeln("ERR", args),
+    warn: (...args) => writeln("WARN", args),
+  };
+}

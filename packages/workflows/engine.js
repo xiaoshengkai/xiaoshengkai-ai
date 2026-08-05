@@ -3,11 +3,12 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { executeStep, loadTemplate } from "./lib/executor.js";
-import { createWorkflowLogger } from "./lib/logger.js";
+import { createItemLogger } from "../shared/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const DATA_DIR = path.join(PROJECT_ROOT, "data", "workflows");
+const LOG_DIR = path.join(PROJECT_ROOT, "logs", "workflows");
 
 const MAX_EXECUTIONS = 50;
 
@@ -88,7 +89,7 @@ export function createExecution(templateName, params) {
 
 export async function startExecution(templateName, params) {
   const { executionId, dir, template } = createExecution(templateName, params);
-  const logger = createWorkflowLogger(executionId);
+  const logger = createItemLogger(LOG_DIR, executionId);
 
   logger.info(`开始执行工作流: ${templateName} (${executionId})`);
   logger.info(`参数: ${JSON.stringify(params)}`);
@@ -193,7 +194,7 @@ export async function runExecution(executionId) {
 
   const state = readState(dir);
   const template = loadTemplate(state.template);
-  const logger = createWorkflowLogger(executionId);
+  const logger = createItemLogger(LOG_DIR, executionId);
 
   logger.info(`开始执行工作流: ${state.template} (${executionId})`);
   logger.info(`参数: ${JSON.stringify(state.params)}`);
@@ -252,7 +253,7 @@ export async function runNextStep(executionId) {
 
   const template = loadTemplate(state.template);
   const templateDir = path.resolve(__dirname, "templates", template.name);
-  const logger = createWorkflowLogger(executionId);
+  const logger = createItemLogger(LOG_DIR, executionId);
   const vars = { ...state.params, executionDir: dir };
 
   // 收集已完成步骤的输出

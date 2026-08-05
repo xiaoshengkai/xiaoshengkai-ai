@@ -265,7 +265,10 @@ export default function WorkflowPage() {
             ) : (
               <div className="space-y-3">
                 <div className="text-sm font-bold text-gray-800 mb-2">{selectedTemplate.label}</div>
-                {selectedTemplate.params.map(p => (
+                {selectedTemplate.params.filter(p => {
+                    if (p.name === "voice_id" && formValues["enable_tts"] === "否") return false;
+                    return true;
+                  }).map(p => (
                   <div key={p.name}>
                     <label className="text-xs text-gray-500 block mb-1">
                       {p.label} {p.required && <span className="text-red-400">*</span>}

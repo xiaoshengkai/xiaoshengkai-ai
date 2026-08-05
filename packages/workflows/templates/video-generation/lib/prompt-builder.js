@@ -2,13 +2,22 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { callLLM } from "../../../../shared/llm/index.js";
-import { validateScript, validateHTML, getScriptStats } from "../schema.js";
+import { validateScript, validateHTML, getScriptStats } from "./schema.js";
 import { ERRORS } from "./errors.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function loadScriptRules() {
   const p = path.join(__dirname, "..", "script-rules.md");
+  return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
+}
+
+function loadStyleGuide(style) {
+  const name = style === "Neo-Brutalist" ? "neo-brutalist"
+    : style === "奶油风" ? "cream"
+    : style === "极简黑白" ? "bw"
+    : "neo-brutalist";
+  const p = path.join(__dirname, "..", "templates", "styles", `${name}.md`);
   return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
 }
 
@@ -35,25 +44,28 @@ export async function generateScript(title, content, style) {
   const startTime = Date.now();
   const rules = loadScriptRules();
   const inputContent = content || title;
-  const styleGuide = style || "Neo-Brutalist";
 
-  let basePrompt = `${rules}
+  const userPickedStyle = style && style !== "自动（AI 决定）";
+  const styleSection = userPickedStyle
+    ? `\n## 指定风格\n用户选择: ${style}\n严格遵循以下风格指南：\n\n${loadStyleGuide(style)}`
+    : "\n## 风格\n根据内容主题自由选择最合适的视觉风格";
+
+  const basePrompt = `${rules}${styleSection}
 
 ## 本次任务
 
 视频标题: ${title}
 内容描述: ${inputContent}
-视觉风格: ${styleGuide}
 
 ## 输出要求
 
 - 严格 JSON，无其他文字
 - 数字必须拼读（narration 中）
 - 每个场景的 html 必须包含 class="clip" 和 data-duration
-- 场景数 3-12 个
-- 第一场是 hook，最后一场是 outro
+- 场景数 8-20 个
 - 内联样式用 style 属性，禁止 class 样式
 - 禁止 <script> 标签，禁止 jQuery
+${userPickedStyle ? "- 严格遵循上述风格指南的颜色/字体/布局规则" : "- 根据内容主题自由选择视觉风格"}
 
 输出：`;
 

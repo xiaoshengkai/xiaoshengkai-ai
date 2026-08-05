@@ -15,7 +15,7 @@ export const ScriptSchema = z.object({
   scenes: z
     .array(Scene)
     .min(3, { message: "至少需要 3 个场景" })
-    .max(12, { message: "最多 12 个场景" })
+    .max(20, { message: "最多 20 个场景" })
     .refine((s) => s[0]?.type === "hook", { message: "第一个场景必须是 hook 类型" })
     .refine((s) => s[s.length - 1]?.type === "outro", { message: "最后一个场景必须是 outro 类型" }),
 });

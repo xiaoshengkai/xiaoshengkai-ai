@@ -6,9 +6,11 @@ import { fileURLToPath } from "node:url";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import ffprobeInstaller from "@ffprobe-installer/ffprobe";
 import { getAudioDuration } from "./bgm.js";
+import { createItemLogger } from "../../../../shared/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..", "..", "..", "..", "..");
+const LOG_DIR = path.join(ROOT_DIR, "logs", "workflows");
 const GSAP_GSAP = path.join(ROOT_DIR, "node_modules", "gsap", "dist", "gsap.min.js");
 const HYPERFRAMES_BIN = path.join(ROOT_DIR, "node_modules", ".bin", "hyperframes");
 const ANIMATION_TEMPLATE = path.resolve(__dirname, "..", "templates", "animation.html");
@@ -19,6 +21,8 @@ function runFfmpeg(args) {
 }
 
 export async function renderMP4(workDir, allHtml) {
+  const execId = path.basename(path.resolve(workDir, ".."));
+  const logger = createItemLogger(LOG_DIR, execId);
   const startTime = Date.now();
   const narrationPath = path.join(workDir, "narration.mp3");
   const bgmPath = path.join(workDir, "bgm.mp3");
@@ -26,12 +30,11 @@ export async function renderMP4(workDir, allHtml) {
 
   const hasNarration = fs.existsSync(narrationPath);
   const hasBgm = fs.existsSync(bgmPath);
-  console.log(`[render] 开始 (narration=${hasNarration}, bgm=${hasBgm})`);
+  logger.info(`[render] 开始 (narration=${hasNarration}, bgm=${hasBgm})`);
 
   const workDir2 = path.join(workDir, "render");
   fs.mkdirSync(workDir2, { recursive: true });
 
-  // 用 animation 模板包装场景 HTML
   let html = allHtml || "";
   if (html && !html.includes("<!DOCTYPE") && !html.trim().startsWith("<html")) {
     const template = fs.readFileSync(ANIMATION_TEMPLATE, "utf-8");
@@ -42,7 +45,9 @@ export async function renderMP4(workDir, allHtml) {
     html = html.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/gsap.*?"><\/script>/, `<script>${fs.readFileSync(GSAP_GSAP, "utf-8")}</script>`);
   }
 
-  // 注入 data-start 和 data-track-index
+  html = html.replace(/font-family:\s*'[^']*'/gi, "font-family: sans-serif");
+  html = html.replace(/font-family:\s*"[^"]*"/gi, "font-family: sans-serif");
+
   let currentTime = 0;
   let trackIndex = 0;
   html = html.replace(/class="clip([^"]*)"/g, (match, attrs) => {
@@ -56,9 +61,8 @@ export async function renderMP4(workDir, allHtml) {
 
   const htmlPath = path.join(workDir2, "index.html");
   fs.writeFileSync(htmlPath, html);
-  console.log(`[render] HTML 生成 (${((Date.now() - startTime) / 1000).toFixed(1)}s, ${html.length} 字节)`);
+  logger.info(`[render] HTML 生成 (${((Date.now() - startTime) / 1000).toFixed(1)}s, ${html.length} 字节)`);
 
-  // HyperFrames 渲染纯画面
   const cpuCores = cpus().length;
   const ffmpegDir = path.dirname(ffmpegInstaller.path);
   const ffprobeDir = path.dirname(ffprobeInstaller.path);
@@ -67,14 +71,13 @@ export async function renderMP4(workDir, allHtml) {
   const hfStart = Date.now();
   const silentPath = path.join(workDir, "output-silent.mp4");
   const cmd = `"${HYPERFRAMES_BIN}" render "${workDir2}" --output "${silentPath}" --width 1080 --height 1920 --fps 24 --workers ${Math.min(cpuCores, 4)} --player-auto-start`;
-  console.log("[render] HyperFrames 开始...");
+  logger.info("[render] HyperFrames 开始...");
   execSync(cmd, { stdio: "inherit", cwd: workDir2, env });
-  console.log(`[render] HyperFrames 完成 (${((Date.now() - hfStart) / 1000).toFixed(1)}s)`);
+  logger.info(`[render] HyperFrames 完成 (${((Date.now() - hfStart) / 1000).toFixed(1)}s)`);
 
-  // 用 ffmpeg 混合音频
   if (hasNarration || hasBgm) {
     const mixStart = Date.now();
-    console.log("[render] ffmpeg 混合音频...");
+    logger.info("[render] ffmpeg 混合音频...");
     const args = ["-y", "-i", silentPath];
     if (hasNarration) args.push("-i", narrationPath);
     if (hasBgm) args.push("-i", bgmPath);
@@ -91,11 +94,11 @@ export async function renderMP4(workDir, allHtml) {
     }
     runFfmpeg(args.join(" "));
     fs.unlinkSync(silentPath);
-    console.log(`[render] ffmpeg 完成 (${((Date.now() - mixStart) / 1000).toFixed(1)}s)`);
+    logger.info(`[render] ffmpeg 完成 (${((Date.now() - mixStart) / 1000).toFixed(1)}s)`);
   } else {
     fs.renameSync(silentPath, outputPath);
   }
 
-  console.log(`[render] 完成 (${((Date.now() - startTime) / 1000).toFixed(1)}s total)`);
+  logger.info(`[render] 完成 (${((Date.now() - startTime) / 1000).toFixed(1)}s total)`);
   return { videoFile: outputPath };
 }

@@ -12,7 +12,7 @@ export async function POST(
   const { id } = await params;
   try {
     const result = await new Promise<string>((resolve, reject) => {
-      execFile("node", [CLI_PATH, "next", JSON.stringify({ executionId: id })], { timeout: 300000 }, (err, stdout, stderr) => {
+      execFile("node", [CLI_PATH, "next", JSON.stringify({ executionId: id })], { timeout: 900000 }, (err, stdout, stderr) => {
         if (stderr) console.error(`[workflow] cli stderr:`, stderr);
         if (err) reject(err);
         else resolve(stdout.trim());

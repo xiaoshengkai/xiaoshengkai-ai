@@ -1,11 +1,12 @@
 {
   "name": "video-generation",
   "label": "短视频生成",
-  "description": "script.json 驱动 + 逐场景渲染 + TTS + BGM + SFX + 硬字幕 + SRT",
+  "description": "script.json 驱动 + TTS + BGM + 渲染",
   "params": [
     { "name": "title", "label": "视频标题", "type": "text", "required": true },
     { "name": "content", "label": "视频内容描述", "type": "textarea", "required": false, "placeholder": "详细描述视频内容（可选，不填则用标题生成）" },
     { "name": "style", "label": "视觉风格（可选）", "type": "select", "options": ["自动（AI 决定）", "Neo-Brutalist", "奶油风", "极简黑白"], "default": "自动（AI 决定）", "required": false },
+    { "name": "enable_tts", "label": "TTS 语音合成", "type": "select", "options": ["是", "否"], "default": "是" },
     { "name": "voice_id", "label": "TTS音色", "type": "text", "default": "male-qn-qingse" },
     { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.3 },
     { "name": "bgm_file", "label": "BGM 音频（可选）", "type": "text", "required": false, "placeholder": "上传 mp3/wav 文件" }
@@ -29,7 +30,7 @@
       "previewField": "narration.mp3",
       "module": "./lib/tts.js",
       "function": "generateTTS",
-      "args": ["{script.allNarration}", "{voice_id}", "{executionDir}"]
+      "args": ["{script.allNarration}", "{voice_id}", "{executionDir}", "{enable_tts}"]
     },
     {
       "id": "bgm",
@@ -40,26 +41,6 @@
       "module": "./lib/bgm.js",
       "function": "generateBGM",
       "args": ["{script.bgm_prompt}", "{executionDir}", "{bgm_file}"]
-    },
-    {
-      "id": "sfx",
-      "name": "SFX 音效",
-      "type": "tool",
-      "previewType": "text",
-      "previewField": "output",
-      "module": "./lib/sfx.js",
-      "function": "pickSfx",
-      "args": ["{script.script}", "{executionDir}"]
-    },
-    {
-      "id": "preview",
-      "name": "构建 HTML 预览",
-      "type": "tool",
-      "previewType": "iframe",
-      "previewField": "previewFile",
-      "module": "./lib/preview.js",
-      "function": "buildPreviewHTML",
-      "args": ["{script.allHtml}", "{executionDir}"]
     },
     {
       "id": "render",

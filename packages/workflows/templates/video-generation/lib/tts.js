@@ -58,7 +58,11 @@ export async function pollTTSTask(taskId, workDir) {
   throw new Error("TTS 任务超时");
 }
 
-export async function generateTTS(text, voiceId, workDir) {
+export async function generateTTS(text, voiceId, workDir, enableTts) {
+  if (enableTts === "否") {
+    console.log("[tts] 已跳过");
+    return { output: "TTS 已跳过", narration: null };
+  }
   const startTime = Date.now();
   console.log(`[tts] 开始 (${text.length} 字)`);
   const taskId = await createTTSTask(text, voiceId);

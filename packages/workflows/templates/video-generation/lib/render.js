@@ -45,12 +45,14 @@ export async function renderMP4(workDir) {
   });
 
   if (hasNarration) {
+    fs.copyFileSync(narrationPath, path.join(workDir2, "narration.mp3"));
     const narrationDur = getAudioDuration(narrationPath);
-    html = html.replace("</body>", `<audio data-start="0" data-duration="${narrationDur}" data-track-index="${trackIndex}" data-volume="1.0" src="${narrationPath}" preload="auto"></audio>\n</body>`);
+    html = html.replace("</body>", `<audio data-start="0" data-duration="${narrationDur}" data-track-index="${trackIndex}" data-volume="1.0" src="narration.mp3" preload="auto"></audio>\n</body>`);
     trackIndex++;
   }
   if (hasBgm) {
-    html = html.replace("</body>", `<audio data-start="0" data-duration="${currentTime}" data-track-index="${trackIndex}" data-volume="0.3" src="${bgmPath}" preload="auto" loop></audio>\n</body>`);
+    fs.copyFileSync(bgmPath, path.join(workDir2, "bgm.mp3"));
+    html = html.replace("</body>", `<audio data-start="0" data-duration="${currentTime}" data-track-index="${trackIndex}" data-volume="0.3" src="bgm.mp3" preload="auto" loop></audio>\n</body>`);
   }
 
   fs.writeFileSync(htmlPath, html);

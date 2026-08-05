@@ -665,10 +665,14 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
       );
 
     case "json":
+      let jsonValue = value;
+      if (typeof value === "string") {
+        try { jsonValue = JSON.parse(value); } catch {}
+      }
       return (
         <pre className="text-xs text-gray-700 bg-gray-50 p-3 rounded border border-gray-200 max-h-[60vh] overflow-auto font-mono"
           style={{ border: "2px solid #E5E7EB" }}>
-          {JSON.stringify(value, null, 2)}
+          {typeof jsonValue === "string" ? jsonValue : JSON.stringify(jsonValue, null, 2)}
         </pre>
       );
 

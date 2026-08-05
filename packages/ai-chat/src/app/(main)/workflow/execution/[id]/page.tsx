@@ -303,7 +303,10 @@ export default function ExecutionDetailPage() {
   }
 
   function renderDefaultSteps() {
-    return execution!.steps.map((step, i) => renderStepItem(step, i));
+    return execution!.steps.filter(s => {
+      if (s.id === "tts" && s.output === "TTS 已跳过") return false;
+      return true;
+    }).map((step, i) => renderStepItem(step, i));
   }
 
   function renderStepItem(step: ExecutionStep, i: number) {

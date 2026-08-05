@@ -26,6 +26,7 @@ export async function renderMP4(workDir, allHtml) {
 
   const hasNarration = fs.existsSync(narrationPath);
   const hasBgm = fs.existsSync(bgmPath);
+  console.log(`[render] 开始 (narration=${hasNarration}, bgm=${hasBgm})`);
 
   const workDir2 = path.join(workDir, "render");
   fs.mkdirSync(workDir2, { recursive: true });
@@ -41,7 +42,7 @@ export async function renderMP4(workDir, allHtml) {
     html = html.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/gsap.*?"><\/script>/, `<script>${fs.readFileSync(GSAP_GSAP, "utf-8")}</script>`);
   }
 
-  // 注入 data-start 和 data-track-index（纯画面，不注入音频）
+  // 注入 data-start 和 data-track-index
   let currentTime = 0;
   let trackIndex = 0;
   html = html.replace(/class="clip([^"]*)"/g, (match, attrs) => {
@@ -55,6 +56,7 @@ export async function renderMP4(workDir, allHtml) {
 
   const htmlPath = path.join(workDir2, "index.html");
   fs.writeFileSync(htmlPath, html);
+  console.log(`[render] HTML 生成 (${((Date.now() - startTime) / 1000).toFixed(1)}s, ${html.length} 字节)`);
 
   // HyperFrames 渲染纯画面
   const cpuCores = cpus().length;
@@ -62,14 +64,17 @@ export async function renderMP4(workDir, allHtml) {
   const ffprobeDir = path.dirname(ffprobeInstaller.path);
   const env = { ...process.env, PATH: `${ffmpegDir}:${ffprobeDir}:${process.env.PATH}` };
 
+  const hfStart = Date.now();
   const silentPath = path.join(workDir, "output-silent.mp4");
   const cmd = `"${HYPERFRAMES_BIN}" render "${workDir2}" --output "${silentPath}" --width 1080 --height 1920 --fps 24 --workers ${Math.min(cpuCores, 4)} --player-auto-start`;
-  console.log("[render] HyperFrames:", cmd);
+  console.log("[render] HyperFrames 开始...");
   execSync(cmd, { stdio: "inherit", cwd: workDir2, env });
+  console.log(`[render] HyperFrames 完成 (${((Date.now() - hfStart) / 1000).toFixed(1)}s)`);
 
   // 用 ffmpeg 混合音频
   if (hasNarration || hasBgm) {
-    console.log("[render] 混合音频...");
+    const mixStart = Date.now();
+    console.log("[render] ffmpeg 混合音频...");
     const args = ["-y", "-i", silentPath];
     if (hasNarration) args.push("-i", narrationPath);
     if (hasBgm) args.push("-i", bgmPath);
@@ -86,10 +91,11 @@ export async function renderMP4(workDir, allHtml) {
     }
     runFfmpeg(args.join(" "));
     fs.unlinkSync(silentPath);
+    console.log(`[render] ffmpeg 完成 (${((Date.now() - mixStart) / 1000).toFixed(1)}s)`);
   } else {
     fs.renameSync(silentPath, outputPath);
   }
 
-  console.log(`[render] 完成 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
+  console.log(`[render] 完成 (${((Date.now() - startTime) / 1000).toFixed(1)}s total)`);
   return { videoFile: outputPath };
 }

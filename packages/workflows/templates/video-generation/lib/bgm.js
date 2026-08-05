@@ -11,14 +11,17 @@ function sleep(ms) {
 }
 
 export async function generateBGM(bgmPrompt, executionDir, bgmFilePath) {
+  const startTime = Date.now();
   const outPath = path.join(executionDir, "bgm.mp3");
 
   if (bgmFilePath && fs.existsSync(bgmFilePath)) {
     fs.copyFileSync(bgmFilePath, outPath);
+    console.log(`[bgm] 使用上传文件 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
     return { bgmFile: outPath, "bgm.mp3": "bgm.mp3" };
   }
 
   if (fs.existsSync(outPath)) {
+    console.log(`[bgm] 复用 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
     return { bgmFile: outPath, "bgm.mp3": "bgm.mp3" };
   }
 
@@ -46,6 +49,7 @@ export async function generateBGM(bgmPrompt, executionDir, bgmFilePath) {
       const audioRes = await fetch(downloadUrl);
       const buffer = Buffer.from(await audioRes.arrayBuffer());
       fs.writeFileSync(outPath, buffer);
+      console.log(`[bgm] 完成 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
       return { bgmFile: outPath, "bgm.mp3": "bgm.mp3" };
     } catch (e) {
       lastErr = e;

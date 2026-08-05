@@ -59,6 +59,10 @@ export async function pollTTSTask(taskId, workDir) {
 }
 
 export async function generateTTS(text, voiceId, workDir) {
+  const startTime = Date.now();
+  console.log(`[tts] 开始 (${text.length} 字)`);
   const taskId = await createTTSTask(text, voiceId);
-  return await pollTTSTask(taskId, workDir);
+  const result = await pollTTSTask(taskId, workDir);
+  console.log(`[tts] 完成 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
+  return result;
 }

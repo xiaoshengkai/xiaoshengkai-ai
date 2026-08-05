@@ -59,9 +59,10 @@ export async function pollTTSTask(taskId, workDir) {
 }
 
 export async function generateTTS(text, voiceId, workDir, enableTts) {
+  console.log(`[tts] enableTts="${enableTts}"`);
   if (enableTts === "否") {
     console.log("[tts] 已跳过");
-    return { output: "TTS 已跳过", narration: null };
+    return { output: "TTS 已跳过" };
   }
   const startTime = Date.now();
   console.log(`[tts] 开始 (${text.length} 字)`);

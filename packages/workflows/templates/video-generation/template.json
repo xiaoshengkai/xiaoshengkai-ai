@@ -1,23 +1,25 @@
 {
   "name": "video-generation",
   "label": "短视频生成",
-  "description": "主题 → AI脚本生成 → TTS语音 → BGM → HTML预览 → 渲染MP4",
+  "description": "script.json 驱动 + 逐场景渲染 + TTS + BGM + SFX + 硬字幕 + SRT",
   "params": [
-    { "name": "topic", "label": "视频主题", "type": "text", "required": true },
+    { "name": "title", "label": "视频标题", "type": "text", "required": true },
+    { "name": "content", "label": "视频内容描述", "type": "textarea", "required": false, "placeholder": "详细描述视频内容（可选，不填则用标题生成）" },
     { "name": "style", "label": "视觉风格", "type": "select", "options": ["Neo-Brutalist", "奶油风", "极简黑白"], "default": "Neo-Brutalist" },
-    { "name": "duration", "label": "目标时长(秒)", "type": "number", "default": 40 },
     { "name": "voice_id", "label": "TTS音色", "type": "text", "default": "male-qn-qingse" },
-    { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.3 }
+    { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.3 },
+    { "name": "bgm_file", "label": "BGM 音频（可选）", "type": "text", "required": false, "placeholder": "上传 mp3/wav 文件" }
   ],
   "steps": [
     {
       "id": "script",
-      "name": "AI 生成脚本",
-      "type": "ai",
-      "previewType": "code",
-      "previewField": "html",
-      "prompt": "你是一个专业短视频脚本生成器。\n\n【强约束】你必须始终返回严格 JSON 格式。绝不要输出 JSON 之外的解释、提问或思考文字。\n\n输入主题: {topic}\n视觉风格: {style}\n目标时长: {duration}秒\n\n如果主题为空或模糊，使用此占位符 JSON:\n{\"html\":\"<div class=\\\"clip\\\" data-duration=\\\"5\\\" style=\\\"background:#FF3D00;display:flex;align-items:center;justify-content:center;border:8px solid #000\\\"><h1 style=\\\"font-size:64px;color:#fff\\\">⚠️ 请提供具体视频主题</h1></div>\",\"narration\":\"请告诉我你想制作的视频主题\",\"bgm_prompt\":\"neutral\",\"title\":\"主题待定\"}\n\n如果主题明确，生成 {duration} 秒的场景。每个场景用 <div class=\\\"clip\\\" data-duration=\\\"秒数\\\"> 包裹，data-duration 是该场景的时长（秒）。\n\n输出格式（严格 JSON，无其他文字）:\n{\"html\":\"纯场景 HTML，每个 <div class=\\\"clip\\\" data-duration=\\\"5\\\">...</div> 为一个场景\",\"narration\":\"完整旁白文本,口语化,每条≤20字\",\"bgm_prompt\":\"BGM 风格,如轻快电子/史诗管弦/lo-fi嘻哈\",\"title\":\"视频标题,10字以内\"}\n\n要求:\n1. 开头钩子: 前3秒用动态大字+悬念\n2. 每场景 3-7 秒，在 data-duration 属性里指定\n3. 图表用内联SVG\n4. 禁止 jQuery\n5. 内联样式用 style 属性,不用 class\n6. 所有文字用中文\n7. 场景数量 = 目标时长/平均每场景时长",
-      "timeout": 120000
+      "name": "AI 生成 script.json",
+      "type": "tool",
+      "previewType": "json",
+      "previewField": "script",
+      "module": "./lib/prompt-builder.js",
+      "function": "generateScript",
+      "args": ["{title}", "{content}", "{style}"]
     },
     {
       "id": "tts",
@@ -27,7 +29,7 @@
       "previewField": "narration.mp3",
       "module": "./lib/tts.js",
       "function": "generateTTS",
-      "args": ["{script.narration}", "{voice_id}", "{executionDir}"]
+      "args": ["{script.allNarration}", "{voice_id}", "{executionDir}"]
     },
     {
       "id": "bgm",
@@ -37,7 +39,17 @@
       "previewField": "bgm.mp3",
       "module": "./lib/bgm.js",
       "function": "generateBGM",
-      "args": ["{script.bgm_prompt}", "{executionDir}"]
+      "args": ["{script.bgm_prompt}", "{executionDir}", "{bgm_file}"]
+    },
+    {
+      "id": "sfx",
+      "name": "SFX 音效",
+      "type": "tool",
+      "previewType": "text",
+      "previewField": "output",
+      "module": "./lib/sfx.js",
+      "function": "pickSfx",
+      "args": ["{script.script}", "{executionDir}"]
     },
     {
       "id": "preview",
@@ -47,7 +59,7 @@
       "previewField": "previewFile",
       "module": "./lib/preview.js",
       "function": "buildPreviewHTML",
-      "args": ["{script.output}", "{executionDir}"]
+      "args": ["{script.allHtml}", "{executionDir}"]
     },
     {
       "id": "render",

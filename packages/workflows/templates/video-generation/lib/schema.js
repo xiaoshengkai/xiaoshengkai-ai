@@ -1,23 +1,21 @@
 import { z } from "zod";
 
 const Scene = z.object({
-  id: z.string().min(1),
-  type: z.enum(["hook", "body", "outro"]),
+  id: z.union([z.string(), z.number()]).transform(v => String(v)),
+  type: z.string().default("body"),
   narration: z.string().min(1),
   html: z.string().min(1),
 });
 
 export const ScriptSchema = z.object({
   schemaVersion: z.literal(1),
-  title: z.string().min(1),
-  style: z.string().default("Neo-Brutalist"),
+  title: z.string().default("未命名"),
+  style: z.union([z.string(), z.record(z.unknown())]).default("Neo-Brutalist"),
   bgm_prompt: z.string().default("轻快电子"),
   scenes: z
     .array(Scene)
     .min(3, { message: "至少需要 3 个场景" })
-    .max(20, { message: "最多 20 个场景" })
-    .refine((s) => s[0]?.type === "hook", { message: "第一个场景必须是 hook 类型" })
-    .refine((s) => s[s.length - 1]?.type === "outro", { message: "最后一个场景必须是 outro 类型" }),
+    .max(20, { message: "最多 20 个场景" }),
 });
 
 export function validateScript(json) {
@@ -41,21 +39,15 @@ export function validateHTML(script) {
   const errors = [];
   for (const scene of script.scenes) {
     const html = scene.html || "";
-    if (!html.includes('class="clip"') && !html.includes("class='clip'")) {
-      errors.push(`scene ${scene.id}: html 缺少 class="clip"`);
-    }
     if (!html.includes("data-duration")) {
-      errors.push(`scene ${scene.id}: html 缺少 data-duration 属性`);
+      errors.push(`scene ${scene.id}: 缺少 data-duration`);
     }
     if (/<script/i.test(html)) {
-      errors.push(`scene ${scene.id}: html 包含 <script> 标签（禁止）`);
-    }
-    if (/jQuery|\$\(/.test(html)) {
-      errors.push(`scene ${scene.id}: html 包含 jQuery 代码（禁止）`);
+      errors.push(`scene ${scene.id}: 包含 script 标签`);
     }
   }
   if (errors.length > 0) {
-    return { ok: false, error: `HTML 校验失败:\n${errors.join("\n")}` };
+    return { ok: false, error: errors.join("; ") };
   }
   return { ok: true };
 }

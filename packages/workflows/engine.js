@@ -235,6 +235,12 @@ export async function runNextStep(executionId) {
     return { ok: false, error: "工作流已结束" };
   }
 
+  // 防止并发：检查是否有正在运行的步骤
+  const running = state.steps.find(s => s.status === "running");
+  if (running) {
+    return { ok: false, error: `步骤 "${running.name}" 正在执行中，请等待完成` };
+  }
+
   const nextIdx = state.steps.findIndex(s => s.status === "pending");
   if (nextIdx < 0) return { ok: false, error: "所有步骤已执行" };
 

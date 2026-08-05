@@ -59,10 +59,11 @@ export async function generateScript(title, content, style) {
 
 ## 输出要求
 
-- 严格 JSON，无其他文字
-- 数字必须拼读（narration 中）
-- 每个场景的 html 必须包含 class="clip" 和 data-duration
+- 严格 JSON，无其他文字，无 markdown 代码块
+- schemaVersion 必须是数字 1
+- 每个场景的 id 必须是字符串（如 "hook", "body-1", "body-2", "outro"）
 - 场景数 8-20 个
+- 每个场景的 html 必须包含 class="clip" 和 data-duration="秒数"
 - 内联样式用 style 属性，禁止 class 样式
 - 禁止 <script> 标签，禁止 jQuery
 ${userPickedStyle ? "- 严格遵循上述风格指南的颜色/字体/布局规则" : "- 根据内容主题自由选择视觉风格"}
@@ -70,10 +71,12 @@ ${userPickedStyle ? "- 严格遵循上述风格指南的颜色/字体/布局规�
 输出：`;
 
   let lastError;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const prompt = attempt === 0
-      ? basePrompt
-      : `${basePrompt}\n\n上次校验失败：${lastError}\n请修正后重新输出：`;
+  for (let attempt = 0; attempt < 1; attempt++) {
+    const retryHint = attempt > 0
+      ? `\n上次校验失败：${lastError}\n请修正：schemaVersion 必须是数字 1，每个场景的 id 必须是字符串`
+      : "";
+
+    const prompt = `${basePrompt}${retryHint}`;
 
     console.log(`[prompt-builder] 第 ${attempt + 1} 次尝试...`);
 

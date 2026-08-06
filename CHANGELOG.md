@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.6.1 (2026-08-05) — video-generation 改造 + 目录整理 + 10 项修复
+
+### 重构
+- **video-generation 架构改造**：script.json 驱动 + Zod 校验 + 重试，4 步管线（script→tts→bgm→render）
+- **TTS 可选**：创建时可选 enable_tts，选否时跳过 + 隐藏步骤
+- **风格选择**：用户可选（Neo-Brutalist/奶油风/极简/自动），不选则 AI 决定
+- **目录整理**：删除 subtitles.js、3 个旧 MD，templates/ 重组为 styles/，简化 utils.js 和 errors.js
+- **渲染分离**：render.js 纯画面渲染 + ffmpeg 音频混合，不依赖 HyperFrames 内置音频
+- **日志系统**：render.js 使用 shared/logger 写入 workflow 日志
+
+### 修复
+- engine 防并发运行（有步骤 running 时拒绝新请求）
+- CLI timeout 300s→900s
+- schema 放宽（type 接受任意字符串，title 可选，id 接受数字/字符串）
+- AI 生成的 HTML 字体替换为 sans-serif（避免 HyperFrames 编译卡住）
+- script.json 预览格式化显示
+- utils.js 路径修复（.. 去掉）
+- 时间格式：YYYY-MM-DD HH:mm:ss
+- 下载按钮只在 concat 步骤显示
+- LLM prompt 优化（maxTokens 8000，减少重试）
+
+### 变更文件
+- `packages/workflows/templates/video-generation/template.json` — 重构
+- `packages/workflows/templates/video-generation/lib/prompt-builder.js` — 新增
+- `packages/workflows/templates/video-generation/lib/schema.js` — 新增
+- `packages/workflows/templates/video-generation/lib/render.js` — 重构
+- `packages/workflows/templates/video-generation/lib/errors.js` — 简化
+- `packages/workflows/templates/video-generation/lib/bgm.js` — 上传+缓存+重试
+- `packages/workflows/templates/video-generation/script-rules.md` — 新增
+- `packages/workflows/templates/video-generation/utils.js` — 简化
+- `packages/workflows/engine.js` — 防并发+retryable
+- `packages/workflows/cli.js` — ANSI 转义码过滤
+- `packages/ai-chat/src/app/(main)/workflow/page.tsx` — 表单+TTS隐藏
+- `packages/ai-chat/src/app/(main)/workflow/execution/[id]/page.tsx` — JSON预览+步骤隐藏
+- `packages/ai-chat/src/app/api/workflows/execution/[id]/next/route.ts` — timeout 900s
+
 ## v0.6.0 (2026-08-04) — 视频生成 v2 完整实现 + 10 项修复
 
 ### 新增

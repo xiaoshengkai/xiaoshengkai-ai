@@ -91,6 +91,32 @@ function runFfmpeg(args) {
   }
 }
 
+function dedupeCss(css) {
+  if (!css) return "";
+  const map = new Map();
+  const lines = css.split("\n");
+  for (const line of lines) {
+    const m = line.match(/^(\.[\w-]+)\s*\{\s*(.+)\s*\}$/);
+    if (m) {
+      const key = m[2].trim();
+      if (!map.has(key)) map.set(key, []);
+      const existing = map.get(key);
+      if (!existing.includes(m[1])) {
+        existing.push(m[1]);
+      }
+    }
+  }
+  const result = [];
+  for (const [value, selectors] of map) {
+    if (selectors.length > 1) {
+      result.push(`${selectors.join(", ")} { ${value} }`);
+    } else {
+      result.push(`${selectors[0]} { ${value} }`);
+    }
+  }
+  return result.join("\n");
+}
+
 export async function renderMP4(workDir, allHtml, globalCss, globalJsAnimation, scenesJson) {
   const execId = path.basename(workDir);
   const logger = createDateLogger("workflows", LOG_DIR, execId);
@@ -116,8 +142,10 @@ export async function renderMP4(workDir, allHtml, globalCss, globalJsAnimation, 
   const allCss = [globalCss, ...scenes.map(s => s.css || "")].filter(Boolean).join("\n");
   const allJs = [globalJsAnimation, ...scenes.map(s => s.jsAnimation || "")].filter(Boolean).join("\n");
 
-  if (allCss) {
-    html = html.replace("/* GLOBAL_CSS_INJECTION */", allCss);
+  const dedupedCss = dedupeCss(allCss);
+
+  if (dedupedCss) {
+    html = html.replace("/* GLOBAL_CSS_INJECTION */", dedupedCss);
   }
   if (allJs) {
     html = html.replace("// GLOBAL_JS_INJECTION", allJs);

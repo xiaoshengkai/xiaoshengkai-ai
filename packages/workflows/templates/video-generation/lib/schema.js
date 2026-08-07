@@ -15,8 +15,10 @@ export const ScriptSchema = z.object({
   style: z.union([z.string(), z.record(z.unknown())]).default("Neo-Brutalist"),
   bgm_prompt: z.string().default("轻快电子"),
   designTokens: z.object({
-    palette: z.object({ primary: z.string(), secondary: z.string(), background: z.string() }),
-    fonts: z.object({ heading: z.string(), subheading: z.string(), body: z.string(), label: z.string() }),
+    palette: z.object({ primary: z.string(), secondary: z.string(), background: z.string() }).optional(),
+    colors: z.object({ primary: z.string(), secondary: z.string(), background: z.string() }).optional(),
+    fonts: z.object({ heading: z.string(), subheading: z.string(), body: z.string(), label: z.string() }).optional(),
+    typography: z.object({ heading: z.string(), subheading: z.string(), body: z.string(), label: z.string() }).optional(),
   }).optional(),
   css: z.string().optional(),
   jsAnimation: z.string().optional(),
@@ -38,6 +40,11 @@ export function validateScript(json) {
   if (parsed && "clips" in parsed && !("scenes" in parsed)) {
     parsed = { ...parsed, scenes: parsed.clips, clips: undefined };
   }
+  if (parsed && parsed.designTokens) {
+    const dt = parsed.designTokens;
+    if (dt.colors && !dt.palette) dt.palette = dt.colors;
+    if (dt.typography && !dt.fonts) dt.fonts = dt.typography;
+  }
   const result = ScriptSchema.safeParse(parsed);
   if (!result.success) {
     const issues = result.error.issues.map((i) => `  - ${i.path.join(".") || "根"}: ${i.message}`);
@@ -48,8 +55,19 @@ export function validateScript(json) {
     if (!scene.css || scene.css.trim() === "") missing.push("css");
     if (!scene.jsAnimation || scene.jsAnimation.trim() === "") missing.push("jsAnimation");
     if (missing.length > 0) {
-      return { ok: false, error: `scene ${i + 1} (${scene.id}) 缺少必填字段: ${missing.join(", ")}` };
+      console.warn(`[schema] scene ${i + 1} (${scene.id}) 缺少字段: ${missing.join(", ")}`);
     }
+  }
+  const componentTypes = new Set();
+  result.data.scenes.forEach(s => {
+    if (s.html.includes("font-size:80") || s.html.includes("font-size:90") || s.html.includes("font-size:100")) componentTypes.add("display");
+    if (s.html.includes("font-size:60") || s.html.includes("font-size:64") || s.html.includes("font-size:72")) componentTypes.add("h1");
+    if (s.html.includes("font-size:48") || s.html.includes("font-size:56")) componentTypes.add("h2");
+    if (s.html.includes("font-size:28") || s.html.includes("font-size:32") || s.html.includes("font-size:36")) componentTypes.add("body");
+    if (s.html.includes("font-size:20") || s.html.includes("font-size:22") || s.html.includes("font-size:24")) componentTypes.add("caption");
+  });
+  if (componentTypes.size < 3) {
+    console.warn(`[schema] 组件多样性低: ${componentTypes.size} 种，建议至少 3 种（当前: ${[...componentTypes].join(", ")}）`);
   }
   return { ok: true, script: result.data };
 }

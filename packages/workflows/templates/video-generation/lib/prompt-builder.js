@@ -12,6 +12,13 @@ function loadScriptRules() {
   return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
 }
 
+function loadDesignRules() {
+  const dir = path.join(__dirname, "..", "design-rules");
+  if (!fs.existsSync(dir)) return "";
+  const files = fs.readdirSync(dir).filter(f => f.endsWith(".md")).sort();
+  return files.map(f => fs.readFileSync(path.join(dir, f), "utf-8")).join("\n\n");
+}
+
 function loadStyleGuide(style) {
   const name = style === "Neo-Brutalist" ? "neo-brutalist"
     : style === "奶油风" ? "cream"
@@ -56,6 +63,7 @@ function parseJSON(text) {
 export async function generateScript(title, content, style) {
   const startTime = Date.now();
   const rules = loadScriptRules();
+  const designRules = loadDesignRules();
   const inputContent = content || title;
 
   const userPickedStyle = style && style !== "自动（AI 决定）";
@@ -63,7 +71,7 @@ export async function generateScript(title, content, style) {
     ? `\n## 指定风格\n用户选择: ${style}\n严格遵循以下风格指南：\n\n${loadStyleGuide(style)}`
     : "\n## 风格\n根据内容主题自由选择最合适的视觉风格";
 
-  const systemPrompt = rules;
+  const systemPrompt = `${rules}\n\n${designRules}`;
   const userPrompt = `${styleSection}
 
 ## 本次任务

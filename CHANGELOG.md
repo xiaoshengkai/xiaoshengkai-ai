@@ -1,6 +1,50 @@
 # Changelog
 
-## v0.6.2 (2026-08-06) — 日志统一 + prompt 系统重构 + 动画优化 + 移动端适配
+## v0.6.3 (2026-08-07) — 设计规范分离 + 美学方法论 + 设计人格
+
+### 设计规范拆分为 10 个文件
+- **design-rules/ 目录**：将 script-rules.md 中的设计规则拆分为 10 个独立文件
+  - `01-typography.md`：字体层级（5 级）、字重限制（900+400）、中英混排
+  - `02-color.md`：60/30/10 颜色比例、3 色调色板、4 套色板参考
+  - `03-layout.md`：3 种布局语法、9:16 竖屏优先
+  - `04-spacing.md`：8-point grid、元素间距表
+  - `05-shadows.md`：软阴影原则、3 级阴影表、颜色匹配
+  - `06-animation.md`：时长表、缓动表、转场模式、stagger 规则
+  - `07-narrative.md`：Peak-End Rule、五段式节奏、场景节拍
+  - `08-components.md`：5 种组件类型、变体、使用指南
+  - `09-svg.md`：尺寸约束、元素数量、线宽、可读性
+  - `10-anti-patterns.md`：视觉/动画/布局/字体/SVG 反模式
+- **prompt-builder.js**：新增 `loadDesignRules()` 函数，所有设计规则自动加载到 system prompt
+
+### 设计人格
+- **角色改写**："极具创造力的短视频设计师" 替代 "短视频脚本策划"
+- 4 条设计信念：规则是基础创新是灵魂、对比出效果、每个场景有个性、敢于打破常规
+
+### 视觉规范
+- **60/30/10 颜色比例**：60% 背景、30% 辅色、10% 主色
+- **8-point 间距系统**：所有间距 8 或 4 的倍数
+- **阴影规范**：软阴影、3 级阴影表、颜色匹配
+- **字体层级硬限制**：最多 4 种字号 + 2 种字重
+
+### 叙事节奏
+- **Peak-End Rule**：用户记住峰值+结尾
+- **五段式节奏**：Hook(0-3s) → Build(3-15s) → Peak(15-25s) → Cool(25-35s) → End(35-45s)
+
+### 校验增强
+- schemaVersion 容错：`z.union([z.literal(1), z.literal("1")])`
+- designTokens 容错：colors→palette、typography→fonts 自动转换
+- 组件多样性软检查：建议至少 3 种组件类型
+- css/jsAnimation 软警告（不阻断）
+
+### 渲染优化
+- **dedupeCss**：自动合并相同值的 CSS 规则，减少 HTML 冗余
+- **超时 300s**：HyperFrames/ffmpeg 加超时 + stderr 捕获
+
+### 修复
+- 重试 3→5 次
+- 动态 maxTokens 8000→16000→32000
+- 修复表单重置（formValuesRef.current）
+- contentRequirement 字段：新增"内容要求"输入框
 
 ### 日志系统
 - **createDateLogger**：按日期划分（tasks-YYYY-MM-DD.log / workflows-YYYY-MM-DD.log），自动清理 7 天，内容带任务前缀

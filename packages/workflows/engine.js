@@ -3,7 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { executeStep, loadTemplate } from "./lib/executor.js";
-import { createItemLogger } from "../shared/logger.js";
+import { createDateLogger } from "../shared/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
@@ -11,6 +11,32 @@ const DATA_DIR = path.join(PROJECT_ROOT, "data", "workflows");
 const LOG_DIR = path.join(PROJECT_ROOT, "logs", "workflows");
 
 const MAX_EXECUTIONS = 50;
+
+function evaluateSkipWhen(condition, params) {
+  if (!condition) return false;
+  const expr = condition.trim();
+  if (expr.includes("===") || expr.includes("!==")) {
+    const m = expr.match(/^"?\{(\w+)\}"?\s*(===|!==)\s*"(.+)"$/);
+    if (m) {
+      const [, varName, op, val] = m;
+      const actual = params[varName];
+      return op === "===" ? actual === val : actual !== val;
+    }
+    return false;
+  }
+  if (expr.endsWith("_no")) {
+    return params[expr.slice(0, -3)] === "no";
+  }
+  if (expr.endsWith("_yes")) {
+    return params[expr.slice(0, -4)] === "yes";
+  }
+  if (expr.endsWith("_present") || expr.endsWith("_set")) {
+    const varName = expr.replace(/_(present|set)$/, "");
+    const v = params[varName];
+    return v !== undefined && v !== null && v !== "";
+  }
+  return false;
+}
 
 export function listExecutions() {
   if (!fs.existsSync(DATA_DIR)) return [];
@@ -69,17 +95,21 @@ export function createExecution(templateName, params) {
     params,
     startedAt: new Date().toISOString(),
     status: "pending",
-    steps: template.steps.map(s => ({
-      id: s.id,
-      name: s.name,
-      type: s.type,
-      previewType: s.previewType,
-      previewField: s.previewField,
-      status: "pending",
-      output: null,
-      error: null,
-      startedAt: null,
-    })),
+    steps: template.steps.map(s => {
+      const shouldSkip = evaluateSkipWhen(s.skipWhen, params);
+      return {
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        previewType: s.previewType,
+        previewField: s.previewField,
+        status: shouldSkip ? "skipped" : "pending",
+        skipReason: shouldSkip ? s.skipWhen : null,
+        output: null,
+        error: null,
+        startedAt: null,
+      };
+    }),
     currentStep: 0,
   };
 
@@ -89,7 +119,7 @@ export function createExecution(templateName, params) {
 
 export async function startExecution(templateName, params) {
   const { executionId, dir, template } = createExecution(templateName, params);
-  const logger = createItemLogger(LOG_DIR, executionId);
+  const logger = createDateLogger("workflows", LOG_DIR, executionId);
 
   logger.info(`开始执行工作流: ${templateName} (${executionId})`);
   logger.info(`参数: ${JSON.stringify(params)}`);
@@ -97,8 +127,12 @@ export async function startExecution(templateName, params) {
 
   const state = readState(dir);
   state.status = "running";
-  state.steps[0].status = "running";
-  state.steps[0].startedAt = new Date().toISOString();
+  // 找到第一个非 skipped 的步骤
+  const firstNonSkipped = state.steps.findIndex(s => s.status !== "skipped");
+  if (firstNonSkipped >= 0) {
+    state.steps[firstNonSkipped].status = "running";
+    state.steps[firstNonSkipped].startedAt = new Date().toISOString();
+  }
   state.startedAt = new Date().toISOString();
   writeState(dir, state);
 
@@ -122,6 +156,11 @@ function readState(dir) {
 }
 
 async function runSteps(dir, state, template, params, logger) {
+  const origLog = console.log, origWarn = console.warn, origErr = console.error;
+  console.log = (...a) => { origLog(...a); logger.info(a.join(" ")); };
+  console.warn = (...a) => { origWarn(...a); logger.warn(a.join(" ")); };
+  console.error = (...a) => { origErr(...a); logger.error(a.join(" ")); };
+
   const vars = { ...params, executionDir: dir };
   template.params.forEach(p => {
     if (p.default !== undefined && (vars[p.name] === undefined || vars[p.name] === "")) {
@@ -133,6 +172,10 @@ async function runSteps(dir, state, template, params, logger) {
 
   for (let i = 0; i < template.steps.length; i++) {
     const step = template.steps[i];
+    if (state.steps[i].status === "skipped") {
+      logger.info(`[${i + 1}/${template.steps.length}] ${step.name} 已跳过 (${state.steps[i].skipReason})`);
+      continue;
+    }
     state.steps[i].status = "running";
     state.steps[i].startedAt = new Date().toISOString();
     state.currentStep = i;
@@ -146,6 +189,7 @@ async function runSteps(dir, state, template, params, logger) {
       const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
       state.steps[i].status = "completed";
       state.steps[i].output = output;
+      state.steps[i].elapsed = elapsed;
       vars[step.id] = output;
 
       const outputPreview = typeof output === "string"
@@ -171,6 +215,7 @@ async function runSteps(dir, state, template, params, logger) {
       const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
       state.steps[i].status = "failed";
       state.steps[i].error = err.message;
+      state.steps[i].elapsed = elapsed;
       state.status = "failed";
       writeState(dir, state);
       logger.error(`[${i + 1}/${template.steps.length}] ${step.name} 失败 (${elapsed}s): ${err.message}`);
@@ -185,6 +230,10 @@ async function runSteps(dir, state, template, params, logger) {
   state.completedAt = new Date().toISOString();
   writeState(dir, state);
   logger.info(`工作流执行完成，总耗时: ${totalElapsed}s`);
+
+  console.log = origLog;
+  console.warn = origWarn;
+  console.error = origErr;
 }
 
 export async function runExecution(executionId) {
@@ -194,15 +243,18 @@ export async function runExecution(executionId) {
 
   const state = readState(dir);
   const template = loadTemplate(state.template);
-  const logger = createItemLogger(LOG_DIR, executionId);
+  const logger = createDateLogger("workflows", LOG_DIR, executionId);
 
   logger.info(`开始执行工作流: ${state.template} (${executionId})`);
   logger.info(`参数: ${JSON.stringify(state.params)}`);
   logger.info(`共 ${template.steps.length} 步: ${template.steps.map(s => s.name).join(" → ")}`);
 
   state.status = "running";
-  state.steps[0].status = "running";
-  state.steps[0].startedAt = new Date().toISOString();
+  const firstNonSkipped2 = state.steps.findIndex(s => s.status !== "skipped");
+  if (firstNonSkipped2 >= 0) {
+    state.steps[firstNonSkipped2].status = "running";
+    state.steps[firstNonSkipped2].startedAt = new Date().toISOString();
+  }
   state.startedAt = new Date().toISOString();
   writeState(dir, state);
 
@@ -253,8 +305,13 @@ export async function runNextStep(executionId) {
 
   const template = loadTemplate(state.template);
   const templateDir = path.resolve(__dirname, "templates", template.name);
-  const logger = createItemLogger(LOG_DIR, executionId);
+  const logger = createDateLogger("workflows", LOG_DIR, executionId);
   const vars = { ...state.params, executionDir: dir };
+
+  const origLog = console.log, origWarn = console.warn, origErr = console.error;
+  console.log = (...a) => { origLog(...a); logger.info(a.join(" ")); };
+  console.warn = (...a) => { origWarn(...a); logger.warn(a.join(" ")); };
+  console.error = (...a) => { origErr(...a); logger.error(a.join(" ")); };
 
   // 收集已完成步骤的输出
   state.steps.forEach(s => {
@@ -291,6 +348,7 @@ export async function runNextStep(executionId) {
     const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
     state.steps[nextIdx].status = "completed";
     state.steps[nextIdx].output = output;
+    state.steps[nextIdx].elapsed = elapsed;
 
     if (nextIdx === template.steps.length - 1) {
       state.status = "completed";
@@ -309,6 +367,7 @@ export async function runNextStep(executionId) {
     const isRetryable = err.retryable !== false;
     state.steps[nextIdx].status = isRetryable ? "warning" : "failed";
     state.steps[nextIdx].error = err.message;
+    state.steps[nextIdx].elapsed = elapsed;
     state.steps[nextIdx].errorType = err.type || null;
     state.steps[nextIdx].errorSuggestion = err.suggestion || null;
     if (!isRetryable) {
@@ -321,6 +380,10 @@ export async function runNextStep(executionId) {
     }
     logger.error(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 失败 (${elapsed}s): ${err.message}`);
     return { ok: false, stepIndex: nextIdx, stepStatus: "failed", error: err.message };
+  } finally {
+    console.log = origLog;
+    console.warn = origWarn;
+    console.error = origErr;
   }
 }
 
@@ -344,6 +407,7 @@ export function retryStep(executionId, stepId) {
   state.steps[stepIdx].output = null;
   state.steps[stepIdx].error = null;
   state.steps[stepIdx].startedAt = null;
+  state.steps[stepIdx].elapsed = null;
 
   state.status = "running";
   state.currentStep = stepIdx;

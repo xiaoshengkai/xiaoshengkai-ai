@@ -5,7 +5,7 @@ import path from "node:path";
 const PROMPT_PATH = path.resolve(process.cwd(), "src", "lib", "prompts", "video-content.txt");
 
 export async function POST(request: Request) {
-  const { title } = await request.json();
+  const { title, requirement } = await request.json();
   if (!title) {
     return NextResponse.json({ error: "missing title" }, { status: 400 });
   }
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const { callLLM } = await import("../../../../../../shared/llm/index.js");
     const { text } = await callLLM({
       system: systemPrompt,
-      user: `视频标题：${title}\n\n请生成内容描述（最大3000字）`,
+      user: `视频标题：${title}\n\n${requirement ? `内容要求：${requirement}\n\n` : ""}请生成内容描述`,
       format: 'text',
     });
 

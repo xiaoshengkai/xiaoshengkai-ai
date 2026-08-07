@@ -2,7 +2,7 @@ const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.c
 const MINIMAX_IMAGE_MODEL = process.env.MINIMAX_IMAGE_MODEL || "image-01";
 const MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M3";
 
-export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000, format = 'json_object' }) {
+export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object' }) {
   const apiKey = process.env.MINIMAX_API_KEY;
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 
@@ -36,7 +36,10 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   console.log(`[minimax] usage: ${JSON.stringify(data.usage)}`);
   return {
     text: msg.content || "",
-    usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },
+    usage: {
+      totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0,
+      completionTokens: data.usage?.completionTokens || data.usage?.completion_tokens || 0,
+    },
   };
 }
 

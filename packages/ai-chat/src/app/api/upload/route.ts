@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
     const ext = name?.split(".").pop() || "bin";
     const filename = `${crypto.randomUUID()}.${ext}`;
-    const uploadsDir = path.resolve(process.cwd(), "..", "..", "data", "uploads");
+    const uploadsDir = path.resolve(process.cwd(), "..", "..", "data", "static", "images");
     await mkdir(uploadsDir, { recursive: true });
 
     const buffer = Buffer.from(base64.replace(/^data:[^;]+;base64,/, ""), "base64");

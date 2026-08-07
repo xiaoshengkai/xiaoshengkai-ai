@@ -1,7 +1,7 @@
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
 const DEEPSEEK_PRO_MODEL = process.env.DEEPSEEK_PRO_MODEL || 'deepseek-v4-pro';
 
-export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 2000, format = 'json_object' }) {
+export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object' }) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error('未配置 DEEPSEEK_API_KEY');
 
@@ -33,6 +33,9 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   console.log(`[deepseek] usage: ${JSON.stringify(data.usage)}`);
   return {
     text: data.choices?.[0]?.message?.content || '',
-    usage: { totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0 },
+    usage: {
+      totalTokens: data.usage?.totalTokens || data.usage?.total_tokens || 0,
+      completionTokens: data.usage?.completionTokens || data.usage?.completion_tokens || 0,
+    },
   };
 }

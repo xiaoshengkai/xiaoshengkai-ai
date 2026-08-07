@@ -47,6 +47,9 @@ export async function pollTTSTask(taskId, workDir) {
       if (!downloadUrl) throw new Error("TTS 下载链接获取失败");
       const audioRes = await fetch(downloadUrl);
       const buffer = Buffer.from(await audioRes.arrayBuffer());
+      if (buffer.length < 3 || buffer[0] !== 0x49 || buffer[1] !== 0x44 || buffer[2] !== 0x33) {
+        throw new Error(`TTS 下载文件头无效 (前 3 字节: ${buffer.slice(0, 3).toString("hex")}，期望 ID3 头)`);
+      }
       const outPath = `${workDir}/narration.mp3`;
       const fs = await import("node:fs");
       fs.writeFileSync(outPath, buffer);
@@ -60,9 +63,9 @@ export async function pollTTSTask(taskId, workDir) {
 
 export async function generateTTS(text, voiceId, workDir, enableTts) {
   console.log(`[tts] enableTts="${enableTts}"`);
-  if (enableTts === "否") {
-    console.log("[tts] 已跳过");
-    return { output: "TTS 已跳过" };
+  if (enableTts === "no") {
+    console.log("[tts] skipped by engine");
+    return { output: "TTS disabled" };
   }
   const startTime = Date.now();
   console.log(`[tts] 开始 (${text.length} 字)`);

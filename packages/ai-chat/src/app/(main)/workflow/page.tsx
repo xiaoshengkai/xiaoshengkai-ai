@@ -124,24 +124,25 @@ export default function WorkflowPage() {
   }, []);
 
   const handleAiGenerate = useCallback(async () => {
-    const title = formValues["title"];
+    const title = formValuesRef.current["title"];
+    const requirement = formValuesRef.current["contentRequirement"] || "";
     if (!title) { toast("请先填视频标题"); return; }
     setAiGenerating(true);
     try {
       const res = await fetch(`${BASE}/api/workflows/generate-content`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify({ title, requirement }),
       });
       const data = await res.json();
       if (data.content) {
-        setFormValues({ ...formValues, content: data.content });
+        setFormValues({ ...formValuesRef.current, content: data.content });
         toast("🟢 内容已生成");
       } else {
         toast(`🔴 ${data.error || "生成失败"}`);
       }
     } catch { toast("🔴 请求失败"); }
     setAiGenerating(false);
-  }, [formValues]);
+  }, []);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -199,7 +200,7 @@ export default function WorkflowPage() {
                       exe.status === "running" ? "bg-yellow-400 animate-pulse" :
                       exe.status === "failed" ? "bg-red-500" : "bg-gray-400"
                     }`} />
-                    <span className="text-sm font-bold text-gray-800 truncate flex-1">
+                    <span className="text-sm font-bold text-gray-800 truncate">
                       {exe.title || exe.templateLabel}
                     </span>
                     <span className={`inline-block text-xs px-1.5 py-0.5 rounded shrink-0 ${
@@ -267,7 +268,7 @@ export default function WorkflowPage() {
               <div className="space-y-3">
                 <div className="text-sm font-bold text-gray-800 mb-2">{selectedTemplate.label}</div>
                 {selectedTemplate.params.filter(p => {
-                    if (p.name === "voice_id" && formValues["enable_tts"] === "否") return false;
+                    if (p.name === "voice_id" && formValues["enable_tts"] === "no") return false;
                     return true;
                   }).map(p => (
                   <div key={p.name}>

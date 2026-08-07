@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
-const UPLOAD_DIR = path.resolve(process.cwd(), "..", "..", "data", "workflows", "uploads");
+const UPLOAD_DIR = path.resolve(process.cwd(), "..", "..", "data", "static", "audio");
 
 export async function POST(request: Request) {
   try {

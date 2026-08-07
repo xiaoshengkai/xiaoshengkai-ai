@@ -6,12 +6,13 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #000; display: flex; align-items: center; justify-content: center; width: 100vw; height: 100vh; overflow: hidden; }
 #stage { position: relative; overflow: hidden; }
-.clip { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; text-align: center; opacity: 0; overflow: hidden; word-break: break-word; }
-.clip > * { max-width: 100%; flex-shrink: 1; min-width: 0; }
-.clip img, .clip svg { max-width: 100% !important; max-height: 60% !important; height: auto; }
-.clip table { font-size: clamp(10px, 2.5cqw, 20px); width: 100% !important; table-layout: fixed; }
-.clip td, .clip th { padding: 2px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* AI 在此处扩展样式 */
+#stage .clip { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; text-align: center; opacity: 0; overflow: hidden; word-break: break-word; }
+#stage .clip > * { max-width: 100%; flex-shrink: 1; min-width: 0; }
+#stage .clip img, #stage .clip svg { max-width: 100% !important; max-height: 60% !important; height: auto; }
+#stage .clip table { font-size: clamp(10px, 2.5cqw, 20px); width: 100% !important; table-layout: fixed; }
+#stage .clip td, #stage .clip th { padding: 2px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* AI 在此处扩展样式 — 全局 CSS 注入于此 */
+/* GLOBAL_CSS_INJECTION */
 </style>
 </head>
 <body>
@@ -30,14 +31,22 @@ body { background: #000; display: flex; align-items: center; justify-content: ce
     if (isNaN(start)) start = startAccum;
     var dur = parseFloat(s.getAttribute('data-duration')) || 4;
     startAccum = start + dur;
-    tl.set(s, { opacity: 0 }, start);
-    tl.to(s, { opacity: 1, duration: 0.5 }, start);
-    tl.to(s, { opacity: 0, duration: 0.3 }, start + dur - 0.3);
+    tl.set(s, { opacity: 0, y: 40 }, start);
+    tl.to(s, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, start);
+    tl.to(s, { opacity: 0, y: -20, duration: 0.3, ease: "power2.in" }, start + dur - 0.3);
   });
   window.__timelines = window.__timelines || {};
   window.__timelines.main = tl;
   window.addEventListener('load', function() { tl.play(); });
 })();
+</script>
+<script>
+// AI 在此处扩展 GSAP 动画 — 全局 JS 注入于此
+// GLOBAL_JS_INJECTION
+// 可以操作 .clip 和 timeline：
+//   gsap.to('.clip-hook', { x: 100, rotation: 5, duration: 1 });
+//   gsap.from('.clip-body-1 h2', { scale: 0.5, opacity: 0, duration: 0.8 });
+// 禁止 CSS @keyframes / animation 属性，动画完全由 GSAP 实现
 </script>
 </body>
 </html>

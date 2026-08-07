@@ -1,5 +1,60 @@
 # Changelog
 
+## v0.6.2 (2026-08-06) — 日志统一 + prompt 系统重构 + 动画优化 + 移动端适配
+
+### 日志系统
+- **createDateLogger**：按日期划分（tasks-YYYY-MM-DD.log / workflows-YYYY-MM-DD.log），自动清理 7 天，内容带任务前缀
+- **console 拦截**：engine.js runSteps/runNextStep 加 console hook，模板 lib 的 console.log 自动写入工作流日志
+- **render.js execId 修复**：path.basename(path.resolve(workDir, "..")) → path.basename(workDir)
+
+### system/user 分离
+- script-rules.md 全部内容放入 system prompt（行为准则），风格指南+任务+错误放入 user prompt（动态内容）
+- prompt-builder.js 删除硬编码的"输出要求"，全部移到 script-rules.md
+- ROLE 合并到 script-rules.md ## 角色
+
+### skipWhen 条件跳过
+- engine.js 新增 evaluateSkipWhen()，支持 xxx_no/xxx_yes/xxx_present/{var}==="value" 语法
+- tts 步骤 enable_tts_no 时跳过，bgm 步骤 has_bgm_file 时跳过
+
+### prompt 系统（script-rules.md 完全重组）
+- 新增：设计系统（3色调色板+4字体角色+3布局语法）、输出要求、移动端适配、JS动画原则、转场多样性
+- 合并去重：HTML约束+简洁性合并、JS动画原则去重、硬规则统一汇总
+- 美学原则：5 个抽象原则（对比/层级/节奏/留白/焦点）
+- JS 动画原则：5 个原则（stagger/节奏对比/缓动对比/目的性/节制）
+
+### 字体与渲染
+- 字体本地化：复用 tech-video 的 fonts/，render.js 注入 @font-face 块
+- 字体路径修正：fonts/ 放到 render/ 下，URL 改为 fonts/xxx.woff2
+- 渲染超时：HyperFrames/ffmpeg 加 300s 超时 + stderr 捕获
+- 视频时长修正：amix duration=shortest + -shortest 标志，BGM 短于视频时自动循环
+
+### 校验与容错
+- schemaVersion 容错：z.union([z.literal(1), z.literal("1")])，字符串 "1" 自动转数字
+- css/jsAnimation 强制：每个场景必须有 css 和 jsAnimation（非空字符串）
+- clips→scenes 容错：LLM 输出 clips 字段时自动转为 scenes
+- parseJSON 增强：错误信息带文本片段+位置
+
+### LLM 调用优化
+- 动态 maxTokens：8000→16000→32000，截断检测自动翻倍
+- 重试次数：3→5 次
+- maxTokens 默认值：deepseek 8000、minimax 8000
+
+### 表单与 UI
+- contentRequirement 字段：新增"内容要求"输入框，指导 AI 生成内容
+- 表单重置修复：handleAiGenerate 改用 formValuesRef.current
+- 状态紧贴：workflow 列表状态 badge 紧贴 title
+- 步骤执行时间：engine.js 4 处 elapsed 写入 state.json
+- uploads 统一：data/uploads + data/workflows/uploads → data/static/{images,audio}
+
+### 动画与转场
+- 基础转场增强：opacity fade → fade+slide（y:40→0 滑入，y:0→-20 滑出），ease: power2.out/in
+- GSAP 自由动画：animation.html 加占位符，AI 可在 clip 内写 <script>gsap.to()</script>
+- 转场多样性：提示 AI 覆盖默认转场
+
+### 代码规范
+- 消除中文判断：enable_tts "否"→"no"，template.json 改为 yes/no
+- 禁止中文判断：共享库写入铁律
+
 ## v0.6.1 (2026-08-05) — video-generation 改造 + 目录整理 + 10 项修复
 
 ### 重构

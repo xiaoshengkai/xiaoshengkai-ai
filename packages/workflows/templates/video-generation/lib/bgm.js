@@ -14,15 +14,18 @@ export async function generateBGM(bgmPrompt, executionDir, bgmFilePath) {
   const startTime = Date.now();
   const outPath = path.join(executionDir, "bgm.mp3");
 
+  let dur;
   if (bgmFilePath && fs.existsSync(bgmFilePath)) {
     fs.copyFileSync(bgmFilePath, outPath);
-    console.log(`[bgm] 使用上传文件 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
-    return { bgmFile: outPath, "bgm.mp3": "bgm.mp3" };
+    dur = getAudioDuration(outPath);
+    console.log(`[bgm] use uploaded file (${dur.toFixed(1)}s, ${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
+    return { bgmFile: outPath, duration: dur, "bgm.mp3": "bgm.mp3" };
   }
 
   if (fs.existsSync(outPath)) {
-    console.log(`[bgm] 复用 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
-    return { bgmFile: outPath, "bgm.mp3": "bgm.mp3" };
+    dur = getAudioDuration(outPath);
+    console.log(`[bgm] reuse (${dur.toFixed(1)}s, ${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
+    return { bgmFile: outPath, duration: dur, "bgm.mp3": "bgm.mp3" };
   }
 
   const apiKey = process.env.MINIMAX_API_KEY;
@@ -49,8 +52,9 @@ export async function generateBGM(bgmPrompt, executionDir, bgmFilePath) {
       const audioRes = await fetch(downloadUrl);
       const buffer = Buffer.from(await audioRes.arrayBuffer());
       fs.writeFileSync(outPath, buffer);
-      console.log(`[bgm] 完成 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
-      return { bgmFile: outPath, "bgm.mp3": "bgm.mp3" };
+      dur = getAudioDuration(outPath);
+      console.log(`[bgm] done (${dur.toFixed(1)}s, ${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
+      return { bgmFile: outPath, duration: dur, "bgm.mp3": "bgm.mp3" };
     } catch (e) {
       lastErr = e;
       if (attempt < 2) await sleep(2000);

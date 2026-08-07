@@ -21,7 +21,7 @@ export async function GET(
   { params }: { params: Promise<{ filename: string }> }
 ) {
   const { filename } = await params;
-  const filePath = path.resolve(process.cwd(), "..", "..", "data", "uploads", filename);
+  const filePath = path.resolve(process.cwd(), "..", "..", "data", "static", filename);
 
   try {
     const buffer = await readFile(filePath);

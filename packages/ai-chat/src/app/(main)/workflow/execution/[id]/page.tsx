@@ -14,7 +14,7 @@ import { Root, Portal, Backdrop, Popup, Header, Title, Close } from "@/component
 
 interface ExecutionStep {
   id: string; name: string; type: string; previewType?: string; previewField?: string;
-  status: string; output: string | null; error: string | null;
+  status: string; output: string | null; error: string | null; elapsed?: string;
 }
 
 interface Execution {
@@ -303,10 +303,7 @@ export default function ExecutionDetailPage() {
   }
 
   function renderDefaultSteps() {
-    return execution!.steps.filter(s => {
-      if (s.id === "tts" && s.output === "TTS 已跳过") return false;
-      return true;
-    }).map((step, i) => renderStepItem(step, i));
+    return execution!.steps.map((step, i) => renderStepItem(step, i));
   }
 
   function renderStepItem(step: ExecutionStep, i: number) {
@@ -334,6 +331,9 @@ export default function ExecutionDetailPage() {
             <span className="relative z-10">{done ? "✓" : fail ? "✗" : warn ? "⚠" : skipped ? "−" : i + 1}</span>
           </span>
           <span className="text-xs font-bold text-gray-700 flex-1 truncate">{step.name}</span>
+          {step.elapsed && (
+            <span className="text-xs text-gray-400 shrink-0">{step.elapsed}s</span>
+          )}
           <div className="flex gap-1 shrink-0">
             {pending && (
               <button onClick={(e) => { e.stopPropagation(); handleSkip(step.id); }}

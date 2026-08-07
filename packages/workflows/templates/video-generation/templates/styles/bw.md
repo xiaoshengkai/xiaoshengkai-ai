@@ -4,9 +4,12 @@
 - 纯白底色 #FFFFFF，纯黑文字 #000000，对比度 ≥ 15:1
 - 灰色 (#999 ~ #CCC) 仅用于 1px 分割线/边框/几何点缀，禁止灰色文字
 
-## 字体
-- 标题 粗衬线体（Didot/Bodoni），正文 细无衬线体
-- 字号对比 48px+/16px/10px
+## 字体（从本地字体库选取，所有字体已注入 @font-face，无需外部引用）
+- 标题 Lora 700 italic（衬线斜体，杂志感）
+- 正文 Inter 300/400（细无衬线）
+- 中文用 Noto Sans SC 400
+- 兜底：'Noto Sans SC', sans-serif
+- 可用本地字体：Archivo(500/700/900), Alfa Slab One(400), Be Vietnam Pro(500/600/700/800/900), Inter(200-900), Inter Tight(400-900), Lora(400-700 italic), Space Mono(400/700), Noto Sans SC(400/500/700/900)
 
 ## 布局
 - 杂志式非对称排版：左对齐或右对齐，绝不居中
@@ -24,4 +27,6 @@
 
 ## HTML 约束
 - 内联样式用 style 属性，不用 class 样式
-- 禁止 <script>、jQuery
+- 禁止 `<script>`、jQuery、远程样式表、@import
+- 禁止 `<link rel="stylesheet" href="https://">`
+- 禁止 `@import url(...)`

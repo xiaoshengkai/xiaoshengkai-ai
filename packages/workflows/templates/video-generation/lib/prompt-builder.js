@@ -24,20 +24,33 @@ function loadStyleGuide(style) {
 function parseJSON(text) {
   let cleaned = text.replace(/```\w*\n?|\n?```/g, "").trim();
   const start = cleaned.indexOf("{");
-  if (start < 0) throw new Error("未找到 JSON");
+  if (start < 0) {
+    const preview = cleaned.slice(0, 300);
+    throw new Error(`未找到 JSON 起始符 { (文本长度=${cleaned.length})\n文本片段:\n${preview}...`);
+  }
 
   let depth = 0, inString = false, escape = false;
   for (let i = start; i < cleaned.length; i++) {
     const ch = cleaned[i];
     if (escape) { escape = false; continue; }
     if (ch === "\\") { escape = true; continue; }
-    if (ch === '"' && !inString) { inString = true; continue; }
-    if (ch === '"' && inString) { inString = false; continue; }
+    if (ch === '"') { inString = !inString; continue; }
     if (inString) continue;
     if (ch === "{") depth++;
-    if (ch === "}") { depth--; if (depth === 0) return JSON.parse(cleaned.slice(start, i + 1)); }
+    if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        try {
+          return JSON.parse(cleaned.slice(start, i + 1));
+        } catch (e) {
+          const snippet = cleaned.slice(Math.max(0, i - 100), Math.min(i + 100, cleaned.length));
+          throw new Error(`JSON 语法错误 (位置 ${i}): ${e.message}\n文本片段:\n${snippet}`);
+        }
+      }
+    }
   }
-  throw new Error("JSON 未闭合");
+  const snippet = cleaned.slice(start, Math.min(start + 300, cleaned.length));
+  throw new Error(`JSON 未闭合 (depth=${depth}, 文本长度=${cleaned.length})\n文本片段:\n${snippet}...`);
 }
 
 export async function generateScript(title, content, style) {
@@ -50,44 +63,48 @@ export async function generateScript(title, content, style) {
     ? `\n## 指定风格\n用户选择: ${style}\n严格遵循以下风格指南：\n\n${loadStyleGuide(style)}`
     : "\n## 风格\n根据内容主题自由选择最合适的视觉风格";
 
-  const basePrompt = `${rules}${styleSection}
+  const systemPrompt = rules;
+  const userPrompt = `${styleSection}
 
 ## 本次任务
 
 视频标题: ${title}
 内容描述: ${inputContent}
 
-## 输出要求
-
-- 严格 JSON，无其他文字，无 markdown 代码块
-- schemaVersion 必须是数字 1
-- 每个场景的 id 必须是字符串（如 "hook", "body-1", "body-2", "outro"）
-- 场景数 8-20 个
-- 每个场景的 html 必须包含 class="clip" 和 data-duration="秒数"
-- 内联样式用 style 属性，禁止 class 样式
-- 禁止 <script> 标签，禁止 jQuery
-${userPickedStyle ? "- 严格遵循上述风格指南的颜色/字体/布局规则" : "- 根据内容主题自由选择视觉风格"}
-
 输出：`;
 
   let lastError;
-  for (let attempt = 0; attempt < 1; attempt++) {
+  let currentMaxTokens = 8000;
+  const MAX_TOKENS_CAP = 32000;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
     const retryHint = attempt > 0
-      ? `\n上次校验失败：${lastError}\n请修正：schemaVersion 必须是数字 1，每个场景的 id 必须是字符串`
+      ? `\n\n## 上次校验失败，请修正后重新输出\n${lastError}\n`
       : "";
 
-    const prompt = `${basePrompt}${retryHint}`;
+    const finalUserPrompt = retryHint ? `${userPrompt}${retryHint}` : userPrompt;
 
-    console.log(`[prompt-builder] 第 ${attempt + 1} 次尝试...`);
+    console.log(`[prompt-builder] 第 ${attempt + 1}/5 次尝试 (maxTokens=${currentMaxTokens})...`);
 
-    const { text } = await callLLM({
-      system: "你是一个专业的短视频脚本策划，严格按规则输出 JSON。",
-      user: prompt,
-      maxTokens: 8000,
+    const { text, usage } = await callLLM({
+      system: systemPrompt,
+      user: finalUserPrompt,
+      maxTokens: currentMaxTokens,
     });
+
+    const completionTokens = usage?.completionTokens || 0;
+    if (completionTokens >= currentMaxTokens * 0.95 && currentMaxTokens < MAX_TOKENS_CAP) {
+      const next = Math.min(currentMaxTokens * 2, MAX_TOKENS_CAP);
+      console.log(`[prompt-builder] 检测到截断 (completionTokens=${completionTokens} >= ${currentMaxTokens}*0.95), 下次 maxTokens → ${next}`);
+      currentMaxTokens = next;
+    }
 
     try {
       const script = parseJSON(text);
+
+      if (script && typeof script.schemaVersion === "string") {
+        script.schemaVersion = Number(script.schemaVersion);
+      }
 
       const schemaResult = validateScript(script);
       if (!schemaResult.ok) {
@@ -103,6 +120,13 @@ ${userPickedStyle ? "- 严格遵循上述风格指南的颜色/字体/布局规�
         continue;
       }
 
+      if (userPickedStyle && style) {
+        schemaResult.script.style = style;
+      }
+      if (title) {
+        schemaResult.script.title = title;
+      }
+
       const stats = getScriptStats(schemaResult.script);
       console.log(`[prompt-builder] 完成: ${stats.sceneCount} 场景 (${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);
       return {
@@ -113,6 +137,9 @@ ${userPickedStyle ? "- 严格遵循上述风格指南的颜色/字体/布局规�
         bgm_prompt: schemaResult.script.bgm_prompt,
         allHtml: schemaResult.script.scenes.map(s => s.html).join("\n"),
         allNarration: schemaResult.script.scenes.map(s => s.narration).join("\n"),
+        css: schemaResult.script.css || "",
+        jsAnimation: schemaResult.script.jsAnimation || "",
+        scenesJson: JSON.stringify(schemaResult.script.scenes),
       };
     } catch (e) {
       lastError = e.message;

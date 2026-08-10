@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.6.5 (2026-08-10) — 多模态架构重构（图片直传 + 视频支持 + Qwen3.8-Max 接入准备）
+
+### 多模态架构（策略模式 + 配置驱动）
+- **新增 `lib/multimodal-config.ts`**：Provider 注册表（M3/Qwen 等），新增 provider 只需加配置项
+- **新增 `lib/processor.ts`**：处理器工厂，根据 provider/model 能力自动选择路径
+- **新增 `lib/image-processor.ts`**：图片直传（读 base64）+ Preprocess 兜底
+- **新增 `lib/video-processor.ts`**：视频 ffmpeg 抽帧（N 帧 → image content）
+- **新增 `lib/modality-detector.ts`**：识别 [图片:]/[视频:]/URL 三种来源
+- **新增 `config/multimodal.json`**：运行时配置（env 覆盖 JSON 覆盖默认值）
+
+### 三种处理策略
+- **direct**：多模态 provider 直接接收 image content（M3 图片 / Qwen 图片）
+- **frame-extract**：视频抽帧后作为多 image content（Qwen 视频）
+- **preprocess**：纯文本 provider 走 M3 描述 → 文字注入 system（DeepSeek）
+
+### 上传与存储
+- **新增目录**：`data/static/videos/`（视频独立目录）
+- **图片**：`data/static/images/<uuid>.<ext>`（最大 20MB）
+- **视频**：`data/static/videos/<uuid>.<ext>`（最大 100MB）
+- **MIME 白名单**：png/jpg/jpeg/gif/webp + mp4/webm/quicktime/x-matroska
+- **Range 支持**：`/api/uploads/[filename]` 支持视频流式播放（拖动进度条）
+
+### UI 改动
+- 文件选择器 `accept` 支持视频格式
+- 视频附件显示 ▶ 视频缩略图
+- 视频上传/处理失败 toast 提示
+- message-item 支持视频预览（`<video controls>`）
+
+### 历史深度可按模态分级
+- 图片默认 `all`（上下文够大）
+- 视频默认 `1`（base64 巨大，避免撑爆）
+- 通过 env `MULTIMODAL_IMAGE_DEPTH` / `MULTIMODAL_VIDEO_DEPTH` 覆盖
+
+### 修复
+- **旧路径 bug**：`route.ts` 旧 preprocessImages 引用 `data/uploads/`（已不存在）→ 改成 `data/static/images/`
+- **路径穿越防护**：`uploads/[filename]` 加 `isPathSafe()` 校验
+- **MIME 校验**：upload 拒绝非白名单类型，防止 XSS
+
+### Qwen3.8-Max 接入路径（后续）
+- `providers.ts` 加 `qwen`（仿 `minimax`）
+- `multimodal-config.ts` 的 `MULTIMODAL_REGISTRY` 加 `qwen` 条目
+- **业务代码零改动**（已在配置中预留）
+
+### 变更文件
+**新增**：
+- `packages/ai-chat/src/lib/multimodal-config.ts`（~110 行）
+- `packages/ai-chat/src/lib/processor.ts`（~90 行）
+- `packages/ai-chat/src/lib/image-processor.ts`（~160 行）
+- `packages/ai-chat/src/lib/video-processor.ts`（~150 行）
+- `packages/ai-chat/src/lib/modality-detector.ts`（~90 行）
+- `packages/ai-chat/config/multimodal.json`（~25 行）
+
+**修改**：
+- `packages/ai-chat/src/app/api/chat/route.ts`（preprocess → processor）
+- `packages/ai-chat/src/app/api/upload/route.ts`（MIME + 路径分流）
+- `packages/ai-chat/src/app/api/uploads/[filename]/route.ts`（Range + 多目录 + 路径安全）
+- `packages/ai-chat/src/app/(main)/page.tsx`（UI + 视频缩略图 + 错误 toast）
+- `packages/ai-chat/src/components/chat/message-item.tsx`（视频预览）
+
+### 遗留（TODO）
+- **生成图片回流**：工具生成图片后，URL 替换为 `[图片:uuid]` 让多模态 M3 看到（未实现，会让"再画一张类似的"失效）
+- **历史图片文件丢失**：当前是 `error` 策略（明确报错），可改为 `ignore` 静默跳过
+- **视频直接传 URL**：当前所有多模态视频都走 frame-extract（架构已预留 direct 模式）
+
 ## v0.6.4 (2026-08-10) — 视觉组合语法 + 场景结构词汇表 + 渲染 bug 修复
 
 ### 视觉组合语法（composition grammar）

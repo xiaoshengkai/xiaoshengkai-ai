@@ -18,6 +18,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { retrieveRelevantChunks } from '@/lib/retrieve';
 import { deepseek, minimax } from '@/lib/providers';
 import { classifyTask } from '@/lib/model-router';
+import { processAttachments } from '@/lib/processor';
 
 // ─── 提示词常量 ────────────────────────────────────────────────────────
 
@@ -121,87 +122,6 @@ async function getMCPClient(): Promise<MCPClient> {
   return mcpClient;
 }
 
-// ─── 图片预处理 ────────────────────────────────────────────────────────
-
-async function preprocessImages(messages: any[]): Promise<{ messages: any[]; imageDescription?: string }> {
-  const last = messages[messages.length - 1];
-  if (!last?.parts) return { messages };
-
-  const textParts = last.parts.filter((p: any) => p?.type === 'text');
-  const imageUrlParts = textParts.filter((p: any) =>
-    /^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(p.text?.trim()),
-  );
-
-  // 检测 [图片:...] 标记
-  const uploadParts = textParts.filter((p: any) => p.text?.includes('[图片:/'));
-  const hasImages = uploadParts.length > 0 || imageUrlParts.length > 0;
-  if (!hasImages) return { messages };
-
-  let imageDescription = '';
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-
-  try {
-    const imageContent: any[] = [];
-
-    if (uploadParts.length > 0) {
-      for (const up of uploadParts) {
-        const match = up.text.match(/\[图片:([^\]]+)\]/);
-        if (match) {
-          const filename = path.basename(match[1]);
-          const filePath = path.resolve(process.cwd(), '..', '..', 'data', 'uploads', filename);
-          if (fs.existsSync(filePath)) {
-            const buffer = fs.readFileSync(filePath);
-            const base64 = `data:image/png;base64,${buffer.toString('base64')}`;
-            imageContent.push({ type: 'image' as const, image: base64 });
-          }
-        }
-      }
-    }
-    if (imageUrlParts.length > 0) {
-      imageContent.push(...imageUrlParts.map((p: any) => ({ type: 'image' as const, image: p.text.trim() })));
-    }
-
-    const tStart = Date.now();
-    console.log(`[preprocess] 检测到图片: ${imageContent.length} 张, MiniMax-M3 调用中...`);
-
-    const { text: description } = await generateText({
-      model: minimax('MiniMax-M3'),
-      abortSignal: controller.signal,
-      maxOutputTokens: 300,
-      messages: [
-        {
-          role: 'user',
-          content: [{ type: 'text', text: '请客观描述这张图片的内容即可，不要做多余事情。' }, ...imageContent],
-        },
-      ],
-    });
-
-    clearTimeout(timeout);
-    imageDescription = description;
-    console.log(
-      `[preprocess] MiniMax-M3 完成: 耗时 ${((Date.now() - tStart) / 1000).toFixed(1)}s, 描述 ${description.length} 字`,
-    );
-  } catch (err) {
-    clearTimeout(timeout);
-    console.error('[preprocess] 图片描述失败:', (err as Error).message);
-  }
-
-  // 剥离 [图片:...] 前缀，只保留用户可见文本
-  const cleanedParts = last.parts.map((p: any) => {
-    if (p?.type !== 'text') return p;
-    return {
-      ...p,
-      text: p.text.replace(/\[图片:[^\]]+\]\n?/g, ''),
-    };
-  });
-
-  return {
-    messages: [...messages.slice(0, -1), { ...last, parts: cleanedParts }],
-    imageDescription: imageDescription || undefined,
-  };
-}
-
 // ─── POST /api/chat ───────────────────────────────────────────────────
 
 export async function POST(req: Request) {
@@ -215,17 +135,28 @@ export async function POST(req: Request) {
       });
     }
 
-    const { messages: processedMessages, imageDescription } = await preprocessImages(messages);
+    // 任务分类（仅 DeepSeek 路径走 auto-route）
+    const isMiniMax = provider === 'minimax';
+    const classifyResult = isMiniMax ? null : await classifyTask(messages[messages.length - 1]?.parts?.[0]?.text || '');
+    const tier = classifyResult?.tier ?? 'pro';
+    const modelName = isMiniMax
+      ? 'MiniMax-M3'
+      : tier === 'pro'
+        ? process.env.DEEPSEEK_PRO_MODEL || 'deepseek-v4-pro'
+        : process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-v4-flash';
+
+    // 多模态处理：图片 + 视频附件
+    const { messages: processedMessages, systemInjection: multimodalInjection } =
+      await processAttachments({ provider, model: modelName, messages });
+
     const lastMessage = processedMessages[processedMessages.length - 1];
     const userQuery = typeof lastMessage?.parts?.[0]?.text === 'string' ? lastMessage.parts[0].text : '';
 
-    // 检索相关知识 + 任务分类（并行）
+    // 检索相关知识
     let knowledgeContext = '';
-    const [retrieved, classifyResult] = await Promise.all([
+    const [retrieved] = await Promise.all([
       retrieveRelevantChunks(userQuery, 5),
-      provider === 'minimax' ? Promise.resolve(null) : classifyTask(userQuery),
     ]);
-    const tier = classifyResult?.tier ?? 'pro';
     if (retrieved.length > 0) {
       knowledgeContext =
         '以下是从你的笔记中检索到的相关内容，如果与用户问题相关可以参考。\n' +
@@ -267,13 +198,6 @@ export async function POST(req: Request) {
 
     const modelMessages = await convertToModelMessages(llmMessages);
 
-    const isMiniMax = provider === 'minimax';
-    const modelName = isMiniMax
-      ? 'MiniMax-M3'
-      : tier === 'pro'
-        ? process.env.DEEPSEEK_PRO_MODEL || 'deepseek-v4-pro'
-        : process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-v4-flash';
-
     console.log('用户查询:', userQuery);
     console.log(`[router] provider: ${provider}, model: ${modelName}`);
     console.log(
@@ -293,7 +217,7 @@ export async function POST(req: Request) {
 技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
         ${SKILL_LIST}
         ${TOOLS_PROMPT}
-        ${imageDescription ? `\n用户上传了一张图片，图片内容描述：${imageDescription}\n` : ''}
+        ${multimodalInjection ? `\n${multimodalInjection}\n` : ''}
         ${knowledgeContext}`,
       messages: modelMessages,
       maxRetries: 5,

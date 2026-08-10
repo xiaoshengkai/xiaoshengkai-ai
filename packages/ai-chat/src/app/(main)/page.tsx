@@ -87,7 +87,7 @@ export default function ChatPage() {
   const [isFocused, setIsFocused] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [images, setImages] = useState<{ path: string; name: string }[]>([]);
+  const [images, setImages] = useState<{ path: string; name: string; modality: 'image' | 'video' }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<"deepseek" | "minimax">("deepseek");
   const providerRef = useRef(selectedProvider);
@@ -202,9 +202,17 @@ export default function ChatPage() {
     let text = value || "请看这张图";
 
     if (images.length > 0) {
-      const validPaths = images.map((img) => img.path).filter(Boolean) as string[];
-      if (validPaths.length > 0) {
-        text = validPaths.map((p) => `[图片:${p}]`).join("\n") + "\n\n" + text;
+      const validPaths = images.filter((img) => img.path && img.modality === 'image');
+      const validVideos = images.filter((img) => img.path && img.modality === 'video');
+      const tags = ['image', 'video'] as const;
+      const markers: string[] = [];
+      for (const t of tags) {
+        for (const img of t === 'image' ? validPaths : validVideos) {
+          markers.push(`[${t === 'image' ? '图片' : '视频'}:${img.path}]`);
+        }
+      }
+      if (markers.length > 0) {
+        text = markers.join("\n") + "\n\n" + text;
       }
     }
 
@@ -281,7 +289,7 @@ export default function ChatPage() {
     Promise.all(
       imgItems.map(
         (item) =>
-          new Promise<{ path: string; name: string }>((resolve) => {
+          new Promise<{ path: string; name: string; modality: 'image' | 'video' }>((resolve) => {
             const blob = item.getAsFile()!;
             const reader = new FileReader();
             reader.onload = () => {
@@ -290,9 +298,16 @@ export default function ChatPage() {
               fetch(`${BASE}/api/upload`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ base64, name }),
-              }).then(r => r.json()).then(data => resolve({ path: data.path || "", name }))
-                .catch(() => resolve({ path: "", name }));
+                body: JSON.stringify({ base64, name, mimeType: blob.type }),
+              }).then(r => r.json()).then(data => {
+                if (data.error) {
+                  toast.error(data.error);
+                  resolve({ path: "", name, modality: 'image' });
+                } else {
+                  resolve({ path: data.path || "", name, modality: data.modality || 'image' });
+                }
+              })
+                .catch(() => resolve({ path: "", name, modality: 'image' }));
             };
             reader.readAsDataURL(blob);
           })
@@ -309,16 +324,23 @@ export default function ChatPage() {
     Promise.all(
       files.map(
         (f) =>
-          new Promise<{ path: string; name: string }>((resolve) => {
+          new Promise<{ path: string; name: string; modality: 'image' | 'video' }>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => {
               const base64 = reader.result as string;
               fetch(`${BASE}/api/upload`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ base64, name: f.name }),
-              }).then(r => r.json()).then(data => resolve({ path: data.path || "", name: f.name }))
-                .catch(() => resolve({ path: "", name: f.name }));
+                body: JSON.stringify({ base64, name: f.name, mimeType: f.type }),
+              }).then(r => r.json()).then(data => {
+                if (data.error) {
+                  toast.error(data.error);
+                  resolve({ path: "", name: f.name, modality: 'image' });
+                } else {
+                  resolve({ path: data.path || "", name: f.name, modality: data.modality || 'image' });
+                }
+              })
+                .catch(() => resolve({ path: "", name: f.name, modality: 'image' }));
             };
             reader.readAsDataURL(f);
           })
@@ -399,7 +421,13 @@ export default function ChatPage() {
                 <div className="flex items-center gap-2 px-3 pt-2 pb-1 overflow-x-auto">
                   {images.map((img, i) => (
                     <div key={i} className="relative shrink-0 h-10 border-2 border-muted-foreground/15">
-                      <img src={img.path} className="w-auto h-10 object-contain" alt={img.name} />
+                      {img.modality === 'video' ? (
+                        <div className="w-16 h-10 bg-black flex items-center justify-center text-white text-xs">
+                          <span className="text-[10px]">▶ 视频</span>
+                        </div>
+                      ) : (
+                        <img src={img.path} className="w-auto h-10 object-contain" alt={img.name} />
+                      )}
                       <button
                         onClick={() => removeImage(i)}
                         className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-muted-foreground/80 text-white text-[10px] flex items-center justify-center cursor-pointer"
@@ -442,7 +470,7 @@ export default function ChatPage() {
               />
               <div className="flex items-center justify-between px-3 pt-1 pb-2">
                 <div className="flex items-center gap-1">
-                  <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                  <input type="file" accept="image/*,video/mp4,video/webm,video/quicktime,video/x-matroska" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="pixel-btn-image px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"

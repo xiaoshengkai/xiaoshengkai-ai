@@ -114,14 +114,21 @@ toast.error("保存失败，请重试", {
               {deduplicatedParts.map((part, i) => {
                 if (part.type === "text") {
                   if (msg.role === "user") {
-                    const segments = part.text.split(/(\[图片:[^\]]+\])/g);
+                    const segments = part.text.split(/(\[(图片|视频):[^\]]+\])/g);
                     return (
                       <span key={i}>
                         {segments.map((seg, j) => {
-                          const m = seg.match(/^\[图片:([^\]]+)\]$/);
+                          const m = seg.match(/^\[(图片|视频):([^\]]+)\]$/);
                           if (m) {
-                            const index = register(m[1]);
-                            return <img key={j} src={m[1]} onClick={() => open(index)} className="max-w-full max-h-48 pixel-img mb-2 cursor-zoom-in" alt="图片" />;
+                            const tag = m[1];
+                            const url = m[2];
+                            if (tag === "视频") {
+                              return (
+                                <video key={j} src={url} controls className="max-w-full max-h-48 pixel-img mb-2" />
+                              );
+                            }
+                            const index = register(url);
+                            return <img key={j} src={url} onClick={() => open(index)} className="max-w-full max-h-48 pixel-img mb-2 cursor-zoom-in" alt="图片" />;
                           }
                           return seg ? <span key={j}>{seg}</span> : null;
                         })}

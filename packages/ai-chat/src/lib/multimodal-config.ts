@@ -3,19 +3,23 @@
  *
  * 扩展方式：新增 provider/model 只需加配置项，业务代码零改动
  * 配置优先级：环境变量 > JSON 文件 > 代码默认值
+ *
+ * 视频处理说明（M3）：
+ *   M3 直接接受 video_url content type，无需预抽帧。M3 自己按 fps 采样。
+ *   所以 strategy = 'direct' 表示"直传 video_url"而非抽帧。
  */
 
 export type Modality = 'image' | 'video';
-export type Strategy = 'direct' | 'frame-extract' | 'none';
+export type Strategy = 'direct' | 'none';
 
 export interface ProviderCapabilities {
   provider: string;
-  /** 支持图片直传（base64/URL）的模型列表 */
+  /** 支持图片直传（image_url）的模型列表 */
   imageModels: string[];
-  /** 支持视频直传或抽帧的模型列表 */
+  /** 支持视频直传（video_url）的模型列表 */
   videoModels: string[];
-  /** 视频是否只支持抽帧方式（true=抽帧，false=直传URL） */
-  videoViaFrameExtract?: boolean;
+  /** 默认视频采样 fps（0.2-5，默认 1）*/
+  videoFps?: number;
   description?: string;
 }
 
@@ -26,15 +30,16 @@ export const DEFAULT_MULTIMODAL_REGISTRY: Record<string, ProviderCapabilities> =
   minimax: {
     provider: 'minimax',
     imageModels: ['MiniMax-M3'],
-    videoModels: [],  // M3 视频未确认
-    description: 'MiniMax M3 多模态（图片）',
+    videoModels: ['MiniMax-M3'],
+    videoFps: 1,
+    description: 'MiniMax M3 多模态（image_url + video_url）',
   },
   qwen: {
     provider: 'qwen',
     imageModels: ['qwen3.8-max', 'qwen-vl-max'],
     videoModels: ['qwen3.8-max'],
-    videoViaFrameExtract: true,
-    description: '通义千问 3.8-Max 多模态（图片+视频抽帧）',
+    videoFps: 1,
+    description: '通义千问 3.8-Max 多模态（image_url + video_url）',
   },
 };
 
@@ -46,20 +51,17 @@ export interface MultimodalConfig {
   imageHistoryDepth: number | 'all';
   /** 视频历史深度（视频 base64 巨大，默认 1） */
   videoHistoryDepth: number;
-  /** 单文件大小上限（字节） */
+  /** 单文件大小上限（字节）—M3 限制：图片 10MB，视频 50MB */
   maxFileSize: number;
   /** 缺失文件时的策略 */
   missingFileStrategy: 'error' | 'ignore' | 'preprocess';
-  /** 视频抽帧数量 */
-  videoFrameCount: number;
 }
 
 export const DEFAULT_CONFIG: MultimodalConfig = {
   imageHistoryDepth: 'all',
   videoHistoryDepth: 1,
-  maxFileSize: 100 * 1024 * 1024,  // 100MB
+  maxFileSize: 50 * 1024 * 1024,  // 50MB（M3 base64 视频上限）
   missingFileStrategy: 'error',
-  videoFrameCount: 5,
 };
 
 /**
@@ -89,8 +91,5 @@ export function getModalityStrategy(
   if (!cfg) return 'none';
   const models = modality === 'image' ? cfg.imageModels : cfg.videoModels;
   if (models.length === 0) return 'none';
-  if (models.includes(model)) {
-    return cfg.videoViaFrameExtract && modality === 'video' ? 'frame-extract' : 'direct';
-  }
-  return 'none';
+  return models.includes(model) ? 'direct' : 'none';
 }

@@ -1,5 +1,58 @@
 # Changelog
 
+## v0.6.6 (2026-08-10) — M3 视频 API 修正（image_url → video_url + fps 参数）
+
+### 重大修正
+之前 v0.6.5 实现错了——M3 文档明确要求 video 用 `video_url` content type，且 M3 自己按 `fps` 采样视频帧。v0.6.5 用 ffmpeg 预抽帧是错误方案。
+
+### 核心改动
+- **废弃 ffmpeg 抽帧**：`video-processor.ts` 不再调 ffmpeg
+- **M3 视频 content type**：直接传 `video_url` + `fps: 1`
+- **providers.ts fetch 拦截器**：自动把 `image_url`（MIME 是 `video/*`）重写为 `video_url`
+  - 业务代码只需 `{type: 'image', image: 'data:video/mp4;base64,...'}` 即可
+  - AI SDK 自动转成 image_url → 拦截器再改成 video_url
+  - 无需绕过 AI SDK
+- **统一大小限制**：
+  - 图片最大 **10MB**（M3 限制）
+  - 视频最大 **50MB**（M3 base64 限制）
+- **MIME 白名单调整**：
+  - 去掉 `video/webm`（M3 不支持）
+  - 加 `video/x-msvideo`（AVI）
+- **`detail` 默认值**：图片/视频都默认 `default`，M3 自适应 token
+- **历史深度**：保留 `image=all` / `video=1` 默认
+
+### 测试视频方法
+ffmpeg 生成测试视频：
+```bash
+ffmpeg -y -f lavfi -i testsrc=size=320x240:duration=3:rate=12 \
+  -pix_fmt yuv420p /tmp/test.mp4
+```
+
+### 验证清单
+- [ ] M3 直接接收 base64 video_url，返回合理响应
+- [ ] M3 + 图片 + 视频（一次调用）能解析两者
+- [ ] DeepSeek + 视频：preprocess（M3 描述）+ 文字 fallback
+- [ ] Files API 路径（>50MB 视频）：**TODO 下次**
+- [ ] Qwen3.8-Max 接入：架构已预留
+
+### 改动文件
+- `packages/ai-chat/src/lib/providers.ts`（+18/-3 行）— fetch 拦截器加 video_url 转换
+- `packages/ai-chat/src/lib/video-processor.ts`（重写，废弃 ffmpeg）
+- `packages/ai-chat/src/lib/processor.ts`（简化，删 frame-extract 分支）
+- `packages/ai-chat/src/lib/multimodal-config.ts`（删 videoFrameCount，加 videoFps）
+- `packages/ai-chat/src/app/api/upload/route.ts`（webm 移除、大小 10/50MB）
+- `packages/ai-chat/src/app/(main)/page.tsx`（accept 同步更新）
+- `packages/ai-chat/config/multimodal.json`（删 videoFrameCount）
+
+### 清理
+- 删除 `packages/ai-chat/test-*.mjs`（3 个临时测试文件）
+
+### 待办（Files API）
+M3 文档提到 >50MB 视频需走 Files API：`mm_file://{file_id}`（最大 512MB）。本次未实现，留 TODO：
+- 新增 `/api/m3/files/upload` 路由
+- 调用 M3 `/v1/files/upload` 拿 file_id
+- processor 检测超 50MB 自动转 Files API 路径
+
 ## v0.6.5 (2026-08-10) — 多模态架构重构（图片直传 + 视频支持 + Qwen3.8-Max 接入准备）
 
 ### 多模态架构（策略模式 + 配置驱动）

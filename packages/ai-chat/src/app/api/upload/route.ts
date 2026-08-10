@@ -12,19 +12,19 @@ import path from "node:path";
 import crypto from "node:crypto";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
-const VIDEO_EXTS = new Set(["mp4", "webm", "mov", "mkv"]);
+const VIDEO_EXTS = new Set(["mp4", "mov", "avi", "mkv"]);  // 移除 webm（M3 不支持）
 
-const IMAGE_MAX = 20 * 1024 * 1024;   // 20MB
-const VIDEO_MAX = 100 * 1024 * 1024;  // 100MB
+const IMAGE_MAX = 10 * 1024 * 1024;   // 10MB（M3 图片上限）
+const VIDEO_MAX = 50 * 1024 * 1024;  // 50MB（M3 视频 base64 上限）
 
 const MIME_WHITELIST: Record<string, Set<string>> = {
-  "image/png": IMAGE_EXTS,
+  "image/png": new Set(["png"]),
   "image/jpeg": new Set(["jpg", "jpeg"]),
   "image/gif": new Set(["gif"]),
   "image/webp": new Set(["webp"]),
   "video/mp4": new Set(["mp4"]),
-  "video/webm": new Set(["webm"]),
   "video/quicktime": new Set(["mov"]),
+  "video/x-msvideo": new Set(["avi"]),
   "video/x-matroska": new Set(["mkv"]),
 };
 

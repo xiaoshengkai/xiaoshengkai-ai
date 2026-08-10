@@ -3,8 +3,9 @@
     "minimax": {
       "provider": "minimax",
       "imageModels": ["MiniMax-M3"],
-      "videoModels": [],
-      "description": "MiniMax M3 多模态（图片）"
+      "videoModels": ["MiniMax-M3"],
+      "videoViaFrameExtract": true,
+      "description": "MiniMax M3 多模态（图片+视频抽帧）"
     },
     "qwen": {
       "provider": "qwen",

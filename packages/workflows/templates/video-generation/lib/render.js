@@ -159,8 +159,8 @@ export async function renderMP4(workDir, allHtml, globalCss, globalJsAnimation, 
 
   let currentTime = 0;
   let trackIndex = 0;
-  html = html.replace(/class="clip([^"]*)"/g, (match, attrs) => {
-    const durMatch = attrs.match(/data-duration="(\d+)"/);
+  html = html.replace(/class=["']clip([^"']*)["']/g, (match, attrs) => {
+    const durMatch = attrs.match(/data-duration=["]?(\d+)["]?/);
     const dur = durMatch ? parseInt(durMatch[1]) : 5;
     const result = `class="clip${attrs}" data-start="${currentTime}" data-track-index="${trackIndex}"`;
     currentTime += dur;

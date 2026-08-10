@@ -1,5 +1,50 @@
 # Changelog
 
+## v0.6.4 (2026-08-10) — 视觉组合语法 + 场景结构词汇表 + 渲染 bug 修复
+
+### 视觉组合语法（composition grammar）
+- **script-rules.md 新增章节**：从"做什么"扩展到"怎么搭"
+- **6 大元素词汇表**：几何/有机/排版/色彩/纹理/运动（抽象概念，不锁死具体样式）
+- **组合语法**：层数规则（≥3 层）/ 焦点规则（1 个焦点）/ 对比规则（动静大小明暗疏密）/ 节奏规则（相邻场景换元素类型）
+- **自检清单**：4 个问题（3 层/3 类/抹字立得住/重叠度 <50%）
+- **5 条反模式**：纯文字+emoji/全场景同元素/无背景层/装饰少/抹字崩溃
+
+### 场景结构词汇表
+- **6 种结构类型**：stat-card / process-step / data-viz / comparison / quote / list
+- **强约束**：每个视频至少用 3 种结构类型
+- **分布建议**：10 场景 = 1 hook + 4-5 body（混用） + 1 peak + 1 outro
+- **效果**：从「所有场景长得一样」跃升到「柱状图/对比/流式列表/多结构」
+
+### JS 动画策略 A/B
+- **策略 A（推荐）**：clip 级动画 `gsap.from('#clip-1', ...)` — 选择器 100% 命中
+- **策略 B**：内嵌 `<script>` 用 `this.querySelector(...)` — 更丰富但需小心
+- **不推荐**：在 `jsAnimation` 字段写 `#stage .clip-N .classname` — 选择器找不到目标
+
+### 设计 Tokens 强制
+- 不再允许 `"designTokens": {}` 空对象
+- 必须填 `palette`（background/primary/secondary）+ `fonts`（heading/body）
+
+### 渲染 bug 修复（关键）
+- **render.js:162 正则**：`class="clip([^"]*)"` → `class=["']clip([^"']*)["']`
+- **原因**：AI 输出单引号 `class='clip'` 时正则不匹配，data-start/data-track-index 未注入
+- **后果**：只有 scene 1 显示，后续场景全是黑屏
+- **修复后**：单/双引号都支持，10 场景全部正常渲染
+
+### 视频质量验证
+- 同一主题「银行的赚钱逻辑」3 轮迭代
+- iter1：1.7MB 78% 静态帧（GSAP 选择器全失败）
+- iter3 重渲染：4.1MB 6 种场景结构 0 个动画报错
+- 真实 SVG 可视化：柱状图、风险对比图、流式列表
+
+### 变更文件
+- `packages/workflows/templates/video-generation/script-rules.md`（+131 行）
+  - 「视觉组合语法」章节
+  - 「场景结构词汇表」章节
+  - JS 动画策略 A/B
+  - designTokens 强制 + scene id 必填
+- `packages/workflows/templates/video-generation/lib/render.js`（+2/-2 行）
+  - 正则支持单/双引号
+
 ## v0.6.3 (2026-08-07) — 设计规范分离 + 美学方法论 + 设计人格
 
 ### 设计规范拆分为 10 个文件

@@ -16,6 +16,13 @@ script（含校验）→ tts（可选）→ bgm → render
 - **纯画面渲染**：HyperFrames 渲染纯画面，ffmpeg 单独混合音频
 - **风格可选**：用户可选 Neo-Brutalist/奶油风/极简黑白，不选则 AI 决定
 
+## 设计规范与组合语法
+
+- `design-rules/`：10 个独立文件（typography/color/layout/spacing/shadows/animation/narrative/components/svg/anti-patterns）
+- **script-rules.md「视觉组合语法」**：6 大元素词汇表（几何/有机/排版/色彩/纹理/运动）+ 层数/焦点/对比/节奏 4 条组合规则
+- **场景结构词汇表**：stat-card / process-step / data-viz / comparison / quote / list 至少用 3 种
+- **JS 动画策略 A/B**：A 推荐 clip 级（`#clip-N` 必命中）/ B 内嵌 script 用 `this.querySelector`
+
 ## 模板
 
 - `templates/animation.html`：GSAP 动画骨架

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";

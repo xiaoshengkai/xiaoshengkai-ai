@@ -1,7 +1,7 @@
 
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import { useMemo, useEffect, useState, useRef } from "react";
 import type { UIMessage } from "ai";
 import { calculateCost, formatTokens } from "@/lib/cost";

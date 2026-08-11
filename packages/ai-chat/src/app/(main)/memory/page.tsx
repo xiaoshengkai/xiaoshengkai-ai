@@ -1,7 +1,7 @@
 
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import { useCallback, useEffect, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { toast } from "sonner";

@@ -1,20 +1,13 @@
-import fs from "node:fs";
-import path from "node:path";
-
-const DATA_DIR = path.resolve(process.cwd(), "..", "..", "data", "conversations");
+import { readConversation, deleteConversation } from "@/lib/conversation-store";
 
 export async function DELETE(req: Request) {
-  const url = new URL(req.url);
-  const id = url.searchParams.get("id");
+  const id = new URL(req.url).searchParams.get("id");
   if (!id) return Response.json({ error: "id 必填" }, { status: 400 });
 
   console.log(`[conv:delete] id=${id}`);
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-
-  if (!fs.existsSync(filePath)) {
+  if (!readConversation(id)) {
     return Response.json({ error: "对话不存在" }, { status: 404 });
   }
-
-  fs.unlinkSync(filePath);
+  deleteConversation(id);
   return Response.json({ ok: true });
 }

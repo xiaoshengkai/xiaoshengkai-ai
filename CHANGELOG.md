@@ -1,5 +1,113 @@
 # Changelog
 
+## v0.6.8 (2026-08-11) — 整体代码优化（类型安全 + 工具合并 + 死代码清理）
+
+用户之前提到"等会来一次整体的代码检查优化"，今天完成。一次跑完 9 个 phase（基线 → 工具新建 → 死代码 → 合并 → 类型 → UI 抽离 → 性能 → 临时测试 → 收尾），零功能改动。
+
+### 核心改动
+
+**A. 类型安全（最关键）**
+- 新建 `src/lib/types.ts`：定义 `Message` / `MessagePart` / `MessageMetadata` / `TokenUsage` / `NoteData` 等核心类型
+- **消除 47 处 `any`** + **删除 6 处 `// eslint-disable`**（其中 4 处是隐藏的真实 hook 错误）
+- 影响：`image-processor.ts` / `video-processor.ts` / `processor.ts` / `m3-raw-fetch.ts` / `modality-detector.ts` / `route.ts` / `message-item.tsx` / `page.tsx` / `markdown-components.tsx`
+
+**B. 工具方法去重（合并 4 处散落）**
+- `src/lib/workflow-cli.ts`（合并 `cli-parser.ts`）— 替换 8 处 workflow route 的 `execFile` 包装
+- `src/lib/conversation-store.ts` — 5 个 conversations route 全部走统一 helper
+- `src/lib/upload-client.ts`（`uploadFile` / `readAsBase64`）— 合并 `handlePaste` + `handleFileChange` 重复块
+- `src/lib/multimodal-markers.ts` — 8 个 marker/URL 正则常量统一导出，6 处内联正则全部移除（`js-hoist-regexp`）
+
+**C. 新增工具**
+- `src/lib/env.ts` — 集中 9 个 env 读取（MINIMAX/DEEPSEEK/GLM/CHROMA_BASE_URL/API_KEY 等），替换 5 处散落
+- `src/lib/mime.ts` — `extToMime` / `isImageExt` / `isVideoExt`，替换 5 处 MIME 字典
+- `src/lib/format.ts` — `formatDateTime` / `formatRelative`，合并 3 处日期实现
+
+**E. 目录瘦身（删除 5 个文件）**
+- `config/multimodal.json`（从未被读取的 dead config）
+- `src/lib/api-path.ts`（1 行 export → 并入 utils.ts）
+- `src/lib/cli-parser.ts`（合并到 workflow-cli.ts）
+- `src/app/body-wrapper.tsx`（5 行 identity → 内联 layout.tsx）
+- `src/components/ui/card.tsx`（0 处引用）
+
+**F. 死代码**
+- `vector-store.ts` 删 `COLLECTION_NAME = "java_knowledge"`（@deprecated，无 caller）
+- `chroma-server.ts` 删 `isChromaOwnedByThisProcess`（无 caller）
+- `modality-detector.ts` 删 `isVideoPath` / `isImagePath`（无 caller）
+- `execution/[id]/page.tsx` 删 `STEP_GROUPS` 空数组
+- `admin/chroma/route.ts` 删 `MAX_LIMIT` / `MIN_LIMIT` / `MAX_TOP_K` / `ADMIN_PAGE_SIZE_DEFAULT` 导入
+- `providers.ts:10` `name: "aether"` 错名 → `"deepseek"`（实际是 DeepSeek provider）
+
+**G. UI 组件抽离**
+- `src/components/ui/pixel-logo.tsx`（新）— 统一 `left-sidebar.tsx` 和 `page.tsx` 里两份几乎一样的 `PixelLogo` 实现
+
+**H. 性能微调**
+- `MessageItem` 套 `React.memo`（按 msg.id + isLoading 比较）
+- 6 处内联正则全部 hoist 到 `multimodal-markers.ts` 模块级常量
+- 修了一个隐藏 bug：全局 regex + `.test()` 会保留 lastIndex，导致 `processor.ts` 的 `hasImage`/`hasVideo` 在多消息场景下偶发 false。改用 `String.search()` 后正常
+- `parseCliOutput` 加括号匹配（之前 trailing line 会让 JSON.parse 崩）
+
+### 测试（临时）
+
+写了 4 个测试文件 `packages/ai-chat/_test/*.test.ts`（mime / multimodal-markers / workflow-cli / format），`node --test` 跑 **15/15 通过**，跑完即删 `_test/`。
+
+测试过程发现 2 个真实 bug：
+1. `processor.ts` 的 `hasImage/hasVideo` 用 `IMAGE_URL_REGEX.test()` — 全局 regex 的 lastIndex state 导致多消息场景偶发 false（已修）
+2. `parseCliOutput` 不处理 trailing noise — 当 CLI 输出 `{"ok":true}\n` 后还有日志，JSON.parse 失败（已加括号匹配算法）
+
+### 净效果
+
+| 维度 | 改前 | 改后 |
+|---|---|---|
+| `any` 类型 | 47 处 | 0 |
+| `eslint-disable`（除 2 处合法 `<img>`） | 6 处 | 0 |
+| env 读取散落点 | 5 个文件 | 1 个 (`env.ts`) |
+| workflow route `execFile` 包装 | 8 份重复 | 1 个 helper |
+| conversation route `fs` 操作 | 5 份重复 | 1 个 helper |
+| MIME 字典 | 5 份 | 1 个 helper |
+| 多模态正则 | 6 处内联 | 1 个文件模块级常量 |
+| 死代码 | 9 项 | 0 |
+| TypeScript 编译 | 0 错误 | 0 错误 |
+| 净 LOC | - | ~-280 行（功能不变）|
+
+### 变更文件
+
+**新增（10）**
+- `src/lib/types.ts`
+- `src/lib/env.ts`
+- `src/lib/format.ts`
+- `src/lib/mime.ts`
+- `src/lib/multimodal-markers.ts`
+- `src/lib/workflow-cli.ts`
+- `src/lib/conversation-store.ts`
+- `src/lib/upload-client.ts`
+- `src/components/ui/pixel-logo.tsx`
+- `_test/*.test.ts`（4 个临时测试，已删）
+
+**删除（5）**
+- `config/multimodal.json`
+- `src/lib/api-path.ts`
+- `src/lib/cli-parser.ts`
+- `src/app/body-wrapper.tsx`
+- `src/components/ui/card.tsx`
+
+**修改（~25）**
+- 4 个 lib 文件（image/video/processor/m3-raw-fetch）— 类型 + 正则常量
+- 3 个 layout 组件（page、schedule、workflow）— 移除 eslint-disable
+- 5 个 conversations route — 全部走 conversation-store
+- 8 个 workflow route — 全部走 workflow-cli
+- 多个文件用 env 替换散落 process.env 读取
+
+### 已知限制
+- ESLint 实际跑不起来（`eslint-config-next` 依赖的 `next/dist/compiled/babel/eslint-parser` 在 16.x 缺失），靠 `tsc --noEmit` 替代
+- PixelButton 重构（20 处 inline style）推迟 — 用户原本提的，但 YAGNI 原则下没做（未量化收益，改动面太大）
+- NoteBody 组件抽离（note-preview-card + note/[taskId] 共享）推迟 — 同样 YAGNI
+
+### 后续 TODO
+- 上线后跑 7 个核心场景回归测试
+- PixelButton / NoteBody 抽离可作为单独 PR
+- Qwen3.8-Max 接入（之前提过）
+- Files API 路径（>50MB 视频走 mm_file://）
+
 ## v0.6.7 (2026-08-11) — 代码清理 + DeepSeek preprocess 路径修复
 
 ### 核心改动

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import { useMemo, useState, useCallback } from "react";
 import { isToolUIPart, isReasoningUIPart, type UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
@@ -114,7 +114,7 @@ toast.error("保存失败，请重试", {
               {deduplicatedParts.map((part, i) => {
                 if (part.type === "text") {
                   if (msg.role === "user") {
-                    const segments = part.text.split(/(\[(图片|视频):[^\]]+\])/g);
+                    const segments = part.text.split(/(\[(?:图片|视频):[^\]]+\])/g);
                     return (
                       <span key={i}>
                         {segments.map((seg, j) => {

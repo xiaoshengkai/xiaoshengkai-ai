@@ -1,28 +1,16 @@
 import { NextResponse } from "next/server";
-import path from "node:path";
-import { execFile } from "node:child_process";
-import { parseCliOutput } from "@/lib/cli-parser";
-
-const CLI_PATH = path.resolve(process.cwd(), "..", "..", "packages", "workflows", "cli.js");
+import { runWorkflowCli } from "@/lib/workflow-cli";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = await request.json();
-  const { stepId } = body;
+  const { stepId } = await request.json();
   if (!stepId) return NextResponse.json({ ok: false, error: "missing stepId" }, { status: 400 });
 
   try {
-    const result = await new Promise<string>((resolve, reject) => {
-      execFile("node", [CLI_PATH, "skip", JSON.stringify({ executionId: id, stepId })], { timeout: 10000 }, (err, stdout, stderr) => {
-        if (stderr) console.error(`[workflow] cli stderr:`, stderr);
-        if (err) reject(err);
-        else resolve(stdout.trim());
-      });
-    });
-    const data = parseCliOutput(result);
+    const data = await runWorkflowCli(["skip", JSON.stringify({ executionId: id, stepId })], 10_000);
     return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -1,18 +1,21 @@
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
-import { Send, ChevronDown, Image, Square } from "lucide-react";
+import { Send, ChevronDown, Image as ImageIcon, Square } from "lucide-react";
 import { toast } from "sonner";
 import MessageItem from "@/components/chat/message-item";
 import { ImageViewerProvider } from "@/components/ui/image-viewer";
 import RightPanel from "@/components/layout/right-panel";
 import { useConversation } from "@/components/layout/conversation-context";
 import { calculateCost, formatTokens } from "@/lib/cost";
+import { uploadFile } from "@/lib/upload-client";
+import type { AttachedFile } from "@/lib/types";
+import PixelLogo from "@/components/ui/pixel-logo";
 
 const LoadingDots = React.memo(function LoadingDots() {
   return (
@@ -30,45 +33,10 @@ const LoadingDots = React.memo(function LoadingDots() {
   );
 });
 
-function PixelLogo() {
-  const PX = 12;
-  const pixels = [
-    "..██..",
-    ".████.",
-    "██████",
-    ".████.",
-    "..██..",
-    "..██..",
-    ".█..█.",
-  ];
-
-  return (
-    <div className="relative" style={{ width: pixels[0].length * PX, height: pixels.length * PX }}>
-      {pixels.map((row, y) =>
-        row.split("").map((cell, x) =>
-          cell === "█" ? (
-            <div
-              key={`${x}-${y}`}
-              className="absolute"
-              style={{
-                left: x * PX,
-                top: y * PX,
-                width: PX,
-                height: PX,
-                background: "var(--primary)",
-              }}
-            />
-          ) : null
-        )
-      )}
-    </div>
-  );
-}
-
 const EmptyState = React.memo(function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-      <PixelLogo />
+      <PixelLogo size={12} />
       <h1 className="text-2xl font-bold tracking-widest font-mono">小盛开AI</h1>
       <p className="text-muted-foreground/60 text-xs font-mono">PRESS ENTER TO CHAT ▸</p>
     </div>
@@ -87,7 +55,7 @@ export default function ChatPage() {
   const [isFocused, setIsFocused] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [images, setImages] = useState<{ path: string; name: string; modality: 'image' | 'video' }[]>([]);
+  const [images, setImages] = useState<AttachedFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<"deepseek" | "minimax">("deepseek");
   const providerRef = useRef(selectedProvider);
@@ -130,7 +98,8 @@ export default function ChatPage() {
   const saveConversation = useCallback(async () => {
     if (!convIdRef.current || messages.length === 0 || savingRef.current) return;
     savingRef.current = true;
-    const title = (messages[0]?.parts?.find((p: any) => p.type === "text") as any)?.text?.slice(0, 30) || "未命名对话";
+    const firstTextPart = messages[0]?.parts?.find((p) => p.type === "text") as { text?: string } | undefined;
+    const title = firstTextPart?.text?.slice(0, 30) || "未命名对话";
     try {
       await fetch(`${BASE}/api/conversations/save`, {
         method: "POST",
@@ -174,7 +143,7 @@ export default function ChatPage() {
     };
 
     switchConversation();
-  }, [activeConversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeConversationId, newIdsRef, stop, setMessages]);
 
   // AI 回复完成后保存
   const prevStatusRef = useRef(status);
@@ -279,78 +248,38 @@ export default function ChatPage() {
     }
   }, [hasMessages, messages, setMessages]);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+  /** 通用上传 + 容错 fallback（上传失败仍返回占位条目） */
+  const uploadOrFallback = useCallback(async (file: File): Promise<AttachedFile> => {
+    const name = file.name || `paste.${file.type.split('/')[1] || 'png'}`;
+    try {
+      return await uploadFile(file);
+    } catch (err) {
+      toast.error((err as Error).message);
+      return { path: '', name, modality: file.type.startsWith('video/') ? 'video' : 'image' };
+    }
+  }, []);
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
     const imgItems = Array.from(items).filter((i) => i.type.startsWith("image/"));
     if (imgItems.length === 0) return;
     e.preventDefault();
     setUploading(true);
-    Promise.all(
-      imgItems.map(
-        (item) =>
-          new Promise<{ path: string; name: string; modality: 'image' | 'video' }>((resolve) => {
-            const blob = item.getAsFile()!;
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = reader.result as string;
-              const name = blob.name || "paste.png";
-              fetch(`${BASE}/api/upload`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ base64, name, mimeType: blob.type }),
-              }).then(r => r.json()).then(data => {
-                if (data.error) {
-                  toast.error(data.error);
-                  resolve({ path: "", name, modality: 'image' });
-                } else {
-                  resolve({ path: data.path || "", name, modality: data.modality || 'image' });
-                }
-              })
-                .catch(() => resolve({ path: "", name, modality: 'image' }));
-            };
-            reader.readAsDataURL(blob);
-          })
-      )
-    ).then((newImgs) => {
-      setImages((prev) => [...prev, ...newImgs.filter((i) => i.path)]);
-      setUploading(false);
-    });
-  }, []);
+    const files = imgItems.map((i) => i.getAsFile()).filter((f): f is File => f !== null);
+    const uploaded = await Promise.all(files.map(uploadOrFallback));
+    setImages((prev) => [...prev, ...uploaded.filter((i) => i.path)]);
+    setUploading(false);
+  }, [uploadOrFallback]);
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setUploading(true);
-    Promise.all(
-      files.map(
-        (f) =>
-          new Promise<{ path: string; name: string; modality: 'image' | 'video' }>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = reader.result as string;
-              fetch(`${BASE}/api/upload`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ base64, name: f.name, mimeType: f.type }),
-              }).then(r => r.json()).then(data => {
-                if (data.error) {
-                  toast.error(data.error);
-                  resolve({ path: "", name: f.name, modality: 'image' });
-                } else {
-                  resolve({ path: data.path || "", name: f.name, modality: data.modality || 'image' });
-                }
-              })
-                .catch(() => resolve({ path: "", name: f.name, modality: 'image' }));
-            };
-            reader.readAsDataURL(f);
-          })
-      )
-    ).then((newImgs) => {
-      setImages((prev) => [...prev, ...newImgs.filter((i) => i.path)]);
-      setUploading(false);
-    });
+    const uploaded = await Promise.all(files.map(uploadOrFallback));
+    setImages((prev) => [...prev, ...uploaded.filter((i) => i.path)]);
+    setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [uploadOrFallback]);
 
   const removeImage = useCallback((i: number) => {
     setImages((prev) => prev.filter((_, idx) => idx !== i));
@@ -475,7 +404,7 @@ export default function ChatPage() {
                     onClick={() => fileInputRef.current?.click()}
                     className="pixel-btn-image px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"
                   >
-                    <Image className="size-3.5" />
+                    <ImageIcon className="size-3.5" />
                   </button>
                 </div>
                 {isLoading ? (

@@ -1,15 +1,16 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { env } from "./env";
 
 export const glm = createOpenAICompatible({
   name: "glm",
-  baseURL: process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4",
-  apiKey: process.env.GLM_API_KEY,
+  baseURL: env.GLM_BASE_URL,
+  apiKey: env.GLM_API_KEY,
 });
 
 export const deepseek = createOpenAICompatible({
-  name: "aether",
-  baseURL: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1",
-  apiKey: process.env.DEEPSEEK_API_KEY,
+  name: "deepseek",
+  baseURL: env.DEEPSEEK_BASE_URL,
+  apiKey: env.DEEPSEEK_API_KEY,
 });
 
 /**
@@ -22,8 +23,8 @@ export const deepseek = createOpenAICompatible({
  */
 export const minimax = createOpenAICompatible({
   name: "minimax",
-  baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1",
-  apiKey: process.env.MINIMAX_API_KEY,
+  baseURL: env.MINIMAX_BASE_URL,
+  apiKey: env.MINIMAX_API_KEY,
   fetch: async (url, init) => {
     let body = JSON.parse(init?.body as string || "{}");
     if (Array.isArray(body.messages)) {

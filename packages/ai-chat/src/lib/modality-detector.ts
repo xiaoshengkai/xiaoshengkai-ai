@@ -7,6 +7,9 @@
  *  - https://... 直接 URL
  */
 
+import { ATTACHMENT_REGEX } from './multimodal-markers';
+import type { Message } from './types';
+
 export type Modality = 'image' | 'video' | 'unknown';
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
@@ -24,16 +27,11 @@ export interface Attachment {
 
 /**
  * 从字符串解析附件信息
- * 支持：
- *   - [图片:/api/uploads/xxx.png]
- *   - [视频:/api/uploads/xxx.mp4]
- *   - https://example.com/xxx.png
  */
 export function parseAttachment(source: string): Attachment | null {
   source = source.trim();
   if (!source) return null;
 
-  // 上传标记
   const uploadMatch = source.match(/^\[(图片|视频):([^\]]+)\]$/);
   if (uploadMatch) {
     const tag = uploadMatch[1];
@@ -49,7 +47,6 @@ export function parseAttachment(source: string): Attachment | null {
     return { modality, source, filename, localPath: filename };
   }
 
-  // 公网/内网 URL
   if (/^https?:\/\//.test(source)) {
     const filename = source.split('?')[0].split('/').pop() || '';
     const ext = filename.split('.').pop()?.toLowerCase() || '';
@@ -66,15 +63,13 @@ export function parseAttachment(source: string): Attachment | null {
 /**
  * 从 messages 中提取所有附件
  */
-export function extractAttachments(messages: any[]): Attachment[] {
+export function extractAttachments(messages: Message[]): Attachment[] {
   const out: Attachment[] = [];
   for (const msg of messages) {
     for (const part of msg.parts || []) {
       if (part?.type !== 'text') continue;
-      const text = part.text || '';
-      // 匹配 [图片:...] 或 [视频:...] 或 https://...图片视频URL
-      const regex = /\[(图片|视频):[^\]]+\]|https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|mp4|webm|mov|mkv)(?:\?[^\s]*)?/gi;
-      const matches = text.match(regex) || [];
+      const text = (part as { text?: string }).text || '';
+      const matches = text.match(ATTACHMENT_REGEX) || [];
       for (const m of matches) {
         const att = parseAttachment(m);
         if (att) out.push(att);
@@ -82,20 +77,4 @@ export function extractAttachments(messages: any[]): Attachment[] {
     }
   }
   return out;
-}
-
-/**
- *  判断路径是否为视频文件
- */
-export function isVideoPath(path: string): boolean {
-  const ext = path.split('.').pop()?.toLowerCase() || '';
-  return VIDEO_EXTS.includes(ext);
-}
-
-/**
- * 判断路径是否为图片文件
- */
-export function isImagePath(path: string): boolean {
-  const ext = path.split('.').pop()?.toLowerCase() || '';
-  return IMAGE_EXTS.includes(ext);
 }

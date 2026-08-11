@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp } from "lucide-react";
@@ -22,13 +22,6 @@ interface Execution {
   startedAt: string; completedAt: string | null;
   steps: ExecutionStep[];
 }
-
-const STEP_GROUPS: Record<string, { label: string; stepIds: string[] }> = {
-  "tech-video": {
-    label: "v2",
-    stepIds: [],
-  },
-};
 
 const V2_GROUPS = [
   { label: "准备", stepIds: ["script", "validate"] },

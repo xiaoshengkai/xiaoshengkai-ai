@@ -21,6 +21,7 @@ import { ChromaClient, type Collection, type Where } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 import { generateText } from "ai";
 import { deepseek } from "@/lib/providers";
+import { env } from "./env";
 
 // ─── 数据库常量 ─────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ function parseChromaUrl(url: string): { host: string; port: number; ssl: boolean
   };
 }
 
-const _chromaConn = parseChromaUrl(process.env.CHROMA_URL ?? "http://localhost:8000");
+const _chromaConn = parseChromaUrl(env.CHROMA_URL);
 
 // ─── 类型定义 ───────────────────────────────────────────────────────
 
@@ -541,8 +542,3 @@ ${items}`,
     after: ids.length - toRemove.size,
   };
 }
-
-// ─── 向后兼容导出 ───────────────────────────────────────────────────
-
-/** @deprecated 使用 getCollection(database, collectionName) */
-export const COLLECTION_NAME = "java_knowledge";

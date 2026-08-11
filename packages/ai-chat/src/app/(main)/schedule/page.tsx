@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import { useEffect, useState, useCallback } from "react";
 import { Play, ExternalLink, Pencil } from "lucide-react";
 import { toast } from "sonner";
@@ -46,7 +46,6 @@ export default function SchedulePage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTasks();
     const timer = setInterval(fetchTasks, 10000);
     return () => clearInterval(timer);

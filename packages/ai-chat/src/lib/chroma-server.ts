@@ -22,6 +22,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import { existsSync, mkdirSync } from "fs";
 import { join, resolve } from "path";
+import { env } from "./env";
 
 // ─── 常量(集中配置,便于阅读与调整) ──────────────────────────────────────
 
@@ -73,7 +74,7 @@ let startingPromise: Promise<void> | null = null;
  * 优先从 `CHROMA_URL` 读取,缺省回落到 `http://localhost:8000`。
  */
 function getChromaBaseUrl(): string {
-  return process.env.CHROMA_URL ?? `http://${DEFAULT_CHROMA_HOST}:${DEFAULT_CHROMA_PORT}`;
+  return env.CHROMA_URL;
 }
 
 /**
@@ -209,12 +210,4 @@ export async function ensureChromaRunning(): Promise<void> {
     // 无论成功失败都清空,失败时下一次调用可以重试。
     startingPromise = null;
   }
-}
-
-/**
- * 当前是否由本模块持有 Chroma 子进程。
- * 用于诊断/测试,生产代码无需关心。
- */
-export function isChromaOwnedByThisProcess(): boolean {
-  return chromaProcess !== null;
 }

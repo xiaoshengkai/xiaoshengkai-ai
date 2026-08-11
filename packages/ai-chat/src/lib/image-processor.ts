@@ -10,18 +10,21 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { extractAttachments } from './modality-detector';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
+import { IMAGE_URL_REGEX, IMAGE_UPLOAD_REGEX, IMAGE_MARKER_STRIP, IMAGE_MARKER_TRIM } from './multimodal-markers';
+import type { FilePart, Message, MessagePart, TextPart } from './types';
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
 const IMAGE_DIR = path.resolve(ROOT_DIR, 'data', 'static', 'images');
+
+/** 本地文件路径对应的 file part */
+type ImageFilePart = FilePart;
 
 /**
  * 下载远程图片到本地（带缓存）
  * 返回本地文件名，失败返回 null
  */
 async function downloadRemoteImage(url: string): Promise<string | null> {
-  // 已经是本地路径，跳过
   if (url.startsWith('/api/uploads/')) return null;
-  // 检查是否已缓存
   const hash = crypto.createHash('md5').update(url).digest('hex').slice(0, 8);
   const existing = fs.readdirSync(IMAGE_DIR).find(f => f.includes(hash));
   if (existing) return existing;
@@ -44,16 +47,14 @@ async function downloadRemoteImage(url: string): Promise<string | null> {
 }
 
 export interface ImageProcessResult {
-  messages: any[];
+  messages: Message[];
   /** Preprocess 模式下注入到 system prompt 的图片描述 */
   systemInjection?: string;
 }
 
-/**
- * 读图片 → AI SDK file 类型
- */
-function loadImagesAsFile(filenames: string[]): { type: 'file'; mediaType: string; data: string }[] {
-  const out: { type: 'file'; mediaType: string; data: string }[] = [];
+/** 读图片 → AI SDK file 类型 */
+function loadImagesAsFile(filenames: string[]): ImageFilePart[] {
+  const out: ImageFilePart[] = [];
   for (const filename of filenames) {
     const filePath = path.resolve(ROOT_DIR, 'data', 'static', 'images', filename);
     if (!fs.existsSync(filePath)) {
@@ -72,13 +73,18 @@ function loadImagesAsFile(filenames: string[]): { type: 'file'; mediaType: strin
   return out;
 }
 
-/**
- * URL 图片 → AI SDK file 类型
- */
-/**
- * 处理 messages 中的 [图片:...] 标记
- */
-export async function processImagesDirect(messages: any[]): Promise<any[]> {
+/** OpenAI 格式 content part（preprocess 路径用） */
+type OpenAIPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail: 'low' | 'default' | 'high' } }
+  | { type: 'video_url'; video_url: { url: string; detail?: string; fps?: number } };
+
+interface OpenAIMsg {
+  role: string;
+  content: OpenAIPart[];
+}
+
+export async function processImagesDirect(messages: Message[]): Promise<Message[]> {
   const depth = readHistoryDepth('image');
   const total = messages.length;
 
@@ -90,22 +96,23 @@ export async function processImagesDirect(messages: any[]): Promise<any[]> {
       }
     }
 
-    const newParts: any[] = [];
+    const newParts: MessagePart[] = [];
     for (const part of msg.parts || []) {
-      if (part?.type !== 'text') {
+      if (part.type !== 'text') {
         newParts.push(part);
         continue;
       }
-      const text = part.text || '';
-      const uploadRegex = /\[图片:([^\]]+)\]/g;
-      const urlRegex = /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi;
+      const tp = part as TextPart;
+      const text = tp.text || '';
+      const uploadRegex = IMAGE_UPLOAD_REGEX;
+      const urlRegex = IMAGE_URL_REGEX;
 
       const uploads = [...text.matchAll(uploadRegex)].map((m) => {
-        const url = m[1];
+        const url = m[1] ?? '';
         return url.split('/').pop() || '';
       }).filter(Boolean);
 
-      const urls = [...text.matchAll(urlRegex)].map((m) => m[0]);
+      const urls = [...text.matchAll(urlRegex)].map((m) => m[0]).filter((u): u is string => Boolean(u));
 
       if (uploads.length === 0 && urls.length === 0) {
         newParts.push(part);
@@ -121,14 +128,12 @@ export async function processImagesDirect(messages: any[]): Promise<any[]> {
           newParts.push(...loadImagesAsFile(uploads));
         }
         if (urls.length > 0) {
-          // 下载远程 URL 到本地（OSS 签名 24h 过期，缓存后下次追问可用）
           const localFiles: string[] = [];
           for (const url of urls) {
             const local = await downloadRemoteImage(url);
             if (local) {
               localFiles.push(local);
             } else {
-              // 下载失败，保留原始 URL
               newParts.push({ type: 'file', mediaType: 'image/png', data: url });
             }
           }
@@ -152,61 +157,55 @@ export async function processImagesDirect(messages: any[]): Promise<any[]> {
   }));
 }
 
-/**
- * 剥离消息中的图片标记，替换为 [图片] 占位符
- */
-export function stripImages(msg: any): any {
+/** 剥离消息中的图片标记，替换为 [图片] 占位符 */
+export function stripImages(msg: Message): Message {
   return {
     ...msg,
-    parts: (msg.parts || []).map((p: any) => {
-      if (p?.type !== 'text') return p;
-      return {
-        ...p,
-        text: (p.text || '').replace(/\[图片:[^\]]+\]/g, '[图片]').replace(
-          /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi,
-          '[图片]'
-        ),
-      };
+    parts: (msg.parts || []).map((p: MessagePart): MessagePart => {
+      if (p.type !== 'text') return p;
+      const textPart = p as TextPart;
+      const stripped = (textPart.text || '').replace(/\[图片:[^\]]+\]/g, '[图片]').replace(IMAGE_URL_REGEX, '[图片]');
+      return { ...textPart, text: stripped };
     }),
   };
 }
 
 /**
  * Preprocess：用 M3 描述图片 → 文字注入 system prompt
- *
- * 支持 UIMessage 格式（text 含 [图片:xxx]）和 ModelMessage 格式（file part）
  */
-export async function preprocessImagesDescription(messages: any[]): Promise<ImageProcessResult> {
+export async function preprocessImagesDescription(messages: Message[]): Promise<ImageProcessResult> {
   const last = messages[messages.length - 1];
   if (!last?.parts) return { messages };
 
   const attachments = extractAttachments(messages).filter((a) => a.modality === 'image');
   if (attachments.length === 0) return { messages };
 
-  // 构造 OpenAI 格式 content
-  const openaiMessages = messages.map((m: any) => {
-    const content: any[] = [];
+  const openaiMessages: OpenAIMsg[] = messages.map((m) => {
+    const content: OpenAIPart[] = [];
     for (const p of m.parts || []) {
-      if (p?.type === 'text') {
-        content.push({ type: 'text', text: p.text });
-      } else if (p?.type === 'file' && p.mediaType?.startsWith('image/')) {
-        content.push({
-          type: 'image_url',
-          image_url: { url: p.data, detail: p.mediaType === 'image/jpeg' ? 'low' : 'default' },
-        });
-      } else if (p?.type === 'file' && p.mediaType?.startsWith('video/')) {
-        content.push({
-          type: 'video_url',
-          video_url: { url: p.data, detail: 'default', fps: 1 },
-        });
+      if (p.type === 'text') {
+        const tp = p as TextPart;
+        content.push({ type: 'text', text: tp.text });
+      } else if (p.type === 'file') {
+        const fp = p as FilePart;
+        if (fp.mediaType?.startsWith('image/')) {
+          content.push({
+            type: 'image_url',
+            image_url: { url: fp.data, detail: fp.mediaType === 'image/jpeg' ? 'low' : 'default' },
+          });
+        } else if (fp.mediaType?.startsWith('video/')) {
+          content.push({
+            type: 'video_url',
+            video_url: { url: fp.data, detail: 'default', fps: 1 },
+          });
+        }
       }
     }
     return { role: m.role, content };
   });
 
-  // 如果没有图片内容（UIMessage 模式），从 text 标记读图片文件
-  const hasImageContent = openaiMessages.some((m: any) =>
-    m.content?.some((p: any) => p.type === 'image_url')
+  const hasImageContent = openaiMessages.some((m) =>
+    m.content?.some((p) => p.type === 'image_url')
   );
 
   if (!hasImageContent) {
@@ -233,8 +232,8 @@ export async function preprocessImagesDescription(messages: any[]): Promise<Imag
     }
   }
 
-  const hasAnyImage = openaiMessages.some((m: any) =>
-    m.content?.some((p: any) => p.type === 'image_url')
+  const hasAnyImage = openaiMessages.some((m) =>
+    m.content?.some((p) => p.type === 'image_url')
   );
   if (!hasAnyImage) return { messages };
 
@@ -243,20 +242,24 @@ export async function preprocessImagesDescription(messages: any[]): Promise<Imag
 
   const { m3ChatComplete } = await import('./m3-raw-fetch');
   const description = await m3ChatComplete(
-    [{ role: 'user', content: [{ type: 'text', text: '请客观描述这张图片的内容即可，不要做多余事情。' }, ...(openaiMessages[openaiMessages.length - 1]?.content || [])] }],
+    [{
+      role: 'user',
+      content: [
+        { type: 'text', text: '请客观描述这张图片的内容即可，不要做多余事情。' },
+        ...(openaiMessages[openaiMessages.length - 1]?.content || []),
+      ],
+    }],
     { modelName: 'MiniMax-M3', systemPrompt: '' },
   );
 
   console.log(`[preprocess] M3 完成: ${((Date.now() - tStart) / 1000).toFixed(1)}s, ${description?.length || 0} 字`);
 
-  const cleanedParts = last.parts.map((p: any) => {
-    if (p?.type !== 'text') return p;
+  const cleanedParts: MessagePart[] = last.parts.map((p): MessagePart => {
+    if (p.type !== 'text') return p;
+    const tp = p as TextPart;
     return {
-      ...p,
-      text: (p.text || '').replace(/\[图片:[^\]]+\]\n?/g, '').replace(
-        /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi,
-        ''
-      ).trim(),
+      ...tp,
+      text: (tp.text || '').replace(IMAGE_MARKER_STRIP, '').replace(IMAGE_URL_REGEX, '').trim(),
     };
   });
 

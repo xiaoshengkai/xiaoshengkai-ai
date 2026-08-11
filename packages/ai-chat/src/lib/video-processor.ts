@@ -3,25 +3,22 @@
  *
  * AI SDK 6 用 {type: 'file', mediaType: 'video/mp4', data: 'data:...'} 格式。
  * minimax fetch 拦截器根据 mediaType 把 file 转成 video_url。
- *
- * 历史深度控制：
- * - 视频默认 depth=1（base64 巨大）
- * - 通过 env MULTIMODAL_VIDEO_DEPTH=* 表示 all，=N 表示最近 N 条
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { extractAttachments } from './modality-detector';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
+import { VIDEO_URL_REGEX, VIDEO_UPLOAD_REGEX, VIDEO_MARKER_STRIP } from './multimodal-markers';
 import { m3ChatComplete } from './m3-raw-fetch';
+import type { FilePart, Message, MessagePart, TextPart } from './types';
+import { extToMime } from './mime';
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
 
-/**
- * 读视频 → AI SDK file 类型（video MIME）
- */
-function loadVideosAsFile(filenames: string[]): { type: 'file'; mediaType: string; data: string }[] {
-  const out: { type: 'file'; mediaType: string; data: string }[] = [];
+/** 读视频 → AI SDK file 类型（video MIME） */
+function loadVideosAsFile(filenames: string[]): FilePart[] {
+  const out: FilePart[] = [];
   for (const filename of filenames) {
     const filePath = path.resolve(ROOT_DIR, 'data', 'static', 'videos', filename);
     if (!fs.existsSync(filePath)) {
@@ -35,32 +32,24 @@ function loadVideosAsFile(filenames: string[]): { type: 'file'; mediaType: strin
     }
     const buffer = fs.readFileSync(filePath);
     const ext = path.extname(filename).slice(1).toLowerCase();
-    const mime =
-      ext === 'mp4' ? 'video/mp4' :
-      ext === 'mov' ? 'video/quicktime' :
-      ext === 'avi' ? 'video/x-msvideo' :
-      ext === 'mkv' ? 'video/x-matroska' :
-      `video/${ext}`;
+    const mime = extToMime(ext);
     out.push({ type: 'file', mediaType: mime, data: `data:${mime};base64,${buffer.toString('base64')}` });
   }
   return out;
 }
 
-function loadVideoUrlsAsFile(urls: string[]): { type: 'file'; mediaType: string; data: string }[] {
+function loadVideoUrlsAsFile(urls: string[]): FilePart[] {
   return urls.map((u) => {
     const url = u.trim();
     const extMatch = url.match(/\.([a-z0-9]+)(?:\?|$)/i);
-    const ext = extMatch?.[1]?.toLowerCase() || 'mp4';
-    const mime = ext === 'mov' ? 'video/quicktime' : `video/${ext}`;
+    const ext = extMatch?.[1]?.toLowerCase() ?? 'mp4';
+    const mime = extToMime(ext);
     return { type: 'file', mediaType: mime, data: url };
   });
 }
 
-/**
- * 处理 messages 中的 [视频:...] 标记
- * 历史消息按 depth 决定保留/剥离
- */
-export function processVideos(messages: any[]): any[] {
+/** 处理 messages 中的 [视频:...] 标记 */
+export function processVideos(messages: Message[]): Message[] {
   const depth = readHistoryDepth('video');
   const total = messages.length;
 
@@ -72,20 +61,21 @@ export function processVideos(messages: any[]): any[] {
       }
     }
 
-    const newParts: any[] = [];
+    const newParts: MessagePart[] = [];
     for (const part of msg.parts || []) {
-      if (part?.type !== 'text') {
+      if (part.type !== 'text') {
         newParts.push(part);
         continue;
       }
-      const text = part.text || '';
-      const uploadRegex = /\[视频:([^\]]+)\]/g;
-      const urlRegex = /https?:\/\/[^\s]+\.(?:mp4|mov|avi|mkv)(?:\?[^\s]*)?/gi;
+      const tp = part as TextPart;
+      const text = tp.text || '';
+      const uploadRegex = VIDEO_UPLOAD_REGEX;
+      const urlRegex = VIDEO_URL_REGEX;
 
       const uploads = [...text.matchAll(uploadRegex)]
-        .map((m) => m[1].split('/').pop() || '')
+        .map((m) => (m[1] ?? '').split('/').pop() || '')
         .filter(Boolean);
-      const urls = [...text.matchAll(urlRegex)].map((m) => m[0]);
+      const urls = [...text.matchAll(urlRegex)].map((m) => m[0]).filter((u): u is string => Boolean(u));
 
       if (uploads.length === 0 && urls.length === 0) {
         newParts.push(part);
@@ -109,73 +99,78 @@ export function processVideos(messages: any[]): any[] {
   });
 }
 
-/**
- * 剥离消息中的视频标记
- */
-export function stripVideos(msg: any): any {
+/** 剥离消息中的视频标记 */
+export function stripVideos(msg: Message): Message {
   return {
     ...msg,
-    parts: (msg.parts || []).map((p: any) => {
-      if (p?.type !== 'text') return p;
+    parts: (msg.parts || []).map((p): MessagePart => {
+      if (p.type !== 'text') return p;
+      const tp = p as TextPart;
       return {
-        ...p,
-        text: (p.text || '').replace(/\[视频:[^\]]+\]/g, '[视频]').replace(
-          /https?:\/\/[^\s]+\.(?:mp4|mov|avi|mkv)(?:\?[^\s]*)?/gi,
-          '[视频]'
-        ),
+        ...tp,
+        text: (tp.text || '').replace(VIDEO_MARKER_STRIP, '[视频]').replace(VIDEO_URL_REGEX, '[视频]'),
       };
     }),
   };
 }
 
-/**
- * 视频预处理：M3 描述 → 文字给纯文本 provider
- *
- * 注意：消息可能是 UIMessage 格式（text 含 [视频:xxx]）或 ModelMessage 格式（file part）
- * 两种都支持
- */
-export async function preprocessVideoDescription(messages: any[]): Promise<string | undefined> {
+/** OpenAI 格式 part */
+type OpenAIVideoPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail: 'low' | 'default' | 'high' } }
+  | { type: 'video_url'; video_url: { url: string; detail?: string; fps?: number } };
+
+interface OpenAIVideoMsg {
+  role: string;
+  content: OpenAIVideoPart[];
+}
+
+/** 视频预处理：M3 描述 → 文字给纯文本 provider */
+export async function preprocessVideoDescription(messages: Message[]): Promise<string | undefined> {
   const attachments = extractAttachments(messages).filter((a) => a.modality === 'video');
   if (attachments.length === 0) return undefined;
 
-  // 构造 OpenAI 格式 messages
-  const openaiMessages = messages.map((m: any) => {
-    const content: any[] = [];
+  const openaiMessages: OpenAIVideoMsg[] = messages.map((m) => {
+    const content: OpenAIVideoPart[] = [];
     for (const p of m.parts || []) {
-      if (p?.type === 'text') {
-        content.push({ type: 'text', text: p.text });
-      } else if (p?.type === 'file' && p.mediaType?.startsWith('video/')) {
-        content.push({
-          type: 'video_url',
-          video_url: { url: p.data, detail: 'default', fps: 1 },
-        });
-      } else if (p?.type === 'file' && p.mediaType?.startsWith('image/')) {
-        content.push({
-          type: 'image_url',
-          image_url: { url: p.data, detail: p.mediaType === 'image/jpeg' ? 'low' : 'default' },
-        });
+      if (p.type === 'text') {
+        const tp = p as TextPart;
+        content.push({ type: 'text', text: tp.text });
+      } else if (p.type === 'file') {
+        const fp = p as FilePart;
+        if (fp.mediaType?.startsWith('video/')) {
+          content.push({
+            type: 'video_url',
+            video_url: { url: fp.data, detail: 'default', fps: 1 },
+          });
+        } else if (fp.mediaType?.startsWith('image/')) {
+          content.push({
+            type: 'image_url',
+            image_url: { url: fp.data, detail: fp.mediaType === 'image/jpeg' ? 'low' : 'default' },
+          });
+        }
       }
     }
     return { role: m.role, content };
   });
 
-  // 如果没有视频文件内容（UIMessage 模式，只有 [视频:xxx] 标记），需要先读文件
-  const hasVideoContent = openaiMessages.some((m: any) =>
-    m.content?.some((p: any) => p.type === 'video_url')
+  const hasVideoContent = openaiMessages.some((m) =>
+    m.content?.some((p) => p.type === 'video_url')
   );
 
   if (!hasVideoContent) {
-    // 从 text 标记读视频文件并加到 last message
     const lastMsg = openaiMessages[openaiMessages.length - 1];
     if (!lastMsg) return undefined;
     for (const att of attachments) {
       if (att.localPath) {
         try {
           const fileParts = loadVideosAsFile([att.filename]);
-          lastMsg.content.push(...fileParts.map((fp) => ({
-            type: 'video_url',
-            video_url: { url: fp.data, detail: 'default', fps: 1 },
-          })));
+          for (const fp of fileParts) {
+            lastMsg.content.push({
+              type: 'video_url',
+              video_url: { url: fp.data, detail: 'default', fps: 1 },
+            });
+          }
         } catch (err) {
           console.warn(`[video-preprocess] 跳过视频 ${att.filename}:`, (err as Error).message);
         }

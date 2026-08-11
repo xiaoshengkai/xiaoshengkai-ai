@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import path from "node:path";
-import { execFile } from "node:child_process";
-import { parseCliOutput } from "@/lib/cli-parser";
-
-const CLI_PATH = path.resolve(process.cwd(), "..", "..", "packages", "workflows", "cli.js");
+import { runWorkflowCli } from "@/lib/workflow-cli";
 
 export async function POST(
   _request: Request,
@@ -11,14 +7,7 @@ export async function POST(
 ) {
   const { id } = await params;
   try {
-    const result = await new Promise<string>((resolve, reject) => {
-      execFile("node", [CLI_PATH, "next", JSON.stringify({ executionId: id })], { timeout: 900000 }, (err, stdout, stderr) => {
-        if (stderr) console.error(`[workflow] cli stderr:`, stderr);
-        if (err) reject(err);
-        else resolve(stdout.trim());
-      });
-    });
-    return NextResponse.json(parseCliOutput(result));
+    return NextResponse.json(await runWorkflowCli(["next", JSON.stringify({ executionId: id })], 900_000));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

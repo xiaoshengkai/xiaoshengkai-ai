@@ -23,18 +23,12 @@ import {
   getCollectionStats,
   compactCollection,
   searchRelevant,
-  ADMIN_PAGE_SIZE_DEFAULT,
   VECTOR_PREVIEW_DIMENSIONS,
   EMBEDDING_DIM,
   SHARED_DB,
   SHARED_COLLECTION,
 } from "@/lib/vector-store";
 import { glm } from "@/lib/providers";
-import { TOP_K_DEFAULT } from "@/lib/vector-store";
-
-const MAX_LIMIT = 100;
-const MIN_LIMIT = 1;
-const MAX_TOP_K = 50;
 
 function ok(data: unknown) {
   return NextResponse.json({ ok: true, data });

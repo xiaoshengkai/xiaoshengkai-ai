@@ -9,27 +9,29 @@
 import { getModalityStrategy } from './multimodal-config';
 import { processImagesDirect, preprocessImagesDescription } from './image-processor';
 import { processVideos, preprocessVideoDescription } from './video-processor';
+import {
+  ATTACHMENT_REGEX, UPLOAD_MARKER_STRIP, IMAGE_URL_REGEX, VIDEO_URL_REGEX,
+  IMAGE_MARKER_STRIP, VIDEO_MARKER_STRIP,
+} from './multimodal-markers';
+import type { Message, MessagePart, TextPart } from './types';
 
 export interface ProcessInput {
   provider: string;
   model: string;
-  messages: any[];
+  messages: Message[];
 }
 
 export interface ProcessResult {
-  messages: any[];
+  messages: Message[];
   /** Preprocess 模式下注入到 system prompt 的图片/视频描述 */
   systemInjection?: string;
 }
 
-/**
- * 处理消息中的图片 + 视频附件
- */
+/** 处理消息中的图片 + 视频附件 */
 export async function processAttachments({ provider, model, messages }: ProcessInput): Promise<ProcessResult> {
   const imageStrategy = getModalityStrategy(provider, model, 'image');
   const videoStrategy = getModalityStrategy(provider, model, 'video');
 
-  // 没有任何多模态能力 → preprocess
   if (imageStrategy === 'none' && videoStrategy === 'none') {
     if (hasImageOrVideo(messages)) {
       console.log(`[processor] ${provider}/${model} 不支持多模态 → preprocess 路径`);
@@ -47,7 +49,6 @@ export async function processAttachments({ provider, model, messages }: ProcessI
     return { messages };
   }
 
-  // 部分支持多模态（罕见）：回退到 preprocess
   if (imageStrategy === 'none' || videoStrategy === 'none') {
     if (hasImageOrVideo(messages)) {
       console.log(`[processor] ${provider}/${model} 部分支持多模态 → 回退 preprocess`);
@@ -63,7 +64,6 @@ export async function processAttachments({ provider, model, messages }: ProcessI
     return { messages };
   }
 
-  // 完全支持多模态 → direct
   try {
     return { messages: processVideos(await processImagesDirect(messages)) };
   } catch (err) {
@@ -72,42 +72,52 @@ export async function processAttachments({ provider, model, messages }: ProcessI
   }
 }
 
-/**
- * 同时剥离图片和视频标记（preprocess 后用）
- */
-function stripBothAttachments(msg: any): any {
+/** 同时剥离图片和视频标记（preprocess 后用） */
+function stripBothAttachments(msg: Message): Message {
   return {
     ...msg,
-    parts: (msg.parts || []).map((p: any) => {
-      if (p?.type !== 'text') return p;
+    parts: (msg.parts || []).map((p): MessagePart => {
+      if (p.type !== 'text') return p;
+      const tp = p as TextPart;
       return {
-        ...p,
-        text: (p.text || '')
-          .replace(/\[图片:[^\]]+\]/g, '[图片]')
-          .replace(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi, '[图片]')
-          .replace(/\[视频:[^\]]+\]/g, '[视频]')
-          .replace(/https?:\/\/[^\s]+\.(?:mp4|mov|avi|mkv)(?:\?[^\s]*)?/gi, '[视频]'),
+        ...tp,
+        text: (tp.text || '')
+          .replace(IMAGE_MARKER_STRIP, '[图片]')
+          .replace(IMAGE_URL_REGEX, '[图片]')
+          .replace(VIDEO_MARKER_STRIP, '[视频]')
+          .replace(VIDEO_URL_REGEX, '[视频]'),
       };
     }),
   };
 }
 
-function hasImageOrVideo(messages: any[]): boolean {
+function hasImageOrVideo(messages: Message[]): boolean {
   return hasImage(messages) || hasVideo(messages);
 }
 
-function hasImage(messages: any[]): boolean {
+// ponytail: 用 String.search 而非 RegExp.test — 全局 regex 的 .test() 会保留 lastIndex，
+// 第二次调用可能从上次匹配后位置开始，返回 false。search() 不修改 lastIndex。
+function hasImage(messages: Message[]): boolean {
   return messages.some((msg) =>
-    (msg.parts || []).some((p: any) =>
-      p?.type === 'text' && (/\[图片:[^\]]+\]/.test(p.text || '') || /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/i.test(p.text || ''))
-    )
+    (msg.parts || []).some((p) => {
+      if (p.type !== 'text') return false;
+      const tp = p as TextPart;
+      const text = tp.text || '';
+      return /\[图片:[^\]]+\]/.test(text) || text.search(IMAGE_URL_REGEX) >= 0;
+    })
   );
 }
 
-function hasVideo(messages: any[]): boolean {
+function hasVideo(messages: Message[]): boolean {
   return messages.some((msg) =>
-    (msg.parts || []).some((p: any) =>
-      p?.type === 'text' && (/\[视频:[^\]]+\]/.test(p.text || '') || /https?:\/\/[^\s]+\.(?:mp4|mov|avi|mkv)(?:\?[^\s]*)?/i.test(p.text || ''))
-    )
+    (msg.parts || []).some((p) => {
+      if (p.type !== 'text') return false;
+      const tp = p as TextPart;
+      const text = tp.text || '';
+      return /\[视频:[^\]]+\]/.test(text) || text.search(VIDEO_URL_REGEX) >= 0;
+    })
   );
 }
+
+// re-export for legacy callers
+export { ATTACHMENT_REGEX, UPLOAD_MARKER_STRIP };

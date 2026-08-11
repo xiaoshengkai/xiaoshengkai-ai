@@ -4,8 +4,10 @@
  * 注意：必须用 stream:false 时才能区分"流"和"一次性"调用
  */
 
-const BASE_URL = process.env.MINIMAX_BASE_URL || 'https://api.minimaxi.com/v1';
-const API_KEY = process.env.MINIMAX_API_KEY || '';
+import { env } from './env';
+
+const BASE_URL = env.MINIMAX_BASE_URL;
+const API_KEY = env.MINIMAX_API_KEY;
 const DEFAULT_MODEL = 'MiniMax-M3';
 
 interface CallOptions {
@@ -14,12 +16,18 @@ interface CallOptions {
   signal?: AbortSignal;
 }
 
+/** OpenAI 格式 message（preprocess 路径用） */
+interface OpenAIMessage {
+  role: string;
+  content: string | unknown[];
+}
+
 /**
  * 流式调用 M3（OpenAI 兼容接口）
  * 把 OpenAI SSE 转换为 AI SDK UI message stream 格式
  */
 export async function m3ChatStream(
-  messages: any[],
+  messages: OpenAIMessage[],
   opts: CallOptions
 ): Promise<Response> {
   const body = {
@@ -39,7 +47,7 @@ export async function m3ChatStream(
  * 非流式调用 M3（preprocess 视频描述等场景）
  */
 export async function m3ChatComplete(
-  messages: any[],
+  messages: OpenAIMessage[],
   opts: Omit<CallOptions, 'signal'> & { signal?: AbortSignal }
 ): Promise<string | undefined> {
   const body = {
@@ -54,11 +62,11 @@ export async function m3ChatComplete(
 
   const response = await rawFetch(body, opts.signal);
   if (!response.ok) return undefined;
-  const data = await response.json();
+  const data = await response.json() as { choices?: { message?: { content?: string } }[] };
   return data.choices?.[0]?.message?.content;
 }
 
-async function rawFetch(body: any, signal?: AbortSignal): Promise<Response> {
+async function rawFetch(body: unknown, signal?: AbortSignal): Promise<Response> {
   const url = `${BASE_URL}/chat/completions`;
   return fetch(url, {
     method: 'POST',
@@ -99,6 +107,19 @@ export async function toUIMessageStream(openaiResponse: Response): Promise<Respo
   const stream = new ReadableStream({
     async start(controller) {
       let buffer = '';
+      const startedIds = new Set<string>();
+      const emitStart = (type: string, id: string) => {
+        if (startedIds.has(id)) return;
+        startedIds.add(id);
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: `${type}-start`, id })}\n\n`)
+        );
+      };
+      const emitEnd = (type: string, id: string) => {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: `${type}-end`, id })}\n\n`)
+        );
+      };
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -110,6 +131,8 @@ export async function toUIMessageStream(openaiResponse: Response): Promise<Respo
             if (!line.startsWith('data: ')) continue;
             const data = line.slice(6).trim();
             if (data === '[DONE]') {
+              if (startedIds.has('rs')) emitEnd('reasoning', 'rs');
+              if (startedIds.has('txt')) emitEnd('text', 'txt');
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({ type: 'finish' })}\n\n`)
               );
@@ -119,6 +142,7 @@ export async function toUIMessageStream(openaiResponse: Response): Promise<Respo
               const chunk = JSON.parse(data);
               const delta = chunk.choices?.[0]?.delta;
               if (delta?.reasoning_content) {
+                emitStart('reasoning', 'rs');
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({
                     type: 'reasoning-delta',
@@ -128,6 +152,7 @@ export async function toUIMessageStream(openaiResponse: Response): Promise<Respo
                 );
               }
               if (delta?.content) {
+                emitStart('text', 'txt');
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({
                     type: 'text-delta',

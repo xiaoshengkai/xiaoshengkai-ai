@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Play, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -70,7 +70,6 @@ export default function WorkflowPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchExecutions(); fetchTemplates();
     const timer = setInterval(fetchExecutions, 5000);
     return () => clearInterval(timer);

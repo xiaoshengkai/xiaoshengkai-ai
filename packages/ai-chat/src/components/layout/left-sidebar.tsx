@@ -1,11 +1,12 @@
 
 "use client";
 
-import { BASE } from "@/lib/api-path";
+import { BASE } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { useConversation } from "@/components/layout/conversation-context";
+import PixelLogo from "@/components/ui/pixel-logo";
 import {
   Database,
   Wrench,
@@ -112,7 +113,7 @@ export default function LeftSidebar({
     <aside className="pixel-sidebar w-[240px] shrink-0 h-dvh flex flex-col">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-3 px-4 py-4 border-b-2 border-border">
-        <PixelLogo />
+        <PixelLogo size={10} />
         <span className="text-sm font-bold font-[family-name:var(--font-pixel)] tracking-wider">
           小盛开AI
         </span>
@@ -210,40 +211,5 @@ export default function LeftSidebar({
         © 2026 开盛
       </div>
     </aside>
-  );
-}
-
-function PixelLogo() {
-  const PX = 10;
-  const pixels = [
-    "..██..",
-    ".████.",
-    "██████",
-    ".████.",
-    "..██..",
-    "..██..",
-    ".█..█.",
-  ];
-
-  return (
-    <div className="relative shrink-0" style={{ width: pixels[0].length * PX, height: pixels.length * PX }}>
-      {pixels.map((row, y) =>
-        row.split("").map((cell, x) =>
-          cell === "█" ? (
-            <div
-              key={`${x}-${y}`}
-              className="absolute"
-              style={{
-                left: x * PX,
-                top: y * PX,
-                width: PX,
-                height: PX,
-                background: "var(--primary)",
-              }}
-            />
-          ) : null
-        )
-      )}
-    </div>
   );
 }

@@ -13,31 +13,40 @@ export const deepseek = createOpenAICompatible({
 });
 
 /**
- * MiniMax provider
+ * MiniMax provider — OpenAI 兼容接口
  *
- * fetch 拦截器做了两件事：
- * 1. 把 image_url 中 MIME 是 video/* 的部分重写为 video_url（M3 专用）
- * 2. 添加 reasoning_split=true 让思考内容分离
+ * fetch 拦截器：
+ * 1. 把 video file 重写为 video_url（M3 文档要求）
+ * 2. 把 image file 重写为 image_url
+ * 3. 添加 reasoning_split=true
  */
 export const minimax = createOpenAICompatible({
   name: "minimax",
-  baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.chat/v1",
+  baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1",
   apiKey: process.env.MINIMAX_API_KEY,
   fetch: async (url, init) => {
     let body = JSON.parse(init?.body as string || "{}");
-    // 把视频 MIME 的 image_url 重写为 video_url（M3 文档要求）
     if (Array.isArray(body.messages)) {
       for (const msg of body.messages) {
         if (!Array.isArray(msg.content)) continue;
         for (const part of msg.content) {
-          if (part?.type === 'image_url' && part.image_url?.url?.startsWith('data:video/')) {
+          if (part?.type === 'file' && part.mediaType?.startsWith('video/')) {
             part.type = 'video_url';
-            part.video_url = {
-              url: part.image_url.url,
-              detail: 'default',
-              fps: 1,
+            part.video_url = { url: part.data, detail: 'default', fps: 1 };
+            delete part.mediaType;
+            delete part.data;
+          } else if (part?.type === 'file' && part.mediaType?.startsWith('image/')) {
+            part.type = 'image_url';
+            part.image_url = {
+              url: part.data,
+              detail: part.mediaType === 'image/jpeg' ? 'low' : 'default',
             };
-            delete part.image_url;
+            delete part.mediaType;
+            delete part.data;
+          } else if (part?.type === 'image' && part.image?.startsWith?.('data:video/')) {
+            part.type = 'video_url';
+            part.video_url = { url: part.image, detail: 'default', fps: 1 };
+            delete part.image;
           }
         }
       }

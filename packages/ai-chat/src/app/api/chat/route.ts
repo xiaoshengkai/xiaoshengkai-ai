@@ -2,16 +2,20 @@
  * AI Chat API Route
  * ============================================================================
  *
- * 接收前端 useChat hook 发来的消息,通过 DeepSeek V4 Pro 模型生成回复。
+ * 接收前端 useChat hook 发来的消息,调用 DeepSeek/M3 生成回复。
  * 集成统一的 mcp (时间/文件/知识库/多模态生成/skill)。
  *
- * 数据流:浏览器 → UIMessage[] → convertToModelMessages → ModelMessage[] → LLM
+ * 数据流:浏览器 → UIMessage[] → processAttachments() → ModelMessage[] → LLM
+ *
+ * 多模态路径：
+ * - 图片：AI SDK streamText (file→image_url 自动转换)
+ * - 视频：raw fetch 绕过 AI SDK (OpenAI/Anthropic provider 都不支持 video file)
  * ============================================================================
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { streamText, convertToModelMessages, stepCountIs, generateText } from 'ai';
+import { streamText, stepCountIs } from 'ai';
 import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -19,6 +23,7 @@ import { retrieveRelevantChunks } from '@/lib/retrieve';
 import { deepseek, minimax } from '@/lib/providers';
 import { classifyTask } from '@/lib/model-router';
 import { processAttachments } from '@/lib/processor';
+import { m3ChatStream, m3ChatComplete, toUIMessageStream } from '@/lib/m3-raw-fetch';
 
 // ─── 提示词常量 ────────────────────────────────────────────────────────
 
@@ -124,6 +129,35 @@ async function getMCPClient(): Promise<MCPClient> {
 
 // ─── POST /api/chat ───────────────────────────────────────────────────
 
+/**
+ * 检测消息中是否包含视频（需要走 raw fetch 路径）
+ */
+function messagesContainVideo(modelMessages: any[]): boolean {
+  return modelMessages.some((msg) =>
+    Array.isArray(msg.content) && msg.content.some(
+      (p: any) => p.type === 'file' && p.mediaType?.startsWith('video/')
+    )
+  );
+}
+
+/**
+ * ModelMessage 构造（自己来，因为 AI SDK 6 convertToModelMessages 会丢 file.data）
+ * 保留 file 类型，让 AI SDK OpenAI provider 自动转 image_url
+ */
+function toModelMessages(messages: any[]): any[] {
+  return messages.map((msg: any) => {
+    const content: any[] = [];
+    for (const p of msg.parts || []) {
+      if (p?.type === 'text') {
+        content.push({ type: 'text', text: p.text });
+      } else if (p?.type === 'file') {
+        content.push({ type: 'file', mediaType: p.mediaType, data: p.data });
+      }
+    }
+    return { role: msg.role, content };
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const { messages, provider = 'deepseek' } = await req.json();
@@ -135,9 +169,10 @@ export async function POST(req: Request) {
       });
     }
 
-    // 任务分类（仅 DeepSeek 路径走 auto-route）
+    // 任务分类（仅 DeepSeek 走 auto-route）
     const isMiniMax = provider === 'minimax';
-    const classifyResult = isMiniMax ? null : await classifyTask(messages[messages.length - 1]?.parts?.[0]?.text || '');
+    const userText = messages[messages.length - 1]?.parts?.[0]?.text || '';
+    const classifyResult = isMiniMax ? null : await classifyTask(userText);
     const tier = classifyResult?.tier ?? 'pro';
     const modelName = isMiniMax
       ? 'MiniMax-M3'
@@ -149,97 +184,42 @@ export async function POST(req: Request) {
     const { messages: processedMessages, systemInjection: multimodalInjection } =
       await processAttachments({ provider, model: modelName, messages });
 
-    const lastMessage = processedMessages[processedMessages.length - 1];
-    const userQuery = typeof lastMessage?.parts?.[0]?.text === 'string' ? lastMessage.parts[0].text : '';
+    // 自己构造 ModelMessage（绕开 convertToModelMessages 的 data 丢失 bug）
+    const modelMessages = toModelMessages(processedMessages);
 
     // 检索相关知识
-    let knowledgeContext = '';
-    const [retrieved] = await Promise.all([
-      retrieveRelevantChunks(userQuery, 5),
-    ]);
-    if (retrieved.length > 0) {
-      knowledgeContext =
-        '以下是从你的笔记中检索到的相关内容，如果与用户问题相关可以参考。\n' +
-        retrieved.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n');
-    }
+    const retrieved = await retrieveRelevantChunks(userText, 5);
+    const knowledgeContext = retrieved.length > 0
+      ? '以下是从你的笔记中检索到的相关内容，如果与用户问题相关可以参考。\n' +
+        retrieved.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n')
+      : '';
 
     // 加载 MCP 工具
-    const tools: Record<string, unknown> = {};
-    try {
-      const client = await getMCPClient();
-      const t = await client.tools();
-      Object.assign(tools, t);
-      console.log(`[mcp] loaded (${Object.keys(t).length} tools)`);
-    } catch (err) {
-      console.error(`[mcp] FAILED - ${(err as Error).message}`);
-    }
+    const tools = await loadMcpTools();
 
-    const cleanMessages = processedMessages.map((msg: any) => {
-      const badParts = (msg.parts || []).filter((p: any) => p != null && !p.type);
-      if (badParts.length > 0) {
-        console.warn('[cleanMessages] 发现无 type 的 parts:', JSON.stringify(badParts));
-      }
-      return {
-        ...msg,
-        parts: (msg.parts || []).filter((p: any) => p != null && p.type),
-      };
+    // 构建 system prompt
+    const systemPrompt = buildSystemPrompt({
+      multimodalInjection,
+      knowledgeContext,
     });
 
-    // 剥离图片路径，防止发给 LLM 时撑爆上下文窗口
-    const llmMessages = cleanMessages.map((msg: any) => ({
-      ...msg,
-      parts: (msg.parts || []).map((p: any) => {
-        if (p.type === 'text' && p.text?.includes('[图片:/')) {
-          return { ...p, text: p.text.replace(/\[图片:[^\]]+\]/g, '[图片]') };
-        }
-        return p;
-      }),
-    }));
+    console.log(`[router] provider=${provider}, model=${modelName}, hasVideo=${messagesContainVideo(modelMessages)}`);
 
-    const modelMessages = await convertToModelMessages(llmMessages);
+    // === 视频路径：raw fetch 绕过 AI SDK ===
+    if (messagesContainVideo(modelMessages) && isMiniMax) {
+      const openaiMessages = fileToOpenAI(modelMessages);
+      const response = await m3ChatStream(openaiMessages, { modelName, systemPrompt, signal: req.signal });
+      return toUIMessageStream(response);
+    }
 
-    console.log('用户查询:', userQuery);
-    console.log(`[router] provider: ${provider}, model: ${modelName}`);
-    console.log(
-      '检索到的知识片段:',
-      retrieved.map((r) => `[${r.index}] ${r.content.slice(0, 50)}...`),
-    );
-    console.log('可用工具:', Object.keys(tools));
-    console.log('[system] SKILL_LIST in prompt:', SKILL_LIST ? '有内容' : '空');
-
+    // === 常规路径：AI SDK streamText ===
     const result = streamText({
       tools: tools as unknown as Parameters<typeof streamText>[0]['tools'],
       model: isMiniMax ? minimax(modelName) : deepseek(modelName),
-      system: `你是小盛开AI，一个实用的编程助手，擅长代码编写、知识管理、图表生成和多媒体创作。用中文思考，所有思考过程必须用中文描述，不要使用英文。用通俗语言回答。参考知识库时自然融入答案，不标注来源。
-
-工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。
-
-技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
-        ${SKILL_LIST}
-        ${TOOLS_PROMPT}
-        ${multimodalInjection ? `\n${multimodalInjection}\n` : ''}
-        ${knowledgeContext}`,
+      system: systemPrompt,
       messages: modelMessages,
       maxRetries: 5,
       stopWhen: stepCountIs(100),
-      onStepFinish({ text, toolCalls, toolResults, finishReason }) {
-        console.log('步骤完成:', {
-          finishReason,
-          textSnapshot: text?.slice(0, 100),
-          toolCalls: toolCalls?.map((t) => ({ name: t.toolName, input: t.input })),
-          toolResults: toolResults?.map((t) => t.toolName),
-        });
-      },
-      onError({ error }) {
-        const err = error as any;
-        console.error('streamText 错误:', {
-          name: err.name,
-          message: err.message,
-          statusCode: err.statusCode,
-          responseBody: err.responseBody,
-          url: err.url,
-        });
-      },
       abortSignal: req.signal,
     });
 
@@ -267,5 +247,64 @@ export async function POST(req: Request) {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+}
+
+// ─── 辅助函数 ──────────────────────────────────────────────────────
+
+/**
+ * file 类型转 OpenAI 格式（给 raw fetch 路径用）
+ */
+function fileToOpenAI(messages: any[]): any[] {
+  return messages.map((msg) => ({
+    role: msg.role,
+    content: msg.content.map((p: any) => {
+      if (p.type === 'file' && p.mediaType?.startsWith('video/')) {
+        return { type: 'video_url', video_url: { url: p.data, detail: 'default', fps: 1 } };
+      }
+      if (p.type === 'file' && p.mediaType?.startsWith('image/')) {
+        return {
+          type: 'image_url',
+          image_url: { url: p.data, detail: p.mediaType === 'image/jpeg' ? 'low' : 'default' },
+        };
+      }
+      return p;
+    }),
+  }));
+}
+
+/**
+ * 构建 system prompt
+ */
+function buildSystemPrompt({
+  multimodalInjection,
+  knowledgeContext,
+}: {
+  multimodalInjection?: string;
+  knowledgeContext: string;
+}): string {
+  return `你是小盛开AI，一个实用的编程助手，擅长代码编写、知识管理、图表生成和多媒体创作。用中文思考，所有思考过程必须用中文描述，不要使用英文。用通俗语言回答。参考知识库时自然融入答案，不标注来源。
+
+工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。
+
+技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
+        ${SKILL_LIST}
+        ${TOOLS_PROMPT}
+        ${multimodalInjection ? `\n${multimodalInjection}\n` : ''}
+        ${knowledgeContext}`;
+}
+
+/**
+ * 加载 MCP 工具（带缓存）
+ */
+async function loadMcpTools(): Promise<Record<string, unknown>> {
+  try {
+    const client = await getMCPClient();
+    const t = await client.tools();
+    console.log(`[mcp] loaded (${Object.keys(t).length} tools)`);
+    return t;
+  } catch (err) {
+    console.error(`[mcp] FAILED - ${(err as Error).message}`);
+    return {};
   }
 }

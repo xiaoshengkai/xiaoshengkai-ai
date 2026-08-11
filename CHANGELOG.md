@@ -1,5 +1,64 @@
 # Changelog
 
+## v0.6.7 (2026-08-11) — 代码清理 + DeepSeek preprocess 路径修复
+
+### 核心改动
+- **route.ts**（净 -100 行）：删除冗余 preprocess 死代码，重构为单一 `POST()` 函数；提取 video detection / model construction / system prompt 三个辅助函数
+- **m3-raw-fetch.ts**（新增 163 行）：M3 OpenAI 兼容接口的流式/非流式调用 + OpenAI SSE → AI SDK UI message stream 转换
+- **image-processor.ts**（+50 行）：preprocess 改用 `m3ChatComplete`（绕开 AI SDK），支持 UIMessage 格式的 `[图片:xxx]` 标记自动加载文件
+- **video-processor.ts**（+30 行）：preprocess 改用 `m3ChatComplete`，支持 UIMessage 格式的 `[视频:xxx]` 标记自动加载文件
+- **processor.ts**（+10 行）：image/video preprocess 改串行（避免并发读取同一目录竞态）
+- **providers.ts**（+1 行）：统一默认 baseURL 到 `https://api.minimaxi.com/v1`
+
+### 修复
+- **DeepSeek + 视频 preprocess 路径**：之前因 messages 是 ModelMessage 格式（无 file parts），preprocess 读不到文件内容；现在主动从 data/static/videos/ 读取并构造 video_url
+- **DeepSeek + 图片 preprocess 路径**：同样的修复，主动从 data/static/images/ 读取图片文件
+- **DeepSeek + 图片+视频**：image/video preprocess 改串行（避免并发文件读取竞态）
+
+### 视频直传路径全景
+
+| 场景 | 路径 |
+|---|---|
+| M3 + 仅图片 | AI SDK streamText（file→OpenAI provider 自动转 image_url）|
+| M3 + 仅视频 | raw fetch → m3ChatStream（OpenAI provider 不支持 video file）|
+| M3 + 图片+视频 | raw fetch（自动检测 video）|
+| DeepSeek + 任何附件 | preprocess 路径：M3 描述 → 文字注入 system prompt |
+| 无附件 | AI SDK streamText 正常路径 |
+
+### 端到端测试（7 个核心场景全部通过）
+- ✅ M3 + 仅图片（AI SDK 路径）
+- ✅ M3 + 仅视频（raw fetch 路径）
+- ✅ M3 + 图片+视频（raw fetch 路径）
+- ✅ DeepSeek + 仅视频（preprocess 路径）
+- ✅ DeepSeek + 仅图片（preprocess 路径）
+- ✅ DeepSeek + 图片+视频（preprocess 路径）
+- ✅ 仅文字（AI SDK 路径）
+
+### 上传边界测试
+- ✅ webm 拒绝（M3 不支持）
+- ✅ 未知 MIME 拒绝
+- ✅ 60MB 视频拒绝（>50MB 限制）
+
+### 变更文件
+**新增**：
+- `packages/ai-chat/src/lib/m3-raw-fetch.ts`（163 行）
+
+**修改**：
+- `packages/ai-chat/src/app/api/chat/route.ts`（+80 / -180 行，净 -100）
+- `packages/ai-chat/src/lib/image-processor.ts`（+50 / -30 行）
+- `packages/ai-chat/src/lib/video-processor.ts`（+30 / -50 行）
+- `packages/ai-chat/src/lib/processor.ts`（+10 / -5 行）
+- `packages/ai-chat/src/lib/providers.ts`（+1 / -1 行）
+
+**净效果**：+173 / -256 行 = -83 行总代码，video 直传路径 + DeepSeek preprocess 路径完整
+
+### 已知限制（待办）
+- M3 通过 OpenAI 兼容接口不支持原生 `image_url` 格式（需要 file→fetch 拦截器重写）— 已实现
+- Files API 路径（>50MB 视频走 mm_file://）— 未实现
+- M3 的 `video_url` 是 M3 自定义扩展，标准 OpenAI 不支持 — 已通过 raw fetch 绕过
+- Qwen3.8-Max 接入预留（multimodal-config.ts 已配置，但 .env 无 QWEN API key）
+- 已知 `page.tsx` 有 AI SDK v6/v7 重复实例化错误（pre-existing，与本次改动无关）
+
 ## v0.6.6 (2026-08-10) — M3 视频 API 修正（image_url → video_url + fps 参数）
 
 ### 重大修正

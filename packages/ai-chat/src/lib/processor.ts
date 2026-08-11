@@ -33,10 +33,11 @@ export async function processAttachments({ provider, model, messages }: ProcessI
   if (imageStrategy === 'none' && videoStrategy === 'none') {
     if (hasImageOrVideo(messages)) {
       console.log(`[processor] ${provider}/${model} 不支持多模态 → preprocess 路径`);
-      const [imgDesc, vidDesc] = await Promise.all([
-        preprocessImagesDescription(messages).then((r) => r.systemInjection),
-        preprocessVideoDescription(messages),
-      ]);
+      // 串行调用，避免并发读取同一文件目录
+      const imgResult = await preprocessImagesDescription(messages);
+      const vidDesc = await preprocessVideoDescription(messages);
+      const imgDesc = imgResult.systemInjection;
+      console.log(`[preprocess] img desc len=${imgDesc?.length || 0}, vid desc len=${vidDesc?.length || 0}`);
       return {
         messages: messages.map(stripBothAttachments),
         systemInjection: [imgDesc, vidDesc].filter(Boolean).join('\n\n') || undefined,

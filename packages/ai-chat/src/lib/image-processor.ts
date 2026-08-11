@@ -1,14 +1,12 @@
 /**
  * 图片处理器
  *
- * Direct 模式：[图片:uuid] → 读 data/static/images/xxx.png → base64 → image content
- * Preprocess 模式：调 M3 描述 → 文字注入 system prompt
+ * AI SDK 5 使用 {type: 'file', mediaType, data} 格式传递多媒体。
+ * minimax fetch 拦截器会根据 mediaType 把 file 改写成 image_url 或 video_url。
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { generateText } from 'ai';
-import { minimax } from './providers';
 import { extractAttachments } from './modality-detector';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
 
@@ -21,10 +19,10 @@ export interface ImageProcessResult {
 }
 
 /**
- * Direct：读本地文件 → base64 → 返回 image content parts
+ * 读图片 → AI SDK file 类型
  */
-function loadImagesAsBase64(filenames: string[]): { type: 'image'; image: string }[] {
-  const out: { type: 'image'; image: string }[] = [];
+function loadImagesAsFile(filenames: string[]): { type: 'file'; mediaType: string; data: string }[] {
+  const out: { type: 'file'; mediaType: string; data: string }[] = [];
   for (const filename of filenames) {
     const filePath = path.resolve(ROOT_DIR, 'data', 'static', 'images', filename);
     if (!fs.existsSync(filePath)) {
@@ -36,24 +34,29 @@ function loadImagesAsBase64(filenames: string[]): { type: 'image'; image: string
     }
     const buffer = fs.readFileSync(filePath);
     const ext = path.extname(filename).slice(1).toLowerCase();
-    const mime = ext === 'jpg' ? 'jpeg' : ext;
-    const base64 = `data:image/${mime};base64,${buffer.toString('base64')}`;
-    out.push({ type: 'image', image: base64 });
+    const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+    const base64 = `data:${mime};base64,${buffer.toString('base64')}`;
+    out.push({ type: 'file', mediaType: mime, data: base64 });
   }
   return out;
 }
 
 /**
- * 把 URL 图片转为 image parts
+ * URL 图片 → AI SDK file 类型
  */
-function loadUrlsAsImage(urls: string[]): { type: 'image'; image: string }[] {
-  return urls.map((u) => ({ type: 'image', image: u.trim() }));
+function loadUrlsAsFile(urls: string[]): { type: 'file'; mediaType: string; data: string }[] {
+  return urls.map((u) => {
+    const url = u.trim();
+    // 从 URL 推断 mediaType
+    const extMatch = url.match(/\.([a-z0-9]+)(?:\?|$)/i);
+    const ext = extMatch?.[1]?.toLowerCase() || 'png';
+    const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+    return { type: 'file', mediaType: mime, data: url };
+  });
 }
 
 /**
  * 处理 messages 中的 [图片:...] 标记
- * - 历史消息根据 depth 决定保留/剥离
- * - 当前消息全部保留
  */
 export function processImagesDirect(messages: any[]): any[] {
   const depth = readHistoryDepth('image');
@@ -61,7 +64,6 @@ export function processImagesDirect(messages: any[]): any[] {
 
   return messages.map((msg, i) => {
     const isCurrent = i === total - 1;
-    // 当前消息强制保留；历史按 depth
     if (!isCurrent && depth !== 'all') {
       if (typeof depth === 'number' && depth < total - i) {
         return stripImages(msg);
@@ -75,7 +77,6 @@ export function processImagesDirect(messages: any[]): any[] {
         continue;
       }
       const text = part.text || '';
-      // 收集 [图片:uuid] 和 URL
       const uploadRegex = /\[图片:([^\]]+)\]/g;
       const urlRegex = /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi;
 
@@ -91,29 +92,28 @@ export function processImagesDirect(messages: any[]): any[] {
         continue;
       }
 
-      // 替换文本为不含标记的版本
       const cleanText = text.replace(uploadRegex, '').replace(urlRegex, '').trim();
-      const content: any[] = [];
-      if (cleanText) content.push({ type: 'text', text: cleanText });
       try {
+        if (cleanText) {
+          newParts.push({ type: 'text', text: cleanText });
+        }
         if (uploads.length > 0) {
-          content.push(...loadImagesAsBase64(uploads));
+          newParts.push(...loadImagesAsFile(uploads));
         }
         if (urls.length > 0) {
-          content.push(...loadUrlsAsImage(urls));
+          newParts.push(...loadUrlsAsFile(urls));
         }
       } catch (err) {
         const strategy = DEFAULT_CONFIG.missingFileStrategy;
         if (strategy === 'error') throw err;
         if (strategy === 'ignore') {
-          // 忽略图片，继续文本
           console.warn(`[image-processor] 忽略缺失图片: ${(err as Error).message}`);
           if (!cleanText) continue;
+          newParts.push({ type: 'text', text: cleanText });
+        } else {
+          return msg;
         }
-        // preprocess fallback
-        return msg;  // 让上层回退到 preprocess 路径
       }
-      newParts.push({ ...part, type: 'content', content });
     }
     return { ...msg, parts: newParts };
   });
@@ -139,7 +139,9 @@ export function stripImages(msg: any): any {
 }
 
 /**
- * Preprocess：用 M3 描述最后一条消息的图片
+ * Preprocess：用 M3 描述图片 → 文字注入 system prompt
+ *
+ * 支持 UIMessage 格式（text 含 [图片:xxx]）和 ModelMessage 格式（file part）
  */
 export async function preprocessImagesDescription(messages: any[]): Promise<ImageProcessResult> {
   const last = messages[messages.length - 1];
@@ -148,65 +150,85 @@ export async function preprocessImagesDescription(messages: any[]): Promise<Imag
   const attachments = extractAttachments(messages).filter((a) => a.modality === 'image');
   if (attachments.length === 0) return { messages };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-
-  try {
-    const imageContent: any[] = [];
-    for (const att of attachments) {
-      if (att.localPath) {
-        // 上传文件：读 base64
-        const filePath = path.resolve(ROOT_DIR, 'data', 'static', 'images', att.filename);
-        if (!fs.existsSync(filePath)) continue;
-        const buffer = fs.readFileSync(filePath);
-        const ext = path.extname(att.filename).slice(1).toLowerCase();
-        const mime = ext === 'jpg' ? 'jpeg' : ext;
-        imageContent.push({ type: 'image', image: `data:image/${mime};base64,${buffer.toString('base64')}` });
-      } else {
-        // URL
-        imageContent.push({ type: 'image', image: att.source });
+  // 构造 OpenAI 格式 content
+  const openaiMessages = messages.map((m: any) => {
+    const content: any[] = [];
+    for (const p of m.parts || []) {
+      if (p?.type === 'text') {
+        content.push({ type: 'text', text: p.text });
+      } else if (p?.type === 'file' && p.mediaType?.startsWith('image/')) {
+        content.push({
+          type: 'image_url',
+          image_url: { url: p.data, detail: p.mediaType === 'image/jpeg' ? 'low' : 'default' },
+        });
+      } else if (p?.type === 'file' && p.mediaType?.startsWith('video/')) {
+        content.push({
+          type: 'video_url',
+          video_url: { url: p.data, detail: 'default', fps: 1 },
+        });
       }
     }
+    return { role: m.role, content };
+  });
 
-    if (imageContent.length === 0) return { messages };
+  // 如果没有图片内容（UIMessage 模式），从 text 标记读图片文件
+  const hasImageContent = openaiMessages.some((m: any) =>
+    m.content?.some((p: any) => p.type === 'image_url')
+  );
 
-    const tStart = Date.now();
-    console.log(`[preprocess] 检测到 ${imageContent.length} 张图片，M3 调用中...`);
-
-    const { text: description } = await generateText({
-      model: minimax('MiniMax-M3'),
-      abortSignal: controller.signal,
-      maxOutputTokens: 300,
-      messages: [
-        {
-          role: 'user',
-          content: [{ type: 'text', text: '请客观描述这张图片的内容即可，不要做多余事情。' }, ...imageContent],
-        },
-      ],
-    });
-
-    clearTimeout(timeout);
-    console.log(`[preprocess] M3 完成: ${((Date.now() - tStart) / 1000).toFixed(1)}s, ${description.length} 字`);
-
-    // 剥离标记，保留文本
-    const cleanedParts = last.parts.map((p: any) => {
-      if (p?.type !== 'text') return p;
-      return {
-        ...p,
-        text: (p.text || '').replace(/\[图片:[^\]]+\]\n?/g, '').replace(
-          /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi,
-          ''
-        ).trim(),
-      };
-    });
-
-    return {
-      messages: [...messages.slice(0, -1), { ...last, parts: cleanedParts }],
-      systemInjection: description,
-    };
-  } catch (err) {
-    clearTimeout(timeout);
-    console.error('[preprocess] 失败:', (err as Error).message);
-    return { messages };
+  if (!hasImageContent) {
+    const lastMsg = openaiMessages[openaiMessages.length - 1];
+    if (lastMsg) {
+      for (const att of attachments) {
+        if (att.localPath) {
+          try {
+            const filePath = path.resolve(ROOT_DIR, 'data', 'static', 'images', att.filename);
+            if (!fs.existsSync(filePath)) continue;
+            const buffer = fs.readFileSync(filePath);
+            const ext = path.extname(att.filename).slice(1).toLowerCase();
+            const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+            const base64 = `data:${mime};base64,${buffer.toString('base64')}`;
+            lastMsg.content.push({
+              type: 'image_url',
+              image_url: { url: base64, detail: mime === 'image/jpeg' ? 'low' : 'default' },
+            });
+          } catch (err) {
+            console.warn(`[image-preprocess] 跳过图片 ${att.filename}:`, (err as Error).message);
+          }
+        }
+      }
+    }
   }
+
+  const hasAnyImage = openaiMessages.some((m: any) =>
+    m.content?.some((p: any) => p.type === 'image_url')
+  );
+  if (!hasAnyImage) return { messages };
+
+  const tStart = Date.now();
+  console.log(`[preprocess] 检测到图片，M3 调用中...`);
+
+  const { m3ChatComplete } = await import('./m3-raw-fetch');
+  const description = await m3ChatComplete(
+    [{ role: 'user', content: [{ type: 'text', text: '请客观描述这张图片的内容即可，不要做多余事情。' }, ...(openaiMessages[openaiMessages.length - 1]?.content || [])] }],
+    { modelName: 'MiniMax-M3', systemPrompt: '' },
+  );
+
+  console.log(`[preprocess] M3 完成: ${((Date.now() - tStart) / 1000).toFixed(1)}s, ${description?.length || 0} 字`);
+
+  const cleanedParts = last.parts.map((p: any) => {
+    if (p?.type !== 'text') return p;
+    return {
+      ...p,
+      text: (p.text || '').replace(/\[图片:[^\]]+\]\n?/g, '').replace(
+        /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi,
+        ''
+      ).trim(),
+    };
+  });
+
+  return {
+    messages: [...messages.slice(0, -1), { ...last, parts: cleanedParts }],
+    systemInjection: description || undefined,
+  };
 }

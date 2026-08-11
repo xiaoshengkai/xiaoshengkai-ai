@@ -5,6 +5,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "node scripts/fix-transformers-mjs.mjs",
     "dev": "bash scripts/dev.sh",
     "build": "npm run build -w packages/ai-chat",
     "lint": "npm run lint -w packages/ai-chat",
@@ -17,11 +18,12 @@
     "test:video-v2": "node packages/workflows/templates/tech-video/test.js"
   },
   "dependencies": {
+    "@chroma-core/default-embed": "^0.1.9",
     "axios": "^1.18.1",
     "dotenv": "^17.4.2",
     "node-cron": "^3.0.3"
   },
   "devDependencies": {
-    "http-proxy": "^1.18.0"
+    "http-proxy": "^1.18.1"
   }
 }

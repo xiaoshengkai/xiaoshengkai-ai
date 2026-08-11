@@ -2,13 +2,13 @@
  * 处理器工厂 — 根据 provider/model 选策略
  *
  * 策略：
- * - direct: AI SDK 直传 image_url + video_url（M3 自己抽帧）
+ * - direct: AI SDK 直传（M3 等支持多模态）
  * - preprocess: M3 描述 → 文字注入 system（DeepSeek 等纯文本 provider）
  */
 
 import { getModalityStrategy } from './multimodal-config';
 import { processImagesDirect, preprocessImagesDescription } from './image-processor';
-import { processVideos, stripVideos, preprocessVideoDescription } from './video-processor';
+import { processVideos, preprocessVideoDescription } from './video-processor';
 
 export interface ProcessInput {
   provider: string;
@@ -33,9 +33,10 @@ export async function processAttachments({ provider, model, messages }: ProcessI
   if (imageStrategy === 'none' && videoStrategy === 'none') {
     if (hasImageOrVideo(messages)) {
       console.log(`[processor] ${provider}/${model} 不支持多模态 → preprocess 路径`);
-      // 串行调用，避免并发读取同一文件目录
-      const imgResult = await preprocessImagesDescription(messages);
-      const vidDesc = await preprocessVideoDescription(messages);
+      const [imgResult, vidDesc] = await Promise.all([
+        preprocessImagesDescription(messages),
+        preprocessVideoDescription(messages),
+      ]);
       const imgDesc = imgResult.systemInjection;
       console.log(`[preprocess] img desc len=${imgDesc?.length || 0}, vid desc len=${vidDesc?.length || 0}`);
       return {
@@ -46,40 +47,29 @@ export async function processAttachments({ provider, model, messages }: ProcessI
     return { messages };
   }
 
-  // 图片直传
-  let processedMessages = messages;
-  if (imageStrategy === 'direct') {
-    try {
-      processedMessages = processImagesDirect(processedMessages);
-    } catch (err) {
-      console.warn(`[processor] 图片直传失败，回退 preprocess:`, (err as Error).message);
-      return processAttachments({ provider: 'minimax', model: 'MiniMax-M3', messages });
+  // 部分支持多模态（罕见）：回退到 preprocess
+  if (imageStrategy === 'none' || videoStrategy === 'none') {
+    if (hasImageOrVideo(messages)) {
+      console.log(`[processor] ${provider}/${model} 部分支持多模态 → 回退 preprocess`);
+      const [imgResult, vidDesc] = await Promise.all([
+        preprocessImagesDescription(messages),
+        preprocessVideoDescription(messages),
+      ]);
+      return {
+        messages: messages.map(stripBothAttachments),
+        systemInjection: [imgResult.systemInjection, vidDesc].filter(Boolean).join('\n\n') || undefined,
+      };
     }
-  } else if (hasImage(processedMessages)) {
-    // 视频支持但图片不支持（不太可能但兜底）
-    const imgResult = await preprocessImagesDescription(processedMessages);
-    processedMessages = imgResult.messages;
+    return { messages };
   }
 
-  // 视频直传（video_url content type，M3 自己处理 fps）
-  if (videoStrategy === 'direct') {
-    try {
-      processedMessages = processVideos(processedMessages);
-    } catch (err) {
-      console.error(`[processor] 视频处理失败:`, (err as Error).message);
-      throw err;
-    }
-  } else if (hasVideo(processedMessages)) {
-    const desc = await preprocessVideoDescription(processedMessages);
-    processedMessages = processedMessages.map(stripVideos);
-    if (desc) {
-      // 叠加已有的 systemInjection（如果有）
-      // 这里简单处理：描述作为单独的 system injection
-      // 实际上需要和图片描述合并
-    }
+  // 完全支持多模态 → direct
+  try {
+    return { messages: processVideos(processImagesDirect(messages)) };
+  } catch (err) {
+    console.warn(`[processor] 直传失败，回退 preprocess:`, (err as Error).message);
+    return processAttachments({ provider: 'minimax', model: 'MiniMax-M3', messages });
   }
-
-  return { messages: processedMessages };
 }
 
 /**

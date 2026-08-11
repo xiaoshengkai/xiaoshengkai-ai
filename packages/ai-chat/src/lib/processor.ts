@@ -65,7 +65,7 @@ export async function processAttachments({ provider, model, messages }: ProcessI
 
   // 完全支持多模态 → direct
   try {
-    return { messages: processVideos(processImagesDirect(messages)) };
+    return { messages: processVideos(await processImagesDirect(messages)) };
   } catch (err) {
     console.warn(`[processor] 直传失败，回退 preprocess:`, (err as Error).message);
     return processAttachments({ provider: 'minimax', model: 'MiniMax-M3', messages });

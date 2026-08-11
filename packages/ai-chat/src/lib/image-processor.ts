@@ -7,10 +7,41 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { extractAttachments } from './modality-detector';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
+const IMAGE_DIR = path.resolve(ROOT_DIR, 'data', 'static', 'images');
+
+/**
+ * 下载远程图片到本地（带缓存）
+ * 返回本地文件名，失败返回 null
+ */
+async function downloadRemoteImage(url: string): Promise<string | null> {
+  // 已经是本地路径，跳过
+  if (url.startsWith('/api/uploads/')) return null;
+  // 检查是否已缓存
+  const hash = crypto.createHash('md5').update(url).digest('hex').slice(0, 8);
+  const existing = fs.readdirSync(IMAGE_DIR).find(f => f.includes(hash));
+  if (existing) return existing;
+
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) return null;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length === 0 || buffer.length > 10 * 1024 * 1024) return null;
+
+    const ext = url.split('?')[0].split('.').pop()?.toLowerCase() || 'png';
+    const filename = `${hash}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    fs.mkdirSync(IMAGE_DIR, { recursive: true });
+    fs.writeFileSync(path.join(IMAGE_DIR, filename), buffer);
+    console.log(`[image-cache] downloaded ${filename} (${(buffer.length / 1024).toFixed(1)}KB)`);
+    return filename;
+  } catch {
+    return null;
+  }
+}
 
 export interface ImageProcessResult {
   messages: any[];
@@ -44,25 +75,14 @@ function loadImagesAsFile(filenames: string[]): { type: 'file'; mediaType: strin
 /**
  * URL 图片 → AI SDK file 类型
  */
-function loadUrlsAsFile(urls: string[]): { type: 'file'; mediaType: string; data: string }[] {
-  return urls.map((u) => {
-    const url = u.trim();
-    // 从 URL 推断 mediaType
-    const extMatch = url.match(/\.([a-z0-9]+)(?:\?|$)/i);
-    const ext = extMatch?.[1]?.toLowerCase() || 'png';
-    const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-    return { type: 'file', mediaType: mime, data: url };
-  });
-}
-
 /**
  * 处理 messages 中的 [图片:...] 标记
  */
-export function processImagesDirect(messages: any[]): any[] {
+export async function processImagesDirect(messages: any[]): Promise<any[]> {
   const depth = readHistoryDepth('image');
   const total = messages.length;
 
-  return messages.map((msg, i) => {
+  return await Promise.all(messages.map(async (msg, i) => {
     const isCurrent = i === total - 1;
     if (!isCurrent && depth !== 'all') {
       if (typeof depth === 'number' && depth < total - i) {
@@ -101,7 +121,20 @@ export function processImagesDirect(messages: any[]): any[] {
           newParts.push(...loadImagesAsFile(uploads));
         }
         if (urls.length > 0) {
-          newParts.push(...loadUrlsAsFile(urls));
+          // 下载远程 URL 到本地（OSS 签名 24h 过期，缓存后下次追问可用）
+          const localFiles: string[] = [];
+          for (const url of urls) {
+            const local = await downloadRemoteImage(url);
+            if (local) {
+              localFiles.push(local);
+            } else {
+              // 下载失败，保留原始 URL
+              newParts.push({ type: 'file', mediaType: 'image/png', data: url });
+            }
+          }
+          if (localFiles.length > 0) {
+            newParts.push(...loadImagesAsFile(localFiles));
+          }
         }
       } catch (err) {
         const strategy = DEFAULT_CONFIG.missingFileStrategy;
@@ -116,7 +149,7 @@ export function processImagesDirect(messages: any[]): any[] {
       }
     }
     return { ...msg, parts: newParts };
-  });
+  }));
 }
 
 /**

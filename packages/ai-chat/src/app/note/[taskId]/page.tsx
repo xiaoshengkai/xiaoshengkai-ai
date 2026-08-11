@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE } from "@/lib/utils";
+import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";

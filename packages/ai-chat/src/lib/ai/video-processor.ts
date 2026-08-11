@@ -11,8 +11,8 @@ import { extractAttachments } from './modality-detector';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
 import { VIDEO_URL_REGEX, VIDEO_UPLOAD_REGEX, VIDEO_MARKER_STRIP } from './multimodal-markers';
 import { m3ChatComplete } from './m3-raw-fetch';
-import type { FilePart, Message, MessagePart, TextPart } from './types';
-import { extToMime } from './mime';
+import type { FilePart, Message, MessagePart, TextPart } from "../utils/types"
+import { extToMime } from "../utils/mime"
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
 

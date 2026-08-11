@@ -8,7 +8,7 @@
  */
 
 import { ATTACHMENT_REGEX } from './multimodal-markers';
-import type { Message } from './types';
+import type { Message } from "../utils/types"
 
 export type Modality = 'image' | 'video' | 'unknown';
 

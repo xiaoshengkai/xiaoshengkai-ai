@@ -13,7 +13,7 @@ import {
   ATTACHMENT_REGEX, UPLOAD_MARKER_STRIP, IMAGE_URL_REGEX, VIDEO_URL_REGEX,
   IMAGE_MARKER_STRIP, VIDEO_MARKER_STRIP,
 } from './multimodal-markers';
-import type { Message, MessagePart, TextPart } from './types';
+import type { Message, MessagePart, TextPart } from "../utils/types"
 
 export interface ProcessInput {
   provider: string;

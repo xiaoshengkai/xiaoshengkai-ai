@@ -25,6 +25,6 @@ export async function register(): Promise<void> {
     return;
   }
 
-  const { ensureChromaRunning } = await import("@/lib/chroma-server");
+  const { ensureChromaRunning } = await import("@/lib/rag/chroma-server");
   await ensureChromaRunning();
 }

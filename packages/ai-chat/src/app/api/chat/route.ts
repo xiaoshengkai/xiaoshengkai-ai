@@ -19,13 +19,13 @@ import { streamText, stepCountIs, type ModelMessage as AISDKModelMessage } from 
 import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import { env } from '@/lib/env';
-import { retrieveRelevantChunks } from '@/lib/retrieve';
-import { deepseek, minimax } from '@/lib/providers';
-import { classifyTask } from '@/lib/model-router';
-import { processAttachments } from '@/lib/processor';
-import { m3ChatStream, toUIMessageStream } from '@/lib/m3-raw-fetch';
-import type { Message, MessagePart } from '@/lib/types';
+import { env } from '@/lib/utils/env';
+import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
+import { deepseek, minimax } from '@/lib/ai/providers';
+import { classifyTask } from '@/lib/ai/model-router';
+import { processAttachments } from '@/lib/ai/processor';
+import { m3ChatStream, toUIMessageStream } from '@/lib/ai/m3-raw-fetch';
+import type { Message, MessagePart } from '@/lib/utils/types';
 
 // ─── 提示词常量 ────────────────────────────────────────────────────────
 

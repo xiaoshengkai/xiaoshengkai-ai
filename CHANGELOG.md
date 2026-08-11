@@ -1,5 +1,85 @@
 # Changelog
 
+## v0.6.9 (2026-08-11) — `src/lib/` 目录重构（按功能聚类）
+
+用户反馈"`src/lib/` 下文件太多"。不改任何代码逻辑，只调整目录组织。
+
+### 新结构
+
+```
+src/lib/
+├── ai/                   # 9 个 — AI SDK 集成
+│   ├── providers.ts            # glm/deepseek/minimax
+│   ├── model-router.ts        # DeepSeek 路由分类
+│   ├── multimodal-config.ts   # provider 能力注册表
+│   ├── modality-detector.ts   # 模态识别
+│   ├── multimodal-markers.ts  # marker 正则
+│   ├── image-processor.ts     # 图片处理
+│   ├── video-processor.ts     # 视频处理
+│   ├── processor.ts           # 策略分发器
+│   └── m3-raw-fetch.ts        # M3 raw fetch
+├── rag/                  # 3 个 — RAG
+│   ├── retrieve.ts            # 跨库检索
+│   ├── vector-store.ts        # Chroma 客户端
+│   └── chroma-server.ts       # Chroma 进程管理
+├── store/                # 1 个 — 存储
+│   └── conversation-store.ts  # 对话 JSON
+├── utils/                # 7 个 — 工具
+│   ├── env.ts                 # env 集中
+│   ├── format.ts              # 日期格式
+│   ├── mime.ts                # MIME 字典
+│   ├── types.ts               # 核心类型
+│   ├── utils.ts               # cn + BASE
+│   ├── cost.ts                # 价格计算
+│   └── upload-client.ts       # 客户端上传
+├── workflow-cli.ts       # 顶层 — CLI 子进程
+└── prompts/
+    └── video-content.txt
+```
+
+### 路径映射
+
+| 旧 | 新 |
+|---|---|
+| `@/lib/providers` | `@/lib/ai/providers` |
+| `@/lib/model-router` | `@/lib/ai/model-router` |
+| `@/lib/multimodal-config` | `@/lib/ai/multimodal-config` |
+| `@/lib/modality-detector` | `@/lib/ai/modality-detector` |
+| `@/lib/multimodal-markers` | `@/lib/ai/multimodal-markers` |
+| `@/lib/image-processor` | `@/lib/ai/image-processor` |
+| `@/lib/video-processor` | `@/lib/ai/video-processor` |
+| `@/lib/processor` | `@/lib/ai/processor` |
+| `@/lib/m3-raw-fetch` | `@/lib/ai/m3-raw-fetch` |
+| `@/lib/retrieve` | `@/lib/rag/retrieve` |
+| `@/lib/vector-store` | `@/lib/rag/vector-store` |
+| `@/lib/chroma-server` | `@/lib/rag/chroma-server` |
+| `@/lib/conversation-store` | `@/lib/store/conversation-store` |
+| `@/lib/env` | `@/lib/utils/env` |
+| `@/lib/format` | `@/lib/utils/format` |
+| `@/lib/mime` | `@/lib/utils/mime` |
+| `@/lib/types` | `@/lib/utils/types` |
+| `@/lib/utils` | `@/lib/utils/utils` ← utils.ts 重命名为 utils/utils.ts |
+| `@/lib/cost` | `@/lib/utils/cost` |
+| `@/lib/upload-client` | `@/lib/utils/upload-client` |
+| `@/lib/workflow-cli` | 不变（保留顶层） |
+
+### 决策
+
+- **合并** ×：用户问"文件功能是否可以合并" — 我检查了所有文件，结论是**大多数文件职责清晰，不该合并**。强行合并会让 utils.ts 变成"杂物间"反模式。
+- **保留 `lib/utils/utils.ts`**：丑但最简单，IDE 补全自动区分。
+- **`workflow-cli.ts` 留在顶层**：CLI 调用是横切关注点（workflow + 未来 task 等可能都用），不属于任何子目录。
+
+### 变更文件
+
+- 20 个 `git mv`（仅移动，内容 0 改动）
+- 25 个文件 import 路径更新（应用层 12 + lib/ 内部 9 + 间接 4）
+- 1 个文件路径修复（`scripts/verify-migration.ts`）
+
+### 验证
+
+- `tsc --noEmit` 0 错误
+- 功能完全不变（只移动 + 改 import）
+
 ## v0.6.8 (2026-08-11) — 整体代码优化（类型安全 + 工具合并 + 死代码清理）
 
 用户之前提到"等会来一次整体的代码检查优化"，今天完成。一次跑完 9 个 phase（基线 → 工具新建 → 死代码 → 合并 → 类型 → UI 抽离 → 性能 → 临时测试 → 收尾），零功能改动。

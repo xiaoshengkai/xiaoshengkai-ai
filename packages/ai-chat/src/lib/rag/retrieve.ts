@@ -11,8 +11,8 @@
  */
 
 import { embed } from "ai";
-import { glm } from "@/lib/providers";
-import { searchRelevant, SHARED_DB, SHARED_COLLECTION, CHAT_DB, CHAT_COLLECTION, TOP_K_DEFAULT, listCollections } from "@/lib/vector-store";
+import { glm } from "@/lib/ai/providers";
+import { searchRelevant, SHARED_DB, SHARED_COLLECTION, CHAT_DB, CHAT_COLLECTION, TOP_K_DEFAULT, listCollections } from "@/lib/rag/vector-store";
 
 export interface RetrievedChunk {
   content: string;

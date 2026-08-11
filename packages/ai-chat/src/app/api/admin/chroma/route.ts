@@ -27,8 +27,8 @@ import {
   EMBEDDING_DIM,
   SHARED_DB,
   SHARED_COLLECTION,
-} from "@/lib/vector-store";
-import { glm } from "@/lib/providers";
+} from "@/lib/rag/vector-store";
+import { glm } from "@/lib/ai/providers";
 
 function ok(data: unknown) {
   return NextResponse.json({ ok: true, data });

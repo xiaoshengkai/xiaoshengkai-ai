@@ -1,10 +1,10 @@
 
 "use client";
 
-import { BASE } from "@/lib/utils";
+import { BASE } from "@/lib/utils/utils";
 import { useMemo, useEffect, useState, useRef } from "react";
 import type { UIMessage } from "ai";
-import { calculateCost, formatTokens } from "@/lib/cost";
+import { calculateCost, formatTokens } from "@/lib/utils/cost";
 
 interface RetrievedChunk {
   content: string;

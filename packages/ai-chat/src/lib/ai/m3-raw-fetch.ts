@@ -4,7 +4,7 @@
  * 注意：必须用 stream:false 时才能区分"流"和"一次性"调用
  */
 
-import { env } from './env';
+import { env } from "../utils/env"
 
 const BASE_URL = env.MINIMAX_BASE_URL;
 const API_KEY = env.MINIMAX_API_KEY;

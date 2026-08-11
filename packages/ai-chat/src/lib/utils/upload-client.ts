@@ -3,7 +3,7 @@
  */
 
 import { BASE } from "./utils";
-import type { UploadResult } from "./types";
+import type { UploadResult } from "./types"
 
 export function readAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

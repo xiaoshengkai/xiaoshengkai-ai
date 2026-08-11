@@ -1,7 +1,7 @@
 import { generateText, embed } from "ai";
 import { randomUUID } from "crypto";
-import { getCollection, CHAT_DB, CHAT_COLLECTION } from "@/lib/vector-store";
-import { glm, deepseek } from "@/lib/providers";
+import { getCollection, CHAT_DB, CHAT_COLLECTION } from "@/lib/rag/vector-store";
+import { glm, deepseek } from "@/lib/ai/providers";
 
 export async function POST(req: Request) {
   try {

@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { deepseek } from "@/lib/providers";
+import { deepseek } from "@/lib/ai/providers";
 
 export type ModelTier = "flash" | "pro";
 

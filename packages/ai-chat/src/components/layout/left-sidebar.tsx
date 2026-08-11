@@ -1,7 +1,7 @@
 
 "use client";
 
-import { BASE } from "@/lib/utils";
+import { BASE } from "@/lib/utils/utils";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";

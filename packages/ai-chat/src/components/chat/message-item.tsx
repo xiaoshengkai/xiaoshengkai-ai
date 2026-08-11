@@ -1,15 +1,15 @@
 
 "use client";
 
-import { BASE } from "@/lib/utils";
+import { BASE } from "@/lib/utils/utils";
 import { useMemo, useState, useCallback } from "react";
 import { isToolUIPart, isReasoningUIPart, type UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 
-import { cn } from "@/lib/utils";
-import { calculateCost, formatTokens } from "@/lib/cost";
+import { cn } from "@/lib/utils/utils";
+import { calculateCost, formatTokens } from "@/lib/utils/cost";
 import { BookmarkPlus, Check, X, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import TooltipIcon from "@/components/ui/tooltip-icon";

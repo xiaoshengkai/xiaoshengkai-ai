@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE } from "@/lib/utils";
+import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp } from "lucide-react";

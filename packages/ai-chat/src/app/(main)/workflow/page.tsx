@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE } from "@/lib/utils";
+import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Play, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";

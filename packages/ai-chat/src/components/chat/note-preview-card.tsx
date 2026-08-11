@@ -1,12 +1,12 @@
 
 "use client";
 
-import { BASE } from "@/lib/utils";
+import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 import { ExternalLink } from "lucide-react";
 
 interface NoteImage {

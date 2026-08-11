@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE } from "@/lib/utils";
+import { BASE } from "@/lib/utils/utils";
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
@@ -12,9 +12,9 @@ import MessageItem from "@/components/chat/message-item";
 import { ImageViewerProvider } from "@/components/ui/image-viewer";
 import RightPanel from "@/components/layout/right-panel";
 import { useConversation } from "@/components/layout/conversation-context";
-import { calculateCost, formatTokens } from "@/lib/cost";
-import { uploadFile } from "@/lib/upload-client";
-import type { AttachedFile } from "@/lib/types";
+import { calculateCost, formatTokens } from "@/lib/utils/cost";
+import { uploadFile } from "@/lib/utils/upload-client";
+import type { AttachedFile } from "@/lib/utils/types";
 import PixelLogo from "@/components/ui/pixel-logo";
 
 const LoadingDots = React.memo(function LoadingDots() {

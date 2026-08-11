@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { env } from "./env";
+import { env } from "../utils/env"
 
 export const glm = createOpenAICompatible({
   name: "glm",

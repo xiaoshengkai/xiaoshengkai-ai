@@ -7,7 +7,7 @@
 
 import type { Metadata } from "next";
 import "./globals.css";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 import { Toaster } from "sonner";
 
 

@@ -22,7 +22,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import { existsSync, mkdirSync } from "fs";
 import { join, resolve } from "path";
-import { env } from "./env";
+import { env } from "../utils/env"
 
 // ─── 常量(集中配置,便于阅读与调整) ──────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { deepseek } from "@/lib/providers";
+import { deepseek } from "@/lib/ai/providers";
 
 const COMPRESS_PROMPT = `请将以下对话整理为上下文摘要，供后续对话参考。确保不丢失任何关键信息。
 

@@ -17,7 +17,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { embed } from "ai";
-import { glm } from "../src/lib/providers";
+import { glm } from "../src/lib/ai/providers";
 import { ChromaClient } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 

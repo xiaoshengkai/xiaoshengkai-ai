@@ -11,7 +11,7 @@ import crypto from 'node:crypto';
 import { extractAttachments } from './modality-detector';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
 import { IMAGE_URL_REGEX, IMAGE_UPLOAD_REGEX, IMAGE_MARKER_STRIP, IMAGE_MARKER_TRIM } from './multimodal-markers';
-import type { FilePart, Message, MessagePart, TextPart } from './types';
+import type { FilePart, Message, MessagePart, TextPart } from "../utils/types"
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
 const IMAGE_DIR = path.resolve(ROOT_DIR, 'data', 'static', 'images');

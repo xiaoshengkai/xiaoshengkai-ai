@@ -20,8 +20,8 @@
 import { ChromaClient, type Collection, type Where } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 import { generateText } from "ai";
-import { deepseek } from "@/lib/providers";
-import { env } from "./env";
+import { deepseek } from "@/lib/ai/providers";
+import { env } from "../utils/env"
 
 // ─── 数据库常量 ─────────────────────────────────────────────────────
 

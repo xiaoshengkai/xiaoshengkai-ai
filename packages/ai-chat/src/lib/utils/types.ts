@@ -13,18 +13,13 @@ export interface TokenUsage {
   outputTokenDetails?: { textTokens?: number; reasoningTokens?: number };
 }
 
-export interface RetrievedChunkMeta {
-  content: string;
-  source: string;
-}
-
 export interface MessageMetadata {
   usage?: TokenUsage;
   provider?: string;
   model?: string;
   modelTier?: string;
   classifyUsage?: TokenUsage;
-  retrievedChunks?: RetrievedChunkMeta[];
+  retrievedChunks?: { content: string; source: string }[];
 }
 
 export interface TextPart {
@@ -39,20 +34,7 @@ export interface FilePart {
   name?: string;
 }
 
-export interface ReasoningPart {
-  type: 'reasoning';
-  text: string;
-}
-
-export interface ToolPart {
-  type: string;
-  toolCallId?: string;
-  state?: string;
-  input?: unknown;
-  output?: unknown;
-}
-
-export type MessagePart = TextPart | FilePart | ReasoningPart | ToolPart | { type: string; [key: string]: unknown };
+export type MessagePart = TextPart | FilePart | { type: string; [key: string]: unknown };
 
 export interface Message {
   id: string;
@@ -62,19 +44,20 @@ export interface Message {
 }
 
 export interface NoteImage {
-  url: string;
-  description?: string;
+  index: number;
+  type: 'cover' | 'illustration';
+  prompt: string;
+  url: string | null;
+  status: 'pending' | 'done' | 'failed';
 }
 
 export interface NoteData {
-  id?: string;
+  taskId: string;
+  status: 'generating' | 'ready' | 'failed' | 'partial';
   title: string;
-  cover?: string;
-  content: string;
-  illustrations?: NoteImage[];
-  tags?: string[];
-  topic?: string;
-  status?: string;
+  content: string[];
+  tags: string[];
+  images: NoteImage[];
 }
 
 export interface UploadResult {

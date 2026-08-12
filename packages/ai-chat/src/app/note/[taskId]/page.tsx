@@ -7,23 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { Download } from "lucide-react";
-
-interface NoteImage {
-  index: number;
-  type: "cover" | "illustration";
-  prompt: string;
-  url: string | null;
-  status: string;
-}
-
-interface NoteData {
-  taskId: string;
-  status: string;
-  title: string;
-  content: string[];
-  tags: string[];
-  images: NoteImage[];
-}
+import type { NoteData } from "@/lib/utils/types";
 
 export default function NotePreviewPage() {
   const params = useParams();

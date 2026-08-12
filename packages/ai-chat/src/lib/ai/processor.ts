@@ -10,7 +10,7 @@ import { getModalityStrategy } from './multimodal-config';
 import { processImagesDirect, preprocessImagesDescription } from './image-processor';
 import { processVideos, preprocessVideoDescription } from './video-processor';
 import {
-  ATTACHMENT_REGEX, UPLOAD_MARKER_STRIP, IMAGE_URL_REGEX, VIDEO_URL_REGEX,
+  IMAGE_URL_REGEX, VIDEO_URL_REGEX,
   IMAGE_MARKER_STRIP, VIDEO_MARKER_STRIP,
 } from './multimodal-markers';
 import type { Message, MessagePart, TextPart } from "../utils/types"
@@ -118,6 +118,3 @@ function hasVideo(messages: Message[]): boolean {
     })
   );
 }
-
-// re-export for legacy callers
-export { ATTACHMENT_REGEX, UPLOAD_MARKER_STRIP };

@@ -8,23 +8,7 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { cn } from "@/lib/utils/utils";
 import { ExternalLink } from "lucide-react";
-
-interface NoteImage {
-  index: number;
-  type: "cover" | "illustration";
-  prompt: string;
-  url: string | null;
-  status: "pending" | "done" | "failed";
-}
-
-interface NoteData {
-  taskId: string;
-  status: "generating" | "ready" | "failed" | "partial";
-  title: string;
-  content: string[];
-  tags: string[];
-  images: NoteImage[];
-}
+import type { NoteData } from "@/lib/utils/types";
 
 export default function NotePreviewCard({ taskId }: { taskId: string }) {
   const [note, setNote] = useState<NoteData | null>(null);

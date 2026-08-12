@@ -1,5 +1,54 @@
 # Changelog
 
+## v0.6.10 (2026-08-11) — 死代码清理 + NoteImage/NoteData 共享
+
+基于 grep 扫描发现的未使用导出。
+
+### 删除的死导出（14 项，~70 行）
+
+| 文件 | 删除 | 备注 |
+|---|---|---|
+| `lib/utils/format.ts` | `formatRelative` | 0 引用 |
+| `lib/utils/env.ts` | `Env` type | 0 引用 |
+| `lib/utils/mime.ts` | `IMAGE_EXTS` / `VIDEO_EXTS` / `ALL_VIDEO_EXTS_FOR_DETECT` export | modality-detector 和 upload/route 各自有 local copy |
+| `lib/utils/mime.ts` | `getExt` / `isImageExt` / `isVideoExt` | 0 引用 |
+| `lib/utils/types.ts` | `RetrievedChunkMeta` / `ReasoningPart` / `ToolPart` | 0 引用 |
+| `lib/ai/multimodal-markers.ts` | `UPLOAD_MARKER_REGEX` / `CONTEXT_SUMMARY_PREFIX` | 0 引用 |
+
+### 删死 import + 死 re-export
+
+| 文件 | 删除 | 备注 |
+|---|---|---|
+| `lib/ai/processor.ts` | `import { ATTACHMENT_REGEX, UPLOAD_MARKER_STRIP }` + `export { ... }` | body 里完全没用到，re-export 也无人 import |
+
+### NoteImage/NoteData 去重（v0.6.10 关键修复）
+
+`components/chat/note-preview-card.tsx` 和 `app/note/[taskId]/page.tsx` 各自定义了重复的 `NoteImage` / `NoteData` 接口，且字段不一致：
+- `note-preview-card.tsx`：`status: "pending" \| "done" \| "failed"`（精确）
+- `note/[taskId]/page.tsx`：`status: string`（宽松）
+
+修复：
+1. `lib/utils/types.ts` 里的 `NoteImage` / `NoteData` 改成与 `note-preview-card.tsx` 一致的字段（精确类型）
+2. 两个组件删本地 interface，改 `import type { NoteData } from "@/lib/utils/types"`
+3. 副作用：`note/[taskId]/page.tsx` 从 `status: string` 升级到严格 union（类型更安全）
+
+### 净效果
+
+| 维度 | 改前 | 改后 |
+|---|---|---|
+| 死导出 | 14 项 | 0 |
+| NoteImage/NoteData 重复定义 | 2 处 | 1 处共享 |
+| 净 LOC | - | **-91 行**（来自本次 commit + dashboard.html 无关改动）|
+
+### 验证
+
+- `tsc --noEmit` 0 错误
+- `format.ts`: 24 行 → 9 行（formatRelative 删）
+- `mime.ts`: 48 行 → 28 行（6 导出删）
+- `types.ts`: 90 行 → 72 行（5 接口删）
+- `multimodal-markers.ts`: 22 行 → 17 行（2 常量删）
+- `processor.ts`: 123 行 → 119 行（import + re-export 删）
+
 ## v0.6.9 (2026-08-11) — `src/lib/` 目录重构（按功能聚类）
 
 用户反馈"`src/lib/` 下文件太多"。不改任何代码逻辑，只调整目录组织。

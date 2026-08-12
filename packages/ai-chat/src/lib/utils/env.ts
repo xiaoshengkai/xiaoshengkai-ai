@@ -19,5 +19,3 @@ export const env = {
 
   CHROMA_URL: process.env.CHROMA_URL || 'http://localhost:8000',
 } as const;
-
-export type Env = typeof env;

@@ -8,6 +8,7 @@ export const env = {
 
   MINIMAX_BASE_URL: process.env.MINIMAX_BASE_URL || 'https://api.minimaxi.com/v1',
   MINIMAX_API_KEY: process.env.MINIMAX_API_KEY || '',
+  MINIMAX_ANTHROPIC_BASE_URL: process.env.MINIMAX_ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic/v1',
 
   DEEPSEEK_BASE_URL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1',
   DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',

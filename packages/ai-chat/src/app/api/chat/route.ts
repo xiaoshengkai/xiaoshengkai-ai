@@ -24,10 +24,11 @@ import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
 import { deepseek, minimax } from '@/lib/ai/providers';
 import { classifyTask } from '@/lib/ai/model-router';
 import { processAttachments } from '@/lib/ai/processor';
-import { m3ChatStream, toUIMessageStream } from '@/lib/ai/m3-raw-fetch';
 import type { Message, MessagePart } from '@/lib/utils/types';
 
 // ─── 提示词常量 ────────────────────────────────────────────────────────
+
+const M3_MAX_OUTPUT_TOKENS = 131072;  // 128K，M3 上下文 1,000,000，输出不受限
 
 const TOOLS_PROMPT = `
 可用工具:
@@ -132,21 +133,6 @@ async function getMCPClient(): Promise<MCPClient> {
 // ─── POST /api/chat ───────────────────────────────────────────────────
 
 /**
- * 检测消息中是否包含视频（需要走 raw fetch 路径）
- */
-function messagesContainVideo(modelMessages: AISDKModelMessage[]): boolean {
-  return modelMessages.some((msg) => {
-    if (!Array.isArray(msg.content)) return false;
-    return msg.content.some((p) =>
-      typeof p === 'object' && p !== null
-      && (p as { type?: string }).type === 'file'
-      && typeof (p as { mediaType?: string }).mediaType === 'string'
-      && (p as { mediaType: string }).mediaType.startsWith('video/')
-    );
-  });
-}
-
-/**
  * ModelMessage 构造（自己来，因为 AI SDK 6 convertToModelMessages 会丢 file.data）
  */
 function toModelMessages(messages: Message[]): AISDKModelMessage[] {
@@ -206,24 +192,23 @@ export async function POST(req: Request) {
       knowledgeContext,
     });
 
-    console.log(`[router] provider=${provider}, model=${modelName}, hasVideo=${messagesContainVideo(modelMessages)}`);
+    console.log(`[router] provider=${provider}, model=${modelName}`);
 
-    // === 视频路径：raw fetch 绕过 AI SDK ===
-    if (messagesContainVideo(modelMessages) && isMiniMax) {
-      const openaiMessages = fileToOpenAI(modelMessages);
-      const response = await m3ChatStream(openaiMessages, { modelName, systemPrompt, signal: req.signal });
-      return toUIMessageStream(response);
-    }
-
-    // === 常规路径：AI SDK streamText ===
+    // === AI SDK streamText ===
     const result = streamText({
       tools: tools as unknown as Parameters<typeof streamText>[0]['tools'],
       model: isMiniMax ? minimax(modelName) : deepseek(modelName),
+      maxOutputTokens: isMiniMax ? M3_MAX_OUTPUT_TOKENS : undefined,
       system: systemPrompt,
       messages: modelMessages,
       maxRetries: 5,
       stopWhen: stepCountIs(100),
       abortSignal: req.signal,
+      providerOptions: {
+        anthropic: {
+          thinking: { type: 'adaptive' },
+        },
+      },
     });
 
     return result.toUIMessageStreamResponse({
@@ -254,32 +239,6 @@ export async function POST(req: Request) {
 }
 
 // ─── 辅助函数 ──────────────────────────────────────────────────────
-
-/**
- * file 类型转 OpenAI 格式（给 raw fetch 路径用）
- */
-function fileToOpenAI(messages: AISDKModelMessage[]) {
-  return messages.map((msg) => ({
-    role: msg.role,
-    content: Array.isArray(msg.content)
-      ? msg.content.map((p) => {
-          const mediaType = (p as { mediaType?: string }).mediaType;
-          const data = (p as { data?: string }).data;
-          const type = (p as { type?: string }).type;
-          if (type === 'file' && mediaType?.startsWith('video/')) {
-            return { type: 'video_url', video_url: { url: data, detail: 'default', fps: 1 } };
-          }
-          if (type === 'file' && mediaType?.startsWith('image/')) {
-            return {
-              type: 'image_url',
-              image_url: { url: data, detail: mediaType === 'image/jpeg' ? 'low' : 'default' },
-            };
-          }
-          return p;
-        })
-      : msg.content,
-  }));
-}
 
 /**
  * 构建 system prompt

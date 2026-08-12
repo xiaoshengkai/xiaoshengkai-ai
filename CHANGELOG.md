@@ -1,5 +1,58 @@
 # Changelog
 
+## v0.7.0 (2026-08-12) — M3 切换 Anthropic 协议 + 多处修复
+
+### 核心改动：M3 `createOpenAICompatible` → `createAnthropic`
+
+用户发现 M3 官方推荐 Anthropic SDK，且 Anthropic 协议原生支持 `type: "thinking"` 内容块（不再需要 `reasoning_split` / `extractReasoningMiddleware` 等 hack）。
+
+**切换后优势**：
+- thinking 是协议原生 content block，AI SDK `@ai-sdk/anthropic` 原生支持
+- 思考过程 `[思考过程]` UI 恢复（`thinking: { type: 'adaptive' }`）
+- 图片直传恢复（M3 重新加入 multimodal registry）
+- 工具调用稳定（新聊天窗口验证通过）
+
+**代价**：
+- 视频直传暂时不可用（`@ai-sdk/anthropic` provider 在代码层面拒了 video，TODO 等升级）
+- 视频走 preprocess 路径（text 描述）
+
+### 新增/修改
+
+| 文件 | 改动 |
+|---|---|
+| `.env` | `MINIMAX_ANTHROPIC_BASE_URL=https://api.minimaxi.com/anthropic/v1` |
+| `env.ts` | `MINIMAX_ANTHROPIC_BASE_URL` 默认值 |
+| `providers.ts` | `createOpenAICompatible` → `createAnthropic({ baseURL, apiKey })` |
+| `chat/route.ts` | 删视频 raw-fetch 路径 + `messagesContainVideo`/`fileToOpenAI` 死函数 |
+| `chat/route.ts` | `thinking: { type: 'adaptive' }` + `M3_MAX_OUTPUT_TOKENS = 131072` |
+| `m3-raw-fetch.ts` | 删 `m3ChatStream`/`toUIMessageStream`，保留 `m3ChatComplete`（DeepSeek preprocess 用） |
+| `multimodal-config.ts` | M3 重新加回 registry（图片直传），`videoModels: []`（TODO） |
+| `package.json` | `@ai-sdk/anthropic@3.0.110` |
+
+### 修复
+
+| 文件 | 修复 |
+|---|---|
+| `upload-client.ts` | `file` → `base64` 字段名匹配 `upload/route.ts` |
+| `xiaohongshu/index.js` | note.md 图片 CDN URL → 相对路径 |
+| `xiaohongshu/index.js` | export 返回 blogUrl + 内容完整性校验 |
+| `xiaohongshu/index.js` | index.html `.img-block` 加 `max-width:600px` |
+
+### 净效果
+
+| 维度 | 改前 | 改后 |
+|---|---|---|
+| M3 协议 | OpenAI 兼容（preprocess 降级） | Anthropic 原生（图片直传） |
+| 思考过程 | ❌ 始终丢失 | ✅ 原生支持 |
+| 视频 | 直传（AI SDK 不支持） | preprocess（TODO 等升级） |
+| 代码行数 | - | **-119 行** |
+| tsc | 0 错误 | 0 错误 |
+
+### 已知限制
+
+- 视频直传：`@ai-sdk/anthropic` provider 在 `convertToModelMessages` 阶段拒了 video，M3 端点支持但 AI SDK 不支持。等 provider 升级后可通过 fetch 拦截器还原。
+- 长上下文工具调用：M3 在 76 条消息后可能退化，建议用「压缩对话」或开新窗口。
+
 ## v0.6.16 (2026-08-12) — 工具方法去重（sleep + parseJSON + task-state + generateImage）
 
 用户问"generateImageAsync 和 generateImage 是不是重复了"，全盘扫描后执行了一次性去重。

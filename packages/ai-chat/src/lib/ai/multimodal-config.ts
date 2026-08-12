@@ -26,10 +26,14 @@ export interface ProviderCapabilities {
 /**
  * 代码默认注册表 — 后续接 Qwen/Claude/Gemini 直接加
  */
-// ponytail: M3 不在 registry 里 → 图片/视频都走 preprocess 路径（text 描述）
-// 优点：M3 只看到 text，AI SDK openai-compatible provider 100% 兼容
-// 代价：M3 不再"直接看图"，但 preprocess 描述文本对绝大多数场景够用
 export const DEFAULT_MULTIMODAL_REGISTRY: Record<string, ProviderCapabilities> = {
+  minimax: {
+    provider: 'minimax',
+    imageModels: ['MiniMax-M3'],
+    videoModels: [],  // TODO: @ai-sdk/anthropic 不支持 video，等 provider 升级后恢复
+    videoFps: 1,
+    description: 'MiniMax M3 多模态（图片直传，视频 preprocess）',
+  },
   qwen: {
     provider: 'qwen',
     imageModels: ['qwen3.8-max', 'qwen-vl-max'],

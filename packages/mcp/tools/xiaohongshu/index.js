@@ -548,7 +548,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;m
 .content th{background:#fdf6f0;padding:8px 12px;text-align:left;font-weight:700;border-bottom:2px solid #e0d0c0}
 .content td{padding:8px 12px;border-bottom:1px solid #f0e0d0}
 .content hr{border:none;border-top:1px solid #e0d0c0;margin:24px 0}
-.img-block{width:100%;border-radius:8px;margin:12px 0}
+.img-block{width:100%;max-width:600px;border-radius:8px;margin:12px 0}
 .img-placeholder{height:200px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;border-radius:8px;margin:12px 0;font-size:14px}
 </style>
 </head>
@@ -576,7 +576,7 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.jpg" alt="封�
             const match = seg.match(/^\[插图-(\d+)\]$/);
             if (match) {
               const img = state.images[parseInt(match[1], 10)];
-              return img?.url ? `![插图](${img.url})` : "_[插图生成失败]_";
+              return img?.url ? `![插图](./images/${img.type === "cover" ? "cover" : `illustration-${img.index}`}.jpg)` : "_[插图生成失败]_";
             }
             return seg + "\n";
           }),
@@ -591,13 +591,23 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.jpg" alt="封�
 
         // 同步到博客
         const category = state.subcategory || "finance";
+        const safeTitle = state.title.replace(/[\/\\:*?"<>|]/g, "_");
+        const blogUrl = `https://node.tailddce43.ts.net/${category}/${safeTitle}/`;
+        let blogSynced = false;
         try {
           syncToBlog(exportDir, state, category);
           updateBlogIndex(category);
-          console.log(`${TAG} export: 已同步到博客 site/${category}/`);
+          blogSynced = true;
+          console.log(`${TAG} export: 已同步到博客 ${blogUrl}`);
         } catch (blogErr) {
           console.error(`${TAG} export: 同步到博客失败 ${blogErr.message}`);
         }
+
+        // 校验导出内容完整性
+        const htmlExists = fs.existsSync(htmlPath);
+        const mdExists = fs.existsSync(mdPath);
+        const htmlSize = htmlExists ? fs.statSync(htmlPath).size : 0;
+        const mdSize = mdExists ? fs.statSync(mdPath).size : 0;
 
         return {
           content: [{
@@ -605,8 +615,12 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.jpg" alt="封�
             text: JSON.stringify({
               ok: true,
               exportDir,
+              blogUrl: blogSynced ? blogUrl : null,
               files: { html: htmlPath, md: mdPath, images: imgCount },
-              note: `笔记已导出到 ${exportDir}`,
+              verified: { htmlExists, mdExists, htmlSize, mdSize, imgCount },
+              note: blogSynced
+                ? `笔记已导出到 ${exportDir}，博客地址：${blogUrl}`
+                : `笔记已导出到 ${exportDir}（博客同步失败：${blogErr?.message || "未知"}）`,
             }, null, 2),
           }],
         };

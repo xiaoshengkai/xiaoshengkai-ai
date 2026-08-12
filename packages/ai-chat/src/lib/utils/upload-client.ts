@@ -19,7 +19,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
   const res = await fetch(`${BASE}/api/upload`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file: dataUrl, name: file.name }),
+    body: JSON.stringify({ base64: dataUrl, name: file.name, mimeType: file.type }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "上传失败" }));

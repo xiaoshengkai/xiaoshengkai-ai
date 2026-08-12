@@ -8,10 +8,19 @@ export async function GET(
 ) {
   const { taskId } = await params;
 
-  const taskFile = path.join(os.tmpdir(), "xhs-tasks", taskId, "task.json");
+  const taskDir = path.join(os.tmpdir(), "xhs-tasks", taskId);
+  const taskFile = path.join(taskDir, "task.json");
   if (!fs.existsSync(taskFile)) {
-    console.log(`[note:status] taskId=${taskId} not found`);
-    return Response.json({ ok: false, error: "笔记任务不存在或已过期" }, { status: 404 });
+    // ponytail: 区分"任务从未创建"vs"task.json 丢失"（目录存在但文件缺失）
+    const dirExists = fs.existsSync(taskDir);
+    console.log(`[note:status] taskId=${taskId} not found (dir=${dirExists})`);
+    return Response.json(
+      {
+        ok: false,
+        error: dirExists ? "任务数据已损坏（目录存在但 task.json 丢失）" : "笔记任务不存在或已过期",
+      },
+      { status: 404 }
+    );
   }
 
   const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));

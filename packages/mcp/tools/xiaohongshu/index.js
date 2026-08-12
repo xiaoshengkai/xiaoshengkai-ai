@@ -176,8 +176,14 @@ ${cardsHtml}
 }
 
 function writeTaskState(workDir, state) {
-  fs.mkdirSync(workDir, { recursive: true });
-  fs.writeFileSync(path.join(workDir, "task.json"), JSON.stringify(state, null, 2));
+  try {
+    fs.mkdirSync(workDir, { recursive: true });
+    fs.writeFileSync(path.join(workDir, "task.json"), JSON.stringify(state, null, 2));
+    console.log(`${TAG} writeTaskState: success taskId=${state.taskId} dir=${workDir}`);
+  } catch (err) {
+    console.error(`${TAG} writeTaskState: FAILED taskId=${state.taskId} dir=${workDir} err=${err.message}`);
+    throw err;
+  }
 }
 
 function updateTask(workDir, update) {

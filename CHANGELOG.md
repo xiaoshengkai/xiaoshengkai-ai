@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.6.13 (2026-08-12) — note status 区分错误诊断
+
+用户报：`/ai/api/note/92b8c2f7/status` 报 404，但 `92b8c2f7` 任务从未被记录创建。
+
+调查发现：
+- `/tmp/xhs-tasks/` 里 3 个旧目录（`0dbb0749` / `59c903ff` / `85511240`）**全是空的**（没 task.json）
+- `writeTaskState()` 没日志，失败完全静默
+- note status 路由无法区分"任务不存在"vs"task.json 损坏"
+
+### 修复
+
+| 文件 | 修改 |
+|---|---|
+| `packages/mcp/tools/xiaohongshu/index.js` | `writeTaskState` 加 try/catch + `[xhs] writeTaskState: success/FAILED ...` 日志 |
+| `packages/ai-chat/src/app/api/note/[taskId]/status/route.ts` | 404 时区分"目录不存在"vs"task.json 缺失"，返回不同 error 文案 |
+
+### 净效果
+- 下次 `writeTaskState` 失败会立刻在日志看到 `[xhs] writeTaskState: FAILED taskId=xxx err=...`
+- 前端 / 调试能区分两类 404：
+  - `"笔记任务不存在或已过期"`（任务确实没创建）
+  - `"任务数据已损坏（目录存在但 task.json 丢失）"`（任务创建过但文件丢失）
+
+### 验证
+- tsc 0 错误
+- **需重启 MCP server** 让 `writeTaskState` 改动生效（Next.js 自动热重载）
+
 ## v0.6.12 (2026-08-12) — 日志噪音修复 + note status 404 日志
 
 ### 问题

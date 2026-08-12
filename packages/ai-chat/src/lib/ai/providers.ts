@@ -1,4 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { extractReasoningMiddleware, wrapLanguageModel } from "ai";
 import { env } from "../utils/env"
 
 export const glm = createOpenAICompatible({
@@ -19,7 +20,11 @@ export const deepseek = createOpenAICompatible({
  * fetch 拦截器：
  * 1. 把 video file 重写为 video_url（M3 文档要求）
  * 2. 把 image file 重写为 image_url
- * 3. 添加 reasoning_split=true
+ * 3. **不** 注入 reasoning_split：让 M3 用默认行为（false），
+ *    thinking 留在 content 的 <think>...</think> 标签里，
+ *    再由 getMinimaxModel 的 extractReasoningMiddleware 抽取。
+ *    （原 reasoning_split:true 会让思考进 reasoning_details，
+ *     openai-compatible provider 不解析该字段 → 思考丢失）
  */
 export const minimax = createOpenAICompatible({
   name: "minimax",
@@ -52,9 +57,18 @@ export const minimax = createOpenAICompatible({
         }
       }
     }
-    return fetch(url, {
-      ...init,
-      body: JSON.stringify({ ...body, reasoning_split: true }),
-    });
+    return fetch(url, init);
   },
 });
+
+/**
+ * 包一层 extractReasoningMiddleware — 抽取 M3 content 里的 <think>...</think> 标签
+ * 成独立的 reasoning 事件，让前端能显示 [思考过程] 折叠区。
+ * 工具事件透传不受影响。
+ */
+export function getMinimaxModel(modelId: string) {
+  return wrapLanguageModel({
+    model: minimax(modelId),
+    middleware: extractReasoningMiddleware({ tagName: "think" }),
+  });
+}

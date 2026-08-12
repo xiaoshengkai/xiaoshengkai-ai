@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.6.14 (2026-08-12) — M3 文字流思考过程丢失修复
+
+### 问题
+用户报："聊天都没有思考过程了 / 调用了什么工具也没展示"
+
+### 根因
+M3 文档关键信息（**用户提供的官方文档**）：
+> "`reasoning_split` 不会开启或关闭 thinking。它只控制 thinking 内容的返回方式：
+> - 为 `true` 时，thinking 通过 `reasoning_content` 和 `reasoning_details` 返回
+> - 为 `false` 时，原生 Chat Completions 响应会将 thinking 保留在 `content` 字段中的 `<think>...</think>` 标签内"
+
+**历史 bug**（commit `5ac0065` 7月埋下）：
+- `providers.ts` 的 fetch 拦截器强制注入 `reasoning_split: true`
+- 原作者以为"AI SDK handles thinking natively"
+- 实际 AI SDK v6 的 `@ai-sdk/openai-compatible` provider **完全不知道 `reasoning_content` / `reasoning_details` 字段**
+- 思考内容在响应里**被静默丢弃**
+- `isReasoningUIPart(part)` 永远不进入 → `<details>[思考过程]</details>` 永远不显示
+
+只有视频流（`m3-raw-fetch.ts`，v0.6.8 我手写的）能显示思考。
+
+### 修复
+- `providers.ts`：删除 `reasoning_split: true` 注入 → 让 M3 用默认行为，thinking 进 `content` 的 `<think>` 标签
+- `providers.ts`：新增 `getMinimaxModel()` helper，用 `wrapLanguageModel + extractReasoningMiddleware({ tagName: 'think' })` 抽取标签成独立 reasoning 事件
+- `chat/route.ts`：`minimax(modelName)` → `getMinimaxModel(modelName)`（1 行）
+
+### 净效果
+| 维度 | 改前 | 改后 |
+|---|---|---|
+| 文字流思考显示 | ❌ 静默丢失 | ✅ 标准 AI SDK 模式抽取 |
+| 视频流思考显示 | ✅ 已正常 | ✅ 不变 |
+| 工具事件 | ❌ 用户报不显示 | ✅ 透传 middleware 恢复（预期）|
+| 改动行数 | - | +18 / -6 |
+
+### 关键学习
+- M3 双模式：`reasoning_split=true` 走 `reasoning_details`（OpenAI 不识别），`reasoning_split=false` 走 `content` 内的 `<think>`（AI SDK 友好）
+- 标准 AI SDK 模式：`extractReasoningMiddleware` 处理 inline 思考标签
+- v0.6.8 改 m3-raw-fetch 时只考虑视频路径，文字流没改 → bug 一直存在
+
+### 验证
+- tsc 0 错误
+- **需 `npm run dev` 或 `next dev` 热更新生效**（已自动）
+
 ## v0.6.13 (2026-08-12) — note status 区分错误诊断
 
 用户报：`/ai/api/note/92b8c2f7/status` 报 404，但 `92b8c2f7` 任务从未被记录创建。

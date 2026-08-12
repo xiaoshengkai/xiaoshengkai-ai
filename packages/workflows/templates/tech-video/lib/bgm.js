@@ -2,12 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { getDurationSec } from "./tts.js";
 import { ERRORS } from "./errors.js";
+import { sleep } from "../../../../shared/utils.js";
 
 const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 export async function generateBGM(scriptJson, executionDir, bgmFilePath) {
   const startTime = Date.now();

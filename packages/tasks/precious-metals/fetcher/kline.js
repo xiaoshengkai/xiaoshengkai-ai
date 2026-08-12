@@ -1,14 +1,11 @@
 import axios from "axios";
 import { config } from "../config.js";
+import { sleep } from "../../shared/utils.js";
 
 const GLOBAL_KLINE_URL =
   "https://stock2.finance.sina.com.cn/futures/api/json_v2.php/GlobalFuturesService.getGlobalFuturesDailyKLine";
 const STOCK_KLINE_URL =
   "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData";
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 async function fetchJson(url, retries = 2) {
   for (let i = 0; i <= retries; i++) {

@@ -2,65 +2,24 @@ import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import crypto from "node:crypto";
-
-const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
+import { sleep, shortId } from "../../../shared/utils.js";
+import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
+import { generateImage } from "../../../shared/llm/providers/minimax.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
-
-function writeTaskState(workDir, state) {
-  fs.mkdirSync(workDir, { recursive: true });
-  fs.writeFileSync(path.join(workDir, "task.json"), JSON.stringify(state));
-}
-
-function updateTask(workDir, update) {
-  const taskFile = path.join(workDir, "task.json");
-  if (!fs.existsSync(taskFile)) return;
-  const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-  Object.assign(state, update);
-  fs.writeFileSync(taskFile, JSON.stringify(state));
-}
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 async function generateImageAsync(taskId, workDir, params) {
   try {
     updateTask(workDir, { status: "generating", progress: 50, message: "生成中..." });
-
-    const apiKey = process.env.MINIMAX_API_KEY;
-    const { prompt, model, aspect_ratio, n, prompt_optimizer, image_url } = params;
-
-    const body = { model, prompt, aspect_ratio, n, prompt_optimizer, response_format: "url" };
-    if (image_url) {
-      body.subject_reference = [{ type: "character", image_file: image_url }];
+    const { prompt, model, aspect_ratio, n, image_url } = params;
+    const imageUrls = [];
+    for (let i = 0; i < (n || 1); i++) {
+      const url = await generateImage(prompt, { aspectRatio: aspect_ratio, model, image_url });
+      imageUrls.push(url);
     }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-    const res = await fetch(`${MINIMAX_BASE_URL}/image_generation`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(body),
-    });
-    clearTimeout(timeout);
-
-    const result = await res.json();
-    if (result.base_resp?.status_code !== 0) {
-      updateTask(workDir, { status: "failed", progress: 100, error: result.base_resp?.status_msg });
-      return;
-    }
-
-    const imageUrls = result.data?.image_urls || [];
     updateTask(workDir, {
-      status: "done",
-      progress: 100,
-      message: "完成",
-      imageUrls,
-      count: imageUrls.length,
-      note: "图片链接有效期 24 小时",
+      status: "done", progress: 100, message: "完成",
+      imageUrls, count: imageUrls.length, note: "图片链接有效期 24 小时",
     });
   } catch (err) {
     const error = err.name === "AbortError" ? "图片生成超时（60s），请重试" : err.message;
@@ -85,25 +44,17 @@ export function register(server) {
         if (provider !== "minimax") {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `不支持的 provider: ${provider}` }) }] };
         }
-
-        const apiKey = process.env.MINIMAX_API_KEY;
-        if (!apiKey) {
+        if (!process.env.MINIMAX_API_KEY) {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
         }
-
-        const taskId = crypto.randomUUID().slice(0, 8);
+        const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);
         writeTaskState(workDir, { status: "started", progress: 0, message: "任务已提交" });
-
         generateImageAsync(taskId, workDir, { prompt, model, aspect_ratio, n, prompt_optimizer }).catch(err => {
           updateTask(workDir, { status: "failed", progress: 100, error: err.message });
         });
-
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({ ok: true, taskId, status: "started", note: "用 checkImageProgress(taskId, interval=5) 查询进度" }, null, 2),
-          }],
+          content: [{ type: "text", text: JSON.stringify({ ok: true, taskId, status: "started", note: "用 checkImageProgress(taskId, interval=5) 查询进度" }, null, 2) }],
         };
       } catch (err) {
         return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: err.message }, null, 2) }] };
@@ -128,25 +79,17 @@ export function register(server) {
         if (provider !== "minimax") {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `不支持的 provider: ${provider}` }) }] };
         }
-
-        const apiKey = process.env.MINIMAX_API_KEY;
-        if (!apiKey) {
+        if (!process.env.MINIMAX_API_KEY) {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
         }
-
-        const taskId = crypto.randomUUID().slice(0, 8);
+        const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);
         writeTaskState(workDir, { status: "started", progress: 0, message: "任务已提交" });
-
         generateImageAsync(taskId, workDir, { prompt, model, aspect_ratio, n, prompt_optimizer, image_url }).catch(err => {
           updateTask(workDir, { status: "failed", progress: 100, error: err.message });
         });
-
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({ ok: true, taskId, status: "started", note: "用 checkImageProgress(taskId, interval=5) 查询进度" }, null, 2),
-          }],
+          content: [{ type: "text", text: JSON.stringify({ ok: true, taskId, status: "started", note: "用 checkImageProgress(taskId, interval=5) 查询进度" }, null, 2) }],
         };
       } catch (err) {
         return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: err.message }, null, 2) }] };
@@ -163,28 +106,17 @@ export function register(server) {
     },
     async ({ taskId, interval }) => {
       const workDir = path.join(TASK_DIR, taskId);
-      const taskFile = path.join(workDir, "task.json");
-      if (!fs.existsSync(taskFile)) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "任务不存在或已过期" }) }] };
-      const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
+      const state = readTaskState(workDir);
+      if (!state) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "任务不存在或已过期" }) }] };
 
       if (state.status === "started" || state.status === "generating") {
-        const base = interval * 1000;
-        const min = base * 0.6;
         const count = state.checkCount || 0;
-
-        let wait = base;
-        for (let i = 0; i < count; i++) {
-          wait = Math.max(wait * 0.9, min);
-        }
-
+        const wait = getAdaptiveWait(interval, count);
         updateTask(workDir, { checkCount: count + 1 });
         console.log(`[image] checkImageProgress: taskId=${taskId}, interval=${interval}, count=${count}, wait=${(wait / 1000).toFixed(1)}s, status=${state.status}`);
         await sleep(wait);
-
-        const updated = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-        return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(readTaskState(workDir), null, 2) }] };
       }
-
       return { content: [{ type: "text", text: JSON.stringify(state, null, 2) }] };
     },
   );

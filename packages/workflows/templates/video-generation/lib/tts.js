@@ -1,8 +1,5 @@
 const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+import { sleep } from "../../../../shared/utils.js";
 
 export async function createTTSTask(text, voiceId) {
   const apiKey = process.env.MINIMAX_API_KEY;

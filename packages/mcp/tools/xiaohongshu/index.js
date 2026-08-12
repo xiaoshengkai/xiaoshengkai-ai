@@ -2,14 +2,14 @@ import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import crypto from "node:crypto";
 import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { generateImage } from "../../../shared/llm/providers/minimax.js";
 import { callLLM as callProviderLLM, PROVIDER } from "../../../shared/llm/index.js";
-
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+import { sleep, shortId } from "../../../shared/utils.js";
+import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
+import { parseJSON } from "../../../shared/llm/parse-json.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
 const TAG = "[xhs]";
@@ -175,43 +175,7 @@ ${cardsHtml}
   console.log(`${TAG} updateBlogIndex: category=${category} entries=${entries.length}`);
 }
 
-function writeTaskState(workDir, state) {
-  try {
-    fs.mkdirSync(workDir, { recursive: true });
-    fs.writeFileSync(path.join(workDir, "task.json"), JSON.stringify(state, null, 2));
-    console.log(`${TAG} writeTaskState: success taskId=${state.taskId} dir=${workDir}`);
-  } catch (err) {
-    console.error(`${TAG} writeTaskState: FAILED taskId=${state.taskId} dir=${workDir} err=${err.message}`);
-    throw err;
-  }
-}
-
-function updateTask(workDir, update) {
-  const taskFile = path.join(workDir, "task.json");
-  if (!fs.existsSync(taskFile)) return;
-  const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-  Object.assign(state, update);
-  fs.writeFileSync(taskFile, JSON.stringify(state, null, 2));
-}
-
-function parseJSON(text) {
-  let cleaned = text.replace(/```\w*\n?|\n?```/g, "").trim();
-  const start = cleaned.indexOf("{");
-  if (start < 0) throw new Error("未找到 JSON");
-
-  let depth = 0, inString = false, escape = false;
-  for (let i = start; i < cleaned.length; i++) {
-    const ch = cleaned[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"' && !inString) { inString = true; continue; }
-    if (ch === '"' && inString) { inString = false; continue; }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    if (ch === "}") { depth--; if (depth === 0) return JSON.parse(cleaned.slice(start, i + 1)); }
-  }
-  throw new Error("JSON 未闭合");
-}
+// writeTaskState / updateTask / parseJSON — 已迁到 shared/ 和 mcp/lib/task-state.js
 
 async function callLLM(prompt, style, subcategory) {
   const category = TEMPLATES[style];
@@ -352,7 +316,7 @@ export function register(server) {
         const prompt = `主题：${topic}\n${context ? `对话内容：${context}\n` : ""}相关知识：${knowledge || "无"}`;
         const noteData = await callLLM(prompt, style, subcategory);
 
-        const taskId = crypto.randomUUID().slice(0, 8);
+        const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);
 
         const images = [
@@ -483,11 +447,8 @@ export function register(server) {
       const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
 
       if (state.status === "generating") {
-        const base = interval * 1000;
-        const min = base * 0.6;
         const count = state.checkCount || 0;
-        let wait = base;
-        for (let i = 0; i < count; i++) wait = Math.max(wait * 0.9, min);
+        const wait = getAdaptiveWait(interval, count);
         updateTask(workDir, { checkCount: count + 1 });
         console.log(`${TAG} checkProgress: taskId=${taskId} status=${state.status} count=${count} wait=${(wait / 1000).toFixed(1)}s`);
         await sleep(wait);

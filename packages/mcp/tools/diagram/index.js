@@ -2,10 +2,11 @@ import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import puppeteer from "puppeteer";
 import { callLLM } from "../../../shared/llm/index.js";
+import { sleep, shortId } from "../../../shared/utils.js";
+import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
 
 const TAG = "[diagram]";
 
@@ -822,22 +823,7 @@ async function reviewVisual(pngPath, context = "") {
 // 注册工具
 // ═══════════════════════════════════════════════════════════════════
 
-function writeTaskState(workDir, state) {
-  fs.mkdirSync(workDir, { recursive: true });
-  fs.writeFileSync(path.join(workDir, "task.json"), JSON.stringify(state));
-}
-
-function updateTask(workDir, update) {
-  const taskFile = path.join(workDir, "task.json");
-  if (!fs.existsSync(taskFile)) return;
-  const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-  Object.assign(state, update);
-  fs.writeFileSync(taskFile, JSON.stringify(state));
-}
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+// writeTaskState / updateTask / sleep — 已迁到 shared/utils.js 和 mcp/lib/task-state.js
 
 async function executeDiagramPipeline(taskId, workDir, prompt, opts) {
   try {
@@ -979,7 +965,7 @@ export function register(server) {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
         }
 
-        const taskId = crypto.randomUUID().slice(0, 8);
+        const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);
         console.log(`${TAG} taskId=${taskId}, workDir=${workDir}`);
 
@@ -1018,19 +1004,11 @@ export function register(server) {
       const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
 
       if (state.status === "running" || state.status === "started" || state.status === "generating" || state.status === "validating" || state.status === "rendering" || state.status === "reviewing") {
-        const base = interval * 1000;
-        const min = base * 0.6;
         const count = state.checkCount || 0;
-
-        let wait = base;
-        for (let i = 0; i < count; i++) {
-          wait = Math.max(wait * 0.9, min);
-        }
-
+        const wait = getAdaptiveWait(interval, count);
         updateTask(workDir, { checkCount: count + 1 });
         console.log(`${TAG} checkDiagramProgress: taskId=${taskId}, interval=${interval}, count=${count}, wait=${(wait / 1000).toFixed(1)}s, status=${state.status}`);
         await sleep(wait);
-
         const updated = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
         return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
       }

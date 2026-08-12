@@ -1,11 +1,8 @@
 import axios from "axios";
 import { config } from "../config.js";
+import { sleep } from "../../shared/utils.js";
 
 const SINA_URL = "https://hq.sinajs.cn";
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 async function fetchWithRetry(url, options = {}, retries = config.retryCount) {
   for (let i = 0; i <= retries; i++) {

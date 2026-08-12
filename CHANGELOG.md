@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.6.16 (2026-08-12) — 工具方法去重（sleep + parseJSON + task-state + generateImage）
+
+用户问"generateImageAsync 和 generateImage 是不是重复了"，全盘扫描后执行了一次性去重。
+
+### 新建共享模块
+
+| 文件 | 导出 | 替换 |
+|---|---|---|
+| `shared/utils.js` | `sleep`, `shortId` | 10 处 sleep + 5 处 randomUUID |
+| `shared/llm/parse-json.js` | `parseJSON` | 3 处（ai.js + xiaohongshu + diagram + tech-video prompt-builder）|
+| `mcp/lib/task-state.js` | `writeTaskState`, `readTaskState`, `updateTask`, `getAdaptiveWait` | 3 处 MCP 工具（image + xiaohongshu + diagram）|
+
+### 合并重复 fetch
+
+| 文件 | 改动 |
+|---|---|
+| `shared/llm/providers/minimax.js` | `generateImage` 加 `image_url` 参数（支持 `subject_reference`）|
+| `mcp/tools/media/image.js` | 删重复 fetch 逻辑，改用共享 `generateImage()` + `task-state` |
+
+### 更新消费者
+
+| 文件 | 改动 |
+|---|---|
+| `mcp/tools/media/image.js` | 用 `shared/utils.js` + `task-state.js` + `minimax.js` |
+| `mcp/tools/xiaohongshu/index.js` | 用 `shared/utils.js` + `task-state.js` + `parse-json.js` |
+| `mcp/tools/diagram/index.js` | 用 `shared/utils.js` + `task-state.js` |
+| `workflows/lib/step-types/ai.js` | 用 `parse-json.js` |
+| `workflows/templates/video-generation/lib/tts.js` | 用 `shared/utils.js` sleep |
+| `workflows/templates/video-generation/lib/bgm.js` | 用 `shared/utils.js` sleep |
+| `workflows/templates/tech-video/lib/tts.js` | 用 `shared/utils.js` sleep |
+| `workflows/templates/tech-video/lib/bgm.js` | 用 `shared/utils.js` sleep |
+| `workflows/templates/tech-video/lib/prompt-builder.js` | 用 `parse-json.js` |
+| `workflows/templates/tech-video/utils.js` | sleep 重导出 `shared/utils.js` |
+| `tasks/precious-metals/fetcher/sina.js` | 用 `shared/utils.js` sleep |
+| `tasks/precious-metals/fetcher/kline.js` | 用 `shared/utils.js` sleep |
+
+### 净效果
+
+| 维度 | 改前 | 改后 |
+|---|---|---|
+| `sleep` 定义 | 10 处 | 1 处（`shared/utils.js`）|
+| `parseJSON` 定义 | 4 处 | 1 处（`shared/llm/parse-json.js`）|
+| `writeTaskState`/`updateTask` | 3 处 | 1 处（`mcp/lib/task-state.js`）|
+| 自适应轮询 | 3 处 | 1 处（`mcp/lib/task-state.js`）|
+| `generateImage` fetch | 2 处 | 1 处（`shared/llm/.../minimax.js`）|
+| 净 LOC | - | **-120 行** |
+| tsc | 0 错误 | 0 错误 |
+
+### 已知未合并
+
+- `video-generation/lib/prompt-builder.js` 的 `parseJSON` 保留本地版本（有增强错误处理：try/catch JSON.parse + 位置信息）
+- callLLM（deepseek/minimax 重复）推迟
+- TTS/BGM 完整复制（video-generation vs tech-video）推迟
+
 ## v0.6.15 (2026-08-12) — M3 回退朴素 createOpenAICompatible + 多模态统一 preprocess
 
 用户决策："回到一开始吧，M3 用 createOpenAICompatible，图片/视频走解析再喂文本"

@@ -43,12 +43,24 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   };
 }
 
-export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIMAX_IMAGE_MODEL } = {}) {
+export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIMAX_IMAGE_MODEL, image_url } = {}) {
   const apiKey = process.env.MINIMAX_API_KEY;
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60000);
+
+  const body = {
+    model,
+    prompt,
+    aspect_ratio: aspectRatio,
+    n: 1,
+    prompt_optimizer: true,
+    response_format: "url",
+  };
+  if (image_url) {
+    body.subject_reference = [{ type: "character", image_file: image_url }];
+  }
 
   const res = await fetch(`${MINIMAX_BASE_URL}/image_generation`, {
     method: "POST",
@@ -57,14 +69,7 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIM
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model,
-      prompt,
-      aspect_ratio: aspectRatio,
-      n: 1,
-      prompt_optimizer: true,
-      response_format: "url",
-    }),
+    body: JSON.stringify(body),
   });
   clearTimeout(timeout);
 

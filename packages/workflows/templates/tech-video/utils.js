@@ -1,11 +1,8 @@
 import { execSync } from "node:child_process";
+export { sleep } from "../../../shared/utils.js";
 
 export function escHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-export function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 export function checkFfmpeg() {

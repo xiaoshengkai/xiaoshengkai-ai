@@ -27,7 +27,6 @@ import { env } from "../utils/env"
 
 export const SHARED_DB = process.env.CHROMA_SHARED_DB ?? "shared";
 export const CHAT_DB = process.env.CHROMA_CHAT_DB ?? "chat";
-export const CODE_DB = process.env.CHROMA_CODE_DB ?? "code";
 
 export const SHARED_COLLECTION = "base_knowledge";
 export const CHAT_COLLECTION = "chat_knowledge";
@@ -73,13 +72,6 @@ const _chromaConn = parseChromaUrl(env.CHROMA_URL);
 
 // ─── 类型定义 ───────────────────────────────────────────────────────
 
-export interface ChunkEmbedding {
-  id: string;
-  content: string;
-  embedding: number[];
-  metadata?: Record<string, string | number | boolean | null>;
-}
-
 export interface SearchResult {
   content: string;
   similarity: number;
@@ -109,11 +101,6 @@ export function getChromaClient(database?: string): ChromaClient {
     }));
   }
   return clientCache.get(db)!;
-}
-
-export function _resetChromaClientForTesting(): void {
-  clientCache.clear();
-  collectionCache.clear();
 }
 
 // ─── Collection 获取/创建 ───────────────────────────────────────────
@@ -332,8 +319,6 @@ export interface ListChunksOptions {
 export interface ListChunksResult {
   chunks: ChunkRow[];
 }
-
-export const ADMIN_PAGE_SIZE_DEFAULT = 20;
 
 export async function listAllChunks(
   opts: ListChunksOptions = {},

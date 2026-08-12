@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.6.11 (2026-08-11) — 二次死代码扫描（按"内部使用也算使用"原则）
+
+用户纠正：只删"全项目 0 引用"的导出。**内部使用的（字段类型/同文件调用）保留**。
+
+### 删除（7 项，0 引用）
+
+| 文件 | 删除 | 备注 |
+|---|---|---|
+| `lib/utils/format.ts` | 整个文件 | 只剩 `formatDateTime`，v0.6.8 引入后从未调用 |
+| `lib/ai/multimodal-markers.ts` | `UPLOAD_MARKER_MATCH` | message-item.tsx 用内联正则，未引这个常量 |
+| `lib/ai/multimodal-markers.ts` | `UPLOAD_MARKER_SPLIT` | 同上 |
+| `lib/rag/vector-store.ts` | `_resetChromaClientForTesting()` | 测试 helper，无测试存在 |
+| `lib/rag/vector-store.ts` | `CODE_DB` 常量 | SHARED_DB/CHAT_DB 在用，CODE_DB 没人用 |
+| `lib/rag/vector-store.ts` | `ChunkEmbedding` interface | 0 引用（SearchResult 是不同接口）|
+| `lib/rag/vector-store.ts` | `ADMIN_PAGE_SIZE_DEFAULT` | 0 引用（admin/chroma 用魔数 100）|
+
+### 保留（"内部使用算使用"）
+
+| 类型/常量 | 内部用途 |
+|---|---|
+| `DISTANCE_FUNCTION` | line 146 `"hnsw:space": DISTANCE_FUNCTION` |
+| `SOFT_DELETE_WINDOW_MS` | line 209 软删过期判断 |
+| `getChromaClient()` | line 143/173/245 内部调用 |
+| `SearchConfig` / `CrossDbSearchConfig` | searchOneCollection 形参 |
+| `ListChunksOptions` / `ListChunksResult` | listAllChunks 形参与返回 |
+| `CompactResult` | compactCollection 返回类型 |
+| `purgeExpiredSoftDeletes()` | searchOneCollection 调用 |
+| 16 个类型导出（`TokenUsage` / `MessageMetadata` / `Attachment` / `Strategy` 等） | 同文件字段类型 |
+
+### 净效果
+
+| 维度 | 改前 | 改后 |
+|---|---|---|
+| lib/utils/ 文件数 | 7 | 6（format.ts 删除）|
+| 真正 0 引用的导出 | 7 | 0 |
+| 净 LOC | - | **-28**（format.ts -10, multimodal-markers -3, vector-store -15）|
+| tsc | 0 错误 | 0 错误 |
+
 ## v0.6.10 (2026-08-11) — 死代码清理 + NoteImage/NoteData 共享
 
 基于 grep 扫描发现的未使用导出。

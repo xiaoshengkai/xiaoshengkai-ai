@@ -30,3 +30,6 @@ logs/
 site/
 docs/
 packages/.planning/packages/workflows/templates/video-generation-v2/lib/sfx/*.mp3
+
+# auto-generated dashboards
+packages/tasks/*/dashboard.html

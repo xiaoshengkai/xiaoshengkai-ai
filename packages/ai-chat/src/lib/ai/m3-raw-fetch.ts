@@ -57,7 +57,7 @@ export async function m3ChatComplete(
       ...messages,
     ],
     stream: false,
-    reasoning_split: false,
+    reasoning_split: true,  // ponytail: true → thinking 进 reasoning_content 字段，content 拿干净文本
   };
 
   const response = await rawFetch(body, opts.signal);

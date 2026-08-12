@@ -21,7 +21,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 import { env } from '@/lib/utils/env';
 import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
-import { deepseek, getMinimaxModel } from '@/lib/ai/providers';
+import { deepseek, minimax } from '@/lib/ai/providers';
 import { classifyTask } from '@/lib/ai/model-router';
 import { processAttachments } from '@/lib/ai/processor';
 import { m3ChatStream, toUIMessageStream } from '@/lib/ai/m3-raw-fetch';
@@ -218,7 +218,7 @@ export async function POST(req: Request) {
     // === 常规路径：AI SDK streamText ===
     const result = streamText({
       tools: tools as unknown as Parameters<typeof streamText>[0]['tools'],
-      model: isMiniMax ? getMinimaxModel(modelName) : deepseek(modelName),
+      model: isMiniMax ? minimax(modelName) : deepseek(modelName),
       system: systemPrompt,
       messages: modelMessages,
       maxRetries: 5,

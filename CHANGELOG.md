@@ -1,5 +1,60 @@
 # Changelog
 
+## v0.6.15 (2026-08-12) — M3 回退朴素 createOpenAICompatible + 多模态统一 preprocess
+
+用户决策："回到一开始吧，M3 用 createOpenAICompatible，图片/视频走解析再喂文本"
+
+### 根因回顾
+
+v0.6.14 尝试用 `extractReasoningMiddleware` 解析 M3 的 ` thinking` 标签 → 报 "reasoning-delta without start"（AI SDK v6.0.220 中间件 edge case）。继续打补丁会陷入"修了 A 坏了 B"循环。
+
+根本问题：M3 有非标准字段（`reasoning_content`），AI SDK 的 openai-compatible provider 不认识 → 理解成本持续产生。
+
+### 架构决策
+
+**放弃 M3 直传多模态**（image_url / video_url），改为**统一 preprocess 路径**：
+
+```
+用户上传图片/视频
+  ↓ processor.ts: M3 返回 'none'（退出 registry）
+  ↓ preprocessImagesDescription / preprocessVideoDescription
+  ↓ m3ChatComplete (reasoning_split=true) 拿 text 描述
+  ↓ 剥掉 file parts，注入 systemInjection
+  ↓ M3 只看到 text，走标准 AI SDK 路径
+```
+
+### 改动
+
+| 文件 | 改动 | 净行数 |
+|---|---|---|
+| `multimodal-config.ts` | 删 minimax 条目（M3 退出多模态 registry） | -5 |
+| `providers.ts` | 删 fetch 拦截器 + `getMinimaxModel` + `extractReasoningMiddleware` 导入 | -43 |
+| `chat/route.ts` | 改 import + model 调用（`getMinimaxModel` → `minimax`） | +2 / -2 |
+| `m3-raw-fetch.ts` | `m3ChatComplete` 里 `reasoning_split: false` → `true`（preprocess 拿到干净 text） | +1 / -1 |
+
+### 净效果
+
+| 维度 | 改前 | 改后 |
+|---|---|---|
+| M3 多模态 | 直传 image_url/video_url | preprocess（text 描述） |
+| M3 reasoning | `extractReasoningMiddleware`（v0.6.14）→ 报错 | 无 reasoning UI（但稳定） |
+| 工具调用 | 偶尔 hallucinate（长上下文压力） | 标准 AI SDK 路径，稳定 |
+| AI SDK 兼容 | ⚠️ M3 自定义字段 | ✅ 纯 text，100% 兼容 |
+| 代码行数 | - | **-54 行** |
+| tsc | 0 错误 | 0 错误 |
+
+### 代价
+
+- M3 不再"直接看图" — 看图能力从"直传"降级为"preprocess 文本描述"
+- 对大多数场景（"这张图是什么"），preprocess 输出已够用
+- 未来如需恢复直传，只需在 registry 重新加回 minimax 条目
+
+### 验证
+
+- `tsc --noEmit` 0 错误
+- preprocess 代码（v0.6.7 已写）已验证
+- 需要重启服务（`next dev` 热更已自动生效）
+
 ## v0.6.14 (2026-08-12) — M3 文字流思考过程丢失修复
 
 ### 问题

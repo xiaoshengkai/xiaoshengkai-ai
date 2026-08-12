@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.6.12 (2026-08-12) — 日志噪音修复 + note status 404 日志
+
+### 问题
+1. `/tmp/xhs-tasks/6c11d6b8/` 不存在 → URL `/ai/api/note/6c11d6b8/status` 返回 404，但**路由不记 log**，没法调试
+2. 日志里 `[ERR] [workflow] cli stderr: ◇ injected env (0) from ../../.env // tip: ⌘ ...` **全是 dotenv 包的营销 tip 噪音**
+   - dotenv 在每次 workflow CLI 启动时打 1 行 stderr 推广话术
+   - `injected env (0)` 是 "没注入新变量"（不是错误，因为 Next.js 进程已经设过 env）
+   - 但我们的 route 把所有 stderr 当 [ERR] 记录 → **60+ 次/分钟**误报
+
+### 修复
+
+| 文件 | 修改 |
+|---|---|
+| `lib/workflow-cli.ts` | `runWorkflowCli` 加 stderr 过滤：跳过 `◇ injected env` / `// tip:` 行 |
+| `app/api/note/[taskId]/status/route.ts` | 404 时打 `[note:status] taskId=xxx not found` |
+
+### 净效果
+- 日志噪音 -99%（dotenv tip 全部过滤）
+- 真 stderr 错误仍可见
+- 404 请求现在日志可见，方便排查
+- tsc 0 错误
+
 ## v0.6.11 (2026-08-11) — 二次死代码扫描（按"内部使用也算使用"原则）
 
 用户纠正：只删"全项目 0 引用"的导出。**内部使用的（字段类型/同文件调用）保留**。

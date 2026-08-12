@@ -10,6 +10,7 @@ export async function GET(
 
   const taskFile = path.join(os.tmpdir(), "xhs-tasks", taskId, "task.json");
   if (!fs.existsSync(taskFile)) {
+    console.log(`[note:status] taskId=${taskId} not found`);
     return Response.json({ ok: false, error: "笔记任务不存在或已过期" }, { status: 404 });
   }
 

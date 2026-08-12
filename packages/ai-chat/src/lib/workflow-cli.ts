@@ -12,7 +12,16 @@ const CLI_PATH = path.resolve(process.cwd(), "..", "..", "packages", "workflows"
 export async function runWorkflowCli(args: string[], timeoutMs = 5000): Promise<unknown> {
   return new Promise((resolve, reject) => {
     execFile("node", [CLI_PATH, ...args], { timeout: timeoutMs }, (err, stdout, stderr) => {
-      if (stderr) console.error("[workflow] cli stderr:", stderr);
+      // ponytail: 过滤 dotenv 包的营销 tip 噪音（每次 CLI 启动都会打 ~1 行 stderr）
+      const realStderr = stderr
+        .split("\n")
+        .filter((line) =>
+          !line.includes("◇ injected env") &&
+          !line.includes("// tip:") &&
+          line.trim() !== ""
+        )
+        .join("\n");
+      if (realStderr) console.error("[workflow] cli stderr:", realStderr);
       if (err) return reject(err);
       resolve(parseCliOutput(stdout));
     });

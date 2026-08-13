@@ -1948,4 +1948,32 @@ M3 文档提到 >50MB 视频需走 Files API：`mm_file://{file_id}`（最大 51
 
 ### 架构
 - npm workspaces monorepo：packages/ai-chat + packages/mcp
-- stdio MCP 客户端，4 个模块注册
+- stdio MCP 客户端，4 个模块注册## v0.7.1 (2026-08-13) — 微调功能 + 大量优化
+
+### 新增
+- 微调功能：AI 修改脚本 + 自动重跑 render
+- 历史版本管理：scripts/v{N}.json + videos/v{N}.mp4
+- 版本切换：一键切换历史版本，视频立即更新
+- 异步任务：POST /tweak 立即返回，后台执行
+- 客户端日志：POST /api/client-log 写入 app 日志文件
+- 声明式动画：data-animate-in / data-transition 属性
+
+### 修复
+- CLI argv 被 \n 破坏 → feedback 走 state.json 传递
+- render.js 正则误匹配 clip-content → 改为独立 class 匹配
+- render.js 多余花括号 → 语法错误无法加载
+- saveVideoVersion import 路径错误
+- writeState 覆盖 videoFile 问题
+- prompt-builder.js parseJSON 重复声明
+- schema.js fonts/palette 字段过严
+- 前端 useEffect 双轮询
+- tweakTask 状态不触发前端更新
+
+### 优化
+- 动画引擎重写：11 种入场预设 + 擦除转场
+- 设计规范：鼓励炫技，删除禁止项
+- 视频播放器 260px → 320px
+- file 路由缓存改为 no-cache
+- 切换版本后自动复制视频到 output.mp4
+- 微调中禁用按钮防重复
+- 预更新步骤状态让前端立即看到变化

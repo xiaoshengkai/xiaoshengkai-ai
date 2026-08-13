@@ -159,13 +159,19 @@ export async function renderMP4(workDir, allHtml, globalCss, globalJsAnimation, 
 
   let currentTime = 0;
   let trackIndex = 0;
-  html = html.replace(/class=["']clip([^"']*)["']/g, (match, attrs) => {
-    const durMatch = attrs.match(/data-duration=["]?(\d+)["]?/);
+  html = html.replace(/(<div[^>]*class=["']clip(?:\s|["'])[^>]*>)/g, (match) => {
+    const durMatch = match.match(/data-duration=["']?(\d+)["']?/);
     const dur = durMatch ? parseInt(durMatch[1]) : 5;
-    const result = `class="clip${attrs}" data-start="${currentTime}" data-track-index="${trackIndex}"`;
+    const result = match.replace('>', ` data-start="${currentTime}" data-track-index="${trackIndex}">`);
     currentTime += dur;
     trackIndex++;
     return result;
+  });
+
+  // 设置 stage 总时长（HyperFrames 需要）
+  html = html.replace(/<div[^>]*id=["']stage["'][^>]*>/g, (match) => {
+    if (match.includes('data-duration=')) return match;
+    return match.replace('>', ` data-duration="${currentTime}">`);
   });
 
   const htmlPath = path.join(workDir2, "index.html");
@@ -208,12 +214,12 @@ export async function renderMP4(workDir, allHtml, globalCss, globalJsAnimation, 
     let filter = "";
     if (hasNarration && hasBgm) {
       filter = `[1:a]volume=1.0[n];[2:a]volume=0.3[b];[n][b]amix=inputs=2:duration=shortest:dropout_transition=0[out]`;
-      args.push("-filter_complex", filter, "-map", "0:v", "-map", "[out]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", outputPath);
+      args.push("-filter_complex", filter, "-map", "0:v", "-map", "[out]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", outputPath);
     } else if (hasNarration) {
       args.push("-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", outputPath);
     } else if (hasBgm) {
       filter = `[1:a]volume=0.3[out]`;
-      args.push("-filter_complex", filter, "-map", "0:v", "-map", "[out]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", outputPath);
+      args.push("-filter_complex", filter, "-map", "0:v", "-map", "[out]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", outputPath);
     }
     runFfmpeg(args.join(" "));
     fs.unlinkSync(silentPath);
@@ -223,5 +229,35 @@ export async function renderMP4(workDir, allHtml, globalCss, globalJsAnimation, 
   }
 
   logger.info(`[render] 完成 (${((Date.now() - startTime) / 1000).toFixed(1)}s total)`);
+
+  // 保存视频版本
+  try {
+    const { saveVideoVersion } = await import("../../../engine.js");
+    const statePath = path.join(workDir, "state.json");
+    if (fs.existsSync(statePath)) {
+      const state = JSON.parse(fs.readFileSync(statePath, "utf-8"));
+      // 首次渲染：如果还没有历史记录，初始化 v0
+      if (!state.scriptHistory && state.template === "video-generation") {
+        const scriptStep = state.steps.find(s => s.id === "script");
+        if (scriptStep?.output?.script) {
+          const scriptsDir = path.join(workDir, "scripts");
+          if (!fs.existsSync(scriptsDir)) fs.mkdirSync(scriptsDir, { recursive: true });
+          const s = typeof scriptStep.output.script === "string" ? JSON.parse(scriptStep.output.script) : scriptStep.output.script;
+          fs.writeFileSync(path.join(scriptsDir, "v0.json"), JSON.stringify(s, null, 2));
+          state.scriptHistory = [{ version: 0, at: state.startedAt || new Date().toISOString(), feedback: "初次生成", videoFile: null }];
+          state.currentScriptVersion = 0;
+          state.tweakCount = 0;
+          state.tweakLimit = 99999;
+          fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+        }
+      }
+      const ver = state.currentScriptVersion ?? 0;
+      saveVideoVersion(execId, ver, outputPath);
+      logger.info(`[render] 视频版本 v${ver} 已保存`);
+    }
+  } catch (e) {
+    logger.warn(`[render] 保存视频版本失败: ${e.message}`);
+  }
+
   return { videoFile: outputPath };
 }

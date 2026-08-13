@@ -5,47 +5,206 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #000; display: flex; align-items: center; justify-content: center; width: 100vw; height: 100vh; overflow: hidden; }
-#stage { position: relative; overflow: hidden; }
+#stage { position: relative; overflow: hidden; container-type: size; }
 #stage .clip { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; text-align: center; opacity: 0; overflow: hidden; word-break: break-word; }
 #stage .clip > * { max-width: 100%; flex-shrink: 1; min-width: 0; }
 #stage .clip img, #stage .clip svg { max-width: 100% !important; max-height: 60% !important; height: auto; }
 #stage .clip table { font-size: clamp(10px, 2.5cqw, 20px); width: 100% !important; table-layout: fixed; }
 #stage .clip td, #stage .clip th { padding: 2px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* AI 在此处扩展样式 — 全局 CSS 注入于此 */
+#wipe { position: absolute; inset: 0; transform: scaleX(0); transform-origin: left; z-index: 100; pointer-events: none; }
+#wipe2 { position: absolute; inset: 0; transform: scaleY(0); transform-origin: top; z-index: 100; pointer-events: none; background: #000; }
+#progress { position: absolute; bottom: 0; left: 0; height: 0.4cqw; background: #e94560; z-index: 99; }
 /* GLOBAL_CSS_INJECTION */
 </style>
 </head>
 <body>
 <div id="stage" data-composition-id="main" data-start="0" data-width="1080" data-height="1920">
   <!-- AI 在此处填充场景 -->
+  <div id="wipe"></div>
+  <div id="wipe2"></div>
+  <div id="progress"></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
 <script>
 (function() {
-  var clips = document.querySelectorAll('.clip');
+  var stage = document.getElementById('stage');
+  var clips = stage.querySelectorAll('.clip');
   if (clips.length === 0) return;
-  var tl = gsap.timeline({ paused: true });
-  var startAccum = 0;
-  clips.forEach(function(s) {
-    var start = parseFloat(s.getAttribute('data-start'));
-    if (isNaN(start)) start = startAccum;
-    var dur = parseFloat(s.getAttribute('data-duration')) || 4;
-    startAccum = start + dur;
-    tl.set(s, { opacity: 0, y: 40 }, start);
-    tl.to(s, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, start);
-    tl.to(s, { opacity: 0, y: -20, duration: 0.3, ease: "power2.in" }, start + dur - 0.3);
+
+  var tl = gsap.timeline({
+    paused: true,
+    onUpdate: function() {
+      var p = document.getElementById('progress');
+      if (p) p.style.width = (tl.progress() * 100) + '%';
+    }
   });
+
+  // ── 入场预设 ──
+  var IN = {
+    'fade-up':    { opacity: 0, y: 40 },
+    'fade-down':  { opacity: 0, y: -40 },
+    'slide-left': { opacity: 0, x: -60 },
+    'slide-right':{ opacity: 0, x: 60 },
+    'scale-up':   { opacity: 0, scale: 0.8 },
+    'scale-down': { opacity: 0, scale: 1.2 },
+    'bounce-in':  { opacity: 0, scale: 0 },
+    'elastic-in': { opacity: 0, scale: 0 },
+    'rotate-in':  { opacity: 0, rotation: -8, scale: 0.9 },
+    'blur-in':    { opacity: 0, filter: 'blur(10px)' },
+    'pop-in':     { opacity: 0, scale: 0.5, y: 20 },
+    'none':       {}
+  };
+  var IN_EASE = {
+    'fade-up': 'power2.out', 'fade-down': 'power2.out',
+    'slide-left': 'power3.out', 'slide-right': 'power3.out',
+    'scale-up': 'power3.out', 'scale-down': 'power3.out',
+    'bounce-in': 'back.out(2)', 'elastic-in': 'elastic.out(1, 0.5)',
+    'rotate-in': 'power3.out', 'blur-in': 'power2.out',
+    'pop-in': 'back.out(1.7)', 'none': 'none'
+  };
+  var IN_DUR = {
+    'fade-up': 0.5, 'fade-down': 0.5, 'slide-left': 0.5, 'slide-right': 0.5,
+    'scale-up': 0.6, 'scale-down': 0.6,
+    'bounce-in': 0.6, 'elastic-in': 0.7,
+    'rotate-in': 0.6, 'blur-in': 0.5, 'pop-in': 0.5,
+    'none': 0
+  };
+
+  // ── 出场预设 ──
+  var OUT = {
+    'fade-up':    { opacity: 0, y: -20 },
+    'fade-down':  { opacity: 0, y: 20 },
+    'slide-left': { opacity: 0, x: -60 },
+    'slide-right':{ opacity: 0, x: 60 },
+    'scale-down': { opacity: 0, scale: 0.8 },
+    'blur-out':   { opacity: 0, filter: 'blur(8px)' },
+    'none':       {}
+  };
+  var OUT_EASE = {
+    'fade-up': 'power2.in', 'fade-down': 'power2.in',
+    'slide-left': 'power2.in', 'slide-right': 'power2.in',
+    'scale-down': 'power2.in', 'blur-out': 'power2.in',
+    'none': 'none'
+  };
+  var OUT_DUR = {
+    'fade-up': 0.3, 'fade-down': 0.3, 'slide-left': 0.3, 'slide-right': 0.3,
+    'scale-down': 0.3, 'blur-out': 0.3, 'none': 0
+  };
+
+  var RESET = { opacity: 1, y: 0, x: 0, scale: 1, rotation: 0, filter: 'blur(0px)' };
+
+  // ── 擦除转场 ──
+  function wipeFn(at, color) {
+    color = color || '#e94560';
+    var w = document.getElementById('wipe');
+    var w2 = document.getElementById('wipe2');
+    if (!w) return;
+    tl.set(w, { scaleX: 0, transformOrigin: 'left', background: color }, at)
+      .to(w, { scaleX: 1, duration: 0.22, ease: 'power2.in' }, at)
+      .to(w, { scaleX: 0, transformOrigin: 'right', duration: 0.22, ease: 'power2.out' }, at + 0.22);
+    if (w2) {
+      tl.set(w2, { scaleY: 0, transformOrigin: 'top' }, at + 0.44)
+        .to(w2, { scaleY: 1, duration: 0.1, ease: 'power2.in' }, at + 0.44)
+        .to(w2, { scaleY: 0, transformOrigin: 'bottom', duration: 0.1 }, at + 0.54);
+    }
+  }
+
+  // ── 主循环 ──
+  var startAccum = 0;
+  clips.forEach(function(s, i) {
+    var dur = parseFloat(s.getAttribute('data-duration')) || 4;
+    var start = startAccum;
+    startAccum = start + dur;
+
+    var animIn = s.getAttribute('data-animate-in') || 'fade-up';
+    var animOut = s.getAttribute('data-animate-out') || 'fade-up';
+    var trans = s.getAttribute('data-transition');
+    var transColor = s.getAttribute('data-transition-color');
+    var childrenCfg = s.getAttribute('data-animate-children');
+
+    var inFrom = IN[animIn] || IN['fade-up'];
+    var inEase = IN_EASE[animIn] || 'power2.out';
+    var inDur = IN_DUR[animIn] !== undefined ? IN_DUR[animIn] : 0.5;
+
+    var outTo = OUT[animOut] || OUT['fade-up'];
+    var outEase = OUT_EASE[animOut] || 'power2.in';
+    var outDur = OUT_DUR[animOut] !== undefined ? OUT_DUR[animOut] : 0.3;
+
+    // 入场
+    if (animIn === 'none') {
+      tl.set(s, RESET, start);
+    } else {
+      tl.fromTo(s, inFrom, Object.assign({}, RESET, { duration: inDur, ease: inEase }), start);
+    }
+
+    // 子元素交错
+    if (childrenCfg) {
+      var parts = childrenCfg.split(';');
+      var stagger = 0.08;
+      parts.forEach(function(p) {
+        var kv = p.split(':');
+        if (kv[0] === 'stagger') stagger = parseFloat(kv[1]) || 0.08;
+      });
+      var children = s.children;
+      var valid = [];
+      for (var j = 0; j < children.length; j++) {
+        if (children[j].tagName !== 'SCRIPT') valid.push(children[j]);
+      }
+      if (valid.length > 0) {
+        tl.from(valid, { opacity: 0, y: 20, duration: 0.4, ease: 'power2.out', stagger: stagger }, start + 0.1);
+      }
+    }
+
+    // 出场
+    if (animOut !== 'none') {
+      var exitTime = start + dur - outDur;
+      if (exitTime < start) exitTime = start;
+      tl.to(s, Object.assign({}, outTo, { duration: outDur, ease: outEase }), exitTime);
+    }
+
+    // 擦除转场（最后一个场景之后不转场）
+    if (i < clips.length - 1 && trans === 'wipe') {
+      wipeFn(start + dur - 0.54, transColor);
+    }
+  });
+
+  // ── 暴露 API ──
   window.__timelines = window.__timelines || {};
   window.__timelines.main = tl;
+  window.__engine = {
+    addClipAnimation: function(clipEl, anim, opts) {
+      var start = parseFloat(clipEl.getAttribute('data-start'));
+      if (isNaN(start)) return;
+      tl.from(clipEl, Object.assign({}, anim, opts || {}), start);
+    },
+    addChildAnimation: function(clipEl, selector, anim, opts) {
+      var start = parseFloat(clipEl.getAttribute('data-start'));
+      if (isNaN(start)) return;
+      var el = clipEl.querySelector(selector);
+      if (!el) return;
+      tl.from(el, Object.assign({}, anim, opts || {}), start);
+    },
+    emphasize: function(clipEl, anim, opts) {
+      var start = parseFloat(clipEl.getAttribute('data-start'));
+      if (isNaN(start)) return;
+      var dur = parseFloat(clipEl.getAttribute('data-duration')) || 4;
+      var mid = start + dur * 0.4;
+      tl.to(clipEl, Object.assign({}, anim, opts || {}), mid);
+    },
+    wipe: wipeFn
+  };
+
   window.addEventListener('load', function() { tl.play(); });
 })();
 </script>
 <script>
 // AI 在此处扩展 GSAP 动画 — 全局 JS 注入于此
 // GLOBAL_JS_INJECTION
-// 可以操作 .clip 和 timeline：
-//   gsap.to('.clip-hook', { x: 100, rotation: 5, duration: 1 });
-//   gsap.from('.clip-body-1 h2', { scale: 0.5, opacity: 0, duration: 0.8 });
+// 可以通过 window.__timelines.main 和 window.__engine 控制动画：
+//   var tl = window.__timelines.main;
+//   var engine = window.__engine;
+//   engine.addChildAnimation(clip, '.title', { y: 30, opacity: 0 }, { duration: 0.6 });
+//   engine.emphasize(clip, { scale: 1.04, duration: 0.15, yoyo: true, repeat: 1 });
 // 禁止 CSS @keyframes / animation 属性，动画完全由 GSAP 实现
 </script>
 </body>

@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp, Edit3, History } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -21,6 +21,11 @@ interface Execution {
   executionId: string; template: string; status: string;
   startedAt: string; completedAt: string | null;
   steps: ExecutionStep[];
+  tweakCount?: number;
+  tweakLimit?: number;
+  currentScriptVersion?: number;
+  scriptHistory?: { version: number; at: string; feedback: string; videoFile: string | null }[];
+  tweakTask?: { status: string; startedAt: string; completedAt: string | null; version: number | null; error: string | null };
 }
 
 const V2_GROUPS = [
@@ -29,6 +34,22 @@ const V2_GROUPS = [
   { label: "渲染", stepIds: ["render"] },
   { label: "合成", stepIds: ["concat"] },
 ];
+
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function clientLog(executionId: string, level: string, message: string) {
+  console.log(`[${executionId}] [${level}] ${message}`);
+  fetch(`${BASE}/api/client-log`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ executionId, level, message }),
+  }).catch(() => {});
+}
 
 export default function ExecutionDetailPage() {
   const params = useParams();
@@ -43,12 +64,20 @@ export default function ExecutionDetailPage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [showScriptPanel, setShowScriptPanel] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [showTweak, setShowTweak] = useState(false);
+  const [tweakFeedback, setTweakFeedback] = useState("");
+  const [tweaking, setTweaking] = useState(false);
+  const [switchingVersion, setSwitchingVersion] = useState<number | null>(null);
+  const [scriptJsonTab, setScriptJsonTab] = useState<"script" | "state">("script");
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
 
   const fetchExecution = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}/api/workflows/execution/${id}`);
       if (res.ok) {
         const data = await res.json();
+        const renderStatus = data.steps?.find((s: ExecutionStep) => s.id === "render")?.status;
+        clientLog(id, "INFO", `fetchExecution: executionStatus=${data.status} renderStatus=${renderStatus} currentScriptVersion=${data.currentScriptVersion} tweakCount=${data.tweakCount}`);
         setExecution(data);
         if (!activeStepId) {
           const running = data.steps.find((s: ExecutionStep) => s.status === "running");
@@ -64,16 +93,42 @@ export default function ExecutionDetailPage() {
   }, [id, activeStepId, locked]);
 
   useEffect(() => {
+    clientLog(id, "INFO", `useEffect run: executionStatus=${execution?.status}`);
     fetchExecution();
+    if (execution?.status === "completed" || execution?.status === "failed") {
+      clientLog(id, "INFO", `useEffect skip polling: status=${execution?.status}`);
+      return;
+    }
+    if (execution?.tweakTask?.status === "running") {
+      clientLog(id, "INFO", `useEffect skip polling: tweakTask running`);
+      return;
+    }
+    clientLog(id, "INFO", `useEffect start polling: status=${execution?.status}`);
     const timer = setInterval(fetchExecution, 2000);
     return () => clearInterval(timer);
-  }, [fetchExecution]);
+  }, [fetchExecution, execution?.status, execution?.tweakTask?.status, id]);
 
   useEffect(() => {
     if (execution?.status === "completed" || execution?.status === "failed") {
       setLocked(false);
     }
   }, [execution?.status]);
+
+  // 当 tweakTask 状态变化时轮询
+  useEffect(() => {
+    if (execution?.tweakTask?.status === "running") {
+      const timer = setInterval(fetchExecution, 2000);
+      return () => clearInterval(timer);
+    }
+  }, [execution?.tweakTask?.status, fetchExecution]);
+
+  useEffect(() => {
+    if (execution?.tweakTask?.status === "done") {
+      toast(`🟢 视频生成完成`);
+    } else if (execution?.tweakTask?.status === "failed") {
+      toast(`🔴 视频生成失败: ${execution.tweakTask.error}`);
+    }
+  }, [execution?.tweakTask?.status]);
 
   const handleNext = useCallback(async () => {
     setNextLoading(true);
@@ -140,6 +195,52 @@ export default function ExecutionDetailPage() {
     } catch { toast("🔴 请求失败"); }
   }, [id]);
 
+  const handleTweak = useCallback(async () => {
+    if (!tweakFeedback.trim()) { toast("🔴 请输入反馈"); return; }
+    clientLog(id, "INFO", `handleTweak start: feedback="${tweakFeedback}"`);
+    setTweaking(true);
+    setTweakFeedback("");
+    setShowTweak(false);
+
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${id}/tweak`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedback: tweakFeedback }),
+      });
+      const data = await res.json();
+      clientLog(id, "INFO", `handleTweak response: ok=${data.ok} status=${data.status}`);
+      if (data.ok) {
+        toast(`🟢 微调已提交，正在生成中...`);
+        fetchExecution();
+      } else {
+        toast(`🔴 ${data.error}`);
+      }
+    } catch { toast("🔴 请求失败"); }
+    setTweaking(false);
+  }, [id, tweakFeedback, fetchExecution]);
+
+  const handleSwitchVersion = useCallback(async (version: number) => {
+    setSwitchingVersion(version);
+    try {
+      console.log("[handleSwitchVersion] start, version=", version);
+      const res = await fetch(`${BASE}/api/workflows/execution/${id}/switch-version`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version }),
+      });
+      const data = await res.json();
+      console.log("[handleSwitchVersion] API response:", data);
+      if (data.ok) {
+        toast(`🟢 已切换到 v${version}`);
+        console.log("[handleSwitchVersion] calling fetchExecution");
+        fetchExecution();
+        setShowTweak(false);
+      } else {
+        toast(`🔴 ${data.error}`);
+      }
+    } catch { toast("🔴 请求失败"); }
+    setSwitchingVersion(null);
+  }, [id, fetchExecution]);
+
   const toggleGroup = useCallback((label: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
@@ -154,6 +255,7 @@ export default function ExecutionDetailPage() {
   const completed = execution.steps.filter(s => s.status === "completed" || s.status === "skipped" || s.status === "warning").length;
   const activeStep = execution.steps.find(s => s.id === activeStepId) || execution.steps[0];
   const isDone = execution.status === "completed" || execution.status === "failed";
+  const isTweakRunning = execution.tweakTask?.status === "running";
   const isV2 = execution.template === "tech-video";
 
   // 解析场景信息
@@ -193,6 +295,24 @@ export default function ExecutionDetailPage() {
             📋 脚本
           </button>
         )}
+        {isDone && (
+          <button onClick={() => setShowTweak(true)}
+            disabled={isTweakRunning}
+            className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
+            style={{ border: "2px solid #1A1A1A", background: isTweakRunning ? "#e2e8f0" : "#9B59B6", color: isTweakRunning ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
+            <Edit3 className="w-3 h-3" /> 微调
+            {execution.tweakCount !== undefined && execution.tweakLimit !== undefined ? (
+              <span className="text-white/70 ml-0.5">{execution.tweakCount}/{execution.tweakLimit}</span>
+            ) : null}
+          </button>
+        )}
+        {isDone && execution.scriptHistory && execution.scriptHistory.length > 0 && (
+          <button onClick={() => setShowHistoryPanel(true)}
+            className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
+            style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#6B7280", boxShadow: "2px 2px 0 #1A1A1A" }}>
+            <History className="w-3 h-3" /> 历史
+          </button>
+        )}
         <button onClick={() => setShowDelete(true)}
           className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer hover:text-red-500"
           style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#6B7280", boxShadow: "2px 2px 0 #1A1A1A" }}>
@@ -221,22 +341,72 @@ export default function ExecutionDetailPage() {
         </div>
 
         <div className="overflow-auto p-4">
-          {activeStep.id === "render" && activeStep.output && typeof activeStep.output === "object" && (activeStep.output as Record<string, unknown>).manifest ? (
-            <RenderManifestPreview
-              executionId={execution.executionId}
-              manifest={(activeStep.output as Record<string, unknown>).manifest as { sceneId: string; templateId: string; actualDuration: number; alignmentDiff: number; warning: string | null }[]}
-              sceneList={sceneList}
-            />
-          ) : (
-            <PreviewPanel step={activeStep} executionId={execution.executionId} />
-          )}
+          {(() => {
+            // 优先级1：script step → JSON tabs
+            if (activeStep.id === "script" && activeStep.output) {
+              if (activeStep.status === "running") {
+                return <LoadingState text="正在修改脚本..." />;
+              }
+              return (
+                <div>
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      onClick={() => setScriptJsonTab("script")}
+                      className={`px-3 py-1 text-xs font-bold rounded cursor-pointer ${
+                        scriptJsonTab === "script"
+                          ? "bg-[#9B59B6] text-white"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      script.json
+                    </button>
+                    <button
+                      onClick={() => setScriptJsonTab("state")}
+                      className={`px-3 py-1 text-xs font-bold rounded cursor-pointer ${
+                        scriptJsonTab === "state"
+                          ? "bg-[#9B59B6] text-white"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      state.json
+                    </button>
+                  </div>
+                  <pre className="text-xs bg-gray-50 p-3 rounded border border-gray-200 overflow-auto max-h-[70vh] whitespace-pre-wrap">
+                    {scriptJsonTab === "script"
+                      ? (() => {
+                          try {
+                            const out = typeof activeStep.output === "string" ? JSON.parse(activeStep.output) : activeStep.output;
+                            const s = typeof out.script === "string" ? JSON.parse(out.script) : out.script;
+                            return JSON.stringify(s, null, 2);
+                          } catch { return String(activeStep.output); }
+                        })()
+                      : JSON.stringify(execution, null, 2)}
+                  </pre>
+                </div>
+              );
+            }
+
+            // 优先级2：render manifest → RenderManifestPreview
+            if (activeStep.id === "render" && activeStep.output && typeof activeStep.output === "object" && (activeStep.output as Record<string, unknown>).manifest) {
+              return (
+                <RenderManifestPreview
+                  executionId={execution.executionId}
+                  manifest={(activeStep.output as Record<string, unknown>).manifest as { sceneId: string; templateId: string; actualDuration: number; alignmentDiff: number; warning: string | null }[]}
+                  sceneList={sceneList}
+                />
+              );
+            }
+
+            // 兜底：PreviewPanel
+            return <PreviewPanel step={activeStep} executionId={execution.executionId} />;
+          })()}
           {activeStep.id === "concat" && (
             <DownloadPanel executionId={execution.executionId} />
           )}
         </div>
       </div>
 
-      {!isDone && (
+      {!isDone && !isTweakRunning && (
         <div className="flex gap-2 px-4 py-3 border-t border-gray-200 shrink-0">
           <button onClick={handleNext} disabled={nextLoading}
             className="pixel-btn inline-flex items-center gap-1 px-4 py-1.5 text-xs font-bold cursor-pointer"
@@ -263,6 +433,118 @@ export default function ExecutionDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={showTweak} onOpenChange={setShowTweak}>
+        <AlertDialogContent className="max-w-lg rounded-none border-2 border-[#1A1A1A]"
+          style={{ boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-extrabold text-lg text-gray-900">
+              微调脚本
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="py-2 space-y-3">
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                你想调整哪里？
+              </label>
+              <textarea
+                value={tweakFeedback}
+                onChange={(e) => setTweakFeedback(e.target.value)}
+                placeholder="例如：第3帧太快了&#10;把背景换成蓝色&#10;标题字号加大"
+                className="w-full h-28 px-3 py-2 text-sm border-2 border-[#1A1A1A] rounded-none resize-none focus:outline-none focus:border-[#9B59B6] bg-white"
+                style={{ boxShadow: "2px 2px 0 #e5e7eb" }}
+                disabled={tweaking || (execution.tweakCount !== undefined && execution.tweakLimit !== undefined && execution.tweakCount >= execution.tweakLimit)}
+              />
+              <p className="text-xs text-gray-400 mt-1.5">
+                💡 支持自然语言描述，AI 会自动调整脚本
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter className="gap-2">
+            <button
+              onClick={() => setShowTweak(false)}
+              disabled={tweaking}
+              className="px-4 py-1.5 text-xs font-bold cursor-pointer"
+              style={{
+                border: "2px solid #1A1A1A",
+                background: "#fff",
+                color: "#374151",
+                boxShadow: "2px 2px 0 #1A1A1A"
+              }}
+            >
+              取消
+            </button>
+            <button
+              onClick={handleTweak}
+              disabled={tweaking || !tweakFeedback.trim() || (execution.tweakCount !== undefined && execution.tweakLimit !== undefined && execution.tweakCount >= execution.tweakLimit)}
+              className="px-4 py-1.5 text-xs font-bold cursor-pointer"
+              style={{
+                border: "2px solid #1A1A1A",
+                background: tweaking ? "#e2e8f0" : "#9B59B6",
+                color: tweaking ? "#94a3b8" : "#fff",
+                boxShadow: "2px 2px 0 #1A1A1A"
+              }}
+            >
+              {tweaking ? "微调中..." : "确认微调"}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {execution.scriptHistory && execution.scriptHistory.length > 0 && (
+        <Root open={showHistoryPanel} onOpenChange={setShowHistoryPanel} swipeDirection="left">
+          <Popup className="right-0 top-0 bottom-0 w-[40%] max-w-none rounded-none flex flex-col p-0 gap-0">
+            <Header className="border-b px-4 py-3 shrink-0">
+              <Title>历史版本 ({execution.scriptHistory.length})</Title>
+              <Close>关闭</Close>
+            </Header>
+            <div className="flex-1 overflow-auto p-4 space-y-2">
+              {execution.scriptHistory.slice().reverse().map((h) => (
+                <div
+                  key={h.version}
+                  className={`p-3 rounded border text-xs ${
+                    h.version === execution.currentScriptVersion ? "bg-[#F5E6F0] border-[#9B59B6]" : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-700">v{h.version}</span>
+                    <span className="text-gray-400">{formatDateTime(h.at)}</span>
+                    {h.version === execution.currentScriptVersion && (
+                      <span className="text-xs text-[#7D3C98] font-bold">当前</span>
+                    )}
+                  </div>
+                  <div className="text-gray-600 mb-2">{h.feedback}</div>
+                  <div className="flex items-center gap-2">
+                    {h.version !== execution.currentScriptVersion && (
+                      <button
+                        onClick={() => handleSwitchVersion(h.version)}
+                        disabled={switchingVersion === h.version}
+                        className="pixel-btn px-2 py-0.5 text-xs cursor-pointer"
+                        style={{ border: "1px solid #9B59B6", background: "transparent", color: "#9B59B6" }}
+                      >
+                        {switchingVersion === h.version ? "切换中..." : "切换到此版本"}
+                      </button>
+                    )}
+                    {h.videoFile ? (
+                      <a
+                        href={`${BASE}/api/workflows/execution/${execution.executionId}/file/${h.videoFile}`}
+                        target="_blank"
+                        className="pixel-btn px-2 py-0.5 text-xs cursor-pointer"
+                        style={{ border: "1px solid #1A1A1A", background: "transparent", color: "#6B7280" }}
+                      >
+                        <Download className="w-3 h-3 inline mr-1" />下载
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-400">尚未渲染</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Popup>
+        </Root>
+      )}
     </div>
   );
 
@@ -422,7 +704,7 @@ function SceneListPanel({ scenes, executionId }: { scenes: { id: string; type: s
         {scenes.map((scene, i) => (
           <div key={scene.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200">
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-              scene.type === "hook" ? "bg-purple-500 text-white" :
+              scene.type === "hook" ? "bg-[#9B59B6] text-white" :
               scene.type === "outro" ? "bg-blue-500 text-white" : "bg-gray-500 text-white"
             }`}>{i + 1}</span>
             <div className="flex-1 min-w-0">
@@ -526,7 +808,7 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
           <h3 className="text-xs font-bold text-gray-800">{step.name}</h3>
           <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✅ 完成</span>
         </div>
-        <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}` : undefined} />
+        <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}` : undefined} executionId={executionId} />
       </div>
     </div>
   );
@@ -591,7 +873,7 @@ function LoadingState({ text }: { text: string }) {
   );
 }
 
-function PreviewContent({ type, value, src }: { type: string; value?: string | null; src?: string }) {
+function PreviewContent({ type, value, src, executionId }: { type: string; value?: string | null; src?: string; executionId: string }) {
   if (type === "code" || type === "json" || type === "text") {
     if (!value) return <p className="text-xs text-gray-400">暂无输出</p>;
   }
@@ -611,7 +893,7 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
     case "iframe":
       return (
         <div className="flex flex-col items-center">
-          <div className="rounded-[24px] border-[6px] border-gray-800 bg-black p-1 shadow-xl" style={{ width: "260px" }}>
+          <div className="rounded-[24px] border-[6px] border-gray-800 bg-black p-1 shadow-xl" style={{ width: "320px" }}>
             <div className="w-16 h-4 bg-gray-800 rounded-full mx-auto mb-1" />
             <div className="rounded-[18px] overflow-hidden bg-white" style={{ aspectRatio: "9/16" }}>
               <iframe src={src} className="w-full h-full border-0" title="预览" sandbox="allow-scripts allow-same-origin" />
@@ -629,10 +911,35 @@ function PreviewContent({ type, value, src }: { type: string; value?: string | n
     case "video":
       return (
         <div className="flex flex-col items-center">
-          <div className="rounded-[24px] border-[6px] border-gray-800 bg-black p-1 shadow-xl" style={{ width: "260px" }}>
+          <div className="rounded-[24px] border-[6px] border-gray-800 bg-black p-1 shadow-xl" style={{ width: "320px" }}>
             <div className="w-16 h-4 bg-gray-800 rounded-full mx-auto mb-1" />
             <div className="rounded-[18px] overflow-hidden bg-black" style={{ aspectRatio: "9/16" }}>
-              <video controls className="w-full h-full object-contain" src={src} playsInline />
+              <video controls className="w-full h-full object-contain" src={src} playsInline
+                onLoadedMetadata={(e) => {
+                  const v = e.currentTarget;
+                  clientLog(executionId, "VIDEO", `loadedMetadata: duration=${v.duration} videoWidth=${v.videoWidth} videoHeight=${v.videoHeight} readyState=${v.readyState}`);
+                }}
+                onTimeUpdate={(e) => {
+                  const v = e.currentTarget;
+                  if (Math.floor(v.currentTime) % 15 === 0 && v.currentTime > 0) {
+                    clientLog(executionId, "VIDEO", `timeUpdate: currentTime=${v.currentTime.toFixed(1)} paused=${v.paused}`);
+                  }
+                }}
+                onSeeked={(e) => {
+                  clientLog(executionId, "VIDEO", `seeked: currentTime=${e.currentTarget.currentTime.toFixed(1)}`);
+                }}
+                onClick={(e) => {
+                  clientLog(executionId, "VIDEO", `click: target=${(e.target as HTMLElement).tagName} offsetX=${e.nativeEvent.offsetX} offsetY=${e.nativeEvent.offsetY}`);
+                }}
+                onMouseDown={(e) => {
+                  clientLog(executionId, "VIDEO", `mousedown: target=${(e.target as HTMLElement).tagName} offsetX=${e.nativeEvent.offsetX} offsetY=${e.nativeEvent.offsetY}`);
+                }}
+                onError={(e) => {
+                  const v = e.currentTarget;
+                  const err = (v as any).error;
+                  clientLog(executionId, "VIDEO", `error: code=${err?.code} message=${err?.message}`);
+                }}
+              />
             </div>
             <div className="w-20 h-1 bg-gray-600 rounded-full mx-auto mt-2" />
           </div>

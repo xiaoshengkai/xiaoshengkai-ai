@@ -51,6 +51,16 @@ async function main() {
     } else {
       process.stdout.write(JSON.stringify({ error: "not found" }));
     }
+  } else if (command === "tweak") {
+    const { executionId } = JSON.parse(args[0]);
+    const { tweakExecution } = await import("./engine.js");
+    const result = await tweakExecution(executionId);
+    process.stdout.write(JSON.stringify(result));
+  } else if (command === "switch-version") {
+    const { executionId, version } = JSON.parse(args[0]);
+    const { switchScriptVersion } = await import("./engine.js");
+    const result = switchScriptVersion(executionId, version);
+    process.stdout.write(JSON.stringify(result));
   } else if (command === "list") {
     const { listExecutions } = await import("./engine.js");
     const list = listExecutions();

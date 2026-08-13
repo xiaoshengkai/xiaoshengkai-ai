@@ -9,6 +9,7 @@
     { "name": "style", "label": "视觉风格（可选）", "type": "select", "options": ["自动（AI 决定）", "Neo-Brutalist", "奶油风", "极简黑白"], "default": "自动（AI 决定）", "required": false },
     { "name": "enable_tts", "label": "TTS 语音合成", "type": "select", "options": ["yes", "no"], "default": "yes" },
     { "name": "voice_id", "label": "TTS音色", "type": "text", "default": "male-qn-qingse" },
+    { "name": "enable_bgm", "label": "BGM 背景音乐", "type": "select", "options": ["yes", "no"], "default": "yes", "required": false },
     { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.3 },
     { "name": "bgm_file", "label": "BGM 音频（可选）", "type": "text", "required": false, "placeholder": "上传 mp3/wav 文件" }
   ],
@@ -43,7 +44,7 @@
       "module": "./lib/bgm.js",
       "function": "generateBGM",
       "args": ["{script.bgm_prompt}", "{executionDir}", "{bgm_file}"],
-      "skipWhen": "has_bgm_file"
+      "skipWhen": ["enable_bgm_no", "has_bgm_file"]
     },
     {
       "id": "render",

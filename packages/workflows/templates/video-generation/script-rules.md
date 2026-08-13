@@ -116,6 +116,7 @@
 
 ## HTML 约束
 - 每个场景用 `<div class="clip" id="clip-{id}" data-duration="秒数">` 包裹（id 必填）
+- 动画属性（可选）：`data-animate-in`（入场效果）、`data-animate-out`（出场效果）、`data-transition`（转场）、`data-transition-color`（擦除颜色）、`data-animate-children`（子元素交错）
 - 内联 style 属性，不用 class 样式
 - font-family 只写字体名（如 'Archivo'），font-weight 单独写
 - ❌ 禁止：font-family:'Archivo 900'
@@ -140,21 +141,56 @@
 - 仅补充特定元素的样式
 - **禁止改 body 的 display / padding**
 
-## JS 动画代码（两种策略二选一）
+## 动画控制（三种策略，按优先级排列）
 
-### 策略 A：clip 级动画（最稳，强烈推荐）
+### 策略 A：声明式属性（最稳，优先使用）
 
-只针对整个 `#clip-{id}` 做动画，**保证选择器一定命中**：
+直接在 clip 上通过 `data-*` 属性控制动画，基础引擎自动处理：
 
-```js
-gsap.from('#clip-1', { scale: 0.9, opacity: 0, duration: 0.6, ease: 'back.out(1.7)' });
+```html
+<div class="clip" id="clip-1" data-duration="4"
+     data-animate-in="bounce-in"
+     data-animate-out="fade-up"
+     data-transition="wipe"
+     data-transition-color="#e94560"
+     data-animate-children="stagger:0.08">
 ```
 
-可叠加效果：scale / rotation / opacity / filter(blur) / y 位移
+**data-animate-in 可选值**：`fade-up`(默认)、`fade-down`、`slide-left`、`slide-right`、`scale-up`、`scale-down`、`bounce-in`、`elastic-in`、`rotate-in`、`blur-in`、`pop-in`、`none`
 
-### 策略 B：内嵌 `<script>` 用相对选择器（更丰富但需小心）
+**data-animate-out 可选值**：`fade-up`(默认)、`fade-down`、`slide-left`、`slide-right`、`scale-down`、`blur-out`、`none`
 
-如果想给 clip 内某个子元素做动画，必须用 `<script>` 嵌在 clip HTML 内，用 `this` 引用当前 clip：
+**data-transition**：`wipe`（擦除转场）、不设置（默认淡入淡出）、`none`（硬切）
+
+**每个场景必须选一个入场动画，优先用炫技效果**（bounce-in/elastic-in/rotate-in/pop-in），尤其是 Hook 和 Peak 场景。
+
+### 策略 B：Timeline API 自定义动画（丰富场景推荐）
+
+通过 `window.__timelines.main` 和 `window.__engine` 在基础 timeline 上叠加自定义动画，写在全局 `jsAnimation` 字段：
+
+```js
+var tl = window.__timelines.main;
+var engine = window.__engine;
+
+// 给 clip 内某个元素加入场动画（自动对齐 clip 的 data-start 时间）
+engine.addChildAnimation(
+  document.getElementById('clip-1'),
+  '.title',
+  { y: 30, opacity: 0 },
+  { duration: 0.6, ease: 'back.out(1.7)' }
+);
+
+// 中间强调动画（在 clip 播放到 40% 时触发）
+engine.emphasize(
+  document.getElementById('clip-3'),
+  { scale: 1.04, duration: 0.15, yoyo: true, repeat: 1 }
+);
+
+// 直接操作 timeline（高级用法）
+tl.from('#clip-2 .big-number', { scale: 0, rotation: -15, duration: 0.7, ease: 'elastic.out(1, 0.5)' }, 5.2);
+```
+
+### 策略 C：内嵌 `<script>` 用相对选择器（备选）
 
 ```html
 <div class="clip" id="clip-1" data-duration="3">
@@ -165,13 +201,27 @@ gsap.from('#clip-1', { scale: 0.9, opacity: 0, duration: 0.6, ease: 'back.out(1.
 </div>
 ```
 
-**不要**把策略 B 写成全局 `jsAnimation` 字段（AI 经常 class 名写错导致选择器失效）。
+### 动画选择指南
 
-### 强烈建议
+| 场景类型 | 推荐入场 | 推荐转场 | 强调 |
+|---------|---------|---------|------|
+| Hook 开场 | `bounce-in` / `elastic-in` | — | — |
+| 数据冲击 | `scale-up` / `pop-in` | `wipe` | 脉冲：`scale:1.04 yoyo` |
+| 对比场景 | `slide-left` / `slide-right` | — | — |
+| 列表展示 | `fade-up` + `data-animate-children` | — | — |
+| 金句/大字 | `blur-in` / `rotate-in` | `wipe` | 抖动：`x:3 yoyo:5` |
+| Peak 高潮 | `elastic-in` / `bounce-in` | `wipe` | 脉冲 |
+| End 结尾 | `scale-up` / `fade-up` | — | — |
 
-- 默认用策略 A（clip 级）
-- 想要丰富动画时，每个 scene 的 `jsAnimation` 字段留空，**改用策略 B 嵌在 HTML 内**
-- 不确定时宁可少做动画，也不要做"假动画"（选择器找不到 = 没效果 = 比不做还糟）
+### 鼓励炫技原则
+
+- ✅ Hook 用弹性/弹跳抓住注意力
+- ✅ Peak 用旋转/弹性制造戏剧性
+- ✅ 数据用脉冲强调重要性
+- ✅ 转场用擦除制造节奏感
+- ✅ 每个场景至少 1 个动画，关键场景 2-3 个
+- 🔶 elastic.out 一个视频最多用 2 次（滥用就廉价）
+- 🔶 每个场景选 1-2 个重点动画，不要所有元素都动
 
 ## 移动端适配
 - 当前默认 9:16（竖屏，1080×1920）

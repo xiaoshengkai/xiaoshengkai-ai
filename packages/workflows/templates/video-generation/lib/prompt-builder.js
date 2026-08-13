@@ -29,38 +29,6 @@ function loadStyleGuide(style) {
   return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
 }
 
-function parseJSON(text) {
-  let cleaned = text.replace(/```\w*\n?|\n?```/g, "").trim();
-  const start = cleaned.indexOf("{");
-  if (start < 0) {
-    const preview = cleaned.slice(0, 300);
-    throw new Error(`未找到 JSON 起始符 { (文本长度=${cleaned.length})\n文本片段:\n${preview}...`);
-  }
-
-  let depth = 0, inString = false, escape = false;
-  for (let i = start; i < cleaned.length; i++) {
-    const ch = cleaned[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(cleaned.slice(start, i + 1));
-        } catch (e) {
-          const snippet = cleaned.slice(Math.max(0, i - 100), Math.min(i + 100, cleaned.length));
-          throw new Error(`JSON 语法错误 (位置 ${i}): ${e.message}\n文本片段:\n${snippet}`);
-        }
-      }
-    }
-  }
-  const snippet = cleaned.slice(start, Math.min(start + 300, cleaned.length));
-  throw new Error(`JSON 未闭合 (depth=${depth}, 文本长度=${cleaned.length})\n文本片段:\n${snippet}...`);
-}
-
 export async function generateScript(title, content, style) {
   const startTime = Date.now();
   const rules = loadScriptRules();
@@ -82,13 +50,13 @@ export async function generateScript(title, content, style) {
 
 输出：`;
 
-  let lastError;
-  let currentMaxTokens = 8000;
+  const allErrors = [];
+  let currentMaxTokens = 16000;
   const MAX_TOKENS_CAP = 32000;
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    const retryHint = attempt > 0
-      ? `\n\n## 上次校验失败，请修正后重新输出\n${lastError}\n`
+    const retryHint = allErrors.length > 0
+      ? `\n\n## 之前全部校验失败，以下所有问题都需一次性修正：\n${allErrors.join("\n")}\n`
       : "";
 
     const finalUserPrompt = retryHint ? `${userPrompt}${retryHint}` : userPrompt;
@@ -102,7 +70,7 @@ export async function generateScript(title, content, style) {
     });
 
     const completionTokens = usage?.completionTokens || 0;
-    if (completionTokens >= currentMaxTokens * 0.95 && currentMaxTokens < MAX_TOKENS_CAP) {
+    if ((completionTokens >= 7900 || completionTokens >= currentMaxTokens * 0.95) && currentMaxTokens < MAX_TOKENS_CAP) {
       const next = Math.min(currentMaxTokens * 2, MAX_TOKENS_CAP);
       console.log(`[prompt-builder] 检测到截断 (completionTokens=${completionTokens} >= ${currentMaxTokens}*0.95), 下次 maxTokens → ${next}`);
       currentMaxTokens = next;
@@ -117,15 +85,18 @@ export async function generateScript(title, content, style) {
 
       const schemaResult = validateScript(script);
       if (!schemaResult.ok) {
-        lastError = schemaResult.error;
-        console.warn(`[prompt-builder] schema 校验失败: ${lastError}`);
+        schemaResult.error.split('\n').forEach(function(l) {
+          var t = l.trim();
+          if (t.startsWith('- ') && !allErrors.includes(t)) allErrors.push(t);
+        });
+        console.warn(`[prompt-builder] schema 校验失败: ${schemaResult.error}`);
         continue;
       }
 
       const htmlResult = validateHTML(schemaResult.script);
       if (!htmlResult.ok) {
-        lastError = htmlResult.error;
-        console.warn(`[prompt-builder] HTML 校验失败: ${lastError}`);
+        if (!allErrors.includes(htmlResult.error)) allErrors.push(htmlResult.error);
+        console.warn(`[prompt-builder] HTML 校验失败: ${htmlResult.error}`);
         continue;
       }
 
@@ -151,10 +122,10 @@ export async function generateScript(title, content, style) {
         scenesJson: JSON.stringify(schemaResult.script.scenes),
       };
     } catch (e) {
-      lastError = e.message;
-      console.warn(`[prompt-builder] 解析失败: ${lastError}`);
+      if (!allErrors.includes(e.message)) allErrors.push(e.message);
+      console.warn(`[prompt-builder] 解析失败: ${e.message}`);
     }
   }
 
-  throw ERRORS.SCRIPT_VALIDATION_FAILED(lastError);
+  throw ERRORS.SCRIPT_VALIDATION_FAILED(allErrors.join("\n"));
 }

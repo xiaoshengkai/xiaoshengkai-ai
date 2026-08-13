@@ -268,6 +268,8 @@ export default function WorkflowPage() {
                 <div className="text-sm font-bold text-gray-800 mb-2">{selectedTemplate.label}</div>
                 {selectedTemplate.params.filter(p => {
                     if (p.name === "voice_id" && formValues["enable_tts"] === "no") return false;
+                    if (p.name === "bgm_volume" && formValues["enable_bgm"] === "no") return false;
+                    if (p.name === "bgm_file" && formValues["enable_bgm"] === "no") return false;
                     return true;
                   }).map(p => (
                   <div key={p.name}>

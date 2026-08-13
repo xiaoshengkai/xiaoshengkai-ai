@@ -14,7 +14,17 @@ const MAX_EXECUTIONS = 50;
 
 function evaluateSkipWhen(condition, params) {
   if (!condition) return false;
-  const expr = condition.trim();
+
+  // 支持数组：OR 语义（任一条件成立即跳过）
+  if (Array.isArray(condition)) {
+    return condition.some(c => evaluateSingleSkip(c, params));
+  }
+  return evaluateSingleSkip(condition, params);
+}
+
+function evaluateSingleSkip(expr, params) {
+  expr = (expr || "").trim();
+  if (!expr) return false;
   if (expr.includes("===") || expr.includes("!==")) {
     const m = expr.match(/^"?\{(\w+)\}"?\s*(===|!==)\s*"(.+)"$/);
     if (m) {
@@ -36,6 +46,26 @@ function evaluateSkipWhen(condition, params) {
     return v !== undefined && v !== null && v !== "";
   }
   return false;
+}
+
+function resetSteps(state, template, params) {
+  state.steps.forEach((step, i) => {
+    if (step.id === "script") return;
+    const shouldSkip = evaluateSkipWhen(template.steps[i]?.skipWhen, params);
+    if (shouldSkip) {
+      step.status = "skipped";
+      step.skipReason = template.steps[i].skipWhen;
+    } else {
+      step.status = "pending";
+      step.skipReason = null;
+    }
+    step.output = null;
+    step.error = null;
+    step.startedAt = null;
+    step.elapsed = null;
+  });
+  state.status = "running";
+  state.error = null;
 }
 
 export function listExecutions() {
@@ -346,16 +376,18 @@ export async function runNextStep(executionId) {
   try {
     const output = await executeStep(step, vars, dir, templateDir);
     const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
-    state.steps[nextIdx].status = "completed";
-    state.steps[nextIdx].output = output;
-    state.steps[nextIdx].elapsed = elapsed;
+
+    const freshState = readState(dir);
+    freshState.steps[nextIdx].status = "completed";
+    freshState.steps[nextIdx].output = output;
+    freshState.steps[nextIdx].elapsed = elapsed;
 
     if (nextIdx === template.steps.length - 1) {
-      state.status = "completed";
-      state.completedAt = new Date().toISOString();
+      freshState.status = "completed";
+      freshState.completedAt = new Date().toISOString();
     }
 
-    writeState(dir, state);
+    writeState(dir, freshState);
     logger.info(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 完成 (${elapsed}s)`);
     if (output) {
       const preview = typeof output === "string" ? output.slice(0, 200) : JSON.stringify(output).slice(0, 200);
@@ -436,4 +468,250 @@ export function editStepOutput(executionId, stepId, output) {
   state.steps[stepIdx].output = output;
   writeState(dir, state);
   return { ok: true };
+}
+
+// ── 微调 ──
+
+const TWEAK_LIMIT = 99999;
+const SCRIPTS_DIRNAME = "scripts";
+const VIDEOS_DIRNAME = "videos";
+
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function getScriptsDir(execDir) {
+  const d = path.join(execDir, SCRIPTS_DIRNAME);
+  ensureDir(d);
+  return d;
+}
+
+function getVideosDir(execDir) {
+  const d = path.join(execDir, VIDEOS_DIRNAME);
+  ensureDir(d);
+  return d;
+}
+
+function writeScriptVersion(execDir, version, script) {
+  const scriptsDir = getScriptsDir(execDir);
+  const filePath = path.join(scriptsDir, `v${version}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(script, null, 2));
+}
+
+function readScriptVersion(execDir, version) {
+  const filePath = path.join(execDir, SCRIPTS_DIRNAME, `v${version}.json`);
+  return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+}
+
+function initScriptHistory(state, execDir) {
+  if (!state.scriptHistory) {
+    const scriptStep = state.steps.find(s => s.id === "script");
+    const script = scriptStep?.output?.script;
+    if (script) {
+      const parsed = typeof script === "string" ? JSON.parse(script) : script;
+      writeScriptVersion(execDir, 0, parsed);
+      state.scriptHistory = [{
+        version: 0,
+        at: state.startedAt || new Date().toISOString(),
+        feedback: "初次生成",
+        videoFile: null,
+      }];
+      state.currentScriptVersion = 0;
+      state.tweakCount = 0;
+    }
+  }
+  if (state.tweakLimit === undefined) state.tweakLimit = TWEAK_LIMIT;
+}
+
+export async function tweakExecution(executionId) {
+  const logger = createDateLogger("workflows", LOG_DIR, executionId);
+  logger.info(`[tweak] 开始`);
+
+  try {
+    const dir = path.join(DATA_DIR, executionId);
+    const state = readState(dir);
+    const scriptStep = state.steps.find(s => s.id === "script");
+    if (!scriptStep) {
+      logger.error("[tweak] 未找到脚本步骤");
+      return { ok: false, error: "未找到脚本步骤" };
+    }
+
+    const feedback = state.tweakTask?.feedback;
+    if (!feedback) {
+      logger.error("[tweak] 未找到 feedback");
+      return { ok: false, error: "未找到 feedback" };
+    }
+
+    initScriptHistory(state, dir);
+
+    const currentVer = state.currentScriptVersion ?? 0;
+
+    if (state.tweakCount >= TWEAK_LIMIT) {
+      logger.warn(`[tweak] 已达上限 (${state.tweakCount}/${TWEAK_LIMIT})`);
+      return { ok: false, error: `已达到微调次数上限 (${state.tweakCount}/${TWEAK_LIMIT})` };
+    }
+
+    let originalScript;
+    try {
+      const out = typeof scriptStep.output === "string" ? JSON.parse(scriptStep.output) : scriptStep.output;
+      originalScript = typeof out.script === "string" ? JSON.parse(out.script) : out.script;
+    } catch (e) {
+      logger.error(`[tweak] 解析原脚本失败: ${e.message}`);
+      return { ok: false, error: "无法解析原脚本" };
+    }
+
+    // LLM 调用前：重置下游步骤状态 + 立即落盘
+    const template = loadTemplate(state.template);
+    resetSteps(state, template, state.params);
+    scriptStep.status = "running";
+    writeState(dir, state);
+    logger.info(`[tweak] 状态已重置: render=${state.steps.find(s => s.id === "render")?.status}, bgm=${state.steps.find(s => s.id === "bgm")?.status}, tts=${state.steps.find(s => s.id === "tts")?.status}, state=${state.status}`);
+
+    // 调用 LLM 微调
+    logger.info(`[tweak] LLM 调用开始 (v${currentVer} → v${currentVer + 1})`);
+    const tStart = Date.now();
+    const { tweakScript } = await import("./templates/video-generation/lib/tweak-builder.js");
+    const tweaked = await tweakScript(originalScript, feedback);
+    logger.info(`[tweak] LLM 调用完成 (${((Date.now() - tStart) / 1000).toFixed(1)}s)`);
+
+    const newVersion = currentVer + 1;
+    const newScript = JSON.parse(tweaked.script);
+
+    // 保存新版本脚本
+    writeScriptVersion(dir, newVersion, newScript);
+
+    // 更新最新 output
+    const newOutput = {
+      script: tweaked.script,
+      validated: true,
+      stats: { sceneCount: newScript.scenes?.length || 0 },
+      title: tweaked.title,
+      bgm_prompt: tweaked.bgm_prompt,
+      allHtml: tweaked.allHtml,
+      allNarration: tweaked.allNarration,
+      css: tweaked.css,
+      jsAnimation: tweaked.jsAnimation,
+      scenesJson: tweaked.scenesJson,
+    };
+    scriptStep.output = newOutput;
+    scriptStep.status = "completed";
+    logger.info("[tweak] 脚本已更新，scriptStep 状态恢复为 completed");
+
+    // 更新历史
+    state.scriptHistory.push({
+      version: newVersion,
+      at: new Date().toISOString(),
+      feedback,
+      videoFile: null,
+    });
+    state.currentScriptVersion = newVersion;
+    state.tweakCount = (state.tweakCount || 0) + 1;
+
+    writeState(dir, state);
+
+    logger.info(`[tweak] 完成 v${newVersion} (${state.tweakCount}/${TWEAK_LIMIT})`);
+    return { ok: true, version: newVersion, tweakCount: state.tweakCount };
+  } catch (e) {
+    logger.error(`[tweak] 失败: ${e.message}`);
+    logger.error(`[tweak] stack: ${e.stack}`);
+    return { ok: false, error: e.message };
+  }
+}
+
+export function switchScriptVersion(executionId, version) {
+  const logger = createDateLogger("workflows", LOG_DIR, executionId);
+  logger.info(`[switch] 开始 v${version}`);
+
+  try {
+    const dir = path.join(DATA_DIR, executionId);
+    const state = readState(dir);
+    const scriptStep = state.steps.find(s => s.id === "script");
+    if (!scriptStep) {
+      logger.error("[switch] 未找到脚本步骤");
+      return { ok: false, error: "未找到脚本步骤" };
+    }
+
+    initScriptHistory(state, dir);
+
+    const history = state.scriptHistory || [];
+    const entry = history.find(h => h.version === version);
+    if (!entry) {
+      logger.error(`[switch] v${version} 不存在`);
+      return { ok: false, error: `版本 v${version} 不存在` };
+    }
+
+    // 读取历史脚本
+    let newScript;
+    try {
+      newScript = readScriptVersion(dir, version);
+    } catch (e) {
+      logger.error(`[switch] 无法读取 v${version}.json: ${e.message}`);
+      return { ok: false, error: `无法读取 v${version}.json` };
+    }
+
+    // 更新 output
+    const newOutput = {
+      script: JSON.stringify(newScript, null, 2),
+      validated: true,
+      stats: { sceneCount: newScript.scenes?.length || 0 },
+      title: newScript.title,
+      bgm_prompt: newScript.bgm_prompt,
+      allHtml: newScript.scenes?.map(s => s.html).join("\n") || "",
+      allNarration: newScript.scenes?.map(s => s.narration).join("\n") || "",
+      css: newScript.css || "",
+      jsAnimation: newScript.jsAnimation || "",
+      scenesJson: JSON.stringify(newScript.scenes || []),
+    };
+    scriptStep.output = newOutput;
+
+    state.currentScriptVersion = version;
+    writeState(dir, state);
+
+    // 复制对应版本视频到 output.mp4 / output-silent.mp4
+    if (entry.videoFile) {
+      const sourceVideo = path.join(dir, entry.videoFile);
+      if (fs.existsSync(sourceVideo)) {
+        const outputMp4 = path.join(dir, "output.mp4");
+        const silentMp4 = path.join(dir, "output-silent.mp4");
+        fs.copyFileSync(sourceVideo, outputMp4);
+        try { fs.copyFileSync(sourceVideo, silentMp4); } catch { /* silent.mp4 may not exist */ }
+        logger.info(`[switch] 复制视频: ${entry.videoFile} → output.mp4`);
+
+        // 更新 render step 的 output.videoFile 引用
+        const renderStep = state.steps.find(s => s.id === "render");
+        if (renderStep?.status === "completed") {
+          renderStep.output = { ...renderStep.output, videoFile: outputMp4 };
+          writeState(dir, state);
+        }
+      }
+    }
+
+    logger.info(`[switch] 完成 v${version}, videoFile=${entry.videoFile || "null"}`);
+    return { ok: true, version, videoFile: entry.videoFile };
+  } catch (e) {
+    logger.error(`[switch] 失败: ${e.message}`);
+    logger.error(`[switch] stack: ${e.stack}`);
+    return { ok: false, error: e.message };
+  }
+}
+
+export function saveVideoVersion(executionId, version, videoPath) {
+  const dir = path.join(DATA_DIR, executionId);
+  const state = readState(dir);
+  if (!state.scriptHistory) return { ok: false, error: "无历史记录" };
+
+  const entry = state.scriptHistory.find(h => h.version === version);
+  if (!entry) return { ok: false, error: `版本 v${version} 不存在` };
+
+  // 拷贝视频到版本目录
+  const videosDir = getVideosDir(dir);
+  const ext = path.extname(videoPath);
+  const dest = path.join(videosDir, `v${version}${ext}`);
+  if (fs.existsSync(videoPath)) {
+    fs.copyFileSync(videoPath, dest);
+  }
+
+  entry.videoFile = `videos/v${version}${ext}`;
+  writeState(dir, state);
+  return { ok: true, videoFile: entry.videoFile };
 }

@@ -98,24 +98,12 @@ export default function SettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-gray-900 font-[family-name:var(--font-pixel)]">⚙️ 系统设置</h1>
-          <p className="text-xs mt-0.5 font-[family-name:var(--font-pixel)] flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border-2 border-[#1A1A1A] bg-white"
-              style={{ boxShadow: "2px 2px 0 #e5e7eb" }}>
-              <span className="text-base">💬</span>
-              <span className="text-gray-700">6 个 AI 模块</span>
-            </span>
-            <span className="text-gray-400 font-bold">×</span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border-2 border-[#1A1A1A] bg-white"
-              style={{ boxShadow: "2px 2px 0 #e5e7eb" }}>
-              <span className="text-base">⚙️</span>
-              <span className="text-gray-700">3 个 Provider</span>
-            </span>
-            <span className="text-gray-400 font-bold">·</span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border-2 border-[#1A1A1A] bg-white"
-              style={{ boxShadow: "2px 2px 0 #e5e7eb" }}>
-              <span className="text-base">⚡</span>
-              <span className="text-gray-700">实时生效</span>
-            </span>
+          <p className="text-xs text-gray-500 mt-1 font-[family-name:var(--font-pixel)] flex items-center gap-2">
+            <span className="flex items-center gap-1"><span>💬</span><span>6 模块</span></span>
+            <span className="text-gray-300">|</span>
+            <span className="flex items-center gap-1"><span>⚙️</span><span>3 Provider</span></span>
+            <span className="text-gray-300">|</span>
+            <span className="flex items-center gap-1"><span>⚡</span><span>实时生效</span></span>
           </p>
         </div>
         <div className="flex gap-2">

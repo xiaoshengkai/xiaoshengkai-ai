@@ -5,7 +5,8 @@
 ## 功能
 
 - 📸 图片理解：粘贴/上传图片 → MiniMax-M3 描述 → DeepSeek 间接理解
-- 💬 流式 AI 对话（DeepSeek V4 Pro）
+- 💬 流式 AI 对话（DeepSeek V4 Pro / MiniMax M3 / GLM 5.2，策略模式路由）
+- ⚙️ 设置系统：6 个模块独立选择（chat / media / vector / workflow / tts / bgm）+ 3 个 Provider 在线配置
 - 📚 RAG 知识库检索（Chroma + 智谱 embedding-3，动态多表检索）
 - 🧠 主题学习笔记（learn-* collection，按主题隔离）
 - 📝 小红书笔记自动生成：对话内容 → 带封面/插画/标签的完整笔记，4 种模板 + 二级类目，聊天内嵌预览 + 独立页面，导出 HTML/MD/图片
@@ -13,7 +14,8 @@
 - 🎨 像素复古风 UI（shadcn/ui + 自定义 CSS）
 - 📝 个人博客（新粗野主义像素风，笔记自动同步，Tailscale Funnel 内网穿透）
 - 🖼️ 文生图 + 图生图（MiniMax），异步模式，73 种视觉风格可选
-- 📊 图表生成：Mermaid + D2 双引擎，异步模式，支持 10 种图表类型（流程图/时序图/类图/状态图/ER图/甘特图/饼图/象限图/架构图/网络拓扑）
+- 🎙️ TTS 语音合成（MiniMax speech-2.8-hd）+ BGM 音乐生成（music-2.6）
+- 📊 图表生成：Mermaid + D2 双引擎，异步模式，支持 10 种图表类型
 - 🎬 短视频生成（MD 风格描述 + GSAP 动画 + HyperFrames 渲染，可发抖音）
 - ⏰ 定时任务系统（node-cron 调度，独立进程，日志隔离，仪表盘预览）
 - 📦 npm workspaces monorepo

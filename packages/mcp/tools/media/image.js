@@ -6,6 +6,21 @@ import { sleep, shortId } from "../../../shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
 import { generateImage } from "../../../shared/llm/providers/minimax.js";
 
+const GENERATORS = {
+  minimax: generateImage,
+};
+
+function getGenerator(provider) {
+  const gen = GENERATORS[provider];
+  if (!gen) throw new Error(`不支持的图片 provider: ${provider}`);
+  return gen;
+}
+
+async function getProviderApiKey(provider) {
+  if (provider === "minimax") return process.env.MINIMAX_API_KEY;
+  return null;
+}
+
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
 
 async function generateImageAsync(taskId, workDir, params) {
@@ -33,7 +48,7 @@ export function register(server) {
     "根据文本描述生成图片。当前支持 MiniMax image-01 模型。返回的图片 URL 包含 OSS 签名，必须原样使用不得修改任何字符。链接有效期 24 小时。异步模式，返回 taskId 后用 checkImageProgress 查询进度。",
     {
       prompt: z.string().min(1).max(1500).describe("图片的文本描述，最长 1500 字符"),
-      provider: z.enum(["minimax"]).optional().default("minimax").describe("模型提供商，默认 minimax"),
+      provider: z.string().optional().default("minimax").describe("模型提供商，默认 minimax"),
       model: z.enum(["image-01", "image-01-live"]).optional().default("image-01").describe("模型名称"),
       aspect_ratio: z.enum(["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"]).optional().default("1:1").describe("宽高比"),
       n: z.number().min(1).max(9).optional().default(1).describe("生成数量，1-9"),
@@ -41,11 +56,12 @@ export function register(server) {
     },
     async ({ prompt, provider, model, aspect_ratio, n, prompt_optimizer }) => {
       try {
-        if (provider !== "minimax") {
+        if (!GENERATORS[provider]) {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `不支持的 provider: ${provider}` }) }] };
         }
-        if (!process.env.MINIMAX_API_KEY) {
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
+        const apiKey = await getProviderApiKey(provider);
+        if (!apiKey) {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `未配置 ${provider} API_KEY` }) }] };
         }
         const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);
@@ -76,11 +92,12 @@ export function register(server) {
     },
     async ({ prompt, image_url, provider, model, aspect_ratio, n, prompt_optimizer }) => {
       try {
-        if (provider !== "minimax") {
+        if (!GENERATORS[provider]) {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `不支持的 provider: ${provider}` }) }] };
         }
-        if (!process.env.MINIMAX_API_KEY) {
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
+        const apiKey = await getProviderApiKey(provider);
+        if (!apiKey) {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `未配置 ${provider} API_KEY` }) }] };
         }
         const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);

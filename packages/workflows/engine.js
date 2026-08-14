@@ -222,6 +222,12 @@ async function runSteps(dir, state, template, params, logger) {
       state.steps[i].elapsed = elapsed;
       vars[step.id] = output;
 
+      // ponytail: 最后一步立即标记整体 completed, 避免末尾代码未执行
+      if (i === template.steps.length - 1) {
+        state.status = "completed";
+        state.completedAt = new Date().toISOString();
+      }
+
       const outputPreview = typeof output === "string"
         ? `${output.length} 字符`
         : JSON.stringify(output).length > 200
@@ -542,6 +548,8 @@ export async function tweakExecution(executionId) {
       return { ok: false, error: "未找到 feedback" };
     }
 
+    const images = state.tweakTask?.images || [];
+
     initScriptHistory(state, dir);
 
     const currentVer = state.currentScriptVersion ?? 0;
@@ -571,7 +579,7 @@ export async function tweakExecution(executionId) {
     logger.info(`[tweak] LLM 调用开始 (v${currentVer} → v${currentVer + 1})`);
     const tStart = Date.now();
     const { tweakScript } = await import("./templates/video-generation/lib/tweak-builder.js");
-    const tweaked = await tweakScript(originalScript, feedback);
+    const tweaked = await tweakScript(originalScript, feedback, images);
     logger.info(`[tweak] LLM 调用完成 (${((Date.now() - tStart) / 1000).toFixed(1)}s)`);
 
     const newVersion = currentVer + 1;

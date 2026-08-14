@@ -1,0 +1,26 @@
+import { readProviders, readSelection } from "./store";
+import type { Module } from "./types";
+
+export interface ProviderConfig {
+  protocol: "openai" | "anthropic";
+  baseURL: string;
+  apiKey: string;
+  model: string;
+}
+
+export function getProviderConfig(module: Module): ProviderConfig {
+  const sel = readSelection();
+  const providers = readProviders();
+  const entry = sel[module];
+  if (!entry) throw new Error(`No selection for module "${module}"`);
+  const p = providers[entry.provider];
+  if (!p) throw new Error(`Provider "${entry.provider}" not configured`);
+
+  // chat: if provider has anthropicBaseURL, use Anthropic protocol
+  if (module === "chat" && p.anthropicBaseURL) {
+    return { protocol: "anthropic", baseURL: p.anthropicBaseURL, apiKey: p.apiKey, model: entry.model };
+  }
+
+  // other: OpenAI compatible, baseURL first
+  return { protocol: "openai", baseURL: p.baseURL || "", apiKey: p.apiKey, model: entry.model };
+}

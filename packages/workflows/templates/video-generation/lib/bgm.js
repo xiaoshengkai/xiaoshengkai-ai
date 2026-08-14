@@ -3,10 +3,28 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { ERRORS } from "./errors.js";
-
-const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
-
 import { sleep } from "../../../../shared/utils.js";
+
+function getConfig() {
+  const defaults = {
+    baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1",
+    model: "music-2.6",
+  };
+  try {
+    const settingsDir = path.resolve(process.cwd(), "..", "..", "..", "data", "settings");
+    const providersPath = path.join(settingsDir, "providers.json");
+    const selectionPath = path.join(settingsDir, "selection.json");
+    if (fs.existsSync(providersPath)) {
+      const p = JSON.parse(fs.readFileSync(providersPath, "utf-8"));
+      if (p.minimax?.baseURL) defaults.baseURL = p.minimax.baseURL;
+    }
+    if (fs.existsSync(selectionPath)) {
+      const s = JSON.parse(fs.readFileSync(selectionPath, "utf-8"));
+      if (s.bgm?.model) defaults.model = s.bgm.model;
+    }
+  } catch { /* fallback to defaults */ }
+  return defaults;
+}
 
 export async function generateBGM(bgmPrompt, executionDir, bgmFilePath) {
   const startTime = Date.now();
@@ -26,15 +44,16 @@ export async function generateBGM(bgmPrompt, executionDir, bgmFilePath) {
     return { bgmFile: outPath, duration: dur, "bgm.mp3": "bgm.mp3" };
   }
 
+  const cfg = getConfig();
   const apiKey = process.env.MINIMAX_API_KEY;
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(`${MINIMAX_BASE_URL}/music_generation`, {
+      const res = await fetch(`${cfg.baseURL}/music_generation`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
-          model: "music-2.6",
+          model: cfg.model,
           prompt: bgmPrompt || "轻快电子",
           is_instrumental: true,
           output_format: "url",

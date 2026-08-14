@@ -1,17 +1,40 @@
-const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
-const MINIMAX_IMAGE_MODEL = process.env.MINIMAX_IMAGE_MODEL || "image-01";
-const MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M3";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object' }) {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROVIDERS_PATH = path.resolve(__dirname, "..", "..", "..", "..", "data", "settings", "providers.json");
+
+let MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
+let MINIMAX_IMAGE_MODEL = process.env.MINIMAX_IMAGE_MODEL || "image-01";
+let MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M3";
+
+try {
+  if (fs.existsSync(PROVIDERS_PATH)) {
+    const p = JSON.parse(fs.readFileSync(PROVIDERS_PATH, "utf-8"));
+    if (p.minimax?.baseURL) MINIMAX_BASE_URL = p.minimax.baseURL;
+    if (p.minimax?.models?.image) MINIMAX_IMAGE_MODEL = p.minimax.models.image;
+    if (p.minimax?.models?.chat) MINIMAX_CHAT_MODEL = p.minimax.models.chat;
+  }
+} catch { /* fallback to env */ }
+
+export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object', images = [] }) {
   const apiKey = process.env.MINIMAX_API_KEY;
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 
+  const actualModel = model || MINIMAX_CHAT_MODEL;
+  console.log(`[minimax] 当前调用: model=${actualModel} baseURL=${MINIMAX_BASE_URL}`);
+
+  const userContent = images.length > 0
+    ? [{ type: "text", text: user }, ...images.map(d => ({ type: "image_url", image_url: { url: d, detail: "default" } }))]
+    : user;
+
   const body = {
-    model: model || MINIMAX_CHAT_MODEL,
+    model: actualModel,
     thinking: { type: "disabled" },
     messages: [
       { role: "system", content: system },
-      { role: "user", content: user },
+      { role: "user", content: userContent },
     ],
     temperature,
     max_tokens: maxTokens,

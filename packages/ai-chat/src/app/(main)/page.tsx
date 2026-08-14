@@ -57,9 +57,6 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<AttachedFile[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<"deepseek" | "minimax">("deepseek");
-  const providerRef = useRef(selectedProvider);
-  providerRef.current = selectedProvider;
   const { activeConversationId, setActiveConversationId, clearMessagesRef, triggerRefresh, newIdsRef } = useConversation();
   const convIdRef = useRef<string | null>(null);
   const savingRef = useRef(false);
@@ -69,19 +66,9 @@ export default function ChatPage() {
     convIdRef.current = null;
   };
 
-  useEffect(() => {
-    const saved = sessionStorage.getItem("xsk-provider") as "deepseek" | "minimax" | null;
-    if (saved) setSelectedProvider(saved);
-  }, []);
-
-  const handleProviderChange = useCallback((p: "deepseek" | "minimax") => {
-    sessionStorage.setItem("xsk-provider", p);
-    setSelectedProvider(p);
-  }, []);
-
   const transport = useMemo(() => new DefaultChatTransport({
     api: `${BASE}/api/chat`,
-    body: () => ({ provider: providerRef.current }),
+    body: () => ({}),
   }), []);
 
   const { messages, setMessages, sendMessage, status, stop } = useChat({
@@ -108,14 +95,14 @@ export default function ChatPage() {
           id: convIdRef.current,
           title,
           messages,
-          model: selectedProvider,
+          model: "default",
         }),
       });
       triggerRefresh();
       newIdsRef.current.delete(convIdRef.current);
     } catch { /* ignore */ }
     savingRef.current = false;
-  }, [messages, newIdsRef, selectedProvider, triggerRefresh]);
+  }, [messages, newIdsRef, triggerRefresh]);
 
   // 切换对话时加载新对话
   useEffect(() => {
@@ -436,8 +423,6 @@ export default function ChatPage() {
         <RightPanel
           messages={messages}
           isLoading={isLoading}
-          selectedProvider={selectedProvider}
-          onProviderChange={handleProviderChange}
         />
       </div>
     </ImageViewerProvider>

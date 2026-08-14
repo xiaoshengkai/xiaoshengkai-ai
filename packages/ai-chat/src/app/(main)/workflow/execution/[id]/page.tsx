@@ -66,6 +66,7 @@ export default function ExecutionDetailPage() {
   const [locked, setLocked] = useState(false);
   const [showTweak, setShowTweak] = useState(false);
   const [tweakFeedback, setTweakFeedback] = useState("");
+  const [tweakImages, setTweakImages] = useState<{ id: string; url: string; path: string | null; isUploading: boolean }[]>([]);
   const [tweaking, setTweaking] = useState(false);
   const [switchingVersion, setSwitchingVersion] = useState<number | null>(null);
   const [scriptJsonTab, setScriptJsonTab] = useState<"script" | "state">("script");
@@ -195,17 +196,71 @@ export default function ExecutionDetailPage() {
     } catch { toast("🔴 请求失败"); }
   }, [id]);
 
+  const uploadImage = useCallback(async (file: File) => {
+    const id_ = Math.random().toString(36).slice(2, 9);
+    const reader = new FileReader();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    setTweakImages(prev => [...prev, { id: id_, url: dataUrl, path: null, isUploading: true }]);
+    try {
+      const res = await fetch(`${BASE}/api/upload`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64: dataUrl, name: file.name, mimeType: file.type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "upload failed");
+      setTweakImages(prev => prev.map(i => i.id === id_ ? { ...i, path: data.path, isUploading: false } : i));
+      return data.path;
+    } catch (e) {
+      setTweakImages(prev => prev.filter(i => i.id !== id_));
+      toast("🔴 图片上传失败");
+      return null;
+    }
+  }, []);
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData.files).filter(f => f.type.startsWith("image/"));
+    if (files.length === 0) return;
+    e.preventDefault();
+    const remaining = 4 - tweakImages.length;
+    for (const f of files.slice(0, remaining)) {
+      await uploadImage(f);
+    }
+    if (files.length > remaining) toast("🟡 最多 4 张图片");
+  }, [tweakImages.length, uploadImage]);
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const remaining = 4 - tweakImages.length;
+    for (const f of files.slice(0, remaining)) {
+      await uploadImage(f);
+    }
+    if (files.length > remaining) toast("🟡 最多 4 张图片");
+    e.target.value = "";
+  }, [tweakImages.length, uploadImage]);
+
+  const removeImage = useCallback((id: string) => {
+    setTweakImages(prev => prev.filter(i => i.id !== id));
+  }, []);
+
   const handleTweak = useCallback(async () => {
     if (!tweakFeedback.trim()) { toast("🔴 请输入反馈"); return; }
-    clientLog(id, "INFO", `handleTweak start: feedback="${tweakFeedback}"`);
+    const uploading = tweakImages.filter(i => i.isUploading);
+    if (uploading.length > 0) { toast("🔴 图片上传中，请稍候"); return; }
+    clientLog(id, "INFO", `handleTweak start: feedback="${tweakFeedback}" images=${tweakImages.length}`);
     setTweaking(true);
     setTweakFeedback("");
+    setTweakImages([]);
     setShowTweak(false);
 
     try {
+      const imagePaths = tweakImages.map(i => i.path).filter(Boolean);
       const res = await fetch(`${BASE}/api/workflows/execution/${id}/tweak`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedback: tweakFeedback }),
+        body: JSON.stringify({ feedback: tweakFeedback, imagePaths }),
       });
       const data = await res.json();
       clientLog(id, "INFO", `handleTweak response: ok=${data.ok} status=${data.status}`);
@@ -217,7 +272,7 @@ export default function ExecutionDetailPage() {
       }
     } catch { toast("🔴 请求失败"); }
     setTweaking(false);
-  }, [id, tweakFeedback, fetchExecution]);
+  }, [id, tweakFeedback, tweakImages, fetchExecution]);
 
   const handleSwitchVersion = useCallback(async (version: number) => {
     setSwitchingVersion(version);
@@ -398,7 +453,7 @@ export default function ExecutionDetailPage() {
             }
 
             // 兜底：PreviewPanel
-            return <PreviewPanel step={activeStep} executionId={execution.executionId} />;
+            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} />;
           })()}
           {activeStep.id === "concat" && (
             <DownloadPanel executionId={execution.executionId} />
@@ -451,14 +506,34 @@ export default function ExecutionDetailPage() {
               <textarea
                 value={tweakFeedback}
                 onChange={(e) => setTweakFeedback(e.target.value)}
+                onPaste={handlePaste}
                 placeholder="例如：第3帧太快了&#10;把背景换成蓝色&#10;标题字号加大"
                 className="w-full h-28 px-3 py-2 text-sm border-2 border-[#1A1A1A] rounded-none resize-none focus:outline-none focus:border-[#9B59B6] bg-white"
                 style={{ boxShadow: "2px 2px 0 #e5e7eb" }}
                 disabled={tweaking || (execution.tweakCount !== undefined && execution.tweakLimit !== undefined && execution.tweakCount >= execution.tweakLimit)}
               />
-              <p className="text-xs text-gray-400 mt-1.5">
-                💡 支持自然语言描述，AI 会自动调整脚本
-              </p>
+              {tweakImages.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {tweakImages.map(img => (
+                    <div key={img.id} className="relative w-16 h-16 border-2 border-gray-300"
+                      style={{ boxShadow: "1px 1px 0 #e5e7eb" }}>
+                      <img src={img.url} alt="参考图" className="w-full h-full object-cover" />
+                      {img.isUploading && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><span className="text-white text-xs">上传中</span></div>}
+                      <button onClick={() => removeImage(img.id)} disabled={img.isUploading}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs flex items-center justify-center cursor-pointer"
+                        style={{ border: "1px solid #1A1A1A", boxShadow: "1px 1px 0 #1A1A1A" }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2 mt-1.5">
+                <label className="text-xs text-gray-400 cursor-pointer underline hover:text-gray-600">
+                  <input type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" disabled={tweakImages.length >= 4} />
+                  上传图片
+                </label>
+                <span className="text-xs text-gray-400">或 Ctrl+V 粘贴截图</span>
+                <span className="text-xs text-gray-300 ml-auto">{tweakImages.length}/4</span>
+              </div>
             </div>
           </div>
           <AlertDialogFooter className="gap-2">
@@ -748,8 +823,9 @@ function DownloadPanel({ executionId }: { executionId: string }) {
   );
 }
 
-function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId: string }) {
+function PreviewPanel({ step, executionId, currentScriptVersion }: { step: ExecutionStep; executionId: string; currentScriptVersion?: number }) {
   const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
+  const version = currentScriptVersion ?? 0;
 
   if (step.status === "pending") {
     return (
@@ -808,7 +884,7 @@ function PreviewPanel({ step, executionId }: { step: ExecutionStep; executionId:
           <h3 className="text-xs font-bold text-gray-800">{step.name}</h3>
           <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✅ 完成</span>
         </div>
-        <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}` : undefined} executionId={executionId} />
+        <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}?v=${version}` : undefined} executionId={executionId} />
       </div>
     </div>
   );

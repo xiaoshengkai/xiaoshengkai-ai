@@ -1,4 +1,3 @@
-
 "use client";
 
 import { BASE } from "@/lib/utils/utils";
@@ -11,12 +10,31 @@ interface RetrievedChunk {
   source: string;
 }
 
-interface RightPanelProps {
-  messages: UIMessage[];
-  isLoading: boolean;
-  selectedProvider: "deepseek" | "minimax";
-  onProviderChange: (p: "deepseek" | "minimax") => void;
+interface Providers {
+  [key: string]: {
+    enabled: boolean;
+    baseURL: string;
+    anthropicBaseURL?: string;
+    models: Record<string, string>;
+  };
 }
+
+interface Selection {
+  [module: string]: { provider: string; model: string };
+}
+
+const MODULE_LABELS: Record<string, string> = {
+  chat: "💬 聊天",
+  media: "🖼️ 图片",
+  vector: "📊 向量",
+  workflow: "🔧 工作流",
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  deepseek: "DeepSeek",
+  minimax: "MiniMax",
+  glm: "智谱",
+};
 
 function getLogColor(line: string) {
   if (line.includes("[ERR]")) return { color: "var(--pixel-red)" };
@@ -25,9 +43,19 @@ function getLogColor(line: string) {
   return {};
 }
 
-export default function RightPanel({ messages, isLoading, selectedProvider, onProviderChange }: RightPanelProps) {
+export default function RightPanel({ messages, isLoading }: { messages: UIMessage[]; isLoading: boolean }) {
   const [logLines, setLogLines] = useState<string[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval>>(null);
+  const [settings, setSettings] = useState<{ providers: Providers; selection: Selection } | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${BASE}/api/settings/providers`).then((r) => r.json()),
+      fetch(`${BASE}/api/settings/selection`).then((r) => r.json()),
+    ]).then(([p, s]) => {
+      setSettings({ providers: p, selection: s });
+    });
+  }, []);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -79,12 +107,12 @@ export default function RightPanel({ messages, isLoading, selectedProvider, onPr
       }
     }
 
-    const modelName = displayModel || (selectedProvider === "minimax" ? "MiniMax-M3" : "deepseek-v4-pro");
+    const modelName = displayModel || "deepseek-v4-pro";
     const cost = calculateCost(modelName, totalInput, totalOutput)
       + calculateCost("deepseek-v4-flash", classifyInput, classifyOutput);
 
     return { totalTokens, cost, modelName, retrievedChunks };
-  }, [messages, selectedProvider]);
+  }, [messages]);
 
   return (
     <aside className="pixel-panel w-[280px] shrink-0 h-full flex flex-col overflow-hidden border-l-2 border-border">
@@ -99,29 +127,25 @@ export default function RightPanel({ messages, isLoading, selectedProvider, onPr
             模型
           </div>
           <div className="pixel-panel-card-body">
-            <div className="flex gap-1">
-              <button
-                onClick={() => onProviderChange("deepseek")}
-                className={`flex-1 px-2 py-1 text-[11px] font-[family-name:var(--font-pixel)] cursor-pointer border
-                  ${selectedProvider === "deepseek"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-transparent text-muted-foreground border-border hover:bg-muted"}`}
-              >
-                DeepSeek
-              </button>
-              <button
-                onClick={() => onProviderChange("minimax")}
-                className={`flex-1 px-2 py-1 text-[11px] font-[family-name:var(--font-pixel)] cursor-pointer border
-                  ${selectedProvider === "minimax"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-transparent text-muted-foreground border-border hover:bg-muted"}`}
-              >
-                MiniMax
-              </button>
-            </div>
-            <p className="text-xs font-[family-name:var(--font-pixel)] mt-1.5 text-muted-foreground">
-              {selectedProvider === "minimax" ? "🎨 MiniMax M3" : stats.modelName === "deepseek-v4-pro" ? "🚀 DeepSeek V4 Pro" : "⚡ DeepSeek V4 Flash"}
-            </p>
+            {settings ? (
+              <div className="space-y-1.5">
+                {Object.entries(MODULE_LABELS).map(([mod, label]) => {
+                  const sel = settings.selection[mod];
+                  if (!sel) return null;
+                  const pLabel = PROVIDER_LABELS[sel.provider] || sel.provider;
+                  return (
+                    <div key={mod} className="flex items-center justify-between text-[11px] font-[family-name:var(--font-pixel)]">
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className="font-bold text-foreground">{pLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-[11px] font-[family-name:var(--font-pixel)] text-muted-foreground">
+                {stats.modelName === "MiniMax-M3" ? "🎨 MiniMax M3" : "🚀 DeepSeek"}
+              </p>
+            )}
           </div>
         </div>
 

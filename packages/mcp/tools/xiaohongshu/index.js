@@ -299,6 +299,8 @@ export function register(server) {
 
         if (PROVIDER === "minimax") {
           if (!process.env.MINIMAX_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
+        } else if (PROVIDER === "glm") {
+          if (!process.env.GLM_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 GLM_API_KEY" }) }] };
         } else {
           if (!process.env.DEEPSEEK_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
         }

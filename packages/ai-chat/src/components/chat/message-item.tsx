@@ -4,6 +4,7 @@
 import { BASE } from "@/lib/utils/utils";
 import { useMemo, useState, useCallback } from "react";
 import { isToolUIPart, isReasoningUIPart, type UIMessage } from "ai";
+import { getModelDisplay } from "@/lib/ai/model-display";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -36,7 +37,7 @@ export default function MessageItem({
   } | undefined;
 
   const modelName = meta?.model || "deepseek-v4-pro";
-  const isMiniMax = meta?.provider === "minimax";
+  const modelDisplay = getModelDisplay(meta?.provider || "deepseek", modelName);
   const classifyName = "deepseek-v4-flash";
 
   const deduplicatedParts = useMemo(() => {
@@ -186,8 +187,8 @@ toast.error("保存失败，请重试", {
                 <div>
                   {meta?.usage ? (
                     <div className="flex items-center gap-1 text-[11px] font-mono whitespace-nowrap">
-                      <span style={{ color: isMiniMax ? "var(--pixel-yellow)" : modelName.includes("flash") ? "var(--pixel-blue)" : "var(--pixel-purple)" }}>
-                        {isMiniMax ? "🎨 M3" : modelName.includes("flash") ? "⚡ flash" : "🚀 pro"}
+                      <span style={{ color: modelDisplay.color }}>
+                        {modelDisplay.label}
                       </span>
                       <span className="text-muted-foreground/30">·</span>
                       <span className="text-muted-foreground/50">

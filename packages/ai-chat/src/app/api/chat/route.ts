@@ -16,13 +16,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { streamText, stepCountIs, type ModelMessage as AISDKModelMessage } from 'ai';
-import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import { env } from '@/lib/utils/env';
 import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
-import { deepseek, minimax } from '@/lib/ai/providers';
-import { classifyTask } from '@/lib/ai/model-router';
+import { getModel } from '@/lib/ai/providers';
+import { getChatStrategy } from '@/lib/ai/chat-strategy';
+import { getProviderConfig } from '@/lib/settings/dispatcher';
+import { getMCPClient } from '@/lib/ai/mcp-client';
 import { processAttachments } from '@/lib/ai/processor';
 import type { Message, MessagePart } from '@/lib/utils/types';
 
@@ -109,26 +109,9 @@ function buildSkillList(): string {
 const SKILL_LIST = buildSkillList();
 console.log('[SKILL_LIST]', SKILL_LIST || '(空)');
 
-// ─── MCP 客户端(模块级复用) ───────────────────────────────────────────
+// ─── MCP 客户端(模块级复用, 支持 reload-marker 检测) ───────────────────
 
-let mcpClient: MCPClient | null = null;
-
-async function getMCPClient(): Promise<MCPClient> {
-  if (mcpClient) return mcpClient;
-
-  const transport = new StdioClientTransport({
-    command: 'node',
-    args: ['../mcp/index.js'],
-    cwd: process.cwd(),
-  });
-
-  mcpClient = await createMCPClient({
-    transport,
-    clientName: 'ai-mcp-client',
-  });
-
-  return mcpClient;
-}
+// 由 lib/ai/mcp-client.ts 提供, 支持 settings 变更后自动重建
 
 // ─── POST /api/chat ───────────────────────────────────────────────────
 
@@ -153,7 +136,7 @@ function toModelMessages(messages: Message[]): AISDKModelMessage[] {
 
 export async function POST(req: Request) {
   try {
-    const { messages, provider = 'deepseek' } = await req.json();
+    const { messages } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: '请输入内容' }), {
@@ -162,20 +145,15 @@ export async function POST(req: Request) {
       });
     }
 
-    // 任务分类（仅 DeepSeek 走 auto-route）
-    const isMiniMax = provider === 'minimax';
+    const strategy = getChatStrategy();
     const userText = (messages[messages.length - 1]?.parts?.[0] as { text?: string } | undefined)?.text || '';
-    const classifyResult = isMiniMax ? null : await classifyTask(userText);
-    const tier = classifyResult?.tier ?? 'pro';
-    const modelName = isMiniMax
-      ? 'MiniMax-M3'
-      : tier === 'pro'
-        ? env.DEEPSEEK_PRO_MODEL
-        : env.DEEPSEEK_FLASH_MODEL;
+    const { model: actualModel, classifyUsage } = await strategy.resolveModel(userText);
+    const provider = strategy.getProviderName();
+    const isMiniMax = provider === "minimax";
 
     // 多模态处理：图片 + 视频附件
     const { messages: processedMessages, systemInjection: multimodalInjection } =
-      await processAttachments({ provider, model: modelName, messages });
+      await processAttachments({ provider, model: actualModel, messages });
 
     const modelMessages = toModelMessages(processedMessages);
 
@@ -192,12 +170,15 @@ export async function POST(req: Request) {
       knowledgeContext,
     });
 
-    console.log(`[router] provider=${provider}, model=${modelName}`);
+    const chatConfig = getProviderConfig('chat');
+    const model = strategy.createModel(actualModel, chatConfig);
+
+    console.log(`[router] provider=${provider}, model=${actualModel}`);
 
     // === AI SDK streamText ===
     const result = streamText({
       tools: tools as unknown as Parameters<typeof streamText>[0]['tools'],
-      model: isMiniMax ? minimax(modelName) : deepseek(modelName),
+      model,
       maxOutputTokens: isMiniMax ? M3_MAX_OUTPUT_TOKENS : undefined,
       system: systemPrompt,
       messages: modelMessages,
@@ -208,6 +189,9 @@ export async function POST(req: Request) {
         anthropic: {
           thinking: { type: 'adaptive' },
         },
+        openai: {
+          thinking: { type: 'enabled' },
+        },
       },
     });
 
@@ -217,8 +201,8 @@ export async function POST(req: Request) {
           return {
             usage: part.totalUsage,
             provider,
-            model: modelName,
-            classifyUsage: classifyResult?.usage,
+            model: actualModel,
+            classifyUsage,
             retrievedChunks: retrieved.map((c) => ({
               content: c.content.slice(0, 100),
               source: `[${c.index}]`,

@@ -22,7 +22,7 @@ function MainLayoutInner({ children }: { children: React.ReactNode }) {
           onSelectConversation={handleSelectConversation}
         />
       )}
-      <main className="flex-1 min-w-0 overflow-hidden">
+      <main className={`flex-1 min-w-0 min-h-0 ${pathname === "/" ? "overflow-hidden" : "overflow-y-auto"}`}>
         {children}
       </main>
     </div>

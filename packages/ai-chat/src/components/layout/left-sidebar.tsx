@@ -40,7 +40,7 @@ const menuItems = [
   { href: "/workflow", label: "工作流", icon: GitBranch },
   { href: "/schedule", label: "定时任务", icon: Clock },
   { href: "https://node.tailddce43.ts.net", label: "博客", icon: FileText },
-  { href: "/settings", label: "设置", icon: Settings, disabled: true },
+  { href: "/settings", label: "设置", icon: Settings },
 ];
 
 export default function LeftSidebar({
@@ -190,11 +190,12 @@ export default function LeftSidebar({
       <nav className="px-3 py-3 space-y-1 border-t-2 border-border">
         {menuItems.map((item) => {
           const isDisabled = item.disabled;
+          const isExternal = typeof item.href === "string" && (item.href.startsWith("http") || item.href.startsWith("//"));
           return (
             <Link
               key={item.href}
               href={isDisabled ? "#" : item.href}
-              target={isDisabled ? undefined : "_blank"}
+              target={isExternal ? "_blank" : undefined}
               className={`flex items-center gap-3 px-3 py-2 text-sm font-[family-name:var(--font-pixel)] transition-colors
                 ${isDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-muted"}`}
               onClick={(e) => isDisabled && e.preventDefault()}

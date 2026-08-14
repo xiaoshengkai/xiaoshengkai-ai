@@ -22,8 +22,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("h-dvh antialiased", "font-sans")} suppressHydrationWarning>
-      <body className="h-dvh overflow-hidden" suppressHydrationWarning>
+    <html lang="en" className={cn("min-h-dvh antialiased", "font-sans")} suppressHydrationWarning>
+      <body className="min-h-dvh" suppressHydrationWarning>
         <Toaster position="top-center" />
         {children}
       </body>

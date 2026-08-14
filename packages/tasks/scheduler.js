@@ -183,6 +183,13 @@ function reloadCronJobs() {
     registerCron(task);
   }
   console.log("\n调度器已启动\n");
+
+// ponytail: 写 PID, 供 /api/settings/restart-services 重启
+try {
+  const settingsDir = path.resolve(TASKS_DIR, "..", "..", "data", "settings");
+  fs.mkdirSync(settingsDir, { recursive: true });
+  fs.writeFileSync(path.join(settingsDir, "scheduler.pid"), String(process.pid));
+} catch {}
 }
 
 // 热重载：每 30s 检查 task.json 和 index.json 是否变化

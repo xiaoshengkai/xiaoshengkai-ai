@@ -1,6 +1,33 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { callLLM } from "../../../../shared/llm/index.js";
 import { parseJSON } from "../../../../shared/llm/parse-json.js";
 import { validateScript } from "./schema.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DATA_STATIC_DIR = path.resolve(__dirname, "..", "..", "..", "..", "..", "data", "static");
+
+function resolveImagePath(urlPath) {
+  const filename = path.basename(urlPath);
+  if (!/^[a-f0-9-]{36}\.\w+$/.test(filename)) return null;
+  for (const subdir of ["images", "videos"]) {
+    const fp = path.join(DATA_STATIC_DIR, subdir, filename);
+    if (fs.existsSync(fp)) return fp;
+  }
+  return null;
+}
+
+function imagesToDataURLs(imagePaths) {
+  return imagePaths.map(p => {
+    const fp = resolveImagePath(p);
+    if (!fp) return null;
+    const ext = path.extname(fp).slice(1);
+    const mime = ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+    const data = fs.readFileSync(fp);
+    return `data:${mime};base64,${data.toString("base64")}`;
+  }).filter(Boolean);
+}
 
 const SYSTEM_PROMPT = `你是视频脚本微调助手，不是从0生成。
 输入：原 script.json + 用户自然语言反馈
@@ -18,12 +45,14 @@ const SYSTEM_PROMPT = `你是视频脚本微调助手，不是从0生成。
 
 输出 JSON 时直接给完整脚本，不要任何其他文字。`;
 
-export async function tweakScript(originalScript, feedback) {
+export async function tweakScript(originalScript, feedback, imagePaths = []) {
+  const images = imagesToDataURLs(imagePaths);
   const user = `原脚本：
 ${JSON.stringify(originalScript, null, 2)}
 
 用户反馈：
 ${feedback}
+${images.length > 0 ? `\n用户上传了 ${images.length} 张参考图片(已附在上下文):\n` : ""}
 
 输出修改后的完整脚本：`;
 
@@ -31,6 +60,7 @@ ${feedback}
     system: SYSTEM_PROMPT,
     user,
     maxTokens: 32000,
+    images,
   });
 
   const script = parseJSON(text);

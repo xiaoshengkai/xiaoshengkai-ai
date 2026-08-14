@@ -1,5 +1,84 @@
 # Changelog
 
+## v0.8.0 (2026-08-14) — 设置系统 + 策略模式重构 + GLM 接入 + 多处修复
+
+### 设置系统
+- 设置页面 ：模块选择 + 模块配置
+- 6 个模块独立选择：chat / media / vector / workflow / tts / bgm
+- 3 个 Provider 配置：DeepSeek / MiniMax / 智谱 GLM，BASE_URL + API_KEY 在线修改
+-  持久化，启动时从 env 初始化
+- 状态面板模型卡片只读展示 6 个模块当前选择
+- 左侧栏「设置」入口启用
+- TTS/BGM 模型接入 settings： /  可配置
+
+### 策略模式重构
+- ChatStrategy / ModelDisplayStrategy / TextLLMStrategy / ImageGenStrategy
+- 新增 provider 只需 1 个策略类 + 1 行注册，chat/route.ts 零改动
+-  dispatch 从  改为  表
+- 新增 （GLM OpenAI 兼容实现）
+
+### GLM 模型接入
+- GLM 5.2 聊天模型接入（OpenAI 兼容）
+- GLM 5.2 思考模式开启：
+- GLM-5 → GLM-5.2 自动迁移
+
+### 微调支持图片反馈
+- 微调支持图片上传：粘贴/上传截图或参考图
+- LLM 多模态扩展： 参数
+- DeepSeek 降级：图片仅作为文字提示
+
+### 修复
+- 视频进度条无法拖动： 路由加 Range 请求支持（206 + Content-Range）
+- 切换版本后视频不更新：video src 加  cache buster
+- 全局滚动修复：根 layout body  → 
+- workflow 日志错标 ：  → 
+- tweakTask 卡死 "running" 修复： timeout + auto fire-and-forget
+- engine.js 最后一步立即写 
+- generate-content 路由加日志
+
+### 文件改动
+
+| 文件 | 改动 |
+|---|---|
+|  (types, store, init, dispatcher) | 新增 |
+|  | 新增设置页面 |
+|  | 新增模块选择卡片 |
+|  | 新增 Provider 配置卡片 |
+|  | 新增 API |
+|  | 新增策略模式 |
+|  | 新增模型标签策略 |
+|  | 新增 MCP 重启机制 |
+|  | 新增 GLM 实现 |
+|  | 新增  动态函数 |
+|  | 改读 settings + 策略模式 |
+|  | dispatch 改 CALLERS 表 |
+|  | 加 model 日志 |
+|  | 滚动修复 |
+|  | 滚动修复 |
+|  | 只读展示 6 个模块 |
+|  | 启用设置入口 |
+|  | 删 selectedProvider |
+|  | timeout + fire-and-forget |
+|  | Range 请求 |
+|  | 加日志 |
+|  | 日志级别修复 |
+|  | 最后一步立即写 completed |
+|  | provider 扩展 |
+|  | GLM API key 检查 |
+|  | 读 settings |
+|  | 读 settings |
+|  | 支持图片参数 |
+
+### 限制
+- MCP / 定时任务：启动时读取配置，修改后需重启进程
+- 工作流 CLI：每次新进程，自动读最新配置
+- 聊天/图片/向量/tts/bgm：修改后立即生效
+- GLM 5.2 不支持图片输入（多模态 badge 仅 MiniMax M3）
+
+### 验证
+- tsc 0 错误
+- 端到端 workflow 完整跑通
+
 ## v0.7.1 (2026-08-13) — 微调功能 + 大量优化
 
 ### 新增

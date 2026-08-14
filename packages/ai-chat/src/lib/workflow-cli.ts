@@ -21,7 +21,7 @@ export async function runWorkflowCli(args: string[], timeoutMs = 5000): Promise<
           line.trim() !== ""
         )
         .join("\n");
-      if (realStderr) console.error("[workflow] cli stderr:", realStderr);
+      if (realStderr) console.log("[workflow] cli stderr:", realStderr);
       if (err) return reject(err);
       resolve(parseCliOutput(stdout));
     });

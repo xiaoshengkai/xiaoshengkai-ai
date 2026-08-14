@@ -25,100 +25,62 @@ function writeState(dir: string, state: unknown) {
   fs.writeFileSync(path.join(dir, "state.json"), JSON.stringify(state, null, 2));
 }
 
+function setTweakStatus(dir: string, status: string, error?: string) {
+  try {
+    const state = readState(dir);
+    state.tweakTask = {
+      ...state.tweakTask,
+      status,
+      completedAt: new Date().toISOString(),
+      error: error || null,
+    };
+    writeState(dir, state);
+  } catch { /* ignore */ }
+}
+
 async function runTweakInBackground(executionId: string) {
   const dir = path.join(DATA_DIR, executionId);
+  const TIMEOUT_MS = 600_000; // 10 分钟
 
   try {
-    // 调 tweak CLI（只传 id，feedback 已存 state.json）
-    const data = await runWorkflowCli(
-      ["tweak", JSON.stringify({ executionId })],
-      300_000
-    ) as Record<string, unknown>;
+    // tweak 带 timeout
+    const data = (await Promise.race([
+      runWorkflowCli(["tweak", JSON.stringify({ executionId })], 300_000),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("tweak timeout after 10 min")), TIMEOUT_MS)
+      ),
+    ])) as Record<string, unknown>;
 
     if (!data?.ok) {
-      const state = readState(dir);
-      state.tweakTask = { status: "failed", completedAt: new Date().toISOString(), error: data?.error || "tweak failed" };
-      writeState(dir, state);
+      setTweakStatus(dir, "failed", data?.error as string || "tweak failed");
       writeLog("ERR", `tweak failed: ${data?.error}`);
       return;
     }
 
     // tweak 成功 → 更新任务状态
     const state = readState(dir);
-    state.tweakTask = { status: "completed", completedAt: new Date().toISOString(), version: data.version, error: null };
+    state.tweakTask = { status: "completed", completedAt: new Date().toISOString(), version: data.version as number, error: null };
     writeState(dir, state);
-    writeLog("INFO", `tweak completed v${data.version}, starting auto...`);
+    writeLog("INFO", `tweak completed v${data.version}, starting auto in background...`);
 
-    // 自动跑 render（auto）
-    const autoResult = await runWorkflowCli(
-      ["auto", JSON.stringify({ executionId })],
-      600_000
-    ) as Record<string, unknown>;
-
-    const state2 = readState(dir);
-    if (autoResult?.ok) {
-      state2.tweakTask = { status: "done", completedAt: new Date().toISOString(), version: data.version, error: null };
-      writeLog("INFO", `auto completed, render done`);
-    } else {
-      state2.tweakTask = { status: "failed", completedAt: new Date().toISOString(), version: data.version, error: autoResult?.error || "auto failed" };
-      writeLog("ERR", `auto failed: ${autoResult?.error}`);
-    }
-    writeState(dir, state2);
+    // auto 后台跑，不阻塞
+    runWorkflowCli(["auto", JSON.stringify({ executionId })], 600_000)
+      .then((autoResult) => {
+        if ((autoResult as Record<string, unknown>)?.ok) {
+          setTweakStatus(dir, "done");
+          writeLog("INFO", "auto completed, render done");
+        } else {
+          setTweakStatus(dir, "failed", (autoResult as Record<string, unknown>)?.error as string || "auto failed");
+          writeLog("ERR", `auto failed: ${(autoResult as Record<string, unknown>)?.error}`);
+        }
+      })
+      .catch((err) => {
+        setTweakStatus(dir, "failed", `auto error: ${err instanceof Error ? err.message : String(err)}`);
+        writeLog("ERR", `auto error: ${err instanceof Error ? err.message : String(err)}`);
+      });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     writeLog("ERR", `background tweak failed: ${msg}`);
-    try {
-      const state = readState(dir);
-      state.tweakTask = { status: "failed", completedAt: new Date().toISOString(), error: msg, feedback: state.tweakTask?.feedback || null };
-      writeState(dir, state);
-    } catch { /* ignore */ }
-  }
-}
-
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  const { feedback } = await request.json();
-  if (!feedback) return NextResponse.json({ ok: false, error: "missing feedback" }, { status: 400 });
-
-  const dir = path.join(DATA_DIR, id);
-
-  try {
-    if (!fs.existsSync(dir)) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-
-    // 把 feedback 存到 state.json，不走 CLI argv
-    const state = readState(dir);
-    // 预更新步骤状态，让前端立即看到
-    state.status = "running";
-    state.steps.forEach((s: { id: string; status: string; elapsed?: string | null; output?: unknown; startedAt?: string | null; error?: string | null }) => {
-      if (s.id === "script") {
-        s.status = "running";
-        s.elapsed = null;
-        s.startedAt = null;
-      }
-      if (s.id === "render" && s.status === "completed") {
-        s.status = "pending";
-        s.output = null;
-        s.error = null;
-        s.startedAt = null;
-        s.elapsed = null;
-      }
-    });
-    state.tweakTask = { status: "running", startedAt: new Date().toISOString(), completedAt: null, version: null, error: null, feedback };
-    writeState(dir, state);
-    writeLog("INFO", `async tweak started: feedback="${feedback}"`);
-
-    // 后台执行（不传 feedback，避免 \n 破坏 argv）
-    runTweakInBackground(id).catch((err) => {
-      writeLog("ERR", `background tweak unhandled: ${err instanceof Error ? err.message : String(err)}`);
-    });
-
-    return NextResponse.json({ ok: true, status: "running" });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    writeLog("ERR", `POST /tweak failed: ${msg}`);
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    setTweakStatus(dir, "failed", msg);
   }
 }

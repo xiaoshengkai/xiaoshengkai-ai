@@ -20,10 +20,11 @@ import { embed } from "ai";
 import { glm } from "../src/lib/ai/providers";
 import { ChromaClient } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
+import { loadNetworkConfig } from "../../shared/network.js";
 
-// ─── 常量 ────────────────────────────────────────────────────────
-
-const CHROMA_URL = process.env.CHROMA_URL ?? "http://localhost:8000";
+// 从 config/network.json 读 chroma host+port（共享读取器）
+const NET_CONFIG = loadNetworkConfig();
+const CHROMA_URL = `http://${NET_CONFIG.hosts.local}:${NET_CONFIG.ports.chroma}`;
 const COLLECTION_NAME = "java_knowledge";
 const TOP_K = 3;
 const PASS_OVERLAP = 2;       // Top-K 中至少有几个重叠才算"通过"

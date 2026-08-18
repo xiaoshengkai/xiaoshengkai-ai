@@ -23,14 +23,14 @@ import { spawn, type ChildProcess } from "child_process";
 import { existsSync, mkdirSync } from "fs";
 import { join, resolve } from "path";
 import { env } from "../utils/env"
+import { loadNetworkConfig } from "../../../../shared/network.js"
+
+// 从 config/network.json 读 chroma host+port（共享读取器）
+const NET_CONFIG = loadNetworkConfig();
+const CHROMA_HOST = NET_CONFIG.hosts.local;
+const CHROMA_PORT = NET_CONFIG.ports.chroma;
 
 // ─── 常量(集中配置,便于阅读与调整) ──────────────────────────────────────
-
-/** Chroma HTTP 服务默认端口。 */
-const DEFAULT_CHROMA_PORT = 8000;
-
-/** Chroma HTTP 服务默认主机(localhost 即可,无需暴露外网)。 */
-const DEFAULT_CHROMA_HOST = "localhost";
 
 /** 启动超时上限(毫秒)。超过此时间视为启动失败。 */
 const STARTUP_TIMEOUT_MS = 30_000;
@@ -71,7 +71,7 @@ let startingPromise: Promise<void> | null = null;
 
 /**
  * 解析 Chroma HTTP base URL。
- * 优先从 `CHROMA_URL` 读取,缺省回落到 `http://localhost:8000`。
+ * `env.CHROMA_URL` 从 config/network.json 拼装（hosts.local + ports.chroma）。
  */
 function getChromaBaseUrl(): string {
   return env.CHROMA_URL;
@@ -117,8 +117,8 @@ function spawnChromaProcess(): Promise<void> {
     const args = [
       "run",
       "--path", dataDir,
-      "--host", DEFAULT_CHROMA_HOST,
-      "--port", String(DEFAULT_CHROMA_PORT),
+      "--host", CHROMA_HOST,
+      "--port", String(CHROMA_PORT),
     ];
 
     console.log(`[chroma-server] 启动子进程: ${CHROMA_CLI} ${args.join(" ")}`);
@@ -197,7 +197,7 @@ export async function ensureChromaRunning(): Promise<void> {
   if (!autoStart) {
     throw new Error(
       `Chroma 不可达(${getChromaBaseUrl()})且 ${AUTO_START_ENV}=false,` +
-        `请手动执行: ${CHROMA_CLI} run --path ${getChromaDataDir()} --port ${DEFAULT_CHROMA_PORT}`,
+        `请手动执行: ${CHROMA_CLI} run --path ${getChromaDataDir()} --port ${CHROMA_PORT}`,
     );
   }
 

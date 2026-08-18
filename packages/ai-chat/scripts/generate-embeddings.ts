@@ -30,11 +30,11 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { ChromaClient } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
+import { loadNetworkConfig } from "../../shared/network.js";
 
-// ─── 常量(集中管理) ─────────────────────────────────────────────────
-
-/** Chroma HTTP 连接(必须与 chroma-server.ts / vector-store.ts 一致)。 */
-const CHROMA_URL = process.env.CHROMA_URL ?? "http://localhost:8000";
+// 从 config/network.json 读 chroma host+port（共享读取器）
+const NET_CONFIG = loadNetworkConfig();
+const CHROMA_URL = `http://${NET_CONFIG.hosts.local}:${NET_CONFIG.ports.chroma}`;
 
 /** Chroma collection 名(必须与 vector-store.ts 一致)。 */
 const COLLECTION_NAME = "java_knowledge";

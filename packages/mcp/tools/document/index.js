@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { marked } from "marked";
 import puppeteer from "puppeteer";
 import { shortId, downloadsDir } from "../../../shared/utils.js";
+import { loadNetworkConfig } from "../../../shared/network.js";
 
 const TAG = "[doc]";
 
@@ -43,10 +44,8 @@ const FONT_DOWNLOAD_URLS = [
   "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
 ];
 
-// 从 config/network.json 读端口 + host
-const PORTS_CONFIG = JSON.parse(
-  fs.readFileSync(path.join(PROJECT_ROOT, "config", "network.json"), "utf-8")
-);
+// 从 config/network.json 读端口 + host（共享读取器）
+const PORTS_CONFIG = loadNetworkConfig();
 const LOCAL_HOST = PORTS_CONFIG.hosts.local;
 const PROD_PROXY = PORTS_CONFIG.ports.aiChat.prodProxy;
 const PROD_DIRECT = PORTS_CONFIG.ports.aiChat.prodDirect;

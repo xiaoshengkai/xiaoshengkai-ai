@@ -5,6 +5,7 @@ import { embed } from "ai";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadNetworkConfig } from "../../shared/network.js";
 
 const SHARED_DB = "shared";
 const CHAT_DB = "chat";
@@ -15,13 +16,8 @@ const EMBEDDING_MODEL = process.env.GLM_EMBEDDING_MODEL || "embedding-3";
 const EMBED_MAX_RETRIES = 3;
 const GLM_BASE_URL = process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
 
-// 从 config/network.json 读 chroma host+port
-const NET_CONFIG = JSON.parse(
-  fs.readFileSync(
-    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "config", "network.json"),
-    "utf-8"
-  )
-);
+// 从 config/network.json 读 chroma host+port（共享读取器）
+const NET_CONFIG = loadNetworkConfig();
 const CHROMA_HOST = NET_CONFIG.hosts.local;
 const CHROMA_PORT = NET_CONFIG.ports.chroma;
 

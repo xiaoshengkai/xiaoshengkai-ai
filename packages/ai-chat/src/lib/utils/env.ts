@@ -3,6 +3,13 @@
  *
  * ponytail: 一次性 destructure，全部用 `||` 默认值，不做类型校验（信任边界外由 next.config.ts 守住）
  */
+import fs from "node:fs";
+import path from "node:path";
+import { loadNetworkConfig } from "../../../../shared/network.js";
+
+// 从 config/network.json 读 chroma host+port（项目级配置，committed）
+const NET_CONFIG = loadNetworkConfig();
+
 export const env = {
   BASE_PATH: process.env.NEXT_PUBLIC_BASE_PATH || '',
 
@@ -18,5 +25,5 @@ export const env = {
   GLM_BASE_URL: process.env.GLM_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4',
   GLM_API_KEY: process.env.GLM_API_KEY || '',
 
-  CHROMA_URL: process.env.CHROMA_URL || 'http://localhost:8000',
+  CHROMA_URL: `http://${NET_CONFIG.hosts.local}:${NET_CONFIG.ports.chroma}`,
 } as const;

@@ -1,0 +1,14 @@
+{
+  "hosts": {
+    "local": "localhost",
+    "public": "node.tailddce43.ts.net"
+  },
+  "ports": {
+    "aiChat": {
+      "dev": 3000,
+      "prodDirect": 4567,
+      "prodProxy": 4321
+    },
+    "chroma": 8000
+  }
+}

@@ -3,8 +3,13 @@ const httpProxy = require('http-proxy');
 const fs = require('fs');
 const path = require('path');
 
+const config = require('../config/network.json');
+const LOCAL = config.hosts.local;
+const PROD_DIRECT = config.ports.aiChat.prodDirect;
+const PROXY_PORT = config.ports.aiChat.prodProxy;
+
 const proxy = httpProxy.createProxyServer({
-  target: 'http://localhost:4567',
+  target: `http://${LOCAL}:${PROD_DIRECT}`,
   xfwd: true,
 });
 
@@ -59,8 +64,8 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(4321, () => {
-  console.log('代理已启动 → http://localhost:4321');
+server.listen(PROXY_PORT, () => {
+  console.log(`代理已启动 → http://${LOCAL}:${PROXY_PORT}`);
   console.log('  /             → 博客 (site/)');
-  console.log('  /ai/ /note/ /preview/ /api/ → AI 工作台 (localhost:4567)');
+  console.log(`  /ai/ /note/ /preview/ /api/ → AI 工作台 (${LOCAL}:${PROD_DIRECT})`);
 });

@@ -1,7 +1,12 @@
 #!/bin/bash
-kill -9 $(lsof -t -i:4567) 2>/dev/null
-kill -9 $(lsof -t -i:8000) 2>/dev/null
-kill -9 $(lsof -t -i:4321) 2>/dev/null
+# 4568 (tasks scheduler) 暂不配置化（你说先不管）
+PROD_DIRECT=$(node -e "console.log(require('./config/network.json').ports.aiChat.prodDirect)")
+PROXY_PORT=$(node -e "console.log(require('./config/network.json').ports.aiChat.prodProxy)")
+CHROMA_PORT=$(node -e "console.log(require('./config/network.json').ports.chroma)")
+
+kill -9 $(lsof -t -i:$PROD_DIRECT) 2>/dev/null
+kill -9 $(lsof -t -i:$CHROMA_PORT) 2>/dev/null
+kill -9 $(lsof -t -i:$PROXY_PORT) 2>/dev/null
 pkill -f "packages/tasks/scheduler.js" 2>/dev/null
 tailscale funnel reset 2>/dev/null
 echo '已停止全部服务'

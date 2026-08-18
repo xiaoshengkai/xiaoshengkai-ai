@@ -1,5 +1,54 @@
 # Changelog
 
+## v0.8.1 (2026-08-18) — 网络配置抽取 + 构建修复
+
+### 网络配置单一真相源
+- 新增 `config/network.json`：集中管理 host + 端口（aiChat dev/prodDirect/prodProxy、chroma），改一处全局同步
+- 新增 `packages/shared/network.js`：`loadNetworkConfig()` 从 `process.cwd()` 向上遍历找 `config/network.json`（最多 5 层），找不到带 cwd 信息抛错
+- 新增 `config/README.md`：字段说明 + 消费者清单 + 明确不在 config 里的内容（API key、LLM endpoint 等）
+
+### 消费者改造
+- `env.ts`：`CHROMA_URL` 从 `process.env` 兜底改为读 config（hosts.local + ports.chroma）
+- `chroma-server.ts`：spawn 的 `--host/--port` 改读 config
+- `vector-store.ts` / `admin/chroma/route.ts`：硬编码 `localhost:8000` 改为 `env.CHROMA_URL`
+- `mcp/lib/chroma.js` / `mcp/tools/document/index.js`：改读 `loadNetworkConfig()`
+- `generate-embeddings.ts` / `verify-migration.ts`：改读 `loadNetworkConfig()`，import 用 `@shared/network.js`
+- `proxy.cjs` / `prod.sh` / `dev.sh` / `stop.sh`：端口改读 `config/network.json`
+- `packages/shared/utils.js`：新增 `downloadsDir`（跨工具复用），fetch/xiaohongshu/document 去重
+
+### 修复
+- **构建失败（关键）**：`env.ts` 引入 `node:fs`/`node:path` + `@shared/network.js` 后，被客户端共享模块 `utils.ts`（`cn`）通过 `import { env }` 拉进浏览器 bundle，webpack 客户端编译报 `Module not found: Can't resolve 'fs'`。修复：`utils.ts` 不再 import 服务端专属的 `env`，`BASE` 直接读 `process.env.NEXT_PUBLIC_BASE_PATH`；`env.ts` 删掉死导入 `node:fs`/`node:path`
+- `vector-store.ts` `parseChromaUrl` 缺端口时直接抛错（原来静默兜底 8000）
+
+### 文件改动
+
+| 文件 | 改动 |
+|---|---|
+| `config/network.json` | 新增（单一真相源） |
+| `config/README.md` | 新增（字段 + 消费者清单） |
+| `packages/shared/network.js` | 新增（loadNetworkConfig 共享读取器） |
+| `packages/shared/utils.js` | 加 downloadsDir |
+| `packages/ai-chat/src/lib/utils/env.ts` | 读 config + 删死导入 |
+| `packages/ai-chat/src/lib/utils/utils.ts` | 去 env 依赖，直接读 NEXT_PUBLIC_BASE_PATH |
+| `packages/ai-chat/src/lib/rag/chroma-server.ts` | 读 config + `@shared` alias |
+| `packages/ai-chat/src/lib/rag/vector-store.ts` | env.CHROMA_URL + 端口校验 |
+| `packages/ai-chat/src/app/api/admin/chroma/route.ts` | env.CHROMA_URL |
+| `packages/ai-chat/src/app/api/uploads/[filename]/route.ts` | 字体 MIME + CORS |
+| `packages/ai-chat/scripts/generate-embeddings.ts` | loadNetworkConfig |
+| `packages/ai-chat/scripts/verify-migration.ts` | loadNetworkConfig |
+| `packages/mcp/lib/chroma.js` | loadNetworkConfig |
+| `packages/mcp/tools/document/index.js` | loadNetworkConfig + downloadsDir |
+| `packages/mcp/tools/fetch/index.js` | downloadsDir |
+| `packages/mcp/tools/xiaohongshu/index.js` | downloadsDir |
+| `scripts/proxy.cjs` / `prod.sh` / `dev.sh` / `stop.sh` | 端口读 config |
+| `package.json` | tasks:stop 端口 4568 → 4567 |
+
+### 验证
+- `tsc --noEmit` 0 错误
+- `next build`（BUILD_DIR=.next-prod）通过，路由表完整
+- `loadNetworkConfig()` 从 4 个 cwd（根 / ai-chat / mcp / scripts）均读到 config
+- mcp 4 个模块 + 2 个 tsx 脚本 + scheduler + proxy 全部 import/启动正常
+
 ## v0.8.0 (2026-08-14) — 设置系统 + 策略模式重构 + GLM 接入 + 多处修复
 
 ### 设置系统

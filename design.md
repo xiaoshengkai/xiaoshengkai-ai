@@ -33,11 +33,11 @@ flowchart TD
     U["浏览器 useChat"]
     R1["① 提取 userQuery"]
     R2["② retrieve.ts<br/>智谱 embed → queryVec"]
-    R3["③ vector-store.ts<br/>Chroma cosine Top-3"]
+    R3["③ vector-store.ts<br/>Chroma cosine Top-5（动态多表）"]
     R4["④ knowledgeContext<br/>注入 system prompt"]
-R5["⑤ getMCPClient<br/>skill + exec + chroma + file + ..."]
+    R5["⑤ getMCPClient<br/>stdio spawn node ../mcp/index.js"]
     R6["MCP 工具<br/>知识库/文件/多模态/skill 加载"]
-    R7["⑥ streamText<br/>deepseek('deepseek-v4-pro')"]
+    R7["⑥ streamText<br/>策略模式(deepseek/minimax/glm)"]
     R8["⑦ SSE 流式返回 + iframe 预览"]
     U -->|"POST {messages}"| R1
     R1 --> R2 --> R3 --> R4
@@ -51,12 +51,10 @@ R5["⑤ getMCPClient<br/>skill + exec + chroma + file + ..."]
     direction TB
     A1["ai-chat (Next.js)"]
     A2["chromadb (standalone)<br/>:8000, data/chroma/"]
-    A3["chroma-server (stdio MCP)"]
-    A4["mcp (stdio MCP)<br/>37 tools: skill/exec/todo/file/chroma/fetch/media/xiaohongshu"]
-    A1 -->|"spawn"| A3
+    A4["mcp (stdio)<br/>30 tools: skill/exec/fetch/file/chroma/media/diagram/xiaohongshu/document"]
+    A1 -->|"instrumentation spawn"| A2
     A1 -->|"HTTP :8000"| A2
-    A3 -->|"HTTP :8000"| A2
-    A1 -->|"spawn"| A4
+    A1 -->|"stdio spawn"| A4
   end
 ```
 
@@ -108,10 +106,10 @@ R5["⑤ getMCPClient<br/>skill + exec + chroma + file + ..."]
 **处理流程**
 1. 提取最后一条用户消息
 2. 智谱 `embedding-3` 生成查询向量
-3. Chroma cosine 检索 Top-3 知识片段
+3. Chroma cosine 检索 Top-5 知识片段（动态多表：shared + chat 全部 collection）
 4. 注入 `knowledgeContext` + `SKILL_LIST` 到 system prompt
-5. 启动/复用 1 个 MCP client（统一 mcp 入口，37 tools）
-6. `streamText` 调用 DeepSeek V4 Pro，LLM 可自主调工具（含 loadSkill/exec）
+5. 启动/复用 1 个 MCP client（stdio spawn `node ../mcp/index.js`，30 tools）
+6. `streamText` 按策略模式路由（deepseek / minimax / glm，DeepSeek 经 classifyTask 分 pro/flash）
 7. SSE 流式返回，图表/视频通过 iframe 预览
 
 ## 环境变量
@@ -129,9 +127,45 @@ GLM_EMBEDDING_MODEL=embedding-3
 MINIMAX_API_KEY=xxx
 MINIMAX_BASE_URL=https://api.minimaxi.com/v1
 MINIMAX_IMAGE_MODEL=image-01
+MINIMAX_CHAT_MODEL=MiniMax-M3
+MINIMAX_ANTHROPIC_BASE_URL=https://api.minimaxi.com/anthropic/v1
+
+# Chroma 多库名（默认值，可不配）
+CHROMA_SHARED_DB=shared
+CHROMA_CHAT_DB=chat
+CHROMA_CODE_DB=code
 ```
 
-CHROMA_URL 和 CHROMA_AUTO_START 有默认值，无需配置。
+`CHROMA_URL` 从 `config/network.json` 读（hosts.local + ports.chroma），`CHROMA_AUTO_START` 默认开启、无需配置。
+
+## 网络配置
+
+端口 / host 单一真相源，集中在 `config/network.json`（详见 config/README.md）。
+
+```jsonc
+{
+  "hosts": {
+    "local": "localhost",                 // 本机地址
+    "public": "node.tailddce43.ts.net"   // 公网域名（tailscale funnel）
+  },
+  "ports": {
+    "aiChat": { "dev": 3000, "prodDirect": 4567, "prodProxy": 4321 },
+    "chroma": 8000
+  }
+}
+```
+
+读取方式（三类消费者）：
+
+| 消费者类型 | 方式 | 示例 |
+|---|---|---|
+| CJS | `require('../config/network.json')` | `proxy.cjs` |
+| bash | `node -e "require('./config/network.json').X"` | `prod.sh` / `dev.sh` / `stop.sh` |
+| ESM | `loadNetworkConfig()` | mcp 各模块、ai-chat 服务端 / scripts |
+
+`loadNetworkConfig()` 定义在 `packages/shared/network.js`：从 `process.cwd()` 向上遍历找 `config/network.json`（最多 5 层），找到返回解析对象，找不到抛错（带 cwd 信息），调用方无需关心 cwd/项目根在哪。
+
+明确不在 config 里：API key、LLM endpoint、`BASE_PATH`、Chroma DB 名。
 
 ## 图片生成经验
 
@@ -179,6 +213,16 @@ code/    — 编码记忆，按项目名分 collection
   └── <项目名>（basename(process.cwd())）
 ```
 
+### RAG 预检索
+
+`retrieve.ts` 动态获取 shared + chat 所有 collection，不做硬编码。新增 `listCollections(database)` 函数（60s 缓存），未来任何新 collection 自动纳入检索。
+
+### 工具使用
+
+- `addKnowledge`: 主题笔记 → `database="chat" collection="<命名>"`，一般对话 → `database="chat"`（不传 collection）
+- `searchKnowledge`: 默认搜 shared + chat/chat_knowledge，传 database 和 collection 时搜 shared + 指定库表
+- `searchKnowledge` 每个 collection 取 `topK * 3`，合并后截断，避免跨 collection 遗漏
+
 ## SKILL 系统
 
 ### 设计理念
@@ -192,25 +236,62 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 ```
 用户提问
-  → route.ts 启动时扫描 skills/ 目录，构建 SKILL_LIST
-  → SKILL_LIST 注入 system prompt（<available_skills> 段）
+  → route.ts 启动时扫描 packages/skills/ 目录，构建 SKILL_LIST
+  → SKILL_LIST 注入 system prompt（<available_skills> 段，读 SKILL.md 的 frontmatter）
   → AI 根据用户需求判断是否需要加载 skill
   → AI 调用 loadSkill({ name }) 获取完整 SKILL.md 内容
-  → AI 按 SKILL 指引执行（如 exec 调用 generate-from-template.py）
+  → AI 按 SKILL 指引执行
 ```
 
 ### 目录
 
 ```
-skills/
-├── greet/                       # 问候技能
-│   └── SKILL.md
+packages/skills/
 ├── image-styles/                # 图片风格库（73 种风格）
 │   ├── SKILL.md
 │   └── styles/
-└── xiaohongshu-note/            # 小红书笔记
+├── blog/                        # 博客文章
+│   └── SKILL.md
+├── github-gem-seeker/           # GitHub 项目挖掘
+│   └── SKILL.md
+├── xiaohongshu-note/            # 小红书笔记
+│   └── SKILL.md
+└── task/                        # 定时任务
     └── SKILL.md
 ```
+
+## 工作流系统
+
+### 设计理念
+
+模板驱动的工作流引擎：`template.json` 声明参数表单 + 步骤序列，引擎按步执行。与 AI Chat 解耦——通过独立 CLI 子进程 + stdout 纯 JSON 契约通信，前端只负责收集参数、驱动步骤、展示进度。
+
+### 架构
+
+```
+/workflow 页面
+  → POST /api/workflows/execute
+  → spawn node packages/workflows/cli.js start '{"template":..,"params":..}'
+  → 返回 executionId
+  → 逐步 spawn cli.js next（单步执行，每步返回 preview）
+  → 执行状态持久化到 data/workflows/<executionId>/
+  → 日志写到 logs/workflows/
+```
+
+CLI 子命令：`start`（创建执行）/ `run`（一次跑完）/ `next`（单步）。
+
+### 步骤类型
+
+| 类型 | 说明 |
+|---|---|
+| `ai` | AI 生成（LLM 调用） |
+| `script` | 跑脚本 |
+| `tool` | 调用模板内 `lib/` 的纯函数 |
+
+### 模板
+
+- `templates/tech-video/`：科技风短视频（script.json 驱动 + 逐场景 TTS + BGM + 硬字幕 + SRT）
+- `templates/video-generation/`：视频生成
 
 ## 定时任务系统
 
@@ -245,9 +326,7 @@ skills/
 
 ```
 packages/tasks/
-├── scheduler.js                   # 常驻调度进程
-├── lib/
-│   └── logger.js                  # 任务日志工具
+├── scheduler.js                   # 常驻调度进程（日志复用 ../shared/logger.js）
 └── <task-name>/
     ├── task.json                  # { name, description, cron, enabled, html? }
     └── index.js                   # export async function run()
@@ -271,24 +350,12 @@ logs/
 └── tasks/                         # 任务日志
     └── <task-name>.log
 ```
-```
-
-### RAG 预检索
-
-`retrieve.ts` 动态获取 shared + chat 所有 collection，不做硬编码。新增 `listCollections(database)` 函数（60s 缓存），未来任何新 collection 自动纳入检索。
-
-### 工具使用
-
-- `addKnowledge`: 主题笔记 → `database="chat" collection="<命名>"`，一般对话 → `database="chat"`（不传 collection）
-- `searchKnowledge`: 默认搜 shared + chat/chat_knowledge，传 database 和 collection 时搜 shared + 指定库表
-- `searchKnowledge` 每个 collection 取 `topK * 3`，合并后截断，避免跨 collection 遗漏
 
 ## 生产部署
 
 ```bash
 npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 博客 :4321 + Tailscale Funnel）
 npm run stop   # 停止全部服务 + 关闭内网穿透
-npm run blog   # 单独启动博客
 npm run log    # 查看实时日志
 ```
 
@@ -300,8 +367,10 @@ npm run log    # 查看实时日志
 | 博客 | 4321 | `https://node.tailddce43.ts.net` |
 | ChromaDB | 8000 | 仅本地 |
 
+端口 / host 集中在 `config/network.json`，改这里全局同步。
+
 - 日志文件：`logs/app-YYYY-MM-DD.log`（按日轮转）
-- 博客静态文件：`site/`，通过 `serve` 启动
+- 博客静态文件：`site/`，由 `proxy.cjs` 直接 serve
 - Tailscale Funnel 提供内网穿透，无需公网 IP
 
 ## 目录结构
@@ -309,64 +378,71 @@ npm run log    # 查看实时日志
 ```
 ai-engineer-journey/
 ├── package.json                # npm workspaces 根配置
-├── .env                        # 共享环境变量
-├── .env.example
-├── design.md
-├── packages/
-│   ├── shared/              # 共享模块
-│   │   └── logger.js        # 统一日志系统
-│   ├── ai-chat/                # 业务服务（Next.js）
-│   │   ├── src/
-│   │   │   ├── instrumentation.ts
-│   │   │   ├── lib/
-│   │   │   │   ├── providers.ts
-│   │   │   │   ├── retrieve.ts
-│   │   │   │   ├── vector-store.ts
-│   │   │   │   └── chroma-server.ts
-│   │   │   └── app/
-│   │   │       ├── (main)/
-│   │   │       │   ├── layout.tsx       # 三栏共享布局
-│   │   │       │   ├── page.tsx         # 对话页
-│   │   │       │   └── memory/
-│   │   │       │       └── page.tsx     # 记忆库页
-│   │   │       ├── layout.tsx
-│   │   │       ├── body-wrapper.tsx
-│   │   │       ├── api/chat/route.ts
-│   │   │       ├── api/admin/chroma/route.ts
-│   │   │       ├── api/logs/route.ts
-│   │   │       ├── api/note/[taskId]/status/route.ts
-│   │   │       ├── note/[taskId]/page.tsx
-│   │   │       └── preview/[taskId]/route.ts
-│   │   ├── scripts/
-│   │   ├── data/chroma/
-│   │   └── package.json
-│   └── mcp/             # MCP 工具服务
-│       ├── package.json
-│       ├── index.js             # 统一入口
-│       ├── lib/env.js           # 统一 dotenv 加载
-│       ├── lib/chroma.js        # 共享 Chroma 搜索
-│       ├── lib/minimax.js       # 共享 MiniMax 图片生成
-│       ├── templates/
-│       │   ├── animation.html   # 动画骨架模板
-│       │   ├── default.md       # Neo-Brutalist 风格描述
-│       │   └── cream.md         # 奶油风格描述
-│       └── tools/
-│           ├── skill/index.js     # 1 tool（技能加载）
-│           ├── exec/index.js      # 1 tool（Shell 执行）
-│           ├── diagram/index.js   # 1 tool（图表生成）
-│           ├── todo/index.js      # 6 tools
-│           ├── file/index.js      # 10 tools
-│           ├── chroma/index.js    # 5 tools
-│           ├── fetch/index.js     # 2 tools
-│           ├── xiaohongshu/      # 4 tools（小红书笔记）
-│           │   ├── index.js
-│           │   └── templates/
-│           └── media/             # 7 tools
-│               ├── image.js     # 图片生成
-│               ├── video.js     # 视频/语音
-│               ├── audio.js     # TTS/BGM
-│               └── html-builder.js
-│   └── skills/                  # 技能模块
-│       └── greet/               # 问候技能
-│           └── SKILL.md
+├── .env / .env.example         # 共享环境变量
+├── design.md / CHANGELOG.md
+├── config/
+│   ├── network.json            # 端口 / host 单一真相源
+│   └── README.md               # 字段 + 消费者清单
+├── scripts/                    # 部署 / 运维脚本
+│   ├── prod.sh / dev.sh / stop.sh / log.sh
+│   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai）
+│   └── fix-transformers-mjs.mjs / compress-images.cjs
+├── data/                       # 运行时数据（chroma / tasks / settings / static）
+├── logs/                       # 日志（app/ + tasks/）
+├── site/                       # 博客静态文件
+└── packages/
+    ├── shared/                 # 跨包共享模块
+    │   ├── logger.js           # 统一日志
+    │   ├── network.js          # loadNetworkConfig 共享读取器
+    │   ├── utils.js            # sleep / shortId / downloadsDir
+    │   └── llm/                # LLM 共享封装
+    │       ├── index.js / parse-json.js
+    │       └── providers/      # deepseek.js / glm.js / minimax.js
+    ├── ai-chat/                # 业务服务（Next.js）
+    │   ├── src/
+    │   │   ├── instrumentation.ts      # 启动时 spawn chroma
+    │   │   ├── lib/
+    │   │   │   ├── ai/          # providers / chat-strategy / mcp-client / processor / model-router ...
+    │   │   │   ├── rag/         # retrieve.ts / vector-store.ts / chroma-server.ts
+    │   │   │   ├── settings/    # store / init / dispatcher / types
+    │   │   │   ├── store/       # conversation-store
+    │   │   │   ├── utils/       # env / utils / types
+    │   │   │   └── prompts/
+    │   │   └── app/
+    │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow
+    │   │       ├── api/         # chat / memory / workflows / settings / tasks / conversations ...
+    │   │       ├── note/[taskId]/page.tsx
+    │   │       ├── preview/[taskId]/route.ts
+    │   │       ├── settings/page.tsx
+    │   │       ├── layout.tsx / globals.css
+    │   │       └── favicon.ico
+    │   ├── scripts/             # generate-embeddings / verify-migration
+    │   └── package.json
+    ├── mcp/                     # MCP 工具服务（30 tools）
+    │   ├── index.js             # 统一入口
+    │   ├── lib/                 # env.js / chroma.js / task-state.js
+    │   ├── examples/default.md
+    │   └── tools/
+    │       ├── skill/           # 1 tool（loadSkill）
+    │       ├── exec/            # 1 tool（Shell）
+    │       ├── fetch/           # 2 tools（fetchPage / crawlSite）
+    │       ├── file/            # 10 tools（文件读写）
+    │       ├── chroma/          # 5 tools（知识库增删查）
+    │       ├── media/           # 3 tools（generateImage / generateImageFromImage / checkImageProgress）
+    │       ├── diagram/         # 2 tools（generateDiagram / checkDiagramProgress）
+    │       ├── xiaohongshu/     # 4 tools（小红书笔记）
+    │       │   └── templates/
+    │       ├── document/        # 2 tools（convertDocument / convertDocumentBatch）
+    │       └── todo/            # 6 tools（暂未注册）
+    ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
+    ├── tasks/                   # 定时任务（scheduler.js + daily-reminder-am + precious-metals）
+    └── workflows/               # 工作流引擎
+        ├── cli.js               # 命令行入口
+        ├── engine.js            # 工作流执行引擎
+        ├── lib/
+        │   ├── executor.js
+        │   └── step-types/      # ai.js / script.js / tool.js
+        └── templates/
+            ├── tech-video/      # 技术视频工作流
+            └── video-generation/# 视频生成工作流
 ```

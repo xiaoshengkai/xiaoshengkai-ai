@@ -61,6 +61,8 @@ npm run tasks:run     # 手动执行某个任务（TASK=name）
 | 博客 | 4321（代理静态文件） | `https://node.tailddce43.ts.net` |
 | ChromaDB | 8000 | 仅本地 |
 
+> 端口 / host 集中在 [`config/network.json`](config/README.md)，改这里全局同步。
+
 本机部署，通过 [Tailscale](https://tailscale.com/) Funnel 将本地服务暴露到公网，无需公网 IP 或云服务器。反向代理（`scripts/proxy.js`）统一处理 `/`（AI 工作台）和 `/blog/`（博客）。
 
 ```bash
@@ -80,5 +82,6 @@ Next.js 16 / React 19 / AI SDK v6 / DeepSeek V4 Pro / MiniMax / Chroma / Tailwin
 - [ai-chat](packages/ai-chat/README.md)
 - [mcp](packages/mcp/README.md)
 - [skills](packages/skills/README.md)
+- [网络配置](config/README.md)
 - [设计文档](design.md)
 - [博客](https://node.tailddce43.ts.net)

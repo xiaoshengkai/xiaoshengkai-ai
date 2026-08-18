@@ -3,9 +3,7 @@
  *
  * ponytail: 一次性 destructure，全部用 `||` 默认值，不做类型校验（信任边界外由 next.config.ts 守住）
  */
-import fs from "node:fs";
-import path from "node:path";
-import { loadNetworkConfig } from "../../../../shared/network.js";
+import { loadNetworkConfig } from "@shared/network.js";
 
 // 从 config/network.json 读 chroma host+port（项目级配置，committed）
 const NET_CONFIG = loadNetworkConfig();

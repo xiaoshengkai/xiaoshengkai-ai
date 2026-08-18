@@ -3,10 +3,8 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { URL } from "node:url";
-
-const DEFAULT_DOWNLOAD_DIR = path.join(os.homedir(), "Downloads");
+import { downloadsDir } from "../../../shared/utils.js";
 
 const RESOURCE_TAGS = [
   { selector: 'link[href]', attr: 'href' },
@@ -333,7 +331,7 @@ export function register(server) {
       try {
         console.log(`[fetch:fetchPage] url=${url} download=${download} cookies=${!!cookies}`);
         if (download) {
-          const dir = rootDir || DEFAULT_DOWNLOAD_DIR;
+          const dir = rootDir || downloadsDir;
           const stats = await fetchPageImpl(url, dir, cookies);
           return {
             content: [{
@@ -411,7 +409,7 @@ export function register(server) {
       try {
         console.log(`[fetch:crawlSite] url=${url} download=${download} maxDepth=${maxDepth} maxPages=${maxPages}`);
         if (download) {
-          const dir = rootDir || DEFAULT_DOWNLOAD_DIR;
+          const dir = rootDir || downloadsDir;
           const stats = await crawlSiteImpl(url, dir, maxDepth, maxPages, cookies);
           return {
             content: [{

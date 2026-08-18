@@ -41,7 +41,7 @@ export async function listCollections(database: string): Promise<string[]> {
   if (cached && Date.now() - cached.ts < COLLECTIONS_CACHE_TTL) return cached.data;
   try {
     const res = await fetch(
-      `http://localhost:8000/api/v2/tenants/default_tenant/databases/${database}/collections`,
+      `${env.CHROMA_URL}/api/v2/tenants/default_tenant/databases/${database}/collections`,
     );
     const cols = await res.json();
     const names = cols.map((c: { name: string }) => c.name);
@@ -61,9 +61,10 @@ export const SOFT_DELETE_WINDOW_MS = 3_000;
 
 function parseChromaUrl(url: string): { host: string; port: number; ssl: boolean } {
   const u = new URL(url);
+  if (!u.port) throw new Error(`CHROMA_URL 缺少端口: ${url}`);
   return {
     host: u.hostname,
-    port: u.port ? parseInt(u.port, 10) : 8000,
+    port: parseInt(u.port, 10),
     ssl: u.protocol === "https:",
   };
 }

@@ -29,6 +29,7 @@ import {
   SHARED_COLLECTION,
 } from "@/lib/rag/vector-store";
 import { glm } from "@/lib/ai/providers";
+import { env } from "@/lib/utils/env";
 
 function ok(data: unknown) {
   return NextResponse.json({ ok: true, data });
@@ -242,7 +243,7 @@ async function handleCollections(req: NextRequest) {
 
   try {
     const res = await fetch(
-      `http://localhost:8000/api/v2/tenants/default_tenant/databases/${database}/collections`,
+      `${env.CHROMA_URL}/api/v2/tenants/default_tenant/databases/${database}/collections`,
     );
     const cols = await res.json();
     const names = cols.map((c: { name: string }) => c.name);

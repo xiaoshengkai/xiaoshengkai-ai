@@ -17,8 +17,16 @@ import { register as registerExec } from "./tools/exec/index.js";
 import { register as registerMedia } from "./tools/media/index.js";
 import { register as registerDiagram } from "./tools/diagram/index.js";
 import { register as registerXiaohongshu } from "./tools/xiaohongshu/index.js";
+import { register as registerDocument, checkPandoc } from "./tools/document/index.js";
 
 console.log(`[mcp] server-id: ${Date.now().toString(36)}`);
+
+// 启动期探测 pandoc（非阻塞，缺失不阻塞 server）
+checkPandoc().then((v) => {
+  console.log(`[mcp] pandoc: ${v || "未安装（首次 docx 转换时会自动 brew install）"}`);
+}).catch(() => {
+  console.log("[mcp] pandoc: 探测异常");
+});
 
 const server = new McpServer({ name: "node-mcp", version: "2.0.0" });
 
@@ -32,6 +40,7 @@ const modules = [
   { name: "media", register: registerMedia },
   { name: "diagram", register: registerDiagram },
   { name: "xiaohongshu", register: registerXiaohongshu },
+  { name: "document", register: registerDocument },
 ];
 
 let totalTools = 0;

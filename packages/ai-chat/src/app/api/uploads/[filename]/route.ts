@@ -29,6 +29,10 @@ const MIME: Record<string, string> = {
   pdf: "application/pdf",
   txt: "text/plain",
   json: "application/json",
+  otf: "font/otf",
+  ttf: "font/ttf",
+  woff: "font/woff",
+  woff2: "font/woff2",
 };
 
 const STATIC_ROOT = path.resolve(process.cwd(), "..", "..", "data", "static");
@@ -90,6 +94,7 @@ export async function GET(
           "Content-Range": `bytes ${start}-${end}/${fileSize}`,
           "Accept-Ranges": "bytes",
           "Cache-Control": "public, max-age=3600",
+          "Access-Control-Allow-Origin": "*",
         },
       });
     }
@@ -103,6 +108,7 @@ export async function GET(
       "Content-Length": String(fileSize),
       "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=3600",
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }

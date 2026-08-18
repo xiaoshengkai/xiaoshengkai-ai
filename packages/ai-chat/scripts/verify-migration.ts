@@ -20,7 +20,7 @@ import { embed } from "ai";
 import { glm } from "../src/lib/ai/providers";
 import { ChromaClient } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
-import { loadNetworkConfig } from "../../shared/network.js";
+import { loadNetworkConfig } from "@shared/network.js";
 
 // 从 config/network.json 读 chroma host+port（共享读取器）
 const NET_CONFIG = loadNetworkConfig();

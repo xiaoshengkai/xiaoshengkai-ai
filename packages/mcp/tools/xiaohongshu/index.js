@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { generateImage } from "../../../shared/llm/providers/minimax.js";
 import { callLLM as callProviderLLM, PROVIDER } from "../../../shared/llm/index.js";
-import { sleep, shortId } from "../../../shared/utils.js";
+import { sleep, shortId, downloadsDir } from "../../../shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
 import { parseJSON } from "../../../shared/llm/parse-json.js";
 
@@ -476,9 +476,7 @@ export function register(server) {
         if (!fs.existsSync(taskFile)) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "笔记任务不存在" }) }] };
 
         const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-        const downloadsDir = path.join(os.homedir(), "Downloads");
         const safeName = state.title.replace(/[\/\\:*?"<>|]/g, "_");
-
         let exportDir = path.join(downloadsDir, safeName);
         if (fs.existsSync(exportDir)) {
           exportDir = path.join(downloadsDir, `${safeName}_${Date.now()}`);

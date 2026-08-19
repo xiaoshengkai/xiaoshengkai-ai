@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.9.1 (2026-08-19) — Qwen 接入 + 模型适配层统一
+
+### Qwen 接入
+- chat + workflow 接入 `qwen3.8-max`（OpenAI 兼容、多态/多模态），`chat-strategy` 加 QwenStrategy（fetch 中间件注入 `enable_thinking`）
+- 图片生成接入 `qwen-image-3.0-pro`（DashScope 原生接口、同步）：文生图 + 图生图、多图、watermark/negative_prompt/seed 参数
+- workspace key 需专属域名：`QWEN_BASE_URL` → `token-plan.cn-beijing.maas.aliyuncs.com`，图片接口 URL 由 baseURL 派生
+
+### 模型适配层（shared/llm 抹平差异）
+- 新增 `config.js`：providers.json 为真源、env 兜底（`getApiKey`/`getBaseUrl`/`readSelection`），apiKey/baseURL 全量切到 providers.json（10 处：4 provider + chroma + diagram + xiaohongshu + 4 个 tts/bgm）
+- `index.js` 重构为分发层：`getWorkflowProvider()`（fresh-read，切模型无需重启）、`generateImage`/`generateTTS`/`generateBGM` 三分发器（读 selection.media/tts/bgm）
+- 多态模型 `MULTIMODAL_MODELS` + `callMultimodalLLM`：diagram 视觉校验跟随 workflow 选择，deepseek/glm 回退 MiniMax-M3
+- `minimax.js` 加 `generateTTS`（异步 create/poll/download）+ `generateBGM`，4 个 workflow 模板改调统一接口
+- MiniMax TTS 现返回 tar 归档：加 `extractMp3FromTar` 解包 .mp3
+
+### 图片成本
+- qwen 图片尺寸降到 1K 档（对齐 MiniMax 预设、≤1MP、¥0.25/张）
+
+### 修复
+- tweak 路由缺 POST handler（405）→ 补回
+- 执行页 warning 状态误显示为「完成」：加 warning 分支 + 重试按钮
+- diagram 的 `DEEPSEEK_API_KEY` 预检 bug → 改读 workflow provider
+- `shared/llm/index.js` selection.json 路径 bug（workflow 选择未生效）
+- qwen workflow `enable_thinking:true` + json_object 卡死 → 改 `false` + 180s 超时
+- settings 保存按钮激活态文字颜色改白
+
 ## v0.9.0 (2026-08-19) — Neo-Brutalism 糖果色换肤 + 多主题体系
 
 ### 主题体系

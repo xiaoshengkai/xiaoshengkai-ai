@@ -84,3 +84,31 @@ async function runTweakInBackground(executionId: string) {
     setTweakStatus(dir, "failed", msg);
   }
 }
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const { feedback, imagePaths } = await request.json();
+  if (!feedback?.trim()) {
+    return NextResponse.json({ ok: false, error: "missing feedback" }, { status: 400 });
+  }
+
+  const dir = path.join(DATA_DIR, id);
+  const state = readState(dir);
+  state.tweakTask = {
+    status: "running",
+    feedback,
+    images: imagePaths || [],
+    startedAt: new Date().toISOString(),
+    completedAt: null,
+    version: null,
+    error: null,
+  };
+  writeState(dir, state);
+
+  void runTweakInBackground(id);
+
+  return NextResponse.json({ ok: true, status: "running" });
+}

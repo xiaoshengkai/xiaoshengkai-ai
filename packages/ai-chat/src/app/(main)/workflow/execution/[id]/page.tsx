@@ -680,15 +680,15 @@ export default function ExecutionDetailPage() {
                 disabled={skipping === step.id} className="text-xs text-muted-foreground/70 hover:text-muted-foreground cursor-pointer"
                 title="跳过">{skipping === step.id ? "..." : "跳过"}</button>
             )}
-            {(done || fail) && (
+            {(done || fail || warn) && (
               <button onClick={(e) => { e.stopPropagation(); handleRetry(step.id); }}
                 disabled={retrying === step.id} className="text-xs text-muted-foreground/70 hover:text-blue cursor-pointer"
                 title="重新执行"><RefreshCw className="w-3 h-3" /></button>
             )}
           </div>
         </div>
-        {fail && step.error && (
-          <p className="text-xs text-red-500 mt-1 truncate ml-7">{step.error}</p>
+        {(fail || warn) && step.error && (
+          <p className={`text-xs mt-1 truncate ml-7 ${fail ? "text-red-500" : "text-orange-500"}`}>{step.error}</p>
         )}
       </div>
     );
@@ -908,6 +908,25 @@ function PreviewPanel({ step, executionId, currentScriptVersion, onRetry, retryi
           <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
           <p className="text-xs text-red-400">点击左侧「重做」按钮重新执行</p>
         </div>
+      </div>
+    );
+  }
+
+  if (step.status === "warning") {
+    return (
+      <div className="p-4 rounded-lg" style={{ border: "3px solid var(--orange)", boxShadow: "4px 4px 0 var(--orange)", background: "var(--orange-soft)" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-6 h-6 rounded-full bg-orange text-white flex items-center justify-center text-xs font-bold">⚠</span>
+          <span className="text-sm font-bold text-foreground">执行警告（失败但可重试）</span>
+        </div>
+        <pre className="text-xs whitespace-pre-wrap break-words p-2 rounded" style={{ background: "rgba(255,140,0,0.12)", color: "var(--foreground)" }}>{step.error || "未知错误"}</pre>
+        <button
+          onClick={onRetry}
+          disabled={retrying}
+          className="mt-3 brutal-btn bg-orange text-white px-4 py-1.5 text-xs font-bold"
+        >
+          {retrying ? "重做中..." : "🔄 重新执行"}
+        </button>
       </div>
     );
   }

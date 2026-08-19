@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getApiKey } from "../config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROVIDERS_PATH = path.resolve(__dirname, "..", "..", "..", "..", "data", "settings", "providers.json");
@@ -17,7 +18,7 @@ try {
 } catch { /* fallback to env */ }
 
 export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object' }) {
-  const apiKey = process.env.GLM_API_KEY;
+  const apiKey = getApiKey("glm", "GLM_API_KEY");
   if (!apiKey) throw new Error("未配置 GLM_API_KEY");
 
   const actualModel = model || GLM_CHAT_MODEL;

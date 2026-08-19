@@ -5,8 +5,8 @@ import os from "node:os";
 import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
-import { generateImage } from "../../../shared/llm/providers/minimax.js";
-import { callLLM as callProviderLLM, PROVIDER } from "../../../shared/llm/index.js";
+import { callLLM as callProviderLLM, generateImage, getWorkflowProvider } from "../../../shared/llm/index.js";
+import { getApiKey } from "../../../shared/llm/config.js";
 import { sleep, shortId, downloadsDir } from "../../../shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
 import { parseJSON } from "../../../shared/llm/parse-json.js";
@@ -258,7 +258,7 @@ async function generateAllImages(taskId, workDir, images) {
     const tStart = Date.now();
     try {
       const aspectRatio = img.type === "cover" ? "3:4" : "1:1";
-      const url = await generateImage(img.prompt, { aspectRatio });
+      const [url] = await generateImage(img.prompt, { aspectRatio });
 
       state.images[img.index].url = url;
       state.images[img.index].status = "done";
@@ -297,12 +297,9 @@ export function register(server) {
       try {
         console.log(`${TAG} generate: topic="${topic}" style=${style}${subcategory ? "/" + subcategory : ""} context=${context?.length || 0}字`);
 
-        if (PROVIDER === "minimax") {
-          if (!process.env.MINIMAX_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 MINIMAX_API_KEY" }) }] };
-        } else if (PROVIDER === "glm") {
-          if (!process.env.GLM_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 GLM_API_KEY" }) }] };
-        } else {
-          if (!process.env.DEEPSEEK_API_KEY) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
+        const wfProvider = getWorkflowProvider();
+        if (!getApiKey(wfProvider, `${wfProvider.toUpperCase()}_API_KEY`)) {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `未配置 ${wfProvider} API_KEY` }) }] };
         }
 
         const category = TEMPLATES[style];

@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getApiKey } from "../config.js";
+import { sleep } from "../../utils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROVIDERS_PATH = path.resolve(__dirname, "..", "..", "..", "..", "data", "settings", "providers.json");
@@ -19,7 +21,7 @@ try {
 } catch { /* fallback to env */ }
 
 export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object', images = [] }) {
-  const apiKey = process.env.MINIMAX_API_KEY;
+  const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 
   const actualModel = model || MINIMAX_CHAT_MODEL;
@@ -66,8 +68,8 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   };
 }
 
-export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIMAX_IMAGE_MODEL, image_url } = {}) {
-  const apiKey = process.env.MINIMAX_API_KEY;
+export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIMAX_IMAGE_MODEL, image_url, n = 1, watermark = false, seed } = {}) {
+  const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 
   const controller = new AbortController();
@@ -77,10 +79,12 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIM
     model,
     prompt,
     aspect_ratio: aspectRatio,
-    n: 1,
-    prompt_optimizer: true,
+    n,
+    prompt_optimizer: false,
+    aigc_watermark: watermark,
     response_format: "url",
   };
+  if (seed != null) body.seed = seed;
   if (image_url) {
     body.subject_reference = [{ type: "character", image_file: image_url }];
   }
@@ -101,8 +105,105 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIM
     throw new Error(result.base_resp?.status_msg || "图片生成失败");
   }
 
-  const url = result.data?.image_urls?.[0];
-  if (!url) throw new Error("未获取到图片 URL");
+  const urls = result.data?.image_urls || [];
+  if (urls.length === 0) throw new Error("未获取到图片 URL");
+  return urls;
+}
 
-  return url;
+// ─── TTS 语音合成（异步：创建→轮询→下载）───────────────────────────────
+
+// ponytail: MiniMax TTS 现在返回 tar 归档（_with_meta.tar，含 .mp3/.extra/.titles），
+// 从 tar 里解出 .mp3 条目（512 字节头 + octal 尺寸）
+function extractMp3FromTar(buf) {
+  let off = 0;
+  while (off + 512 <= buf.length) {
+    const name = buf.slice(off, off + 100).toString("utf-8").replace(/\0.*$/, "");
+    const size = parseInt(buf.slice(off + 124, off + 136).toString("utf-8").trim(), 8) || 0;
+    if (!name) break;
+    if (name.endsWith(".mp3")) return buf.slice(off + 512, off + 512 + size);
+    off += 512 + Math.ceil(size / 512) * 512;
+  }
+  return null;
+}
+
+export async function generateTTS({ text, voiceId, model = "speech-2.8-hd", outputPath }) {
+  const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
+  if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
+
+  const createRes = await fetch(`${MINIMAX_BASE_URL}/t2a_async_v2`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      text,
+      voice_setting: { voice_id: voiceId, speed: 1, vol: 1, pitch: 1 },
+      audio_setting: { audio_sample_rate: 32000, bitrate: 128000, format: "mp3", channel: 2 },
+    }),
+  });
+  const createResult = await createRes.json();
+  if (createResult.base_resp?.status_code !== 0) {
+    throw new Error(`TTS 任务创建失败: ${createResult.base_resp?.status_msg}`);
+  }
+  const taskId = createResult.task_id;
+
+  for (let i = 0; i < 300; i++) {
+    await sleep(2000);
+    const pollRes = await fetch(`${MINIMAX_BASE_URL}/query/t2a_async_query_v2?task_id=${taskId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    const pollResult = await pollRes.json();
+    const status = (pollResult.status || "").toLowerCase();
+
+    if (status === "success") {
+      const fileRes = await fetch(`${MINIMAX_BASE_URL}/files/retrieve?file_id=${pollResult.file_id}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      const fileResult = await fileRes.json();
+      const downloadUrl = fileResult.file?.download_url;
+      if (!downloadUrl) throw new Error("TTS 下载链接获取失败");
+      const audioRes = await fetch(downloadUrl);
+      let buffer = Buffer.from(await audioRes.arrayBuffer());
+      if (!(buffer.length >= 3 && buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33)) {
+        const mp3 = extractMp3FromTar(buffer);
+        if (mp3 && mp3.length > 0) buffer = mp3;
+      }
+      if (buffer.length < 3 || buffer[0] !== 0x49 || buffer[1] !== 0x44 || buffer[2] !== 0x33) {
+        throw new Error(`TTS 下载文件头无效 (前 3 字节: ${buffer.slice(0, 3).toString("hex")}，期望 ID3 头)`);
+      }
+      fs.writeFileSync(outputPath, buffer);
+      return { path: outputPath };
+    }
+    if (status === "failed") throw new Error("TTS 任务失败");
+    if (status === "expired") throw new Error("TTS 任务已过期");
+  }
+  throw new Error("TTS 任务超时");
+}
+
+// ─── BGM 音乐生成 ──────────────────────────────────────────────────────
+
+export async function generateBGM({ prompt, model = "music-2.6", outputPath }) {
+  const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
+  if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
+
+  const res = await fetch(`${MINIMAX_BASE_URL}/music_generation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      prompt: prompt || "轻快电子",
+      is_instrumental: true,
+      output_format: "url",
+      audio_setting: { sample_rate: 32000, bitrate: 128000, format: "mp3", channel: 2 },
+    }),
+  });
+  const result = await res.json();
+  if (result.base_resp?.status_code !== 0) {
+    throw new Error(`BGM 生成失败: ${result.base_resp?.status_msg}`);
+  }
+  const downloadUrl = result.data?.audio;
+  if (!downloadUrl) throw new Error("BGM 下载链接获取失败");
+  const audioRes = await fetch(downloadUrl);
+  const buffer = Buffer.from(await audioRes.arrayBuffer());
+  fs.writeFileSync(outputPath, buffer);
+  return { path: outputPath };
 }

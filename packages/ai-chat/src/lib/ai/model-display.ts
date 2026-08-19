@@ -10,6 +10,7 @@ const DISPLAY: Record<string, (model: string) => ModelDisplay> = {
     color: m.includes("flash") ? "var(--blue)" : "var(--purple)",
   }),
   glm: () => ({ label: "🌟 GLM", color: "var(--lime)" }),
+  qwen: () => ({ label: "🌊 Qwen", color: "var(--orange)" }),
 };
 
 export function getModelDisplay(provider: string, model: string): ModelDisplay {

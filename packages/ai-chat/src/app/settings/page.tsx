@@ -25,6 +25,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   deepseek: "DeepSeek",
   minimax: "MiniMax",
   glm: "智谱 GLM",
+  qwen: "通义千问",
 };
 
 export default function SettingsPage() {
@@ -100,7 +101,7 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-foreground font-heading">系统设置</h2>
           <span className="text-xs text-muted-foreground font-mono hidden md:inline">
-            6 模块 · 3 Provider · 实时生效
+            6 模块 · 4 Provider · 实时生效
           </span>
         </div>
         <div className="flex gap-2">
@@ -113,7 +114,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSave}
             disabled={!hasChanges || saving}
-            className={`brutal-btn px-3 py-1.5 text-xs font-bold ${hasChanges && !saving ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+            className={`brutal-btn px-3 py-1.5 text-xs font-bold ${hasChanges && !saving ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
           >
             {saving ? "保存中..." : hasChanges ? "保存更改" : "已保存"}
           </button>

@@ -3,8 +3,7 @@ import path from "node:path";
 import { getDurationSec } from "./tts.js";
 import { ERRORS } from "./errors.js";
 import { sleep } from "../../../../shared/utils.js";
-
-const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
+import { generateBGM as sharedGenerateBGM } from "../../../../shared/llm/index.js";
 
 export async function generateBGM(scriptJson, executionDir, bgmFilePath) {
   const startTime = Date.now();
@@ -34,31 +33,11 @@ export async function generateBGM(scriptJson, executionDir, bgmFilePath) {
     } catch { /* use default */ }
   }
 
-  const apiKey = process.env.MINIMAX_API_KEY;
   const maxRetries = 3;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const res = await fetch(`${MINIMAX_BASE_URL}/music_generation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: "music-2.6",
-          prompt: bgmPrompt || "轻快电子",
-          is_instrumental: true,
-          output_format: "url",
-          audio_setting: { sample_rate: 32000, bitrate: 128000, format: "mp3", channel: 2 },
-        }),
-      });
-      const result = await res.json();
-      if (result.base_resp?.status_code !== 0) {
-        throw new Error(`BGM 生成失败: ${result.base_resp?.status_msg}`);
-      }
-      const downloadUrl = result.data?.audio;
-      if (!downloadUrl) throw new Error("BGM 下载链接获取失败");
-      const audioRes = await fetch(downloadUrl);
-      const buffer = Buffer.from(await audioRes.arrayBuffer());
-      fs.writeFileSync(outPath, buffer);
+      await sharedGenerateBGM({ prompt: bgmPrompt, outputPath: outPath });
 
       const dur = await getDurationSec(outPath);
       console.log(`[bgm] 完成 (${dur.toFixed(2)}s, ${((Date.now() - startTime) / 1000).toFixed(1)}s elapsed)`);

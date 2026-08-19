@@ -17,8 +17,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { callLLM, PROVIDER } = await import("../../../../../../shared/llm/index.js");
-    console.log(`[generate-content] 调用 LLM: provider=${PROVIDER}`);
+    const { callLLM, getWorkflowProvider } = await import("../../../../../../shared/llm/index.js");
+    console.log(`[generate-content] 调用 LLM: provider=${getWorkflowProvider()}`);
     const { text } = await callLLM({
       system: systemPrompt,
       user: `视频标题：${title}\n\n${requirement ? `内容要求：${requirement}\n\n` : ""}请生成内容描述`,

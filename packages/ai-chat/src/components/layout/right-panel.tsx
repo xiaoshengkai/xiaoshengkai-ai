@@ -34,6 +34,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   deepseek: "DeepSeek",
   minimax: "MiniMax",
   glm: "智谱",
+  qwen: "通义千问",
 };
 
 function getLogColor(line: string) {

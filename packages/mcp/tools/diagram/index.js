@@ -4,7 +4,8 @@ import path from "node:path";
 import os from "node:os";
 import { execSync } from "node:child_process";
 import puppeteer from "puppeteer";
-import { callLLM } from "../../../shared/llm/index.js";
+import { callLLM, callMultimodalLLM, getMultimodalProvider, getWorkflowProvider } from "../../../shared/llm/index.js";
+import { getApiKey } from "../../../shared/llm/config.js";
 import { sleep, shortId } from "../../../shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
 
@@ -27,9 +28,6 @@ const CHROME_PATH = (() => {
 console.log(`${TAG} Chrome 路径: ${CHROME_PATH || "未找到"}`);
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
 
 // ═══════════════════════════════════════════════════════════════════
 // DeepSeek System Prompt
@@ -740,21 +738,15 @@ function validateOutput(pngPath) {
 
 async function compressContext(prompt) {
   if (prompt.length <= 200) return prompt;
-  if (!MINIMAX_API_KEY) return prompt.slice(0, 200);
 
   try {
-    const res = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${MINIMAX_API_KEY}` },
-      body: JSON.stringify({
-        model: "MiniMax-M3",
-        messages: [{ role: "user", content: `将以下内容压缩到200字以内，保留关键信息（主题、配色、风格、图表类型、数据）：\n\n${prompt}` }],
-        max_tokens: 300,
-        temperature: 0.3,
-      }),
+    const { text } = await callLLM({
+      user: `将以下内容压缩到200字以内，保留关键信息（主题、配色、风格、图表类型、数据）：\n\n${prompt}`,
+      maxTokens: 300,
+      temperature: 0.3,
+      format: "",
     });
-    const result = await res.json();
-    const compressed = result.choices?.[0]?.message?.content?.trim()?.slice(0, 200) || prompt.slice(0, 200);
+    const compressed = text.trim().slice(0, 200) || prompt.slice(0, 200);
     console.log(`${TAG} 上下文压缩: ${prompt.length} → ${compressed.length} 字`);
     return compressed;
   } catch {
@@ -764,46 +756,28 @@ async function compressContext(prompt) {
 
 async function reviewVisual(pngPath, context = "") {
   const tStart = Date.now();
-  if (!MINIMAX_API_KEY) {
-    console.log(`${TAG} ⑦ 视觉评估: 跳过（未配置 MINIMAX_API_KEY）`);
-    return { score: 3, issues: [], note: "未配置 MINIMAX_API_KEY，跳过视觉校验" };
+  const { provider } = getMultimodalProvider();
+  if (!getApiKey(provider, `${provider.toUpperCase()}_API_KEY`)) {
+    console.log(`${TAG} ⑦ 视觉评估: 跳过（未配置 ${provider} API_KEY）`);
+    return { score: 3, issues: [], note: `未配置 ${provider} API_KEY，跳过视觉校验` };
   }
 
   try {
     const pngBuffer = fs.readFileSync(pngPath);
     const base64 = pngBuffer.toString("base64");
 
-    const res = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${MINIMAX_API_KEY}` },
-      body: JSON.stringify({
-        model: "MiniMax-M3",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: { url: `data:image/png;base64,${base64}`, detail: "high" },
-              },
-              {
-                type: "text",
-                text: `参考用户需求（${context}）。评估图表视觉质量：\n1. 布局与可读性（最重要）：线条是否交叉？间距合理？文字清晰？\n2. 配色与对比度：颜色协调？是否匹配用户风格偏好？\n3. 整体专业度：信息密度合理？专业美观？\n\n打分 1-5，综合评分。返回格式：{"score": 数字, "issues": ["问题描述"]}。只输出 JSON，不要解释。`,
-              },
-            ],
-          },
-        ],
-        max_tokens: 500,
-        temperature: 0.3,
-      }),
+    const { text } = await callMultimodalLLM({
+      user: `参考用户需求（${context}）。评估图表视觉质量：\n1. 布局与可读性（最重要）：线条是否交叉？间距合理？文字清晰？\n2. 配色与对比度：颜色协调？是否匹配用户风格偏好？\n3. 整体专业度：信息密度合理？专业美观？\n\n打分 1-5，综合评分。返回格式：{"score": 数字, "issues": ["问题描述"]}。只输出 JSON，不要解释。`,
+      images: [`data:image/png;base64,${base64}`],
+      maxTokens: 500,
+      temperature: 0.3,
+      format: "",
     });
 
-    const result = await res.json();
-    const text = result.choices?.[0]?.message?.content?.trim() || "";
     const jsonMatch = text.match(/\{\s*"score"[\s\S]*\}/);
     if (jsonMatch) {
       try {
-        const review = { ...JSON.parse(jsonMatch[0]), note: "MiniMax-M3 视觉评估" };
+        const review = { ...JSON.parse(jsonMatch[0]), note: `${provider} 视觉评估` };
         console.log(`${TAG} ⑦ 视觉评估: 耗时 ${((Date.now() - tStart) / 1000).toFixed(1)}s, score=${review.score}, issues=${JSON.stringify(review.issues)}`);
         return review;
       } catch (e) {
@@ -960,9 +934,10 @@ export function register(server) {
       try {
         console.log(`${TAG} 开始: promptLen=${prompt.length}, prompt="${prompt.slice(0, 500)}", theme=${theme}, audience=${audience}, repair=${!!code}`);
 
-        if (!DEEPSEEK_API_KEY) {
-          console.error(`${TAG} 未配置 DEEPSEEK_API_KEY`);
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "未配置 DEEPSEEK_API_KEY" }) }] };
+        const wfProvider = getWorkflowProvider();
+        if (!getApiKey(wfProvider, `${wfProvider.toUpperCase()}_API_KEY`)) {
+          console.error(`${TAG} 未配置 ${wfProvider} API_KEY`);
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `未配置 ${wfProvider} API_KEY` }) }] };
         }
 
         const taskId = shortId();

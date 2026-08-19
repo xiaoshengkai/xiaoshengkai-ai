@@ -2,10 +2,8 @@ import { ChromaClient } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { embed } from "ai";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { loadNetworkConfig } from "../../shared/network.js";
+import { getApiKey, getBaseUrl } from "../../shared/llm/config.js";
 
 const SHARED_DB = "shared";
 const CHAT_DB = "chat";
@@ -14,7 +12,7 @@ const CHAT_COLLECTION = "chat_knowledge";
 const DISTANCE_FUNCTION = "cosine";
 const EMBEDDING_MODEL = process.env.GLM_EMBEDDING_MODEL || "embedding-3";
 const EMBED_MAX_RETRIES = 3;
-const GLM_BASE_URL = process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
+const GLM_BASE_URL = getBaseUrl("glm", "GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4");
 
 // 从 config/network.json 读 chroma host+port（共享读取器）
 const NET_CONFIG = loadNetworkConfig();
@@ -26,7 +24,7 @@ const embeddingFunction = new DefaultEmbeddingFunction();
 const glm = createOpenAICompatible({
   name: "glm",
   baseURL: GLM_BASE_URL,
-  apiKey: process.env.GLM_API_KEY,
+  apiKey: getApiKey("glm", "GLM_API_KEY"),
 });
 
 const clientCache = new Map();

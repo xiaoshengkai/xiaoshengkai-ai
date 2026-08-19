@@ -1,72 +1,54 @@
 import { z } from "zod";
-import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { sleep, shortId } from "../../../shared/utils.js";
+import { shortId, sleep } from "../../../shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
-import { generateImage } from "../../../shared/llm/providers/minimax.js";
-
-const GENERATORS = {
-  minimax: generateImage,
-};
-
-function getGenerator(provider) {
-  const gen = GENERATORS[provider];
-  if (!gen) throw new Error(`不支持的图片 provider: ${provider}`);
-  return gen;
-}
-
-async function getProviderApiKey(provider) {
-  if (provider === "minimax") return process.env.MINIMAX_API_KEY;
-  return null;
-}
+import { generateImage } from "../../../shared/llm/index.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
 
 async function generateImageAsync(taskId, workDir, params) {
   try {
     updateTask(workDir, { status: "generating", progress: 50, message: "生成中..." });
-    const { prompt, model, aspect_ratio, n, image_url } = params;
-    const imageUrls = [];
-    for (let i = 0; i < (n || 1); i++) {
-      const url = await generateImage(prompt, { aspectRatio: aspect_ratio, model, image_url });
-      imageUrls.push(url);
-    }
+    const { prompt, aspect_ratio, n, image_url, watermark, negative_prompt, seed } = params;
+    const imageUrls = await generateImage(prompt, {
+      aspectRatio: aspect_ratio,
+      n,
+      image_url,
+      watermark,
+      negativePrompt: negative_prompt,
+      seed,
+    });
     updateTask(workDir, {
       status: "done", progress: 100, message: "完成",
       imageUrls, count: imageUrls.length, note: "图片链接有效期 24 小时",
     });
   } catch (err) {
-    const error = err.name === "AbortError" ? "图片生成超时（60s），请重试" : err.message;
+    const error = err.name === "AbortError" ? "图片生成超时，请重试" : err.message;
     updateTask(workDir, { status: "failed", progress: 100, error });
   }
 }
 
+const ASPECT_RATIOS = ["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"];
+
 export function register(server) {
   server.tool(
     "generateImage",
-    "根据文本描述生成图片。当前支持 MiniMax image-01 模型。返回的图片 URL 包含 OSS 签名，必须原样使用不得修改任何字符。链接有效期 24 小时。异步模式，返回 taskId 后用 checkImageProgress 查询进度。",
+    "根据文本描述生成图片。模型由系统设置（图片生成模块）决定。返回的图片 URL 包含签名，必须原样使用不得修改任何字符。链接有效期 24 小时。异步模式，返回 taskId 后用 checkImageProgress 查询进度。",
     {
       prompt: z.string().min(1).max(1500).describe("图片的文本描述，最长 1500 字符"),
-      provider: z.string().optional().default("minimax").describe("模型提供商，默认 minimax"),
-      model: z.enum(["image-01", "image-01-live"]).optional().default("image-01").describe("模型名称"),
-      aspect_ratio: z.enum(["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"]).optional().default("1:1").describe("宽高比"),
+      aspect_ratio: z.enum(ASPECT_RATIOS).optional().default("1:1").describe("宽高比"),
       n: z.number().min(1).max(9).optional().default(1).describe("生成数量，1-9"),
-      prompt_optimizer: z.boolean().optional().default(true).describe("是否自动优化 prompt"),
+      watermark: z.boolean().optional().default(false).describe("是否添加水印（部分模型支持）"),
+      negative_prompt: z.string().optional().describe("反向提示词，描述不希望在图中出现的内容（部分模型支持）"),
+      seed: z.number().int().optional().describe("随机种子，用于复现结果（部分模型支持）"),
     },
-    async ({ prompt, provider, model, aspect_ratio, n, prompt_optimizer }) => {
+    async ({ prompt, aspect_ratio, n, watermark, negative_prompt, seed }) => {
       try {
-        if (!GENERATORS[provider]) {
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `不支持的 provider: ${provider}` }) }] };
-        }
-        const apiKey = await getProviderApiKey(provider);
-        if (!apiKey) {
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `未配置 ${provider} API_KEY` }) }] };
-        }
         const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);
         writeTaskState(workDir, { status: "started", progress: 0, message: "任务已提交" });
-        generateImageAsync(taskId, workDir, { prompt, model, aspect_ratio, n, prompt_optimizer }).catch(err => {
+        generateImageAsync(taskId, workDir, { prompt, aspect_ratio, n, watermark, negative_prompt, seed }).catch(err => {
           updateTask(workDir, { status: "failed", progress: 100, error: err.message });
         });
         return {
@@ -80,29 +62,22 @@ export function register(server) {
 
   server.tool(
     "generateImageFromImage",
-    "根据参考图和文本描述生成新图片。支持通过 subject_reference 传入参考人物照片。返回的图片 URL 包含 OSS 签名，必须原样使用不得修改任何字符。链接有效期 24 小时。异步模式，返回 taskId 后用 checkImageProgress 查询进度。",
+    "根据参考图和文本描述生成新图片。模型由系统设置（图片生成模块）决定。返回的图片 URL 包含签名，必须原样使用不得修改任何字符。链接有效期 24 小时。异步模式，返回 taskId 后用 checkImageProgress 查询进度。",
     {
       prompt: z.string().min(1).max(1500).describe("图片的文本描述"),
       image_url: z.string().min(1).describe("参考图片的 URL（公网可访问）"),
-      provider: z.enum(["minimax"]).optional().default("minimax").describe("模型提供商"),
-      model: z.enum(["image-01", "image-01-live"]).optional().default("image-01").describe("模型名称"),
-      aspect_ratio: z.enum(["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"]).optional().default("1:1").describe("宽高比"),
+      aspect_ratio: z.enum(ASPECT_RATIOS).optional().default("1:1").describe("宽高比"),
       n: z.number().min(1).max(9).optional().default(1).describe("生成数量"),
-      prompt_optimizer: z.boolean().optional().default(true).describe("是否自动优化 prompt"),
+      watermark: z.boolean().optional().default(false).describe("是否添加水印（部分模型支持）"),
+      negative_prompt: z.string().optional().describe("反向提示词（部分模型支持）"),
+      seed: z.number().int().optional().describe("随机种子（部分模型支持）"),
     },
-    async ({ prompt, image_url, provider, model, aspect_ratio, n, prompt_optimizer }) => {
+    async ({ prompt, image_url, aspect_ratio, n, watermark, negative_prompt, seed }) => {
       try {
-        if (!GENERATORS[provider]) {
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `不支持的 provider: ${provider}` }) }] };
-        }
-        const apiKey = await getProviderApiKey(provider);
-        if (!apiKey) {
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: `未配置 ${provider} API_KEY` }) }] };
-        }
         const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);
         writeTaskState(workDir, { status: "started", progress: 0, message: "任务已提交" });
-        generateImageAsync(taskId, workDir, { prompt, model, aspect_ratio, n, prompt_optimizer, image_url }).catch(err => {
+        generateImageAsync(taskId, workDir, { prompt, image_url, aspect_ratio, n, watermark, negative_prompt, seed }).catch(err => {
           updateTask(workDir, { status: "failed", progress: 100, error: err.message });
         });
         return {

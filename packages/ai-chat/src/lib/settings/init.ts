@@ -14,13 +14,19 @@ const DEFAULT_PROVIDERS: Providers = {
     baseURL: env.MINIMAX_BASE_URL,
     anthropicBaseURL: env.MINIMAX_ANTHROPIC_BASE_URL,
     apiKey: env.MINIMAX_API_KEY,
-    models: { chat: "MiniMax-M3", text: "MiniMax-M3", image: "image-01", tts: "speech-2.8-hd", bgm: "music-01" },
+    models: { chat: "MiniMax-M3", text: "MiniMax-M3", image: "image-01", tts: "speech-2.8-hd", bgm: "music-2.6" },
   },
   glm: {
     enabled: true,
     baseURL: env.GLM_BASE_URL,
     apiKey: env.GLM_API_KEY,
     models: { chat: "glm-5.2", embedding: "embedding-3" },
+  },
+  qwen: {
+    enabled: true,
+    baseURL: env.QWEN_BASE_URL,
+    apiKey: env.QWEN_API_KEY,
+    models: { chat: "qwen3.8-max", image: "qwen-image-3.0-pro" },
   },
 };
 
@@ -37,6 +43,16 @@ export function initSettings() {
   const existing = readProviders();
   if (Object.keys(existing).length === 0) {
     writeProviders(DEFAULT_PROVIDERS);
+  } else {
+    // ponytail: 迁移 — 补写缺失的默认 provider（如 qwen）
+    let merged = false;
+    for (const [key, cfg] of Object.entries(DEFAULT_PROVIDERS)) {
+      if (!existing[key]) {
+        existing[key] = cfg;
+        merged = true;
+      }
+    }
+    if (merged) writeProviders(existing);
   }
   const sel = readSelection();
   if (!sel.chat) {

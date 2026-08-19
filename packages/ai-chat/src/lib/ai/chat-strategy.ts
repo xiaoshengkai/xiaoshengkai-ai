@@ -46,16 +46,48 @@ class GLMStrategy implements ChatStrategy {
   }
 }
 
+// ponytail: Qwen3.8-Max 是思考模型，DashScope 兼容模式靠 enable_thinking 开关（而非 AI SDK 的 thinking 参数）
+function injectEnableThinking(doFetch: typeof fetch): typeof fetch {
+  return async (input, init) => {
+    if (init?.body && typeof init.body === "string") {
+      try {
+        const body = JSON.parse(init.body);
+        body.enable_thinking = true;
+        init = { ...init, body: JSON.stringify(body) };
+      } catch { /* 非 JSON 不处理 */ }
+    }
+    return doFetch(input, init);
+  };
+}
+
+class QwenStrategy implements ChatStrategy {
+  async resolveModel() {
+    const cfg = getProviderConfig("chat");
+    return { model: cfg.model };
+  }
+  getProviderName() { return "qwen"; }
+  createModel(model: string, cfg: ProviderConfig) {
+    return createOpenAICompatible({
+      name: "qwen",
+      baseURL: cfg.baseURL,
+      apiKey: cfg.apiKey,
+      fetch: injectEnableThinking(fetch),
+    })(model);
+  }
+}
+
 const STRATEGIES: Record<string, ChatStrategy> = {
   minimax: new MiniMaxStrategy(),
   deepseek: new DeepSeekStrategy(),
   glm: new GLMStrategy(),
+  qwen: new QwenStrategy(),
 };
 
 export function getChatStrategy(): ChatStrategy {
   const cfg = getProviderConfig("chat");
   if (cfg.model.startsWith("deepseek")) return STRATEGIES.deepseek;
   if (cfg.model.startsWith("glm")) return STRATEGIES.glm;
+  if (cfg.model.startsWith("qwen")) return STRATEGIES.qwen;
   if (cfg.protocol === "anthropic") return STRATEGIES.minimax;
   return STRATEGIES.deepseek;
 }

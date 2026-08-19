@@ -86,7 +86,7 @@ export default function SettingsPage() {
   if (!providers || !selection) {
     return (
       <div className="flex items-center justify-center h-dvh">
-        <p className="text-xs text-gray-400 font-[family-name:var(--font-pixel)]">加载中...</p>
+        <p className="text-xs text-muted-foreground font-mono">加载中...</p>
       </div>
     );
   }
@@ -94,51 +94,44 @@ export default function SettingsPage() {
   const hasChanges = dirtyProv || dirtySel;
 
   return (
-    <div className="min-h-screen bg-white p-6 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900 font-[family-name:var(--font-pixel)]">⚙️ 系统设置</h1>
-          <p className="text-xs text-gray-500 mt-1 font-[family-name:var(--font-pixel)] flex items-center gap-2">
-            <span className="flex items-center gap-1"><span>💬</span><span>6 模块</span></span>
-            <span className="text-gray-300">|</span>
-            <span className="flex items-center gap-1"><span>⚙️</span><span>3 Provider</span></span>
-            <span className="text-gray-300">|</span>
-            <span className="flex items-center gap-1"><span>⚡</span><span>实时生效</span></span>
-          </p>
+    <div data-theme="pink" className="flex flex-col h-full">
+      {/* 头部：与其他页面统一 */}
+      <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border shrink-0">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-bold text-foreground font-heading">系统设置</h2>
+          <span className="text-xs text-muted-foreground font-mono hidden md:inline">
+            6 模块 · 3 Provider · 实时生效
+          </span>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => router.push("/")}
-            className="px-3 py-1.5 text-xs font-bold cursor-pointer border-2 border-[#1A1A1A] bg-white"
-            style={{ boxShadow: "2px 2px 0 #1A1A1A" }}
+            className="brutal-btn px-3 py-1.5 text-xs font-bold bg-card text-foreground"
           >
             返回聊天
           </button>
           <button
             onClick={handleSave}
             disabled={!hasChanges || saving}
-            className="px-3 py-1.5 text-xs font-bold cursor-pointer border-2 border-[#1A1A1A]"
-            style={{
-              background: hasChanges && !saving ? "#9B59B6" : "#e2e8f0",
-              color: hasChanges && !saving ? "#fff" : "#94a3b8",
-              boxShadow: "2px 2px 0 #1A1A1A",
-            }}
+            className={`brutal-btn px-3 py-1.5 text-xs font-bold ${hasChanges && !saving ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
           >
             {saving ? "保存中..." : hasChanges ? "保存更改" : "已保存"}
           </button>
         </div>
       </div>
 
+      {/* 主体（可滚动） */}
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+
       {/* 重启提示 */}
       <div
-        className="p-3 border-2 border-yellow-500 bg-yellow-50 text-xs font-[family-name:var(--font-pixel)]"
-        style={{ boxShadow: "2px 2px 0 #1A1A1A" }}
+        className="brutal bg-yellow-soft p-3 text-xs font-mono"
       >
-        <p className="font-bold text-yellow-700">⚠️ 注意</p>
-        <p className="text-yellow-600 mt-1">
+        <p className="font-bold text-foreground">⚠️ 注意</p>
+        <p className="text-foreground/70 mt-1">
           修改配置后，聊天模型、图片生成、向量检索 立即生效，无需重启。
         </p>
-        <p className="text-yellow-600 mt-0.5">
+        <p className="text-foreground/70 mt-0.5">
           MCP 进程和定时任务需重启以应用新配置。工作流 CLI 每次自动创建新进程，无需重启。
         </p>
         <button
@@ -150,8 +143,7 @@ export default function SettingsPage() {
               else toast(`🔴 ${d.error || "重启失败"}`);
             } catch { toast("🔴 重启请求失败"); }
           }}
-          className="mt-2 px-3 py-1 text-xs font-bold cursor-pointer border-2 border-yellow-600 bg-yellow-100"
-          style={{ boxShadow: "2px 2px 0 #1A1A1A" }}
+          className="mt-2 brutal-btn px-3 py-1 text-xs font-bold bg-yellow text-foreground"
         >
           重启 MCP / 定时任务
         </button>
@@ -159,7 +151,7 @@ export default function SettingsPage() {
 
       {/* 模型选择 */}
       <div>
-        <h2 className="text-sm font-bold text-gray-800 mb-3 font-[family-name:var(--font-pixel)]">📌 模块模型选择</h2>
+        <h2 className="text-sm font-bold text-foreground mb-3 font-heading">📌 模块模型选择</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           <ModuleSelector module="chat" current={selection.chat} onChange={handleSelectionChange} />
           <ModuleSelector module="media" current={selection.media} onChange={handleSelectionChange} />
@@ -172,7 +164,7 @@ export default function SettingsPage() {
 
       {/* 模块配置 */}
       <div>
-        <h2 className="text-sm font-bold text-gray-800 mb-3 font-[family-name:var(--font-pixel)]">🔑 模块配置</h2>
+        <h2 className="text-sm font-bold text-foreground mb-3 font-heading">🔑 模块配置</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
           {Object.entries(providers).map(([id, config]) => (
             <ProviderConfigCard
@@ -184,6 +176,7 @@ export default function SettingsPage() {
             />
           ))}
         </div>
+      </div>
       </div>
     </div>
   );

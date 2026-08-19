@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
-import PixelLoading from "@/components/ui/pixel-loading";
+import Loading from "@/components/ui/loading";
 
 interface ViewerCtx {
   register: (src: string) => number;
@@ -69,11 +69,11 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
 
       {index >= 0 && currentSrc && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
           onClick={close}
         >
           <button
-            className="fixed top-4 right-4 pixel-btn text-white bg-black/50 border-white/30 hover:bg-black/70 px-3 py-1"
+            className="fixed top-4 right-4 brutal bg-card text-foreground px-3 py-1 font-bold cursor-pointer"
             onClick={close}
           >
             ✕
@@ -82,13 +82,13 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
           {total > 1 && (
             <>
               <button
-                className="fixed left-4 top-1/2 -translate-y-1/2 pixel-btn text-white bg-black/50 border-white/30 hover:bg-black/70 px-3 py-2 text-xl"
+                className="fixed left-4 top-1/2 -translate-y-1/2 brutal bg-card text-foreground px-3 py-2 text-xl cursor-pointer"
                 onClick={e => { e.stopPropagation(); prev(); }}
               >
                 ←
               </button>
               <button
-                className="fixed right-4 top-1/2 -translate-y-1/2 pixel-btn text-white bg-black/50 border-white/30 hover:bg-black/70 px-3 py-2 text-xl"
+                className="fixed right-4 top-1/2 -translate-y-1/2 brutal bg-card text-foreground px-3 py-2 text-xl cursor-pointer"
                 onClick={e => { e.stopPropagation(); next(); }}
               >
                 →
@@ -101,7 +101,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
 
           {imgState === "loading" && (
             <div onClick={e => e.stopPropagation()}>
-              <PixelLoading text="图片加载中..." />
+              <Loading text="图片加载中..." />
             </div>
           )}
 
@@ -109,7 +109,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
           <img
             src={currentSrc}
             alt=""
-            className="max-w-[90vw] max-h-[90vh] object-contain pixel-img"
+            className="max-w-[90vw] max-h-[90vh] object-contain border-[3px] shadow-md"
             onClick={e => e.stopPropagation()}
             onLoad={() => setImgState("loaded")}
             onError={() => setImgState("error")}
@@ -117,7 +117,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
           />
 
           {imgState === "error" && (
-            <div onClick={e => e.stopPropagation()} className="pixel-bubble-ai px-4 py-3 text-destructive font-mono">
+            <div onClick={e => e.stopPropagation()} className="brutal bg-card px-4 py-3 text-destructive font-mono">
               [图片加载失败]
             </div>
           )}

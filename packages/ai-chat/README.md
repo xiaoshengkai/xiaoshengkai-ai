@@ -17,16 +17,14 @@ Next.js 16 / React 19 / AI SDK v6 / DeepSeek V4 Pro / 智谱 embedding-3 / Chrom
 
 ## UI 风格
 
-**像素复古风** — 后续所有 UI 开发均遵循此风格。
+**Neo-Brutalism 糖果色** — 后续所有 UI 开发均遵循此风格。多主题可切换（`data-theme` 作用域 + `UI_THEME` env 定默认）。
 
-- 扫描线叠加层（CRT 效果）
-- 3px 像素边框（box-shadow 8 方向）
-- 12px 点阵背景
-- 像素按钮（按下位移反馈）
-- 终端风格输入框（`>` 提示符）
-- 像素风加载动效（方块跳动）
-- 消息入场动画（淡入上移）
-- 纯 CSS 实现，无额外依赖
+- 纯黑 2-4px 实线边框 + 零模糊纯黑硬阴影（`box-shadow: Npx Npx 0 #000`）
+- 高饱和糖果色（电光黄主色 + 粉/蓝/紫/橙/深绿点缀），禁用渐变/模糊/毛玻璃
+- 直角（`--radius: 0`），hover 位移 `translate(-2px,-2px)` + 阴影扩大，active 按压
+- 用户气泡黑底白字 + 黄硬阴影，AI 气泡白底黑字
+- 字体：Inter（正文）/ Plus Jakarta Sans（标题）/ JetBrains Mono（标签）
+- 主题 token 定义在 `globals.css` 的 `[data-theme="*"]` 块，经 `@theme inline` 映射成 Tailwind 类
 
 ## 快速开始
 

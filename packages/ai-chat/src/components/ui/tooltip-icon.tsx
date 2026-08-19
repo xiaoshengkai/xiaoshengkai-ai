@@ -32,7 +32,7 @@ export default function TooltipIcon({
     >
       {icon}
       <span
-        className={`pointer-events-none absolute whitespace-nowrap px-2 py-0.5 text-xs font-mono bg-primary text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity z-50 ${positionClasses[side]}`}
+        className={`pointer-events-none absolute whitespace-nowrap px-2 py-0.5 text-xs font-mono bg-primary text-primary-foreground border-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 ${positionClasses[side]}`}
       >
         {label}
       </span>

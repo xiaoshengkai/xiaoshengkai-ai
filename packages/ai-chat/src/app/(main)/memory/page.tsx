@@ -3,6 +3,7 @@
 
 import { BASE } from "@/lib/utils/utils";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Virtuoso } from "react-virtuoso";
 import { toast } from "sonner";
 import {
@@ -79,6 +80,7 @@ async function fetchApi<T>(
 }
 
 export default function MemoryLibraryPage() {
+  const router = useRouter();
   const [database, setDatabase] = useState("shared");
   const [collection, setCollection] = useState("base_knowledge");
   const [codeCollections, setCodeCollections] = useState<string[]>([]);
@@ -243,14 +245,21 @@ export default function MemoryLibraryPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold font-[family-name:var(--font-pixel)]">
-            记忆库
-          </h1>
-        </div>
+    <div className="flex flex-col h-full">
+      {/* 头部：与其他页面统一 */}
+      <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border shrink-0">
+        <h2 className="text-lg font-bold text-foreground font-heading">记忆库</h2>
+        <button
+          onClick={() => router.push("/")}
+          className="brutal-btn px-3 py-1 text-xs font-bold bg-card text-foreground"
+        >
+          返回聊天
+        </button>
+      </div>
 
+      {/* 主体（可滚动） */}
+      <div className="flex-1 overflow-y-auto p-6">
+      <div className="max-w-7xl mx-auto">
         {/* 数据库/collection 选择器 */}
         <div className="mb-6 flex gap-4">
           <select
@@ -266,7 +275,7 @@ export default function MemoryLibraryPage() {
               else if (db === "chat") setCollection(chatCollections[0] || "chat_knowledge");
               else setCollection("");
             }}
-            className="px-3 py-1.5 text-sm border rounded bg-background font-[family-name:var(--font-pixel)]"
+            className="px-3 py-1.5 text-sm border-2 border-border bg-card font-mono"
           >
             <option value="shared">shared (主库)</option>
             <option value="chat">chat (聊天库)</option>
@@ -275,7 +284,7 @@ export default function MemoryLibraryPage() {
           <select
             value={collection}
             onChange={(e) => setCollection(e.target.value)}
-            className="px-3 py-1.5 text-sm border rounded bg-background font-[family-name:var(--font-pixel)]"
+            className="px-3 py-1.5 text-sm border-2 border-border bg-card font-mono"
           >
             {database === "code"
               ? (codeCollections.length > 0
@@ -291,7 +300,7 @@ export default function MemoryLibraryPage() {
         </div>
 
         {/* 搜索框 */}
-        <div className="mb-6 p-4 bg-card rounded-lg shadow-sm border">
+        <div className="mb-6 p-4 brutal bg-card">
           <div className="flex gap-2">
             <input
               type="text"
@@ -301,22 +310,20 @@ export default function MemoryLibraryPage() {
                 if (e.key === "Enter") void doSearch();
               }}
               placeholder="输入查询（调智谱 embedding-3 → cosine Top-10）"
-              className="flex-1 px-3 py-2 border rounded bg-background text-sm font-[family-name:var(--font-pixel)] focus:outline-none focus:ring-2 focus:ring-ring"
+              className="flex-1 px-3 py-2 border-2 border-border bg-card text-sm font-mono focus:outline-none focus:border-ring"
               disabled={searching}
             />
             <button
               onClick={() => { if (searchInput.trim()) { void doSearch(); } else { void reloadList(); } }}
               disabled={searching}
-              className="px-5 py-2 text-sm text-white font-[family-name:var(--font-pixel)] cursor-pointer"
-              style={{ background: "var(--primary)", border: "3px solid var(--primary)", boxShadow: "3px 0 0 0 var(--primary), 0 3px 0 0 var(--primary), 3px 3px 0 0 var(--primary)" }}
+              className="brutal-btn px-5 py-2 text-sm text-primary-foreground font-mono bg-primary"
             >
               {searching ? "搜索中…" : "搜索"}
             </button>
 
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogTrigger
-                className="px-5 py-2 text-sm text-white font-[family-name:var(--font-pixel)]"
-                style={{ background: "var(--pixel-red)", border: "3px solid var(--pixel-red)", boxShadow: "3px 0 0 0 var(--pixel-red-dark), 0 3px 0 0 var(--pixel-red-dark), 3px 3px 0 0 var(--pixel-red-dark)" }}
+                className="brutal-btn px-5 py-2 text-sm text-white font-mono bg-destructive"
               >
                 整理数据
               </AlertDialogTrigger>
@@ -349,10 +356,10 @@ export default function MemoryLibraryPage() {
         </div>
 
         {/* 列表 */}
-        <div className="bg-card rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="brutal bg-card">
+          <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground font-[family-name:var(--font-pixel)]">
+              <span className="text-sm text-muted-foreground font-mono">
                 {listLoading && chunks.length === 0 ? "加载中…" : searchResult ? `共 ${searchResult.results.length} 条结果` : `共 ${chunks.length} 条`}
               </span>
               {selected.size > 0 && (
@@ -360,8 +367,7 @@ export default function MemoryLibraryPage() {
                   <span className="text-xs text-destructive">已选 {selected.size} 条</span>
                   <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                     <AlertDialogTrigger
-                      className="px-2 py-0.5 text-xs text-white font-[family-name:var(--font-pixel)] cursor-pointer"
-                      style={{ background: "var(--pixel-red)", border: "3px solid var(--pixel-red)", boxShadow: "3px 0 0 0 var(--pixel-red-dark), 0 3px 0 0 var(--pixel-red-dark), 3px 3px 0 0 var(--pixel-red-dark)" }}
+                      className="brutal-btn px-2 py-0.5 text-xs text-white font-mono bg-destructive"
                     >
                       批量删除
                     </AlertDialogTrigger>
@@ -387,12 +393,12 @@ export default function MemoryLibraryPage() {
               {searchResult ? (
                 <button
                   onClick={() => { setSearchResult(null); setSearchInput(""); void reloadList(); }}
-                  className="pixel-btn-ghost px-2 py-0.5 text-xs"
+                  className="brutal-btn bg-card px-2 py-0.5 text-xs font-mono"
                 >
                   清除搜索
                 </button>
               ) : (
-                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer font-[family-name:var(--font-pixel)]">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer font-mono">
                   <input
                     type="checkbox"
                     checked={includeDeleted}
@@ -411,7 +417,7 @@ export default function MemoryLibraryPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-[30px_1fr_6fr_2fr_1fr_1fr] px-4 py-2 bg-muted text-xs font-medium text-muted-foreground font-[family-name:var(--font-pixel)]">
+          <div className="grid grid-cols-[30px_1fr_6fr_2fr_1fr_1fr] px-4 py-2 bg-muted text-xs font-medium text-muted-foreground font-mono">
             <input
               type="checkbox"
               checked={chunks.length > 0 && chunks.every((c) => selected.has(c.id))}
@@ -476,6 +482,7 @@ export default function MemoryLibraryPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {detail !== null || detailLoading || detailError !== null ? (
@@ -553,9 +560,9 @@ function DetailDrawer({
         className="fixed inset-0 bg-black/30 z-40"
         aria-hidden="true"
       />
-      <div className="fixed top-0 right-0 h-full w-full md:w-2/3 lg:w-1/2 bg-white dark:bg-gray-900 shadow-xl z-50 overflow-y-auto">
-        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold font-[family-name:var(--font-pixel)]">
+      <div className="fixed top-0 right-0 h-full w-full md:w-2/3 lg:w-1/2 bg-card border-l-[3px] border-border shadow-lg z-50 overflow-y-auto">
+        <div className="sticky top-0 bg-card border-b-[3px] border-border px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold font-mono">
             Chunk 详情
           </h2>
           <button
@@ -594,7 +601,7 @@ function DetailDrawer({
 
               <div>
                 <Label>Content ({detail.content.length} 字)</Label>
-                <pre className="mt-1 p-4 bg-muted border rounded text-sm whitespace-pre-wrap break-words font-mono">
+                <pre className="mt-1 p-4 bg-yellow-soft border-[3px] border-border shadow-md text-sm whitespace-pre-wrap break-words font-mono">
                   {detail.content}
                 </pre>
               </div>
@@ -631,7 +638,7 @@ function DetailDrawer({
                 <Label>
                   向量预览（前 {detail.vectorPreview.length} 维 / 总 {detail.totalDimensions} 维）
                 </Label>
-                <div className="mt-1 p-3 bg-muted border rounded font-mono text-xs break-all">
+                <div className="mt-1 p-3 bg-yellow-soft border-2 border-border font-mono text-xs break-all">
                   [{detail.vectorPreview.map((n) => n.toFixed(4)).join(", ")}
                   {detail.totalDimensions > detail.vectorPreview.length ? ", …" : ""}
                   ]

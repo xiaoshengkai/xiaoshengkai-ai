@@ -44,6 +44,8 @@ function serveStatic(req, res) {
     const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
     if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.mp3', '.mp4'].includes(ext)) {
       headers['Cache-Control'] = 'public, max-age=1800, immutable';
+    } else if (ext === '.html' || ext === '.css' || ext === '.js') {
+      headers['Cache-Control'] = 'no-cache';
     }
     res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);

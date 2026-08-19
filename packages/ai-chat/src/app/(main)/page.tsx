@@ -15,19 +15,18 @@ import { useConversation } from "@/components/layout/conversation-context";
 import { calculateCost, formatTokens } from "@/lib/utils/cost";
 import { uploadFile } from "@/lib/utils/upload-client";
 import type { AttachedFile } from "@/lib/utils/types";
-import PixelLogo from "@/components/ui/pixel-logo";
+import Logo from "@/components/ui/logo";
 
 const LoadingDots = React.memo(function LoadingDots() {
   return (
     <div className="flex gap-3 px-4 msg-enter">
-      <div className="pixel-avatar shrink-0 w-8 h-8 bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-mono font-bold">
+      <div className="shrink-0 w-8 h-8 bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-mono font-bold border-2">
         AI
       </div>
-      <div className="pixel-bubble-ai px-4 py-3 flex items-center gap-1.5">
-        <span className="pixel-load-dot" />
-        <span className="pixel-load-dot" />
-        <span className="pixel-load-dot" />
-        <span className="pixel-load-dot" />
+      <div className="bg-card border-[3px] shadow-md px-4 py-3 flex items-center gap-1.5">
+        <span className="w-2 h-2 bg-primary animate-bounce" />
+        <span className="w-2 h-2 bg-yellow animate-bounce" style={{ animationDelay: "0.1s" }} />
+        <span className="w-2 h-2 bg-blue animate-bounce" style={{ animationDelay: "0.2s" }} />
       </div>
     </div>
   );
@@ -36,9 +35,9 @@ const LoadingDots = React.memo(function LoadingDots() {
 const EmptyState = React.memo(function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-      <PixelLogo size={12} />
-      <h1 className="text-2xl font-bold tracking-widest font-mono">小盛开AI</h1>
-      <p className="text-muted-foreground/60 text-xs font-mono">PRESS ENTER TO CHAT ▸</p>
+      <Logo size={12} />
+      <h1 className="text-2xl font-bold tracking-widest font-heading">小盛开AI</h1>
+      <p className="text-muted-foreground text-xs font-mono">PRESS ENTER TO CHAT ▸</p>
     </div>
   );
 });
@@ -109,6 +108,7 @@ export default function ChatPage() {
     if (activeConversationId === convIdRef.current) return;
 
     const switchConversation = async () => {
+      console.log("[scroll-debug] 切换对话:", activeConversationId, "| isAtBottom:", isAtBottom, "| atBottomRef:", atBottomRef.current);
       stop(); // 中断AI回答
       if (activeConversationId && !newIdsRef.current.has(activeConversationId)) {
         try {
@@ -118,7 +118,7 @@ export default function ChatPage() {
             setMessages(data.messages || []);
             convIdRef.current = activeConversationId;
             setTimeout(() => {
-              virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "auto" });
+              virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" });
             }, 100);
             return;
           }
@@ -273,29 +273,45 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "smooth" });
+    console.log("[scroll-debug] msgs.length变化:", messages.length, "| atBottomRef:", atBottomRef.current, "| isAtBottom:", isAtBottom);
+    virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" });
   }, [messages.length]);
 
   useEffect(() => {
     const handler = () => {
       if (atBottomRef.current) {
-        virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "smooth" });
+        virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" });
       }
     };
     window.addEventListener("virtuoso-resize", handler);
     return () => window.removeEventListener("virtuoso-resize", handler);
   }, []);
 
+  useEffect(() => {
+    const scroller = document.querySelector('[data-testid="virtuoso-scroller"]');
+    if (!scroller) return;
+    const onScroll = () => {
+      const el = scroller as HTMLElement;
+      const distBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    };
+    scroller.addEventListener("scroll", onScroll);
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, [isAtBottom]);
+
   return (
     <ImageViewerProvider>
       <div className="flex h-full">
         {/* 聊天区 */}
-        <div className="flex-1 flex flex-col min-w-0 pixel-bg overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Virtuoso
             ref={virtuosoRef}
             className="flex-1 min-h-0"
             followOutput="auto"
-            atBottomStateChange={(atBottom) => { atBottomRef.current = atBottom; setIsAtBottom(atBottom); }}
+            atBottomStateChange={(atBottom) => {
+              console.log("[scroll-debug] atBottomStateChange:", atBottom, "| msgs:", messages.length);
+              atBottomRef.current = atBottom;
+              setIsAtBottom(atBottom);
+            }}
             data={messages}
             computeItemKey={(_, msg) => msg.id}
             itemContent={(index, msg) => (
@@ -325,18 +341,21 @@ export default function ChatPage() {
             <div className="max-w-3xl mx-auto relative">
               {!isAtBottom && messages.length > 5 && (
                 <button
-                  onClick={() => virtuosoRef.current?.scrollToIndex({ index: "LAST", behavior: "smooth" })}
-                  className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-muted-foreground/15 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer absolute -top-12 right-0"
+                  onClick={() => {
+                    console.log("[scroll-debug] 点击下滑 | isAtBottom:", isAtBottom, "| msgs:", messages.length);
+                    virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" });
+                  }}
+                  className="brutal-btn bg-yellow text-foreground w-8 h-8 flex items-center justify-center cursor-pointer absolute -top-12 right-0"
                 >
-                  <ChevronDown className="size-3.5 text-muted-foreground/50" />
+                  <ChevronDown className="size-3.5" />
                 </button>
               )}
             </div>
-            <div className="pixel-input-group max-w-3xl mx-auto">
+            <div className="brutal bg-card max-w-3xl mx-auto">
               {images.length > 0 && (
                 <div className="flex items-center gap-2 px-3 pt-2 pb-1 overflow-x-auto">
                   {images.map((img, i) => (
-                    <div key={i} className="relative shrink-0 h-10 border-2 border-muted-foreground/15">
+                    <div key={i} className="relative shrink-0 h-10 border-2 border-border">
                       {img.modality === 'video' ? (
                         <div className="w-16 h-10 bg-black flex items-center justify-center text-white text-xs">
                           <span className="text-[10px]">▶ 视频</span>
@@ -346,7 +365,7 @@ export default function ChatPage() {
                       )}
                       <button
                         onClick={() => removeImage(i)}
-                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-muted-foreground/80 text-white text-[10px] flex items-center justify-center cursor-pointer"
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-ink text-white text-[10px] flex items-center justify-center cursor-pointer"
                       >
                         ×
                       </button>
@@ -358,7 +377,7 @@ export default function ChatPage() {
                 <div className="flex items-center justify-between px-3 pt-2 pb-1">
                   <div className="flex items-center gap-1">
                     <button
-                      className="pixel-btn-ghost px-2 py-0.5 text-xs font-mono font-bold"
+                      className="brutal-btn bg-card px-2 py-0.5 text-xs font-mono font-bold"
                       onClick={handleCompress}
                       disabled={compressState === "loading"}
                     >
@@ -372,7 +391,7 @@ export default function ChatPage() {
                 rows={1}
                 placeholder="输入消息..."
                 disabled={isLoading}
-                className="pixel-input w-full min-h-10 max-h-80 px-3 py-2 text-sm outline-none resize-none overflow-y-auto placeholder:text-muted-foreground/30"
+                className="w-full min-h-10 max-h-80 px-3 py-2 text-sm outline-none resize-none overflow-y-auto placeholder:text-muted-foreground/50 bg-transparent"
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
                 onInput={handleInput}
@@ -389,7 +408,7 @@ export default function ChatPage() {
                   <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="pixel-btn-image px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"
+                    className="brutal-btn bg-card px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"
                   >
                     <ImageIcon className="size-3.5" />
                   </button>
@@ -398,8 +417,7 @@ export default function ChatPage() {
                   <button
                     type="button"
                     onClick={stop}
-                    style={{ background: "#000", color: "#000", border: "2px solid #000" }}
-                    className="h-8 w-8 flex items-center justify-center cursor-pointer font-bold"
+                    className="brutal-btn bg-ink text-white h-8 w-8 flex items-center justify-center cursor-pointer font-bold"
                     title="停止生成"
                   >
                     <Square className="size-3.5" style={{ background: "#fff" }}/>
@@ -407,9 +425,8 @@ export default function ChatPage() {
                 ) : (
                   <button
                     type="button"
-                    disabled={false}
                     onClick={async () => await handleSend()}
-                    className="pixel-btn h-8 w-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                    className="brutal-btn bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center cursor-pointer"
                   >
                     <Send className="size-3.5" />
                   </button>

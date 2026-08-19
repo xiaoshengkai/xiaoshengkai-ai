@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import PixelLoading from "@/components/ui/pixel-loading";
+import Loading from "@/components/ui/loading";
 import { useImageViewer } from "./image-viewer";
 
 interface GeneratedImageProps {
@@ -32,12 +32,12 @@ export default function GeneratedImage({ src, alt }: GeneratedImageProps) {
   }, [state]);
 
   if (state === "loading") {
-    return <PixelLoading text="图片加载中..." />;
+    return <Loading text="图片加载中..." />;
   }
 
   if (state === "error") {
     return (
-      <span className="pixel-bubble-ai p-3 my-2 text-xs text-destructive font-mono" style={{ display: "block" }}>
+      <span className="brutal bg-card my-2 inline-block p-3 text-xs text-destructive font-mono">
         [图片加载失败]
       </span>
     );
@@ -48,7 +48,7 @@ export default function GeneratedImage({ src, alt }: GeneratedImageProps) {
     <img
       src={src}
       alt={alt}
-      className="pixel-img my-2 cursor-zoom-in"
+      className="border-[3px] shadow-md my-2 cursor-zoom-in max-w-full"
       onClick={() => open(indexRef.current!)}
     />
   );

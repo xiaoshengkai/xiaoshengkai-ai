@@ -1,15 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource/fusion-pixel-12px-proportional-sc";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/plus-jakarta-sans/700.css";
+@import "@fontsource/plus-jakarta-sans/800.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
 
-@custom-variant dark (&:is(.dark *));
 @plugin "@tailwindcss/typography";
 
 @theme inline {
-  --font-sans: 'Fusion Pixel 12px Proportional SC', ui-monospace, monospace;
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-code);
+  --font-heading: var(--font-head);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,6 +47,28 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-pink: var(--pink);
+  --color-pink-soft: var(--pink-soft);
+  --color-yellow: var(--yellow);
+  --color-yellow-soft: var(--yellow-soft);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --color-lime: var(--lime);
+  --color-lime-soft: var(--lime-soft);
+  --color-orange: var(--orange);
+  --color-orange-soft: var(--orange-soft);
+  --color-purple: var(--purple);
+  --color-purple-soft: var(--purple-soft);
+
+  --shadow-sm: var(--shadow-1);
+  --shadow-md: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -48,88 +78,70 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+/* ============ 主题：Neo-Brutalism 糖果色（default） ============ */
+[data-theme="default"] {
+  --background: #FFFFFF;
+  --foreground: #0A0A0A;
+  --card: #FFFFFF;
+  --card-foreground: #0A0A0A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0A0A0A;
+  --primary: #FFE135;
+  --primary-foreground: #0A0A0A;
+  --secondary: #FFF3B0;
+  --secondary-foreground: #0A0A0A;
+  --muted: #F5F5F5;
+  --muted-foreground: #3A3A3A;
+  --accent: #FF1493;
+  --accent-foreground: #FFFFFF;
+  --destructive: #FF0000;
+  --border: #000000;
+  --input: #FFFFFF;
+  --ring: #FFE135;
+  --chart-1: #FF1493;
+  --chart-2: #FFE135;
+  --chart-3: #00BFFF;
+  --chart-4: #ADFF2F;
+  --chart-5: #FF8C00;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0A0A0A;
+  --sidebar-primary: #FFE135;
+  --sidebar-primary-foreground: #0A0A0A;
+  --sidebar-accent: #FFF3B0;
+  --sidebar-accent-foreground: #0A0A0A;
+  --sidebar-border: #000000;
+  --sidebar-ring: #FFE135;
+  --radius: 0;
 
-  --pixel-blue: #5B8DEF;
-  --pixel-blue-dark: #3D5C9E;
-  --pixel-red: #FF6B6B;
-  --pixel-red-dark: #C94444;
-  --pixel-green: #6BCB77;
-  --pixel-green-dark: #3D9E4C;
-  --pixel-yellow: #FFD166;
-  --pixel-yellow-dark: #C9A344;
-  --pixel-purple: #9B59B6;
-  --pixel-purple-dark: #7D3C98;
-  --pixel-bg: #F0F4FF;
-  --pixel-text: #ffffff;
+  --ink: #0A0A0A;
+  --paper: #FFFFFF;
+  --pink: #FF1493;
+  --pink-soft: #FFD3E9;
+  --yellow: #FFE135;
+  --yellow-soft: #FFF3B0;
+  --blue: #00BFFF;
+  --blue-soft: #C9ECFF;
+  --lime: #16A34A;
+  --lime-soft: #DCFCE7;
+  --orange: #FF8C00;
+  --orange-soft: #FFE3C2;
+  --purple: #A855F7;
+  --purple-soft: #ECDDFF;
 
-  --font-pixel: 'Fusion Pixel 12px Proportional SC', monospace;
+  --shadow-1: 2px 2px 0 #000;
+  --shadow-2: 5px 5px 0 #000;
+  --shadow-3: 9px 9px 0 #000;
+
+  --font-body: 'Inter', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
+  --font-code: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+  --font-head: 'Plus Jakarta Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* 页面级作用域主题：在子树内覆盖 primary */
+/* pink: settings 页面（粉+黄混合好看） */
+[data-theme="pink"] {
+  --primary: #FF1493;
+  --primary-foreground: #0A0A0A;
 }
 
 @layer base {
@@ -137,7 +149,7 @@
     border-color: var(--border);
     outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 30%, transparent) transparent;
+    scrollbar-color: var(--primary) var(--muted);
   }
   body {
     background-color: var(--background);
@@ -146,306 +158,108 @@
   html {
     font-family: var(--font-sans);
   }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 12px;
+  height: 12px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--muted);
+  border-left: 3px solid var(--border);
 }
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, var(--muted-foreground) 25%, transparent);
-  border-radius: 0;
+  background: var(--primary);
+  border: 3px solid var(--border);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklch, var(--muted-foreground) 40%, transparent);
+  background: var(--blue);
 }
 
-.pixel-bg {
-  --dot-color: color-mix(in oklch, var(--foreground) 8%, transparent);
-  background-image:
-    radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
-  background-size: 12px 12px;
-  position: relative;
+/* ============ Neo-Brutalism 交互类 ============ */
+@layer components {
+  /* 静态：纯黑边框 + 硬阴影（消息气泡 / 静态卡片） */
+  .brutal {
+    border: 3px solid var(--border);
+    box-shadow: var(--shadow-md);
+  }
+  .brutal-sm {
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow-sm);
+  }
+  .brutal-lg {
+    border: 3px solid var(--border);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* 交互：hover 位移 + 阴影扩大，active 物理按压（按钮 / 可点卡片） */
+  .brutal-btn {
+    border: 3px solid var(--border);
+    box-shadow: var(--shadow-md);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    cursor: pointer;
+  }
+  .brutal-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--shadow-lg);
+  }
+  .brutal-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: var(--shadow-sm);
+  }
+  .brutal-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* 标签 / 徽章 */
+  .brutal-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    background: var(--card);
+    font-family: var(--font-code);
+    font-weight: 700;
+  }
+
+  /* 输入框 */
+  .brutal-input {
+    border: 3px solid var(--border);
+    background: var(--card);
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  .brutal-input:focus {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 3px 3px 0 var(--ring);
+  }
 }
 
-.pixel-bg::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    color-mix(in oklch, var(--foreground) 3%, transparent) 2px,
-    color-mix(in oklch, var(--foreground) 3%, transparent) 4px
-  );
-}
-
-.pixel-bubble {
-  border: 3px solid var(--primary);
-  box-shadow:
-    3px 0 0 0 var(--primary),
-    0 3px 0 0 var(--primary),
-    3px 3px 0 0 var(--primary),
-    -3px 0 0 0 var(--primary),
-    0 -3px 0 0 var(--primary),
-    -3px -3px 0 0 var(--primary),
-    3px -3px 0 0 var(--primary),
-    -3px 3px 0 0 var(--primary);
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.pixel-bubble-ai {
-  border: 3px solid var(--border);
-  box-shadow:
-    3px 0 0 0 var(--border),
-    0 3px 0 0 var(--border),
-    3px 3px 0 0 var(--border),
-    -3px 0 0 0 var(--border),
-    0 -3px 0 0 var(--border),
-    -3px -3px 0 0 var(--border),
-    3px -3px 0 0 var(--border),
-    -3px 3px 0 0 var(--border);
-  background: var(--muted);
-}
-
-.pixel-avatar {
-  border: 1px solid currentColor;
-  box-shadow:
-    2px 0 0 0 currentColor,
-    0 2px 0 0 currentColor,
-    2px 2px 0 0 currentColor;
-  image-rendering: pixelated;
-}
-
-.pixel-input {
-  border: 3px solid color-mix(in oklch, var(--muted-foreground) 30%, transparent);
-  box-shadow:
-    3px 0 0 0 color-mix(in oklch, var(--muted-foreground) 30%, transparent),
-    0 3px 0 0 color-mix(in oklch, var(--muted-foreground) 30%, transparent),
-    3px 3px 0 0 color-mix(in oklch, var(--muted-foreground) 30%, transparent);
-  background: var(--background);
-  font-family: var(--font-pixel), monospace;
-}
-
-.pixel-input:focus {
-  border-color: var(--primary);
-  box-shadow:
-    3px 0 0 0 var(--primary),
-    0 3px 0 0 var(--primary),
-    3px 3px 0 0 var(--primary);
-}
-
-.pixel-input-group {
-  border: 3px solid color-mix(in oklch, var(--muted-foreground) 30%, transparent);
-  box-shadow:
-    3px 0 0 0 color-mix(in oklch, var(--muted-foreground) 30%, transparent),
-    0 3px 0 0 color-mix(in oklch, var(--muted-foreground) 30%, transparent),
-    3px 3px 0 0 color-mix(in oklch, var(--muted-foreground) 30%, transparent);
-  background: var(--background);
-}
-.pixel-input-group:focus-within {
-  border-color: var(--primary);
-  box-shadow:
-    3px 0 0 0 var(--primary),
-    0 3px 0 0 var(--primary),
-    3px 3px 0 0 var(--primary);
-}
-.pixel-input-group .pixel-input {
-  border: none;
-  box-shadow: none;
-}
-
-.pixel-btn {
-  border: 3px solid var(--primary);
-  box-shadow:
-    3px 0 0 0 var(--primary),
-    0 3px 0 0 var(--primary),
-    3px 3px 0 0 var(--primary);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-family: monospace;
-  font-weight: bold;
-  transition: none;
-}
-.pixel-btn:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--primary) 85%, black);
-  border-color: color-mix(in oklch, var(--primary) 85%, black);
-  box-shadow:
-    3px 0 0 0 color-mix(in oklch, var(--primary) 85%, black),
-    0 3px 0 0 color-mix(in oklch, var(--primary) 85%, black),
-    3px 3px 0 0 color-mix(in oklch, var(--primary) 85%, black);
-}
-.pixel-btn:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: none;
-}
-
-.pixel-btn-ghost {
-  border: 2px solid var(--pixel-blue);
-  box-shadow: 2px 0 0 0 var(--pixel-blue-dark), 0 2px 0 0 var(--pixel-blue-dark), 2px 2px 0 0 var(--pixel-blue-dark);
-  background: transparent;
-  color: var(--pixel-blue);
-  cursor: pointer;
-}
-.pixel-btn-ghost:hover:not(:disabled) {
-  border-color: var(--pixel-blue);
-  box-shadow: 2px 0 0 0 var(--pixel-blue-dark), 0 2px 0 0 var(--pixel-blue-dark), 2px 2px 0 0 var(--pixel-blue-dark);
-  background: var(--pixel-blue);
-  color: var(--pixel-text);
-}
-.pixel-btn-ghost:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: none;
-}
-
-.pixel-btn-danger {
-  border: 2px solid var(--pixel-red);
-  box-shadow: 2px 0 0 0 var(--pixel-red-dark), 0 2px 0 0 var(--pixel-red-dark), 2px 2px 0 0 var(--pixel-red-dark);
-  background: transparent;
-  color: var(--pixel-red);
-  cursor: pointer;
-}
-.pixel-btn-danger:hover:not(:disabled) {
-  border-color: var(--pixel-red);
-  box-shadow: 2px 0 0 0 var(--pixel-red-dark), 0 2px 0 0 var(--pixel-red-dark), 2px 2px 0 0 var(--pixel-red-dark);
-  background: var(--pixel-red);
-  color: var(--pixel-text);
-}
-.pixel-btn-danger:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: none;
-}
-
-.pixel-btn-image {
-  border: 2px solid color-mix(in oklch, var(--muted-foreground) 30%, transparent);
-  box-shadow: 2px 0 0 0 color-mix(in oklch, var(--muted-foreground) 20%, transparent), 0 2px 0 0 color-mix(in oklch, var(--muted-foreground) 20%, transparent), 2px 2px 0 0 color-mix(in oklch, var(--muted-foreground) 20%, transparent);
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.pixel-btn-image:hover:not(:disabled) {
-  background: var(--muted);
-  color: var(--foreground);
-}
-.pixel-btn-image:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: none;
-}
-
-@keyframes pixel-load-1 {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.3); }
-}
-@keyframes pixel-load-2 {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  25%, 75% { opacity: 1; transform: scale(1.3); }
-}
-@keyframes pixel-load-3 {
-  0%, 20%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.3); }
-}
-@keyframes pixel-load-4 {
-  0%, 40%, 100% { opacity: 0.3; transform: scale(1); }
-  65% { opacity: 1; transform: scale(1.3); }
-}
-
-.pixel-load-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--primary);
-  display: inline-block;
-  image-rendering: pixelated;
-}
-.pixel-load-dot:nth-child(1) { animation: pixel-load-1 1.2s ease-in-out infinite; }
-.pixel-load-dot:nth-child(2) { animation: pixel-load-2 1.2s ease-in-out infinite; }
-.pixel-load-dot:nth-child(3) { animation: pixel-load-3 1.2s ease-in-out infinite; }
-.pixel-load-dot:nth-child(4) { animation: pixel-load-4 1.2s ease-in-out infinite; }
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.pixel-cursor {
-  display: inline-block;
-  width: 8px;
-  height: 14px;
-  background: var(--primary);
-  animation: blink 1s step-end infinite;
-  vertical-align: middle;
-  margin-left: 1px;
-}
-
+/* 消息进入动画 */
 @keyframes msg-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 .msg-enter {
   animation: msg-in 0.2s ease-out;
 }
 
-.pixel-img {
-  border: 2px solid var(--border);
-  box-shadow: 2px 2px 0 0 var(--border);
-  image-rendering: pixelated;
-  max-width: 100%;
-}
-
-.pixel-sidebar {
-  background: var(--background);
-  border-right: 2px solid var(--border);
-  font-family: var(--font-pixel), monospace;
-}
-
-.pixel-sidebar-active {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.pixel-panel {
-  background: var(--background);
-  font-family: var(--font-pixel), monospace;
-}
-
-.pixel-panel-item {
-  padding: 4px 6px;
-  border: 1px solid var(--border);
-  background: var(--muted);
-}
-
-.pixel-panel-card {
-  border: 2px solid var(--border);
-  box-shadow: 2px 0 0 0 var(--border), 0 2px 0 0 var(--border), 2px 2px 0 0 var(--border);
-  background: var(--background);
-  overflow: hidden;
-}
-
-.pixel-panel-card-header {
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: bold;
-  font-family: var(--font-pixel), monospace;
-  color: var(--pixel-text);
-  border-bottom: 2px solid var(--border);
-}
-
-.pixel-panel-card-body {
-  padding: 8px 10px;
-  background: var(--muted);
-}
-
-.pixel-panel-header {
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: bold;
-  font-family: var(--font-pixel), monospace;
-  color: var(--pixel-text);
-  background: #000;
-  border-bottom: 2px solid var(--border);
+/* 尊重减少动态偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  html { scroll-behavior: auto; }
 }

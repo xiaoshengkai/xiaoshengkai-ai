@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { useConversation } from "@/components/layout/conversation-context";
-import PixelLogo from "@/components/ui/pixel-logo";
+import Logo from "@/components/ui/logo";
 import {
   Database,
   Wrench,
@@ -110,25 +110,20 @@ export default function LeftSidebar({
   };
 
   return (
-    <aside className="pixel-sidebar w-[240px] shrink-0 h-dvh flex flex-col">
+    <aside className="w-[240px] shrink-0 h-dvh flex flex-col bg-card border-r-[3px] border-border">
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-3 px-4 py-4 border-b-2 border-border">
-        <PixelLogo size={10} />
-        <span className="text-sm font-bold font-[family-name:var(--font-pixel)] tracking-wider">
+      <Link href="/" className="flex items-center gap-3 px-4 py-4 border-b-[3px] border-border">
+        <Logo size={10} />
+        <span className="text-sm font-bold font-heading tracking-wider">
           小盛开AI
         </span>
       </Link>
 
       {/* 新对话 */}
-      <div className="px-3 py-2 border-b-2 border-border">
+      <div className="px-3 py-2 border-b-[3px] border-border">
         <button
           onClick={handleNewClick}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm font-[family-name:var(--font-pixel)] cursor-pointer w-full border-2 text-white"
-          style={{
-            background: "var(--pixel-red)",
-            borderColor: "var(--pixel-red)",
-            boxShadow: "3px 0 0 0 var(--pixel-red-dark), 0 3px 0 0 var(--pixel-red-dark), 3px 3px 0 0 var(--pixel-red-dark)",
-          }}
+          className="brutal-btn flex items-center gap-2 px-3 py-1.5 text-sm font-mono font-bold cursor-pointer w-full bg-primary text-primary-foreground"
         >
           <Plus className="size-3.5" />
           <span>新对话</span>
@@ -144,9 +139,8 @@ export default function LeftSidebar({
                 onSelectConversation(conv.id);
                 if (pathname !== "/") router.push("/");
               }}
-              className={`group flex items-center gap-2 px-2 py-1.5 cursor-pointer text-sm font-[family-name:var(--font-pixel)] border-2 relative
-                ${activeConversationId === conv.id ? "border-[var(--pixel-blue)]" : "border-border hover:bg-muted"}`}
-              style={activeConversationId === conv.id ? { background: "var(--pixel-blue)", color: "#fff", borderColor: "var(--pixel-blue)" } : undefined}
+              className={`group flex items-center gap-2 px-2 py-1.5 cursor-pointer text-sm font-mono border-2 relative
+                ${activeConversationId === conv.id ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
             >
               <span className="flex-1 truncate">{conv.title}</span>
               <button
@@ -156,26 +150,26 @@ export default function LeftSidebar({
                   setMenuPos({ top: rect.bottom, left: rect.right + 4 });
                   setMenuOpen(menuOpen === conv.id ? null : conv.id);
                 }}
-                className={`shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer ${activeConversationId === conv.id ? "text-white/70 hover:text-white" : "text-muted-foreground/50 hover:text-foreground"}`}
+                className={`shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer ${activeConversationId === conv.id ? "text-foreground/70 hover:text-foreground" : "text-muted-foreground/50 hover:text-foreground"}`}
               >
                 <MoreHorizontal className="size-4" />
               </button>
               {menuOpen === conv.id && (
                 <div
-                  className="fixed z-50 border-2 border-border shadow-sm py-1 min-w-[100px]"
-                  style={{ top: menuPos.top, left: menuPos.left, background: "var(--muted)", color: "var(--foreground)" }}
+                  className="fixed z-50 brutal bg-card py-1 min-w-[100px]"
+                  style={{ top: menuPos.top, left: menuPos.left }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     onClick={() => handlePin(conv.id, !!conv.pinned)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-[family-name:var(--font-pixel)] hover:bg-muted cursor-pointer w-full text-foreground"
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono hover:bg-muted cursor-pointer w-full text-foreground"
                   >
                     <Pin className="size-3.5" />
                     <span>{conv.pinned ? "取消置顶" : "置顶"}</span>
                   </button>
                   <button
                     onClick={() => handleDelete(conv.id)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-[family-name:var(--font-pixel)] hover:bg-muted cursor-pointer w-full text-destructive"
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono hover:bg-muted cursor-pointer w-full text-destructive"
                   >
                     <Trash2 className="size-3.5" />
                     <span>删除</span>
@@ -196,7 +190,7 @@ export default function LeftSidebar({
               key={item.href}
               href={isDisabled ? "#" : item.href}
               target={isExternal ? "_blank" : undefined}
-              className={`flex items-center gap-3 px-3 py-2 text-sm font-[family-name:var(--font-pixel)] transition-colors
+              className={`flex items-center gap-3 px-3 py-2 text-sm font-mono transition-colors
                 ${isDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-muted"}`}
               onClick={(e) => isDisabled && e.preventDefault()}
             >
@@ -208,7 +202,7 @@ export default function LeftSidebar({
       </nav>
 
       {/* 版权 */}
-      <div className="px-3 pb-3 text-[10px] text-muted-foreground font-[family-name:var(--font-pixel)] text-center">
+      <div className="px-3 pb-3 text-[10px] text-muted-foreground font-mono text-center">
         © 2026 开盛
       </div>
     </aside>

@@ -71,11 +71,10 @@ setSaveState("success");
       toast("已保存到知识库", {
         duration: 1000,
         style: {
-          border: "2px solid var(--pixel-green)",
-          boxShadow: "2px 0 0 0 var(--pixel-green-dark), 0 2px 0 0 var(--pixel-green-dark), 2px 2px 0 0 var(--pixel-green-dark)",
-          background: "var(--pixel-green)",
+          border: "3px solid #000",
+          boxShadow: "4px 4px 0 #000",
+          background: "var(--lime)",
           color: "#fff",
-          borderRadius: 0,
           fontFamily: "monospace",
           fontSize: "0.75rem",
           padding: "4px 12px",
@@ -87,11 +86,10 @@ setSaveState("success");
 toast.error("保存失败，请重试", {
         duration: 1000,
         style: {
-          border: "2px solid var(--pixel-red)",
-          boxShadow: "2px 0 0 0 var(--pixel-red-dark), 0 2px 0 0 var(--pixel-red-dark), 2px 2px 0 0 var(--pixel-red-dark)",
-          background: "var(--pixel-red)",
+          border: "3px solid #000",
+          boxShadow: "4px 4px 0 #000",
+          background: "var(--destructive)",
           color: "#fff",
-          borderRadius: 0,
           fontFamily: "monospace",
           fontSize: "0.75rem",
           padding: "4px 12px",
@@ -105,13 +103,16 @@ toast.error("保存失败，请重试", {
     <div>
       <div className={cn("flex gap-3 msg-enter min-w-0", msg.role === "user" ? "justify-end" : "justify-start")}>
         {msg.role !== "user" && (
-          <div className="pixel-avatar shrink-0 w-8 h-8 bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-[family-name:var(--font-pixel)] font-bold mt-0.5">
+          <div className="shrink-0 w-8 h-8 bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-mono font-bold mt-0.5 border-2">
             AI
           </div>
         )}
         <div className={msg.role === "user" ? "max-w-[80%] min-w-0" : "w-[80%]"}>
-          <div className={cn("px-4 py-2.5 text-sm font-[family-name:var(--font-pixel)]", msg.role === "user" ? "pixel-bubble" : "pixel-bubble-ai")}>
-            <div className={msg.role !== "user" ? "prose dark:prose-invert prose-sm max-w-none [&_img]:pixel-img overflow-hidden" : "whitespace-pre-wrap break-words"}>
+          <div
+            className={cn("px-4 py-2.5 text-sm border-[3px]", msg.role === "user" ? "bg-ink text-white border-ink" : "bg-card text-foreground shadow-md")}
+            style={msg.role === "user" ? { boxShadow: "5px 5px 0 var(--yellow)" } : undefined}
+          >
+            <div className={msg.role !== "user" ? "prose prose-sm max-w-none overflow-hidden" : "whitespace-pre-wrap break-words"}>
               {deduplicatedParts.map((part, i) => {
                 if (part.type === "text") {
                   if (msg.role === "user") {
@@ -125,11 +126,11 @@ toast.error("保存失败，请重试", {
                             const url = m[2];
                             if (tag === "视频") {
                               return (
-                                <video key={j} src={url} controls className="max-w-full max-h-48 pixel-img mb-2" />
+                                <video key={j} src={url} controls className="max-w-full max-h-48 border-[3px] shadow-md mb-2" />
                               );
                             }
                             const index = register(url);
-                            return <img key={j} src={url} onClick={() => open(index)} className="max-w-full max-h-48 pixel-img mb-2 cursor-zoom-in" alt="图片" />;
+                            return <img key={j} src={url} onClick={() => open(index)} className="max-w-full max-h-48 border-[3px] shadow-md mb-2 cursor-zoom-in" alt="图片" />;
                           }
                           return seg ? <span key={j}>{seg}</span> : null;
                         })}
@@ -151,7 +152,7 @@ toast.error("保存失败，请重试", {
                 if (part.type === "file" && part.mediaType?.startsWith("image/")) {
                   return (
                     <div key={i} className="mb-2">
-                      <img src={(part as any).data} alt={(part as any).name || "图片"} className="max-w-full max-h-48 pixel-img" />
+                      <img src={(part as any).data} alt={(part as any).name || "图片"} className="max-w-full max-h-48 border-[3px] shadow-md" />
                     </div>
                   );
                 }
@@ -238,7 +239,7 @@ toast.error("保存失败，请重试", {
           </div>
         </div>
         {msg.role === "user" && (
-          <div className="pixel-avatar shrink-0 w-8 h-8 bg-primary/20 text-primary flex items-center justify-center text-[10px] font-[family-name:var(--font-pixel)] font-bold mt-0.5">
+          <div className="shrink-0 w-8 h-8 bg-pink text-white flex items-center justify-center text-[10px] font-mono font-bold mt-0.5 border-2">
             ME
           </div>
         )}

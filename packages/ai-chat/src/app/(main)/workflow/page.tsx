@@ -2,6 +2,7 @@
 
 import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Play, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -23,6 +24,7 @@ interface Execution {
 }
 
 export default function WorkflowPage() {
+  const router = useRouter();
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -164,49 +166,53 @@ export default function WorkflowPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h2 className="text-lg font-bold text-gray-800">⚙️ 工作流</h2>
-        <button onClick={openCreate}
-          className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
-          style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
-          <Plus className="w-3 h-3" />新建工作流
-        </button>
+      <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border">
+        <h2 className="text-lg font-bold text-foreground font-heading">工作流</h2>
+        <div className="flex gap-2">
+          <button onClick={() => router.push("/")}
+            className="brutal-btn px-3 py-1 text-xs font-bold bg-card text-foreground">
+            返回聊天
+          </button>
+          <button onClick={openCreate}
+            className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold bg-primary text-primary-foreground">
+            <Plus className="w-3 h-3" />新建工作流
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4">
         {executions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
             <span className="text-3xl">⚡</span>
             <p className="text-sm">暂无执行记录</p>
-            <p className="text-xs text-gray-300">点击「新建工作流」开始</p>
+            <p className="text-xs text-muted-foreground/60">点击「新建工作流」开始</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {sortedExecutions.map(exe => {
-              const statusBar = exe.status === "failed" ? "#f87171"
-                : exe.status === "running" ? "#fbbf24"
-                : exe.status === "completed" ? "#4ade80" : "#9ca3af";
+              const statusBar = exe.status === "failed" ? "var(--destructive)"
+                : exe.status === "running" ? "var(--yellow)"
+                : exe.status === "completed" ? "var(--blue)" : "var(--muted-foreground)";
               const pct = Math.round((exe.completedSteps / exe.totalSteps) * 100);
               return (
                 <div key={exe.executionId}
-                  className="pixel-card bg-white rounded-lg p-3 cursor-pointer transition-transform hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0_#1A1A1A]"
-                  style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A" }}
+                  className="brutal-btn bg-card p-3 cursor-pointer"
                   onClick={() => { window.location.href = `/workflow/execution/${exe.executionId}`; }}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                      exe.status === "completed" ? "bg-green-500" :
-                      exe.status === "running" ? "bg-yellow-400 animate-pulse" :
-                      exe.status === "failed" ? "bg-red-500" : "bg-gray-400"
+                      exe.status === "completed" ? "bg-lime" :
+                      exe.status === "running" ? "bg-yellow animate-pulse" :
+                      exe.status === "failed" ? "bg-destructive" : "bg-muted-foreground"
                     }`} />
-                    <span className="text-sm font-bold text-gray-800 truncate">
+                    <span className="text-sm font-bold text-foreground truncate">
                       {exe.title || exe.templateLabel}
                     </span>
-                    <span className={`inline-block text-xs px-1.5 py-0.5 rounded shrink-0 ${
-                      exe.status === "failed" ? "bg-red-100 text-red-700" :
-                      exe.status === "running" ? "bg-yellow-100 text-yellow-700" :
-                      exe.status === "completed" ? "bg-green-100 text-green-700" :
-                      "bg-gray-100 text-gray-600"
+                    <span className={`inline-block text-xs px-1.5 py-0.5 shrink-0 ${
+                      exe.status === "failed" ? "bg-destructive text-white" :
+                      exe.status === "running" ? "bg-yellow text-foreground" :
+                      exe.status === "completed" ? "text-foreground" :
+                      "bg-muted text-muted-foreground"
                     }`}>
                       {exe.status === "completed" ? "✅ 完成" :
                        exe.status === "running" ? "🔄 执行中" :
@@ -215,25 +221,25 @@ export default function WorkflowPage() {
                     <div className="flex-1" />
                     <button
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(exe.executionId); }}
-                      className="text-xs text-gray-400 hover:text-red-500 cursor-pointer shrink-0">
+                      className="brutal-sm bg-destructive text-white px-2 py-0.5 text-xs font-bold cursor-pointer shrink-0">
                       删除
                     </button>
                   </div>
-                  <p className="text-xs text-gray-400 mb-1">工作流名称: {exe.templateLabel}</p>
-                  <p className="text-xs text-gray-500 mb-1">开始: {formatDate(exe.startedAt)}</p>
+                  <p className="text-xs text-muted-foreground/70 mb-1">工作流名称: {exe.templateLabel}</p>
+                  <p className="text-xs text-muted-foreground mb-1">开始: {formatDate(exe.startedAt)}</p>
                   {exe.completedAt && (
-                    <p className="text-xs text-gray-500 mb-1">完成: {formatDate(exe.completedAt)}</p>
+                    <p className="text-xs text-muted-foreground mb-1">完成: {formatDate(exe.completedAt)}</p>
                   )}
                   {exe.failedStep && (
-                    <p className="text-xs text-red-500 mb-1 truncate" title={`${exe.failedStep}: ${exe.failedError}`}>
+                    <p className="text-xs text-destructive mb-1 truncate" title={`${exe.failedStep}: ${exe.failedError}`}>
                       <span className="font-medium">{exe.failedStep}</span>: {exe.failedError}
                     </p>
                   )}
                   <div className="flex items-center gap-2 mt-1.5">
-                    <div className="flex-1 h-1 bg-gray-200 rounded overflow-hidden">
-                      <div className="h-full rounded transition-all" style={{ width: `${pct}%`, background: statusBar }} />
+                    <div className="flex-1 h-2 border-2 border-border bg-muted overflow-hidden">
+                      <div className="h-full transition-all" style={{ width: `${pct}%`, background: statusBar }} />
                     </div>
-                    <span className="text-xs text-gray-600 font-medium">{exe.completedSteps}/{exe.totalSteps}</span>
+                    <span className="text-xs text-muted-foreground font-medium">{exe.completedSteps}/{exe.totalSteps}</span>
                   </div>
                 </div>
               );
@@ -245,27 +251,26 @@ export default function WorkflowPage() {
       {/* 新建弹窗 */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowCreate(false)}>
-          <div className="bg-white rounded-lg p-6 w-[480px] max-h-[80vh] overflow-auto"
-            style={{ border: "3px solid #1A1A1A", boxShadow: "6px 6px 0 #1A1A1A" }}
+          <div className="brutal bg-card p-6 w-[480px] max-h-[80vh] overflow-auto"
             onClick={e => e.stopPropagation()}>
-            <h3 className="text-sm font-bold text-gray-800 mb-4">新建工作流</h3>
+            <h3 className="text-sm font-bold text-foreground mb-4">新建工作流</h3>
             {!selectedTemplate ? (
               <div className="grid grid-cols-1 gap-2">
                 {templates.map(t => (
                   <div key={t.id} onClick={() => selectTemplate(t)}
-                    className="p-3 rounded border-2 border-gray-200 cursor-pointer transition-all hover:border-blue-400 hover:shadow-sm"
+                    className="p-3 border-2 border-border cursor-pointer hover:bg-muted"
                     title={t.description}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-bold text-gray-800">{t.label}</span>
-                      <span className="text-xs text-gray-400">{t.steps.length} 步</span>
+                      <span className="text-sm font-bold text-foreground">{t.label}</span>
+                      <span className="text-xs text-muted-foreground">{t.steps.length} 步</span>
                     </div>
-                    <div className="text-xs text-gray-500">{t.description}</div>
+                    <div className="text-xs text-muted-foreground">{t.description}</div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="text-sm font-bold text-gray-800 mb-2">{selectedTemplate.label}</div>
+                <div className="text-sm font-bold text-foreground mb-2">{selectedTemplate.label}</div>
                 {selectedTemplate.params.filter(p => {
                     if (p.name === "voice_id" && formValues["enable_tts"] === "no") return false;
                     if (p.name === "bgm_volume" && formValues["enable_bgm"] === "no") return false;
@@ -273,22 +278,21 @@ export default function WorkflowPage() {
                     return true;
                   }).map(p => (
                   <div key={p.name}>
-                    <label className="text-xs text-gray-500 block mb-1">
-                      {p.label} {p.required && <span className="text-red-400">*</span>}
+                    <label className="text-xs text-muted-foreground block mb-1">
+                      {p.label} {p.required && <span className="text-destructive">*</span>}
                     </label>
                     {p.type === "select" ? (
                       <select value={formValues[p.name] || ""} onChange={e => setFormValues({ ...formValues, [p.name]: e.target.value })}
-                        className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded bg-white">
+                        className="w-full px-2 py-1 text-xs border-2 border-border bg-card">
                         {p.options?.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : p.name === "bgm_file" ? (
                       <div className="flex gap-2 items-center">
                         <input type="text" value={formValues[p.name] || ""} readOnly
                           placeholder="未选择文件"
-                          className="flex-1 px-2 py-1 text-xs border-2 border-gray-300 rounded bg-gray-50" />
+                          className="flex-1 px-2 py-1 text-xs border-2 border-border bg-muted" />
                         <label
-                          className="pixel-btn shrink-0 px-2 py-1 text-xs font-bold cursor-pointer"
-                          style={{ border: "2px solid #1A1A1A", background: bgmUploading ? "#e2e8f0" : "#F59E0B", color: bgmUploading ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}
+                          className={`brutal-btn shrink-0 px-2 py-1 text-xs font-bold ${bgmUploading ? "bg-muted text-muted-foreground" : "bg-orange text-white"}`}
                         >
                           <Upload className="w-3 h-3 inline mr-1" />
                           {bgmUploading ? "上传中..." : "上传"}
@@ -308,13 +312,12 @@ export default function WorkflowPage() {
                               onChange={e => setFormValues({ ...formValues, [p.name]: e.target.value })}
                               placeholder={p.placeholder || ""}
                               rows={4}
-                              className="flex-1 px-2 py-1 text-xs border-2 border-gray-300 rounded resize-none"
+                              className="flex-1 px-2 py-1 text-xs border-2 border-border resize-none"
                             />
                             <button
                               onClick={handleAiGenerate}
                               disabled={aiGenerating}
-                              className="pixel-btn shrink-0 px-2 py-1 text-xs font-bold cursor-pointer self-start"
-                              style={{ border: "2px solid #1A1A1A", background: aiGenerating ? "#e2e8f0" : "#5B8DEF", color: aiGenerating ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}
+                              className={`brutal-btn shrink-0 px-2 py-1 text-xs font-bold self-start ${aiGenerating ? "bg-muted text-muted-foreground" : "bg-blue text-white"}`}
                             >
                               {aiGenerating ? "生成中..." : "✨ AI 智能生成"}
                             </button>
@@ -326,7 +329,7 @@ export default function WorkflowPage() {
                             onChange={e => setFormValues({ ...formValues, [p.name]: e.target.value })}
                             placeholder={p.placeholder || ""}
                             rows={4}
-                            className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded resize-none"
+                            className="w-full px-2 py-1 text-xs border-2 border-border resize-none"
                           />
                         )}
                       </div>
@@ -334,18 +337,16 @@ export default function WorkflowPage() {
                       <input type={p.type === "number" ? "number" : "text"}
                         value={formValues[p.name] || ""} onChange={e => setFormValues({ ...formValues, [p.name]: e.target.value })}
                         placeholder={p.placeholder || ""}
-                        className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded" />
+                        className="w-full px-2 py-1 text-xs border-2 border-border" />
                     )}
                   </div>
                 ))}
                 <div className="flex gap-2 mt-4 justify-end">
-                  <button onClick={() => setShowCreate(false)} className="pixel-btn px-3 py-1 text-xs font-bold cursor-pointer"
-                    style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#1A1A1A", boxShadow: "2px 2px 0 #1A1A1A" }}>
+                  <button onClick={() => setShowCreate(false)} className="brutal-btn px-3 py-1 text-xs font-bold bg-card text-foreground">
                     取消
                   </button>
                   <button onClick={handleCreate} disabled={executing}
-                    className="pixel-btn px-3 py-1 text-xs font-bold cursor-pointer"
-                    style={{ border: "2px solid #1A1A1A", background: executing ? "#e2e8f0" : "#5B8DEF", color: executing ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
+                    className={`brutal-btn px-3 py-1 text-xs font-bold ${executing ? "bg-muted text-muted-foreground" : "bg-blue text-white"}`}>
                     <Play className="w-3 h-3 inline mr-1" />{executing ? "创建中..." : "执行"}
                   </button>
                 </div>

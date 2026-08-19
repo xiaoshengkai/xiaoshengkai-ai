@@ -37,9 +37,9 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 function getLogColor(line: string) {
-  if (line.includes("[ERR]")) return { color: "var(--pixel-red)" };
-  if (line.includes("[INFO]")) return { color: "var(--pixel-blue)" };
-  if (line.includes("[WARN]")) return { color: "var(--pixel-yellow)" };
+  if (line.includes("[ERR]")) return { color: "var(--destructive)" };
+  if (line.includes("[INFO]")) return { color: "var(--blue)" };
+  if (line.includes("[WARN]")) return { color: "var(--orange)" };
   return {};
 }
 
@@ -115,18 +115,18 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
   }, [messages]);
 
   return (
-    <aside className="pixel-panel w-[280px] shrink-0 h-full flex flex-col overflow-hidden border-l-2 border-border">
-      <div className="pixel-panel-header">
+    <aside className="w-[280px] shrink-0 h-full flex flex-col overflow-hidden border-l-[3px] border-border bg-card">
+      <div className="px-3 py-2 text-sm font-bold font-mono text-white bg-ink border-b-[3px] border-border">
         状态面板
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {/* 模型 */}
-        <div className="pixel-panel-card">
-          <div className="pixel-panel-card-header" style={{ background: "var(--pixel-blue)", borderBottomColor: "var(--pixel-blue-dark)" }}>
+        <div className="brutal bg-card overflow-hidden">
+          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-foreground bg-blue border-b-[3px] border-border">
             模型
           </div>
-          <div className="pixel-panel-card-body">
+          <div className="p-2.5">
             {settings ? (
               <div className="space-y-1.5">
                 {Object.entries(MODULE_LABELS).map(([mod, label]) => {
@@ -134,7 +134,7 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
                   if (!sel) return null;
                   const pLabel = PROVIDER_LABELS[sel.provider] || sel.provider;
                   return (
-                    <div key={mod} className="flex items-center justify-between text-[11px] font-[family-name:var(--font-pixel)]">
+                    <div key={mod} className="flex items-center justify-between text-[11px] font-mono">
                       <span className="text-muted-foreground">{label}</span>
                       <span className="font-bold text-foreground">{pLabel}</span>
                     </div>
@@ -142,7 +142,7 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
                 })}
               </div>
             ) : (
-              <p className="text-[11px] font-[family-name:var(--font-pixel)] text-muted-foreground">
+              <p className="text-[11px] font-mono text-muted-foreground">
                 {stats.modelName === "MiniMax-M3" ? "🎨 MiniMax M3" : "🚀 DeepSeek"}
               </p>
             )}
@@ -150,18 +150,18 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
         </div>
 
         {/* Token 统计 */}
-        <div className="pixel-panel-card">
-          <div className="pixel-panel-card-header" style={{ background: "var(--pixel-green)", borderBottomColor: "var(--pixel-green-dark)" }}>
+        <div className="brutal bg-card overflow-hidden">
+          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-white bg-lime border-b-[3px] border-border">
             Token 统计
           </div>
-          <div className="pixel-panel-card-body">
-            <p className="text-[11px] font-[family-name:var(--font-pixel)] text-foreground/70">
+          <div className="p-2.5">
+            <p className="text-[11px] font-mono text-foreground/70">
               本轮消耗总 token
             </p>
             <p className="text-xs font-mono">
               {formatTokens(stats.totalTokens)} tokens
             </p>
-            <p className="text-[11px] font-[family-name:var(--font-pixel)] text-foreground/70 mt-1">
+            <p className="text-[11px] font-mono text-foreground/70 mt-1">
               本轮消耗金额
             </p>
             <p className="text-xs font-mono">
@@ -172,16 +172,16 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
 
         {/* 检索记忆 */}
         {stats.retrievedChunks && stats.retrievedChunks.length > 0 && (
-          <div className="pixel-panel-card">
-            <div className="pixel-panel-card-header" style={{ background: "var(--pixel-purple)", borderBottomColor: "var(--pixel-purple-dark)" }}>
+          <div className="brutal bg-card overflow-hidden">
+            <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-white bg-purple border-b-[3px] border-border">
               检索记忆 ({stats.retrievedChunks.length})
             </div>
-            <div className="pixel-panel-card-body max-h-[220px] overflow-y-auto">
+            <div className="p-2.5 max-h-[220px] overflow-y-auto">
               <div className="space-y-1.5">
                 {stats.retrievedChunks.map((chunk, i) => (
                   <div
                     key={i}
-                    className="pixel-panel-item text-[11px] font-[family-name:var(--font-pixel)] leading-relaxed"
+                    className="p-1.5 border-2 border-border bg-muted text-[11px] font-mono leading-relaxed"
                   >
                     <p className="line-clamp-3">{chunk.content}</p>
                     {chunk.source && (
@@ -197,21 +197,21 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
         )}
 
         {/* 运行日志 */}
-        <div className="pixel-panel-card">
-          <div className="pixel-panel-card-header" style={{ background: "var(--pixel-yellow)", borderBottomColor: "var(--pixel-yellow-dark)" }}>
+        <div className="brutal bg-card overflow-hidden">
+          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-foreground bg-yellow border-b-[3px] border-border">
             运行日志 ({logLines.length})
           </div>
-          <div className="pixel-panel-card-body max-h-[370px] overflow-y-auto">
+          <div className="p-2.5 max-h-[370px] overflow-y-auto">
             <div className="space-y-0.5">
               {logLines.length === 0 && (
-                <p className="text-[11px] font-[family-name:var(--font-pixel)] text-muted-foreground/50">
+                <p className="text-[11px] font-mono text-muted-foreground/50">
                   暂无日志
                 </p>
               )}
               {logLines.map((line, i) => (
                 <div
                   key={i}
-                  className="text-[10px] font-[family-name:var(--font-pixel)] leading-relaxed break-all"
+                  className="text-[10px] font-mono leading-relaxed break-all"
                   style={getLogColor(line)}
                 >
                   {line}

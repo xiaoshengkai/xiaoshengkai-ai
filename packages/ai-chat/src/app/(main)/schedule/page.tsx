@@ -2,6 +2,7 @@
 
 import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Play, ExternalLink, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,6 +29,7 @@ interface Task {
 }
 
 export default function SchedulePage() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export default function SchedulePage() {
   }, [editingTask, editForm, fetchTasks]);
 
   const statusColor = (task: Task) => {
-    return task.running ? "bg-yellow-400" : "bg-green-400";
+    return task.running ? "bg-yellow animate-pulse" : "bg-lime";
   };
 
   const formatTime = (iso: string | null) => {
@@ -124,46 +126,48 @@ export default function SchedulePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h2 className="text-lg font-bold text-gray-800">⏰ 定时任务</h2>
+      <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border">
+        <h2 className="text-lg font-bold text-foreground font-heading">定时任务</h2>
+        <button
+          onClick={() => router.push("/")}
+          className="brutal-btn px-3 py-1.5 text-xs font-bold bg-card text-foreground"
+        >
+          返回聊天
+        </button>
       </div>
 
       <div className="flex-1 overflow-auto p-4">
         {tasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
             <span className="text-3xl">🕐</span>
             <p className="text-sm">暂无定时任务</p>
-            <p className="text-xs text-gray-300">在对话中说&ldquo;帮我创建一个定时任务&rdquo;即可开始</p>
+            <p className="text-xs text-muted-foreground/60">在对话中说&ldquo;帮我创建一个定时任务&rdquo;即可开始</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {tasks.map(task => (
               <div
                 key={task.name}
-                className="pixel-card bg-white rounded-lg p-4"
-                style={{
-                  border: "3px solid #1A1A1A",
-                  boxShadow: "4px 4px 0 #1A1A1A",
-                }}
+                className="brutal bg-card p-4"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className={`inline-block w-2 h-2 rounded-full align-middle ${statusColor(task)} ${task.running ? "animate-pulse" : ""}`} />
-                    <span className="text-sm font-bold text-gray-800">{task.name}</span>
+                    <span className="text-sm font-bold text-foreground">{task.name}</span>
                   </div>
                   {!task.enabled && (
-                    <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">已暂停</span>
+                    <span className="text-xs px-2 py-0.5 bg-yellow-soft text-foreground border-2 border-yellow">已暂停</span>
                   )}
                 </div>
 
-                <p className="text-xs text-gray-500 mb-2">{task.description}</p>
-                <p className="text-xs text-gray-400 font-mono mb-2">Cron: {task.cron}</p>
+                <p className="text-xs text-muted-foreground mb-2">{task.description}</p>
+                <p className="text-xs text-muted-foreground/70 font-mono mb-2">Cron: {task.cron}</p>
                 {task.until && (
-                  <p className="text-xs text-gray-400 mb-2">截止: {task.until}</p>
+                  <p className="text-xs text-muted-foreground/70 mb-2">截止: {task.until}</p>
                 )}
 
                 {task.lastRun && (
-                  <p className="text-xs text-gray-400 mb-2">
+                  <p className="text-xs text-muted-foreground/70 mb-2">
                     上次运行: {formatTime(task.lastRun)}
                   </p>
                 )}
@@ -172,13 +176,7 @@ export default function SchedulePage() {
                   <button
                     onClick={() => handleRun(task.name)}
                     disabled={running === task.name}
-                    className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
-                    style={{
-                      border: "2px solid #1A1A1A",
-                      background: running === task.name ? "#e2e8f0" : "#5B8DEF",
-                      color: running === task.name ? "#94a3b8" : "#fff",
-                      boxShadow: "2px 2px 0 #1A1A1A",
-                    }}
+                    className={`brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold ${running === task.name ? "bg-muted text-muted-foreground" : "bg-blue text-white"}`}
                   >
                     <Play className="w-3 h-3" />
                     {running === task.name ? "执行中..." : "立即执行"}
@@ -188,13 +186,7 @@ export default function SchedulePage() {
                       href={`${BASE}/api/tasks/${task.name}/dashboard`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
-                      style={{
-                        border: "2px solid #1A1A1A",
-                        background: "#6BCB77",
-                        color: "#fff",
-                        boxShadow: "2px 2px 0 #1A1A1A",
-                      }}
+                      className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold bg-primary text-primary-foreground"
                     >
                       <ExternalLink className="w-3 h-3" />
                       页面
@@ -202,13 +194,7 @@ export default function SchedulePage() {
                   )}
                   <button
                     onClick={() => handleEdit(task)}
-                    className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
-                    style={{
-                      border: "2px solid #1A1A1A",
-                      background: "transparent",
-                      color: "#1A1A1A",
-                      boxShadow: "2px 2px 0 #1A1A1A",
-                    }}
+                    className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold bg-card text-foreground"
                   >
                     <Pencil className="w-3 h-3" />
                     编辑
@@ -224,27 +210,23 @@ export default function SchedulePage() {
       {editingTask && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setEditingTask(null)}>
           <div
-            className="bg-white rounded-lg p-6 w-96"
-            style={{
-              border: "3px solid #1A1A1A",
-              boxShadow: "6px 6px 0 #1A1A1A",
-            }}
+            className="brutal bg-card p-6 w-96"
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="text-sm font-bold text-gray-800 mb-4">编辑: {editingTask.name}</h3>
+            <h3 className="text-sm font-bold text-foreground mb-4">编辑: {editingTask.name}</h3>
 <div className="space-y-3">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Cron 表达式</label>
+                <label className="text-xs text-muted-foreground block mb-1">Cron 表达式</label>
                 <input
                   type="text"
                   value={editForm.cron}
                   onChange={e => setEditForm({ ...editForm, cron: e.target.value })}
-                  className="w-full px-2 py-1 text-xs font-mono border-2 border-gray-300 rounded"
+                  className="w-full px-2 py-1 text-xs font-mono border-2 border-border"
                 />
                 <select
                   value={editForm.cron}
                   onChange={e => { if (e.target.value) setEditForm({ ...editForm, cron: e.target.value }); }}
-                  className="w-full mt-1 px-2 py-1 text-xs border-2 border-gray-300 rounded bg-white"
+                  className="w-full mt-1 px-2 py-1 text-xs border-2 border-border bg-card"
                 >
                   {CRON_PRESETS.map(p => (
                     <option key={p.cron} value={p.cron}>{p.label}</option>
@@ -252,21 +234,21 @@ export default function SchedulePage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">描述</label>
+                <label className="text-xs text-muted-foreground block mb-1">描述</label>
                 <input
                   type="text"
                   value={editForm.description}
                   onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                  className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded"
+                  className="w-full px-2 py-1 text-xs border-2 border-border"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">结束日期（可选）</label>
+                <label className="text-xs text-muted-foreground block mb-1">结束日期（可选）</label>
                 <input
                   type="date"
                   value={editForm.until}
                   onChange={e => setEditForm({ ...editForm, until: e.target.value })}
-                  className="w-full px-2 py-1 text-xs border-2 border-gray-300 rounded"
+                  className="w-full px-2 py-1 text-xs border-2 border-border"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -277,31 +259,19 @@ export default function SchedulePage() {
                   onChange={e => setEditForm({ ...editForm, enabled: e.target.checked })}
                   className="w-4 h-4"
                 />
-                <label htmlFor="task-enabled" className="text-xs text-gray-500">启用</label>
+                <label htmlFor="task-enabled" className="text-xs text-muted-foreground">启用</label>
               </div>
             </div>
             <div className="flex gap-2 mt-4 justify-end">
               <button
                 onClick={() => setEditingTask(null)}
-                className="pixel-btn px-3 py-1 text-xs font-bold"
-                style={{
-                  border: "2px solid #1A1A1A",
-                  background: "transparent",
-                  color: "#1A1A1A",
-                  boxShadow: "2px 2px 0 #1A1A1A",
-                }}
+                className="brutal-btn px-3 py-1 text-xs font-bold bg-card text-foreground"
               >
                 取消
               </button>
               <button
                 onClick={handleSave}
-                className="pixel-btn px-3 py-1 text-xs font-bold"
-                style={{
-                  border: "2px solid #1A1A1A",
-                  background: "#5B8DEF",
-                  color: "#fff",
-                  boxShadow: "2px 2px 0 #1A1A1A",
-                }}
+                className="brutal-btn px-3 py-1 text-xs font-bold bg-blue text-white"
               >
                 保存
               </button>

@@ -45,7 +45,7 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
 
   if (error) {
     return (
-      <div className="pixel-card p-4 my-2 text-sm text-red-500">
+      <div className="brutal bg-card p-4 my-2 text-sm text-destructive">
         {error}
       </div>
     );
@@ -53,9 +53,13 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
 
   if (!note) {
     return (
-      <div className="pixel-card p-4 my-2">
+      <div className="brutal bg-card p-4 my-2">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <div className="pixel-loading-dots" />
+          <span className="flex gap-1">
+            <span className="w-2 h-2 bg-primary animate-bounce" />
+            <span className="w-2 h-2 bg-yellow animate-bounce" style={{ animationDelay: "0.1s" }} />
+            <span className="w-2 h-2 bg-blue animate-bounce" style={{ animationDelay: "0.2s" }} />
+          </span>
           小红书笔记生成中...
         </div>
       </div>
@@ -66,7 +70,7 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
   const illustrations = note.images?.filter((img) => img.type === "illustration") || [];
 
   return (
-    <div className="pixel-card my-2 overflow-hidden">
+    <div className="brutal bg-card my-2 overflow-hidden">
       {/* 封面 */}
       {cover?.url ? (
         <img src={cover.url} alt={note.title} className="w-full aspect-[3/4] object-cover" />
@@ -85,7 +89,7 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
             if (match) {
               const img = illustrations[parseInt(match[1], 10) - 1];
               if (img?.url) {
-                return <img key={i} src={img.url} alt="插画" className="w-full rounded pixel-img my-2" />;
+                return <img key={i} src={img.url} alt="插画" className="w-full border-[3px] shadow-md my-2" />;
               }
               return (
                 <div key={i} className="h-32 bg-muted flex items-center justify-center text-xs text-muted-foreground my-2">

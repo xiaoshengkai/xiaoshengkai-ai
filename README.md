@@ -1,6 +1,6 @@
 # 小盛开AI
 
-像素风 AI 对话助手，集成 RAG 知识库、MCP 工具调用、多模态生成。
+Neo-Brutalism 糖果色 AI 对话助手，集成 RAG 知识库、MCP 工具调用、多模态生成。
 
 ## 功能
 
@@ -11,8 +11,8 @@
 - 🧠 主题学习笔记（learn-* collection，按主题隔离）
 - 📝 小红书笔记自动生成：对话内容 → 带封面/插画/标签的完整笔记，4 种模板 + 二级类目，聊天内嵌预览 + 独立页面，导出 HTML/MD/图片
 - 🔧 38 个 MCP 工具（时间/文件/知识库/图片/图表/短视频/小红书笔记/日志）
-- 🎨 像素复古风 UI（shadcn/ui + 自定义 CSS）
-- 📝 个人博客（新粗野主义像素风，笔记自动同步，Tailscale Funnel 内网穿透）
+- 🎨 Neo-Brutalism 糖果色 UI（shadcn/ui + 自定义 CSS，多主题可切换）
+- 📝 个人博客（Neo-Brutalism 糖果屋风，笔记自动同步，Tailscale Funnel 内网穿透）
 - 🖼️ 文生图 + 图生图（MiniMax），异步模式，73 种视觉风格可选
 - 🎙️ TTS 语音合成（MiniMax speech-2.8-hd）+ BGM 音乐生成（music-2.6）
 - 📊 图表生成：Mermaid + D2 双引擎，异步模式，支持 10 种图表类型

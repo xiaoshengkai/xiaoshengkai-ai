@@ -64,10 +64,10 @@ export default function ModuleSelector({ module, current, onChange, disabled }: 
   if (!info) return null;
 
   return (
-    <div className="pixel-card p-3" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}>
+    <div className="brutal bg-card p-3">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm">{info.icon}</span>
-        <h3 className="text-xs font-bold text-gray-800">{info.label}</h3>
+        <h3 className="text-xs font-bold text-foreground">{info.label}</h3>
       </div>
       <div className="space-y-1">
         {info.providers.map((opt) => (
@@ -75,18 +75,18 @@ export default function ModuleSelector({ module, current, onChange, disabled }: 
             key={opt.id}
             onClick={() => onChange(module, opt.id, opt.model || "")}
             disabled={disabled}
-            className={`w-full text-left px-3 py-2 text-xs font-[family-name:var(--font-pixel)] cursor-pointer border-2 transition-colors flex items-start gap-2
+            className={`w-full text-left px-3 py-2 text-xs font-mono cursor-pointer border-2 transition-colors flex items-start gap-2
               ${current.provider === opt.id
-                ? "bg-primary text-primary-foreground border-primary"
+                ? "bg-primary text-white border-primary"
                 : "bg-transparent text-muted-foreground border-border hover:bg-muted"}`}
-            style={current.provider === opt.id ? { boxShadow: "2px 2px 0 #1A1A1A" } : {}}
+            style={current.provider === opt.id ? { boxShadow: "var(--shadow-sm)" } : {}}
           >
             <div className="flex-1 min-w-0">
               <div className="font-bold truncate">{opt.label}</div>
               {opt.model && <div className="text-[10px] opacity-70 truncate mt-0.5">{opt.model}</div>}
             </div>
             {opt.multimodal && (
-              <span className="shrink-0 self-start px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 border border-purple-300 font-bold">
+              <span className="shrink-0 self-start px-1.5 py-0.5 text-[10px] bg-purple-soft text-foreground border-2 border-purple font-bold">
                 多模态
               </span>
             )}

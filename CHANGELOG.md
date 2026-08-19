@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.9.0 (2026-08-19) — Neo-Brutalism 糖果色换肤 + 多主题体系
+
+### 主题体系
+- 新增 `data-theme` 作用域换肤：token 定义在 `globals.css` 的 `[data-theme="*"]` 块，经 `@theme inline` 映射成 Tailwind 类
+- `UI_THEME` env 定默认主题（`layout.tsx` 注入 `<html data-theme>`）；settings 页用 `data-theme="pink"` 局部粉主题
+- 彻底删除像素风：移除 `.pixel-*` class、`--pixel-*` 变量、fusion-pixel 字体；`pixel-logo`/`pixel-loading` 改为通用 `logo`/`loading`
+
+### 视觉规范（Neo-Brutalism 糖果色）
+- 主色电光黄 `#FFE135`（黑字），背景纯白，直角，纯黑硬阴影，hover 位移 + active 按压
+- 字体换 `@fontsource` Inter / Plus Jakarta Sans / JetBrains Mono
+- 用户气泡黑底白字 + 黄硬阴影，AI 气泡白底黑字；ME 头像粉底白字
+- 深绿 `#16A34A` 替代荧光亮绿（成功/完成/下载）
+
+### 页面统一
+- 各页面 header 统一：`px-4 py-3 border-b-[3px]` + 标题 + 右上角「返回聊天」按钮（去 emoji 颜文字）
+- memory header 重设计，数据库/collection 选择器移入主体顶部
+- workflow 列表删除按钮红底白字；execution 状态标签改纯文字、正在执行时拦截「下一步/自动执行」
+- 下滑到底部按钮修复：`scrollToIndex` 加 `align: "end"`（此前滚不到底）+ 5 处 `[scroll-debug]` 日志
+
+### 博客壳（site/，糖果屋风重设计）
+- `pixel.css`：纯白背景 + 电光黄/soft 色 + 导航/hero/贴纸/跑马灯/彩色 panel/黑 footer 样式
+- 首页全套：sticky 导航 + hero 黄底大 panel（高亮块 + 贴纸 + 打字机 + chips）+ 跑马灯 + 3 彩色类目 panel + 黑 footer
+- finance/tech/life 列表页：加导航 + 彩色 header + 黑 footer
+
 ## v0.8.1 (2026-08-18) — 网络配置抽取 + 构建修复
 
 ### 网络配置单一真相源

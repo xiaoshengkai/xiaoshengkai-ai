@@ -21,8 +21,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = process.env.UI_THEME || "default";
   return (
-    <html lang="en" className={cn("min-h-dvh antialiased", "font-sans")} suppressHydrationWarning>
+    <html lang="zh-CN" data-theme={theme} className={cn("min-h-dvh antialiased", "font-sans")} suppressHydrationWarning>
       <body className="min-h-dvh" suppressHydrationWarning>
         <Toaster position="top-center" />
         {children}

@@ -2,27 +2,28 @@
 
 ## UI 风格
 
-**像素复古风** — 后续所有 UI 开发均遵循此风格，组件库使用 shadcn/ui。
+**Neo-Brutalism 糖果色** — 后续所有 UI 开发均遵循此风格，组件库使用 shadcn/ui。多主题可切换（`data-theme` 作用域覆盖 token）。
 
 ### 视觉规范
 
 | 元素 | 规范 |
 |------|------|
-| 背景 | 12px 点阵网格 + 全屏扫描线叠加层（CRT 效果） |
-| 边框 | 3px 实线 + 8 方向 box-shadow 像素扩展 |
-| 气泡 | 用户蓝色实心（`pixel-bubble`）、AI 灰色（`pixel-bubble-ai`） |
-| 头像 | 2px 像素边框，AI/ME 标签 |
-| 按钮 | 像素边框 + 按下位移 `translate(2px,2px)` |
-| 输入框 | 终端风格，`>` 提示符，focus 时变蓝 |
-| 字体 | `font-mono` 等宽像素感 |
-| 加载 | 4 方块依次跳动动画 |
-| 入场 | 消息淡入上移 `msg-enter` |
+| 背景 | 纯白 `#FFFFFF`，次背景 `--muted #F5F5F5` |
+| 边框 | 2-4px 纯黑实线 + 零模糊纯黑硬阴影（`Npx Npx 0 #000`） |
+| 主色 | 电光黄 `#FFE135`（黑字），粉/蓝/紫/橙/深绿点缀 |
+| 气泡 | 用户黑底白字 + 黄硬阴影（`bg-ink`）、AI 白底黑字（`bg-card`） |
+| 头像 | AI 黄底黑字、ME 粉底白字，2px 黑边 |
+| 按钮 | 黑边硬阴影，hover 位移 + 阴影扩大，active 按压 |
+| 圆角 | 直角（`--radius: 0`） |
+| 字体 | Inter（正文）/ Plus Jakarta Sans（标题）/ JetBrains Mono（标签） |
+| 加载 | 黄色旋转环 + 滑块进度条 |
+| 禁用 | 渐变 / 模糊 / 毛玻璃 / 荧光亮绿 |
 
 ### 组件规则
 
 - 基础组件用 shadcn/ui（Button、Input 等），不手写
-- 像素风格样式通过 CSS class（`pixel-*`）叠加，不修改 shadcn 组件源码
-- 所有像素样式定义在 `globals.css`，无额外依赖
+- 主题样式通过 CSS 变量 + `data-theme` 作用域，经 `@theme inline` 映射成 Tailwind 类
+- 所有 token 定义在 `globals.css` 的 `[data-theme="*"]` 块，无额外依赖
 
 ## 架构流程
 

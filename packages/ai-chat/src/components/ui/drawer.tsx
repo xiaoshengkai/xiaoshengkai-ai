@@ -38,7 +38,7 @@ function DrawerPopup({
       <DrawerPrimitive.Popup
         data-slot="drawer-popup"
         className={cn(
-          "fixed z-50 bg-white shadow-xl outline-none",
+          "fixed z-50 bg-background shadow-lg outline-none",
           "data-[closed]:animate-out data-[closed]:slide-out-to-right",
           "data-[open]:animate-in data-[open]:slide-in-from-right",
           className
@@ -69,7 +69,7 @@ function DrawerTitle({
   return (
     <DrawerPrimitive.Title
       data-slot="drawer-title"
-      className={cn("text-sm font-bold text-gray-800", className)}
+      className={cn("text-sm font-bold text-foreground", className)}
       {...props}
     />
   )
@@ -83,8 +83,8 @@ function DrawerClose({
     <DrawerPrimitive.Close
       data-slot="drawer-close"
       className={cn(
-        "pixel-btn px-2 py-1 text-xs font-bold cursor-pointer",
-        "border-2 border-[#1A1A1A] bg-transparent text-[#6B7280]",
+        "brutal-btn px-2 py-1 text-xs font-bold",
+        "bg-card text-muted-foreground",
         className
       )}
       {...props}

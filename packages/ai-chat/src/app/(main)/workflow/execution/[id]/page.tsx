@@ -310,6 +310,7 @@ export default function ExecutionDetailPage() {
   const completed = execution.steps.filter(s => s.status === "completed" || s.status === "skipped" || s.status === "warning").length;
   const activeStep = execution.steps.find(s => s.id === activeStepId) || execution.steps[0];
   const isDone = execution.status === "completed" || execution.status === "failed";
+  const isRunning = execution.status === "running";
   const isTweakRunning = execution.tweakTask?.status === "running";
   const isV2 = execution.template === "tech-video";
 
@@ -328,33 +329,24 @@ export default function ExecutionDetailPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 shrink-0">
-        <a href="/workflow" className="text-gray-400 hover:text-gray-600"><ArrowLeft className="w-4 h-4" /></a>
+      <div className="flex items-center gap-3 px-4 py-3 border-b-[3px] border-border shrink-0">
+        <a href="/workflow" className="text-muted-foreground/70 hover:text-muted-foreground"><ArrowLeft className="w-4 h-4" /></a>
         <div className="flex items-center gap-2 flex-1">
-          <h2 className="text-sm font-bold text-gray-800">{execution.template}</h2>
-          <span className={`text-xs px-2 py-0.5 rounded ${
-            execution.status === "completed" ? "bg-green-100 text-green-700" :
-            execution.status === "running" ? "bg-yellow-100 text-yellow-700" :
-            execution.status === "failed" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"
-          }`}>
-            {execution.status === "completed" ? "完成" : execution.status === "running" ? "执行中" : execution.status === "failed" ? "失败" : "待执行"}
-          </span>
+          <h2 className="text-sm font-bold text-foreground">{execution.template}</h2>
           {isV2 && sceneList.length > 0 && (
-            <span className="text-xs text-gray-400">{sceneList.length} 场景</span>
+            <span className="text-xs text-muted-foreground/70">{sceneList.length} 场景</span>
           )}
         </div>
         {isV2 && sceneList.length > 0 && (
           <button onClick={() => setShowScriptPanel(true)}
-            className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
-            style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#6B7280", boxShadow: "2px 2px 0 #1A1A1A" }}>
+            className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-yellow text-foreground">
             📋 脚本
           </button>
         )}
         {isDone && (
           <button onClick={() => setShowTweak(true)}
             disabled={isTweakRunning}
-            className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
-            style={{ border: "2px solid #1A1A1A", background: isTweakRunning ? "#e2e8f0" : "#9B59B6", color: isTweakRunning ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
+            className={`brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold ${isTweakRunning ? "bg-muted text-muted-foreground" : "bg-purple text-white"}`}>
             <Edit3 className="w-3 h-3" /> 微调
             {execution.tweakCount !== undefined && execution.tweakLimit !== undefined ? (
               <span className="text-white/70 ml-0.5">{execution.tweakCount}/{execution.tweakLimit}</span>
@@ -363,14 +355,12 @@ export default function ExecutionDetailPage() {
         )}
         {isDone && execution.scriptHistory && execution.scriptHistory.length > 0 && (
           <button onClick={() => setShowHistoryPanel(true)}
-            className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer"
-            style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#6B7280", boxShadow: "2px 2px 0 #1A1A1A" }}>
+            className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-yellow text-foreground">
             <History className="w-3 h-3" /> 历史
           </button>
         )}
         <button onClick={() => setShowDelete(true)}
-          className="pixel-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold cursor-pointer hover:text-red-500"
-          style={{ border: "2px solid #1A1A1A", background: "transparent", color: "#6B7280", boxShadow: "2px 2px 0 #1A1A1A" }}>
+          className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-destructive text-white">
           删除
         </button>
       </div>
@@ -390,9 +380,9 @@ export default function ExecutionDetailPage() {
       )}
 
       <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]">
-        <div className="overflow-auto border-r border-gray-200 p-3 space-y-1.5">
+        <div className="overflow-auto border-r border-border p-3 space-y-1.5">
           {isV2 ? renderV2Steps() : renderDefaultSteps()}
-          <p className="text-xs text-gray-500 text-center pt-2">{completed}/{execution.steps.length} 步完成</p>
+          <p className="text-xs text-muted-foreground text-center pt-2">{completed}/{execution.steps.length} 步完成</p>
         </div>
 
         <div className="overflow-auto p-4">
@@ -407,26 +397,26 @@ export default function ExecutionDetailPage() {
                   <div className="flex gap-2 mb-3">
                     <button
                       onClick={() => setScriptJsonTab("script")}
-                      className={`px-3 py-1 text-xs font-bold rounded cursor-pointer ${
+                      className={`brutal-sm px-3 py-1 text-xs font-bold ${
                         scriptJsonTab === "script"
-                          ? "bg-[#9B59B6] text-white"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          ? "bg-yellow-soft text-foreground"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       script.json
                     </button>
                     <button
                       onClick={() => setScriptJsonTab("state")}
-                      className={`px-3 py-1 text-xs font-bold rounded cursor-pointer ${
+                      className={`brutal-sm px-3 py-1 text-xs font-bold ${
                         scriptJsonTab === "state"
-                          ? "bg-[#9B59B6] text-white"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          ? "bg-blue-soft text-foreground"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       state.json
                     </button>
                   </div>
-                  <pre className="text-xs bg-gray-50 p-3 rounded border border-gray-200 overflow-auto max-h-[70vh] whitespace-pre-wrap">
+                  <pre className="text-xs bg-yellow-soft p-4 border-[3px] border-border shadow-md overflow-auto max-h-[70vh] whitespace-pre-wrap">
                     {scriptJsonTab === "script"
                       ? (() => {
                           try {
@@ -453,7 +443,7 @@ export default function ExecutionDetailPage() {
             }
 
             // 兜底：PreviewPanel
-            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} />;
+            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} onRetry={() => handleRetry(activeStep.id)} retrying={retrying === activeStep.id} />;
           })()}
           {activeStep.id === "concat" && (
             <DownloadPanel executionId={execution.executionId} />
@@ -462,16 +452,16 @@ export default function ExecutionDetailPage() {
       </div>
 
       {!isDone && !isTweakRunning && (
-        <div className="flex gap-2 px-4 py-3 border-t border-gray-200 shrink-0">
-          <button onClick={handleNext} disabled={nextLoading}
-            className="pixel-btn inline-flex items-center gap-1 px-4 py-1.5 text-xs font-bold cursor-pointer"
-            style={{ border: "2px solid #1A1A1A", background: nextLoading ? "#e2e8f0" : "#5B8DEF", color: nextLoading ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
-            <ChevronRight className="w-3 h-3" />{nextLoading ? "执行中..." : "下一步"}
+        <div className="flex gap-2 px-4 py-3 border-t border-border shrink-0">
+          <button onClick={handleNext} disabled={nextLoading || isRunning}
+            className="brutal-btn inline-flex items-center gap-1 px-4 py-1.5 text-xs font-bold cursor-pointer"
+            style={{ border: "2px solid var(--border)", background: nextLoading || isRunning ? "var(--muted)" : "var(--blue)", color: nextLoading || isRunning ? "var(--muted-foreground)" : "#fff", boxShadow: "2px 2px 0 var(--border)" }}>
+            <ChevronRight className="w-3 h-3" />{nextLoading || isRunning ? "执行中..." : "下一步"}
           </button>
-          <button onClick={handleAuto} disabled={autoLoading}
-            className="pixel-btn inline-flex items-center gap-1 px-4 py-1.5 text-xs font-bold cursor-pointer"
-            style={{ border: "2px solid #1A1A1A", background: autoLoading ? "#e2e8f0" : "#6BCB77", color: autoLoading ? "#94a3b8" : "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
-            <Play className="w-3 h-3" />{autoLoading ? "执行中..." : "自动执行"}
+          <button onClick={handleAuto} disabled={autoLoading || isRunning}
+            className="brutal-btn inline-flex items-center gap-1 px-4 py-1.5 text-xs font-bold cursor-pointer"
+            style={{ border: "2px solid var(--border)", background: autoLoading || isRunning ? "var(--muted)" : "var(--primary)", color: autoLoading || isRunning ? "var(--muted-foreground)" : "var(--primary-foreground)", boxShadow: "2px 2px 0 var(--border)" }}>
+            <Play className="w-3 h-3" />{autoLoading || isRunning ? "执行中..." : "自动执行"}
           </button>
         </div>
       )}
@@ -490,17 +480,17 @@ export default function ExecutionDetailPage() {
       </AlertDialog>
 
       <AlertDialog open={showTweak} onOpenChange={setShowTweak}>
-        <AlertDialogContent className="max-w-lg rounded-none border-2 border-[#1A1A1A]"
-          style={{ boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}
+        <AlertDialogContent className="max-w-lg rounded-none border-2 border-[var(--border)]"
+          style={{ boxShadow: "4px 4px 0 var(--border)", background: "#fff" }}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-extrabold text-lg text-gray-900">
+            <AlertDialogTitle className="font-extrabold text-lg text-foreground">
               微调脚本
             </AlertDialogTitle>
           </AlertDialogHeader>
           <div className="py-2 space-y-3">
             <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">
+              <label className="text-xs font-bold text-foreground block mb-1.5">
                 你想调整哪里？
               </label>
               <textarea
@@ -508,31 +498,31 @@ export default function ExecutionDetailPage() {
                 onChange={(e) => setTweakFeedback(e.target.value)}
                 onPaste={handlePaste}
                 placeholder="例如：第3帧太快了&#10;把背景换成蓝色&#10;标题字号加大"
-                className="w-full h-28 px-3 py-2 text-sm border-2 border-[#1A1A1A] rounded-none resize-none focus:outline-none focus:border-[#9B59B6] bg-white"
-                style={{ boxShadow: "2px 2px 0 #e5e7eb" }}
+                className="w-full h-28 px-3 py-2 text-sm border-2 border-[var(--border)] rounded-none resize-none focus:outline-none focus:border-[var(--purple)] bg-card"
+                style={{ boxShadow: "2px 2px 0 var(--muted)" }}
                 disabled={tweaking || (execution.tweakCount !== undefined && execution.tweakLimit !== undefined && execution.tweakCount >= execution.tweakLimit)}
               />
               {tweakImages.length > 0 && (
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {tweakImages.map(img => (
-                    <div key={img.id} className="relative w-16 h-16 border-2 border-gray-300"
-                      style={{ boxShadow: "1px 1px 0 #e5e7eb" }}>
+                    <div key={img.id} className="relative w-16 h-16 border-2 border-border"
+                      style={{ boxShadow: "1px 1px 0 var(--muted)" }}>
                       <img src={img.url} alt="参考图" className="w-full h-full object-cover" />
                       {img.isUploading && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><span className="text-white text-xs">上传中</span></div>}
                       <button onClick={() => removeImage(img.id)} disabled={img.isUploading}
-                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs flex items-center justify-center cursor-pointer"
-                        style={{ border: "1px solid #1A1A1A", boxShadow: "1px 1px 0 #1A1A1A" }}>×</button>
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white text-xs flex items-center justify-center cursor-pointer"
+                        style={{ border: "1px solid var(--border)", boxShadow: "1px 1px 0 var(--border)" }}>×</button>
                     </div>
                   ))}
                 </div>
               )}
               <div className="flex items-center gap-2 mt-1.5">
-                <label className="text-xs text-gray-400 cursor-pointer underline hover:text-gray-600">
+                <label className="text-xs text-muted-foreground/70 cursor-pointer underline hover:text-muted-foreground">
                   <input type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" disabled={tweakImages.length >= 4} />
                   上传图片
                 </label>
-                <span className="text-xs text-gray-400">或 Ctrl+V 粘贴截图</span>
-                <span className="text-xs text-gray-300 ml-auto">{tweakImages.length}/4</span>
+                <span className="text-xs text-muted-foreground/70">或 Ctrl+V 粘贴截图</span>
+                <span className="text-xs text-muted-foreground/50 ml-auto">{tweakImages.length}/4</span>
               </div>
             </div>
           </div>
@@ -542,10 +532,10 @@ export default function ExecutionDetailPage() {
               disabled={tweaking}
               className="px-4 py-1.5 text-xs font-bold cursor-pointer"
               style={{
-                border: "2px solid #1A1A1A",
+                border: "2px solid var(--border)",
                 background: "#fff",
                 color: "#374151",
-                boxShadow: "2px 2px 0 #1A1A1A"
+                boxShadow: "2px 2px 0 var(--border)"
               }}
             >
               取消
@@ -555,10 +545,10 @@ export default function ExecutionDetailPage() {
               disabled={tweaking || !tweakFeedback.trim() || (execution.tweakCount !== undefined && execution.tweakLimit !== undefined && execution.tweakCount >= execution.tweakLimit)}
               className="px-4 py-1.5 text-xs font-bold cursor-pointer"
               style={{
-                border: "2px solid #1A1A1A",
-                background: tweaking ? "#e2e8f0" : "#9B59B6",
-                color: tweaking ? "#94a3b8" : "#fff",
-                boxShadow: "2px 2px 0 #1A1A1A"
+                border: "2px solid var(--border)",
+                background: tweaking ? "var(--muted)" : "var(--purple)",
+                color: tweaking ? "var(--muted-foreground)" : "#fff",
+                boxShadow: "2px 2px 0 var(--border)"
               }}
             >
               {tweaking ? "微调中..." : "确认微调"}
@@ -578,25 +568,25 @@ export default function ExecutionDetailPage() {
               {execution.scriptHistory.slice().reverse().map((h) => (
                 <div
                   key={h.version}
-                  className={`p-3 rounded border text-xs ${
-                    h.version === execution.currentScriptVersion ? "bg-[#F5E6F0] border-[#9B59B6]" : "bg-gray-50 border-gray-200"
+                  className={`brutal-sm p-3 text-xs ${
+                    h.version === execution.currentScriptVersion ? "bg-yellow-soft border-primary" : "bg-muted"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-gray-700">v{h.version}</span>
-                    <span className="text-gray-400">{formatDateTime(h.at)}</span>
+                    <span className="font-bold text-foreground">v{h.version}</span>
+                    <span className="text-muted-foreground/70">{formatDateTime(h.at)}</span>
                     {h.version === execution.currentScriptVersion && (
                       <span className="text-xs text-[#7D3C98] font-bold">当前</span>
                     )}
                   </div>
-                  <div className="text-gray-600 mb-2">{h.feedback}</div>
+                  <div className="text-muted-foreground mb-2">{h.feedback}</div>
                   <div className="flex items-center gap-2">
                     {h.version !== execution.currentScriptVersion && (
                       <button
                         onClick={() => handleSwitchVersion(h.version)}
                         disabled={switchingVersion === h.version}
-                        className="pixel-btn px-2 py-0.5 text-xs cursor-pointer"
-                        style={{ border: "1px solid #9B59B6", background: "transparent", color: "#9B59B6" }}
+                        className="brutal-btn px-2 py-0.5 text-xs cursor-pointer"
+                        style={{ border: "1px solid var(--purple)", background: "transparent", color: "var(--purple)" }}
                       >
                         {switchingVersion === h.version ? "切换中..." : "切换到此版本"}
                       </button>
@@ -605,13 +595,13 @@ export default function ExecutionDetailPage() {
                       <a
                         href={`${BASE}/api/workflows/execution/${execution.executionId}/file/${h.videoFile}`}
                         target="_blank"
-                        className="pixel-btn px-2 py-0.5 text-xs cursor-pointer"
-                        style={{ border: "1px solid #1A1A1A", background: "transparent", color: "#6B7280" }}
+                        className="brutal-btn px-2 py-0.5 text-xs cursor-pointer"
+                        style={{ border: "1px solid var(--border)", background: "transparent", color: "var(--muted-foreground)" }}
                       >
                         <Download className="w-3 h-3 inline mr-1" />下载
                       </a>
                     ) : (
-                      <span className="text-xs text-gray-400">尚未渲染</span>
+                      <span className="text-xs text-muted-foreground/70">尚未渲染</span>
                     )}
                   </div>
                 </div>
@@ -636,15 +626,15 @@ export default function ExecutionDetailPage() {
         <div key={group.label}>
           <div
             onClick={() => toggleGroup(group.label)}
-            className="flex items-center gap-1.5 px-2 py-1 cursor-pointer hover:bg-gray-50 rounded"
+            className="flex items-center gap-1.5 px-2 py-1 cursor-pointer hover:bg-muted rounded"
           >
             <span className={`w-2 h-2 rounded-full ${
-              hasRunning ? "bg-yellow-400 animate-pulse" : hasFail ? "bg-red-500" : allDone ? "bg-green-500" : "bg-gray-300"
+              hasRunning ? "bg-yellow animate-pulse" : hasFail ? "bg-destructive" : allDone ? "bg-lime" : "bg-muted-foreground"
             }`} />
-            <span className="text-xs font-bold text-gray-600">{group.label}</span>
-            <span className="text-xs text-gray-400">{groupSteps.filter(s => s.status === "completed").length}/{groupSteps.length}</span>
+            <span className="text-xs font-bold text-muted-foreground">{group.label}</span>
+            <span className="text-xs text-muted-foreground/70">{groupSteps.filter(s => s.status === "completed").length}/{groupSteps.length}</span>
             <span className="flex-1" />
-            {isCollapsed ? <ChevronDown className="w-3 h-3 text-gray-400" /> : <ChevronUp className="w-3 h-3 text-gray-400" />}
+            {isCollapsed ? <ChevronDown className="w-3 h-3 text-muted-foreground/70" /> : <ChevronUp className="w-3 h-3 text-muted-foreground/70" />}
           </div>
           {!isCollapsed && groupSteps.map((step, i) => renderStepItem(step, i))}
         </div>
@@ -668,31 +658,31 @@ export default function ExecutionDetailPage() {
       <div key={step.id}
         onClick={() => { setActiveStepId(step.id); setLocked(true); }}
         className={`p-2 rounded-lg cursor-pointer transition-all ${
-          isActive ? "ring-2 ring-blue-400 bg-blue-50" : "hover:bg-gray-50"
+          isActive ? "ring-2 ring-primary bg-yellow-soft" : "hover:bg-muted"
         }`}
-        style={{ border: isActive ? "2px solid #60A5FA" : "2px solid transparent" }}
+        style={{ border: isActive ? "2px solid var(--primary)" : "2px solid transparent" }}
       >
         <div className="flex items-center gap-2">
           <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 relative ${
-            done ? "bg-green-500 text-white" : warn ? "bg-orange-500 text-white" : run ? "bg-yellow-400 text-white" :
-            fail ? "bg-red-500 text-white" : skipped ? "bg-gray-400 text-white" : "bg-gray-300 text-gray-600"
+            done ? "bg-blue text-white" : warn ? "bg-orange-500 text-white" : run ? "bg-yellow text-white" :
+            fail ? "bg-destructive text-white" : skipped ? "bg-muted-foreground text-white" : "bg-muted-foreground text-muted-foreground"
           }`}>
-            {run && <span className="absolute inset-0 rounded-full bg-yellow-400 animate-ping opacity-75" />}
+            {run && <span className="absolute inset-0 rounded-full bg-yellow animate-ping opacity-75" />}
             <span className="relative z-10">{done ? "✓" : fail ? "✗" : warn ? "⚠" : skipped ? "−" : i + 1}</span>
           </span>
-          <span className="text-xs font-bold text-gray-700 flex-1 truncate">{step.name}</span>
+          <span className="text-xs font-bold text-foreground flex-1 truncate">{step.name}</span>
           {step.elapsed && (
-            <span className="text-xs text-gray-400 shrink-0">{step.elapsed}s</span>
+            <span className="text-xs text-muted-foreground/70 shrink-0">{step.elapsed}s</span>
           )}
           <div className="flex gap-1 shrink-0">
             {pending && (
               <button onClick={(e) => { e.stopPropagation(); handleSkip(step.id); }}
-                disabled={skipping === step.id} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
+                disabled={skipping === step.id} className="text-xs text-muted-foreground/70 hover:text-muted-foreground cursor-pointer"
                 title="跳过">{skipping === step.id ? "..." : "跳过"}</button>
             )}
             {(done || fail) && (
               <button onClick={(e) => { e.stopPropagation(); handleRetry(step.id); }}
-                disabled={retrying === step.id} className="text-xs text-gray-400 hover:text-blue-500 cursor-pointer"
+                disabled={retrying === step.id} className="text-xs text-muted-foreground/70 hover:text-blue cursor-pointer"
                 title="重新执行"><RefreshCw className="w-3 h-3" /></button>
             )}
           </div>
@@ -720,10 +710,10 @@ function RenderManifestPreview({ executionId, manifest, sceneList }: { execution
             onClick={() => setActiveScene(s.sceneId)}
             className="shrink-0 px-2.5 py-1 text-xs rounded cursor-pointer font-bold transition-colors"
             style={{
-              border: "2px solid #1A1A1A",
-              background: s.sceneId === activeScene ? "#5B8DEF" : "#fff",
+              border: "2px solid var(--border)",
+              background: s.sceneId === activeScene ? "var(--blue)" : "#fff",
               color: s.sceneId === activeScene ? "#fff" : "#374151",
-              boxShadow: s.sceneId === activeScene ? "2px 2px 0 #1A1A1A" : "none",
+              boxShadow: s.sceneId === activeScene ? "2px 2px 0 var(--border)" : "none",
             }}
           >
             {s.sceneId}
@@ -749,11 +739,11 @@ function RenderManifestPreview({ executionId, manifest, sceneList }: { execution
 
       <div className="text-xs space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-gray-400">模板:</span>
-          <span className="text-gray-700 font-bold">{scene?.templateId}</span>
-          <span className="text-gray-300">·</span>
-          <span className="text-gray-400">时长:</span>
-          <span className="text-gray-700">{scene?.actualDuration.toFixed(1)}s</span>
+          <span className="text-muted-foreground/70">模板:</span>
+          <span className="text-foreground font-bold">{scene?.templateId}</span>
+          <span className="text-muted-foreground/50">·</span>
+          <span className="text-muted-foreground/70">时长:</span>
+          <span className="text-foreground">{scene?.actualDuration.toFixed(1)}s</span>
           {scene?.warning ? (
             <span className="text-yellow-600 font-bold">⚠ {scene.warning}</span>
           ) : (
@@ -761,7 +751,7 @@ function RenderManifestPreview({ executionId, manifest, sceneList }: { execution
           )}
         </div>
         {sceneInfo?.narration && (
-          <div className="text-gray-500 italic">📝 {sceneInfo.narration}</div>
+          <div className="text-muted-foreground italic">📝 {sceneInfo.narration}</div>
         )}
       </div>
     </div>
@@ -774,20 +764,20 @@ function SceneListPanel({ scenes, executionId }: { scenes: { id: string; type: s
 
   return (
     <div className="mt-4">
-      <h3 className="text-xs font-bold text-gray-600 mb-2">📋 场景列表</h3>
+      <h3 className="text-xs font-bold text-muted-foreground mb-2">📋 场景列表</h3>
       <div className="space-y-1">
         {scenes.map((scene, i) => (
-          <div key={scene.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200">
+          <div key={scene.id} className="flex items-center gap-2 p-2 bg-muted rounded border border-border">
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-              scene.type === "hook" ? "bg-[#9B59B6] text-white" :
-              scene.type === "outro" ? "bg-blue-500 text-white" : "bg-gray-500 text-white"
+              scene.type === "hook" ? "bg-yellow text-foreground" :
+              scene.type === "outro" ? "bg-orange text-foreground" : "bg-muted-foreground text-white"
             }`}>{i + 1}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-gray-700 truncate">{scene.id}</span>
-                <span className="text-xs text-gray-400">{scene.templateId}</span>
+                <span className="text-xs font-bold text-foreground truncate">{scene.id}</span>
+                <span className="text-xs text-muted-foreground/70">{scene.templateId}</span>
               </div>
-              <p className="text-xs text-gray-500 truncate">{scene.narration}</p>
+              <p className="text-xs text-muted-foreground truncate">{scene.narration}</p>
             </div>
           </div>
         ))}
@@ -801,21 +791,21 @@ function DownloadPanel({ executionId }: { executionId: string }) {
 
   return (
     <div className="mt-4">
-      <h3 className="text-xs font-bold text-gray-600 mb-2">📦 下载</h3>
+      <h3 className="text-xs font-bold text-muted-foreground mb-2">📦 下载</h3>
       <div className="flex flex-wrap gap-2">
         <a href={`${fileBase}/video.mp4`} download
-          className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
-          style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
+          className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
+          style={{ border: "2px solid var(--border)", background: "var(--primary)", color: "var(--primary-foreground)", boxShadow: "2px 2px 0 var(--border)" }}>
           <Download className="w-3 h-3" />video.mp4
         </a>
         <a href={`${fileBase}/video.srt`} download
-          className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
-          style={{ border: "2px solid #1A1A1A", background: "#5B8DEF", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
+          className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
+          style={{ border: "2px solid var(--border)", background: "var(--blue)", color: "#fff", boxShadow: "2px 2px 0 var(--border)" }}>
           <Download className="w-3 h-3" />video.srt
         </a>
         <a href={`${fileBase}/voice-final.mp3`} download
-          className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
-          style={{ border: "2px solid #1A1A1A", background: "#F59E0B", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
+          className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer"
+          style={{ border: "2px solid var(--border)", background: "var(--orange)", color: "#fff", boxShadow: "2px 2px 0 var(--border)" }}>
           <Download className="w-3 h-3" />voice.mp3
         </a>
       </div>
@@ -823,18 +813,18 @@ function DownloadPanel({ executionId }: { executionId: string }) {
   );
 }
 
-function PreviewPanel({ step, executionId, currentScriptVersion }: { step: ExecutionStep; executionId: string; currentScriptVersion?: number }) {
+function PreviewPanel({ step, executionId, currentScriptVersion, onRetry, retrying }: { step: ExecutionStep; executionId: string; currentScriptVersion?: number; onRetry: () => void; retrying: boolean }) {
   const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
   const version = currentScriptVersion ?? 0;
 
   if (step.status === "pending") {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3">
-        <div className="w-12 h-12 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-2 border-dashed border-border flex items-center justify-center">
           <span className="text-xl">⏸️</span>
         </div>
-        <p className="text-sm text-gray-500 font-medium">等待执行</p>
-        <p className="text-xs text-gray-400">点击「下一步」开始执行</p>
+        <p className="text-sm text-muted-foreground font-medium">等待执行</p>
+        <p className="text-xs text-muted-foreground/70">点击「下一步」开始执行</p>
       </div>
     );
   }
@@ -844,22 +834,73 @@ function PreviewPanel({ step, executionId, currentScriptVersion }: { step: Execu
   }
 
   if (step.status === "skipped") {
+    const skippedReason = (step as { skippedReason?: string }).skippedReason;
+    const skippedAt = (step as { skippedAt?: string }).skippedAt;
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3">
-        <div className="w-12 h-12 rounded-full border-2 border-dashed border-gray-400 flex items-center justify-center">
-          <span className="text-xl text-gray-400">⏭️</span>
+      <div className="flex items-center justify-center h-full p-6">
+        <div className="brutal bg-yellow-soft p-8 max-w-lg w-full text-center relative">
+          {/* 右上 sticker（demo 风格，倾斜 -12°） */}
+          <div className="absolute -top-3 -right-3 brutal w-12 h-12 bg-purple text-white flex items-center justify-center text-xl font-bold rotate-12">
+            ⏭
+          </div>
+
+          {/* 大图标 + 标题 */}
+          <div className="flex items-center gap-4 justify-center mb-6">
+            <div className="brutal w-16 h-16 bg-card flex items-center justify-center text-4xl">
+              ⏭️
+            </div>
+            <div className="text-left">
+              <h3 className="text-xl font-bold font-heading text-foreground">此步骤已跳过</h3>
+              <p className="text-sm text-muted-foreground font-mono">SKIPPED</p>
+            </div>
+          </div>
+
+          {/* 步骤信息卡（仅当后端有数据时显示） */}
+          {skippedReason || skippedAt ? (
+            <div className="brutal-sm bg-card p-3 mb-4 text-left text-xs space-y-1">
+              {skippedReason && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">跳过原因</span>
+                  <span className="text-foreground font-bold text-right">{skippedReason}</span>
+                </div>
+              )}
+              {skippedAt && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">跳过时间</span>
+                  <span className="text-foreground font-mono">{skippedAt}</span>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* 影响说明 */}
+          <div className="brutal-sm bg-purple-soft p-3 mb-5 text-left text-xs">
+            <div className="font-bold text-foreground mb-1">⚠ 跳过此步骤可能影响</div>
+            <div className="text-muted-foreground">
+              后续步骤如依赖此输出，可能无法正常执行。建议在最终结果中检查完整性。
+            </div>
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={onRetry}
+              disabled={retrying}
+              className="brutal-btn bg-primary text-primary-foreground px-4 py-2 text-sm font-bold"
+            >
+              {retrying ? "重做中..." : "🔄 重新执行"}
+            </button>
+          </div>
         </div>
-        <p className="text-sm text-gray-500 font-medium">已跳过</p>
-        <p className="text-xs text-gray-400">该步骤已被跳过</p>
       </div>
     );
   }
 
   if (step.status === "failed") {
     return (
-      <div className="p-4 rounded-lg" style={{ border: "3px solid #FCA5A5", boxShadow: "4px 4px 0 #FCA5A5", background: "#FEF2F2" }}>
+      <div className="p-4 rounded-lg" style={{ border: "3px solid var(--pink)", boxShadow: "4px 4px 0 var(--pink)", background: "var(--pink-soft)" }}>
         <div className="flex items-center gap-2 mb-3">
-          <span className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs font-bold">✗</span>
+          <span className="w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center text-xs font-bold">✗</span>
           <span className="text-sm font-bold text-red-700">执行失败</span>
         </div>
         <pre className="text-xs text-red-600 whitespace-pre-wrap break-words bg-red-100/50 p-2 rounded">{step.error || "未知错误"}</pre>
@@ -878,13 +919,13 @@ function PreviewPanel({ step, executionId, currentScriptVersion }: { step: Execu
 
   return (
     <div className="space-y-3">
-      <div className="pixel-card p-3" style={{ border: "3px solid #1A1A1A", boxShadow: "4px 4px 0 #1A1A1A", background: "#fff" }}>
+      <div className="brutal bg-card p-3" style={{ border: "3px solid var(--border)", boxShadow: "4px 4px 0 var(--border)" }}>
         <div className="flex items-center gap-2 mb-2">
-          <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">✓</span>
-          <h3 className="text-xs font-bold text-gray-800">{step.name}</h3>
-          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">✅ 完成</span>
+          <span className="w-5 h-5 rounded-full bg-blue text-white flex items-center justify-center text-xs font-bold">✓</span>
+          <h3 className="text-xs font-bold text-foreground">{step.name}</h3>
+          <span className="text-xs text-foreground px-1.5 py-0.5">✅ 完成</span>
         </div>
-        <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}?v=${version}` : undefined} executionId={executionId} />
+        <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}?v=${version}` : undefined} executionId={executionId} onRetry={onRetry} retrying={retrying} />
       </div>
     </div>
   );
@@ -937,31 +978,31 @@ function LoadingState({ text }: { text: string }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4">
       <div className="relative w-14 h-14">
-        <div className="absolute inset-0 border-[3px] border-gray-200 rounded-full" />
-        <div className="absolute inset-0 border-[3px] border-blue-500 rounded-full border-t-transparent animate-spin" />
+        <div className="absolute inset-0 border-[3px] border-border rounded-full" />
+        <div className="absolute inset-0 border-[3px] border-primary rounded-full border-t-transparent animate-spin" />
       </div>
-      <p className="text-sm text-gray-500 font-medium">{text}</p>
-      <div className="w-40 h-1 bg-gray-200 rounded-full overflow-hidden">
-        <div className="h-full w-1/2 bg-blue-500 rounded-full animate-[slide_1.5s_ease-in-out_infinite]" />
+      <p className="text-sm text-muted-foreground font-medium">{text}</p>
+      <div className="w-40 h-1 bg-muted rounded-full overflow-hidden">
+        <div className="h-full w-1/2 bg-primary rounded-full animate-[slide_1.5s_ease-in-out_infinite]" />
       </div>
       <style>{`@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`}</style>
     </div>
   );
 }
 
-function PreviewContent({ type, value, src, executionId }: { type: string; value?: string | null; src?: string; executionId: string }) {
+function PreviewContent({ type, value, src, executionId, onRetry, retrying }: { type: string; value?: string | null; src?: string; executionId: string; onRetry: () => void; retrying: boolean }) {
   if (type === "code" || type === "json" || type === "text") {
-    if (!value) return <p className="text-xs text-gray-400">暂无输出</p>;
+    if (!value) return <p className="text-xs text-muted-foreground/70">暂无输出</p>;
   }
   if (type === "audio" || type === "video" || type === "iframe") {
-    if (!src || !value) return <p className="text-xs text-gray-400">文件未生成</p>;
+    if (!src || !value) return <p className="text-xs text-muted-foreground/70">文件未生成</p>;
   }
 
   switch (type) {
     case "code":
       return (
-        <pre className="text-xs text-gray-700 bg-gray-50 p-3 rounded border border-gray-200 max-h-[60vh] overflow-auto whitespace-pre-wrap break-words font-mono"
-          style={{ border: "2px solid #E5E7EB" }}>
+        <pre className="text-xs text-foreground bg-muted p-3 rounded border border-border max-h-[60vh] overflow-auto whitespace-pre-wrap break-words font-mono"
+          style={{ border: "2px solid var(--muted)" }}>
           {typeof value === "string" ? (value.length > 5000 ? value.slice(0, 5000) + "\n\n...（内容过长，已截断）" : value) : JSON.stringify(value, null, 2)}
         </pre>
       );
@@ -977,8 +1018,8 @@ function PreviewContent({ type, value, src, executionId }: { type: string; value
             <div className="w-20 h-1 bg-gray-600 rounded-full mx-auto mt-2" />
           </div>
           <a href={src} target="_blank" rel="noopener noreferrer"
-            className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-3"
-            style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
+            className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-3"
+            style={{ border: "2px solid var(--border)", background: "var(--primary)", color: "var(--primary-foreground)", boxShadow: "2px 2px 0 var(--border)" }}>
             新窗口打开
           </a>
         </div>
@@ -1020,8 +1061,8 @@ function PreviewContent({ type, value, src, executionId }: { type: string; value
             <div className="w-20 h-1 bg-gray-600 rounded-full mx-auto mt-2" />
           </div>
           <a href={src} target="_blank" rel="noopener noreferrer" download
-            className="pixel-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-3"
-            style={{ border: "2px solid #1A1A1A", background: "#6BCB77", color: "#fff", boxShadow: "2px 2px 0 #1A1A1A" }}>
+            className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-3"
+            style={{ border: "2px solid var(--border)", background: "var(--primary)", color: "var(--primary-foreground)", boxShadow: "2px 2px 0 var(--border)" }}>
             <Download className="w-3 h-3" />下载视频
           </a>
         </div>
@@ -1032,9 +1073,9 @@ function PreviewContent({ type, value, src, executionId }: { type: string; value
         <div className="flex flex-col items-center">
           <div className="rounded-[24px] border-[6px] border-gray-800 bg-black p-1 shadow-xl" style={{ width: "260px" }}>
             <div className="w-16 h-4 bg-gray-800 rounded-full mx-auto mb-1" />
-            <div className="rounded-[18px] bg-gray-50 p-6" style={{ aspectRatio: "9/16" }}>
+            <div className="rounded-[18px] bg-muted p-6" style={{ aspectRatio: "9/16" }}>
               <div className="flex flex-col items-center justify-center h-full gap-4">
-                <p className="text-xs text-gray-500">🎵 音频播放</p>
+                <p className="text-xs text-muted-foreground">🎵 音频播放</p>
                 <audio controls className="w-full" src={src} preload="metadata" />
               </div>
             </div>
@@ -1049,15 +1090,15 @@ function PreviewContent({ type, value, src, executionId }: { type: string; value
         try { jsonValue = JSON.parse(value); } catch {}
       }
       return (
-        <pre className="text-xs text-gray-700 bg-gray-50 p-3 rounded border border-gray-200 max-h-[60vh] overflow-auto font-mono"
-          style={{ border: "2px solid #E5E7EB" }}>
+        <pre className="text-xs text-foreground bg-muted p-3 rounded border border-border max-h-[60vh] overflow-auto font-mono"
+          style={{ border: "2px solid var(--muted)" }}>
           {typeof jsonValue === "string" ? jsonValue : JSON.stringify(jsonValue, null, 2)}
         </pre>
       );
 
     default:
       return (
-        <p className="text-xs text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
+        <p className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed">
           {typeof value === "string" ? value : JSON.stringify(value)}
         </p>
       );

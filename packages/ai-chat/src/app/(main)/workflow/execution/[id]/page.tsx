@@ -6,10 +6,10 @@ import { useParams } from "next/navigation";
 import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp, Edit3, History } from "lucide-react";
 import { toast } from "sonner";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialog, AlertDialogContent, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Root, Portal, Backdrop, Popup, Header, Title, Close } from "@/components/ui/drawer";
 
 interface ExecutionStep {
@@ -466,18 +466,13 @@ export default function ExecutionDetailPage() {
         </div>
       )}
 
-      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>确定要删除这条执行记录吗？此操作不可撤销。</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>删除</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDelete}
+        onOpenChange={setShowDelete}
+        title="确认删除"
+        description="确定要删除这条执行记录吗？此操作不可撤销。"
+        onConfirm={handleDelete}
+      />
 
       <AlertDialog open={showTweak} onOpenChange={setShowTweak}>
         <AlertDialogContent className="max-w-lg rounded-none border-2 border-[var(--border)]"

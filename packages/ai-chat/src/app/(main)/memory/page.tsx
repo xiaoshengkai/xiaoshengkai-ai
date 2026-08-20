@@ -6,17 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Virtuoso } from "react-virtuoso";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ChunkRow {
   id: string;
@@ -321,27 +311,22 @@ export default function MemoryLibraryPage() {
               {searching ? "搜索中…" : "搜索"}
             </button>
 
-            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-              <AlertDialogTrigger
-                className="brutal-btn px-5 py-2 text-sm text-white font-mono bg-destructive"
-              >
-                整理数据
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>确认整理数据</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    整理 {database}/{collection}：删除重复内容，过滤低质量数据。
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>取消</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void doCompact()} disabled={compacting}>
-                    {compacting ? "整理中…" : "确认整理"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <button
+              onClick={() => setConfirmOpen(true)}
+              className="brutal-btn px-5 py-2 text-sm text-white font-mono bg-destructive"
+            >
+              整理数据
+            </button>
+            <ConfirmDialog
+              open={confirmOpen}
+              onOpenChange={setConfirmOpen}
+              title="确认整理数据"
+              description={`整理 ${database}/${collection}：删除重复内容，过滤低质量数据。`}
+              confirmLabel="确认整理"
+              loading={compacting}
+              loadingLabel="整理中…"
+              onConfirm={() => void doCompact()}
+            />
           </div>
           {searchError && (
             <div className="mt-2 text-sm text-destructive">
@@ -365,27 +350,22 @@ export default function MemoryLibraryPage() {
               {selected.size > 0 && (
                 <>
                   <span className="text-xs text-destructive">已选 {selected.size} 条</span>
-                  <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                    <AlertDialogTrigger
-                      className="brutal-btn px-2 py-0.5 text-xs text-white font-mono bg-destructive"
-                    >
-                      批量删除
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>确认批量删除</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          将删除选中的 {selected.size} 条记录。此操作不可撤销。
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>取消</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void doDelete()} disabled={deleting}>
-                          {deleting ? "删除中…" : "确认删除"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <button
+                    onClick={() => setDeleteDialogOpen(true)}
+                    className="brutal-btn px-2 py-0.5 text-xs text-white font-mono bg-destructive"
+                  >
+                    批量删除
+                  </button>
+                  <ConfirmDialog
+                    open={deleteDialogOpen}
+                    onOpenChange={setDeleteDialogOpen}
+                    title="确认批量删除"
+                    description={`将删除选中的 ${selected.size} 条记录。此操作不可撤销。`}
+                    confirmLabel="确认删除"
+                    loading={deleting}
+                    loadingLabel="删除中…"
+                    onConfirm={() => void doDelete()}
+                  />
                 </>
               )}
             </div>

@@ -16,9 +16,8 @@ const FACTORIES: Record<string, StrategyFactory> = {
 
 export function getChatStrategy(): ChatStrategy {
   const cfg = getProviderConfig("chat");
-  // ponytail: M3 已切到 OpenAI 兼容协议（2026-08-19），按 model 前缀识别而非 anthropic 协议
-  const prefix = cfg.model.split(/[-:]/)[0].toLowerCase();
-  return FACTORIES[prefix]?.() ?? FACTORIES.minimax();
+  // ponytail: 用 cfg.provider 识别 strategy（2026-08-20），不再解析 model 前缀（qwen3.8-max 前缀拆分会错配）
+  return FACTORIES[cfg.provider]?.() ?? FACTORIES.minimax();
 }
 
 export type { ChatStrategy } from "./types";

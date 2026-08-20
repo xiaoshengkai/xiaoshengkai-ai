@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.10.1 (2026-08-20) — 模型选择取值修复 + 确认弹窗抽组件 + 移除重启机制
+
+### 模型选择取值修复
+- `getChatStrategy` 改按 `cfg.provider` 识别 strategy（原来解析 model 前缀，`qwen3.8-max` 拆成 `qwen3.8` 错配回退 minimax）
+- `module-selector` chat deepseek 的 model 去掉 `(自动路由)` 后缀（原来把展示标签写进 selection.json 成非法 id）
+- `deepseek.ts` 自包含 `DEEPSEEK_PRO/FLASH`：resolveModel 不再读 workflow（原来 chat=deepseek+workflow=minimax 时发 MiniMax-M3 给 DeepSeek → 400）；classifyTask 改读 chat 配置
+
+### 确认弹窗抽组件（Neo-Brutalism）
+- `alert-dialog.tsx` 加 brutal 卡片主题：overlay `bg-black/50`、content `rounded-none brutal bg-card`、footer 粗黑分隔、title 加粗；Action/Cancel 保持中性
+- 新建 `components/ui/confirm-dialog.tsx`：共用确认弹窗，红色语义收敛在此（Action 红/Cancel 白，含 loading/tone）
+- 4 处删除/整理确认（workflow / execution / memory×2）改用 `<ConfirmDialog/>`；创建工作流(自定义 div)、tweak(自定义按钮) 不受红色影响
+
+### 移除重启机制
+- 所有配置 fresh-read，保存即生效 → 删设置页"重启 MCP/定时任务"按钮 + 过时文案，改单行提示
+- 删 `api/settings/restart-services` 路由；`scheduler.js` 删失效的 scheduler.pid 写入
+- 坑：删路由后 build 报 Cannot find module（tsconfig include `.next-prod/types`）→ 清 `.next-prod/types` + `.next/cache/.tsbuildinfo`
+
 ## v0.10.0 (2026-08-19) — MiniMax M3 协议切换 + settings 单一真源 + lib/ 目录合理化
 
 ### 阶段 1：M3 切 OpenAI 兼容协议（修复"笨"）

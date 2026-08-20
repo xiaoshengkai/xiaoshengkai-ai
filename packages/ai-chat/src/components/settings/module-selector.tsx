@@ -8,7 +8,7 @@ const MODULE_OPTIONS: Record<string, { label: string; icon: string; providers: {
     label: "聊天模型",
     icon: "💬",
     providers: [
-      { id: "deepseek", label: "DeepSeek", model: "deepseek-v4-pro (自动路由)", multimodal: false },
+      { id: "deepseek", label: "DeepSeek (自动路由)", model: "deepseek-v4-pro", multimodal: false },
       { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3", multimodal: true },
       { id: "glm", label: "GLM-5.2", model: "glm-5.2", multimodal: false },
       { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max", multimodal: true },

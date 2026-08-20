@@ -3,7 +3,10 @@ import type { ChatStrategy } from "./types";
 import type { ProviderConfig } from "@/lib/settings/dispatcher";
 import { getProviderConfig } from "@/lib/settings/dispatcher";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { getWorkflowModel } from "@/lib/core/workflow-model";
+
+// ponytail: DeepSeek 自动路由的两档模型 id（2026-08-20 自包含，不再依赖 workflow/chat 的 model 字符串）
+const DEEPSEEK_PRO = "deepseek-v4-pro";
+const DEEPSEEK_FLASH = "deepseek-v4-flash";
 
 export interface ClassifyResult {
   tier: "pro" | "flash";
@@ -35,10 +38,13 @@ Examples:
 "Debug this NullPointerException" → heavy`;
 
 // ponytail: classifyTask 是 DeepSeek 专属（仅 DeepSeek 有 pro/flash 两档），2026-08-19 从 router/task-router.ts 移入
+// ponytail: 分类用 deepseek flash（轻模型）跑，读 chat 配置的 baseURL/key（2026-08-20，不再用 workflow 避免被其配额拖累）
 async function classifyTask(query: string): Promise<ClassifyResult> {
   try {
+    const cfg = getProviderConfig("chat");
+    const flashModel = createOpenAICompatible({ name: "deepseek", baseURL: cfg.baseURL, apiKey: cfg.apiKey })(DEEPSEEK_FLASH);
     const { text, finishReason, usage } = await generateText({
-      model: getWorkflowModel("flash"),
+      model: flashModel,
       maxOutputTokens: 200,
       prompt: `${CLASSIFY_INSTRUCTIONS}
 
@@ -67,9 +73,8 @@ Classification:`,
 export const createDeepSeekStrategy = (): ChatStrategy => ({
   async resolveModel(userText: string) {
     const classify = await classifyTask(userText);
-    // ponytail: model 分级走 dispatcher（2026-08-19 阶段 2），flashModel 字段可选
-    const cfg = getProviderConfig("workflow");
-    const model = classify.tier === "pro" ? cfg.model : (cfg.flashModel ?? cfg.model);
+    // ponytail: DeepSeek 自动路由 pro/flash 自包含（2026-08-20），不读 workflow/chat 的 model 字符串
+    const model = classify.tier === "pro" ? DEEPSEEK_PRO : DEEPSEEK_FLASH;
     return { model, classifyUsage: classify.usage };
   },
   getProviderName() { return "deepseek"; },

@@ -124,30 +124,11 @@ export default function SettingsPage() {
       {/* 主体（可滚动） */}
       <div className="flex-1 overflow-auto p-6 space-y-6">
 
-      {/* 重启提示 */}
-      <div
-        className="brutal bg-yellow-soft p-3 text-xs font-mono"
-      >
-        <p className="font-bold text-foreground">⚠️ 注意</p>
-        <p className="text-foreground/70 mt-1">
-          修改配置后，聊天模型、图片生成、向量检索 立即生效，无需重启。
+      {/* 生效提示：所有配置均 fresh-read，保存即生效（2026-08-20 移除重启机制） */}
+      <div className="brutal bg-yellow-soft p-3 text-xs font-mono">
+        <p className="text-foreground/70">
+          所有配置（聊天/图片/向量/MCP/工作流/定时任务）保存后立即生效，无需重启。
         </p>
-        <p className="text-foreground/70 mt-0.5">
-          MCP 进程和定时任务需重启以应用新配置。工作流 CLI 每次自动创建新进程，无需重启。
-        </p>
-        <button
-          onClick={async () => {
-            try {
-              const r = await fetch(`${BASE}/api/settings/restart-services`, { method: "POST" });
-              const d = await r.json();
-              if (d.ok) toast("🟢 已通知 MCP 重建, 定时任务已终止");
-              else toast(`🔴 ${d.error || "重启失败"}`);
-            } catch { toast("🔴 重启请求失败"); }
-          }}
-          className="mt-2 brutal-btn px-3 py-1 text-xs font-bold bg-yellow text-foreground"
-        >
-          重启 MCP / 定时任务
-        </button>
       </div>
 
       {/* 模型选择 */}

@@ -12,7 +12,6 @@ const DEFAULT_PROVIDERS: Providers = {
   minimax: {
     enabled: true,
     baseURL: env.MINIMAX_BASE_URL,
-    anthropicBaseURL: env.MINIMAX_ANTHROPIC_BASE_URL,
     apiKey: env.MINIMAX_API_KEY,
     models: { chat: "MiniMax-M3", text: "MiniMax-M3", image: "image-01", tts: "speech-2.8-hd", bgm: "music-2.6" },
   },
@@ -34,7 +33,8 @@ const DEFAULT_SELECTION: Selection = {
   chat: { provider: "minimax", model: "MiniMax-M3" },
   media: { provider: "minimax", model: "image-01" },
   vector: { provider: "glm", model: "embedding-3" },
-  workflow: { provider: "deepseek", model: "deepseek-v4-pro" },
+  workflow: { provider: "deepseek", model: "deepseek-v4-pro", flashModel: "deepseek-v4-flash" },
+  preprocess: { provider: "minimax", model: "MiniMax-M3" },
   tts: { provider: "minimax", model: "speech-2.8-hd" },
   bgm: { provider: "minimax", model: "music-2.6" },
 };
@@ -58,10 +58,12 @@ export function initSettings() {
   if (!sel.chat) {
     writeSelection({ ...DEFAULT_SELECTION, ...sel });
   }
-  // ponytail: 旧 selection 缺 tts/bgm, 补默认值
-  if (sel.chat && (!sel.tts || !sel.bgm)) {
+  // ponytail: 旧 selection 缺 tts/bgm/preprocess, 补默认值
+  if (sel.chat) {
     if (!sel.tts) sel.tts = { provider: "minimax", model: "speech-2.8-hd" };
     if (!sel.bgm) sel.bgm = { provider: "minimax", model: "music-2.6" };
+    if (!sel.preprocess) sel.preprocess = { provider: "minimax", model: "MiniMax-M3" };
+    if (!sel.workflow) sel.workflow = DEFAULT_SELECTION.workflow;
     writeSelection(sel);
   }
   // ponytail: 旧默认 model 升级 (v0.8.1 glm-5 → v0.8.2 glm-5.2)

@@ -13,19 +13,15 @@ export const env = {
 
   MINIMAX_BASE_URL: process.env.MINIMAX_BASE_URL || 'https://api.minimaxi.com/v1',
   MINIMAX_API_KEY: process.env.MINIMAX_API_KEY || '',
-  MINIMAX_ANTHROPIC_BASE_URL: process.env.MINIMAX_ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic/v1',
 
   DEEPSEEK_BASE_URL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1',
   DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
-  DEEPSEEK_PRO_MODEL: process.env.DEEPSEEK_PRO_MODEL || 'deepseek-v4-pro',
-  DEEPSEEK_FLASH_MODEL: process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-v4-flash',
 
   GLM_BASE_URL: process.env.GLM_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4',
   GLM_API_KEY: process.env.GLM_API_KEY || '',
 
   QWEN_BASE_URL: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
   QWEN_API_KEY: process.env.QWEN_API_KEY || '',
-  QWEN_CHAT_MODEL: process.env.QWEN_CHAT_MODEL || 'qwen3.8-max',
 
   CHROMA_URL: `http://${NET_CONFIG.hosts.local}:${NET_CONFIG.ports.chroma}`,
 } as const;

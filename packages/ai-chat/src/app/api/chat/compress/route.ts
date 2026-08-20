@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { deepseek } from "@/lib/ai/providers";
+import { getWorkflowModel } from "@/lib/core/workflow-model";
 
 const COMPRESS_PROMPT = `请将以下对话整理为上下文摘要，供后续对话参考。确保不丢失任何关键信息。
 
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     console.log(`[compress] ${messages.length} messages, prevSummary: ${previousSummary ? previousSummary.length + " chars" : "none"}`);
 
     const { text, usage } = await generateText({
-      model: deepseek(process.env.DEEPSEEK_PRO_MODEL || "deepseek-v4-pro"),
+      model: getWorkflowModel("pro"),
       prompt: `${COMPRESS_PROMPT}\n\n${fullContext}`,
     });
 

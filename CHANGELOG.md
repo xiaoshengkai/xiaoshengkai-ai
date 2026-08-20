@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.10.0 (2026-08-19) — MiniMax M3 协议切换 + settings 单一真源 + lib/ 目录合理化
+
+### 阶段 1：M3 切 OpenAI 兼容协议（修复"笨"）
+- 根因：M3 走 Anthropic 协议 + `thinking:adaptive` + 128K `max_tokens`，thinking 与 text 共享配额被挤，输出被截断
+- `providers.json` 删 `anthropicBaseURL`；`route.ts` 删 `M3_MAX_OUTPUT_TOKENS`/`isMiniMax`/`providerOptions`
+- `chat-strategy` 加 `injectReasoningSplit`（注入 `reasoning_split:true`，thinking 分离到独立字段）；按 model 前缀识别 strategy
+- 修复：删 anthropicBaseURL 后 dispatcher 返回 `protocol:"openai"`，原 `cfg.protocol==="anthropic"` 判断失效 → 改按 `model.toLowerCase().startsWith("minimax")`
+
+### 阶段 2：settings 单一真源（动态读配置）
+- `settings/types.ts` 加 `flashModel?` + `preprocess` module；`dispatcher.ts` 加 `provider`+`flashModel` 字段
+- `providers.ts` 重写为 `getEmbeddingModel()`/`getWorkflowModel(tier)`/`getPreprocessModel()`（embedding 仅 GLM、preprocess 独立 module、workflow 支持 pro/flash 分级）
+- `m3-raw-fetch.ts` 改读 `preprocess` module + `reasoning_split:true`
+- `env.ts` 删 4 死常量；`instrumentation.ts` 启动时 `initSettings()`（删 JSON 后自动重建含新字段）
+- `lib/prompts/video-content.txt` → `video-content.ts`（导出常量 + `buildVideoContentPrompt`）
+
+### 阶段 3+4：lib/ 目录合理化（co-locate + 平级化，12 移动）
+- 单 caller co-locate：`prompts/video-content.ts`→`workflows/generate-content/_lib/prompt.ts`；`ai/router/model-display.ts`→`components/chat/_model-display.ts`；`utils/mime.ts`→`multimodal/mime.ts`；`utils/upload-client.ts`→`(main)/_lib/`；`workflow-cli.ts`→`workflows/_lib/cli.ts`；`store/conversation-store.ts`→`conversations/_lib/store.ts`
+- `lib/ai/*` 拆平级到 `lib/`：`core/ strategies/ multimodal/ router/ mcp-client.ts`，删 `lib/ai/`
+- 最终 `lib/` 7 子系统：`core/ strategies/ multimodal/ rag/ settings/ utils/ + mcp-client.ts`；`utils/` 精简为 `utils/types/cost/env`
+
+### 阶段 5：classifyTask 归位
+- `classifyTask` 是 DeepSeek 专属（仅 DeepSeek 有 pro/flash 两档）→ 从 `router/task-router.ts` 移入 `strategies/deepseek.ts`；删 `lib/router/`
+- `ModelTier` 类型归 `core/workflow-model.ts`（tier 真正归属）
+
+### 约定
+- API 内部私有 helper 用 `_lib/` 或 `_` 前缀（Next.js 不扫 `_` 前缀目录）
+- co-locate 原则：单 caller + 单用途 → 移到调用方同目录；多 caller/成子系统 → 留 `lib/`
+
+### 已知外部问题
+- MiniMax API key 达 Token Plan 用量上限（429 rate_limit），chat 走 minimax 会失败，需升级套餐；代码已验证正常（临时切 deepseek 全链路通过）
+
 ## v0.9.1 (2026-08-19) — Qwen 接入 + 模型适配层统一
 
 ### Qwen 接入

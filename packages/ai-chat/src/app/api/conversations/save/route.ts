@@ -1,4 +1,4 @@
-import { writeConversation } from "@/lib/store/conversation-store";
+import { writeConversation } from "../_lib/store";
 
 export async function POST(req: Request) {
   const { id, title, messages, model } = await req.json();

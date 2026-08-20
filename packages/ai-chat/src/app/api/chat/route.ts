@@ -19,16 +19,14 @@ import { streamText, stepCountIs, type ModelMessage as AISDKModelMessage } from 
 
 import { env } from '@/lib/utils/env';
 import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
-import { getModel } from '@/lib/ai/providers';
-import { getChatStrategy } from '@/lib/ai/chat-strategy';
+
+import { getChatStrategy } from '@/lib/strategies/chat-strategy';
 import { getProviderConfig } from '@/lib/settings/dispatcher';
-import { getMCPClient } from '@/lib/ai/mcp-client';
-import { processAttachments } from '@/lib/ai/processor';
+import { getMCPClient } from '@/lib/mcp-client';
+import { processAttachments } from '@/lib/multimodal/pipeline';
 import type { Message, MessagePart } from '@/lib/utils/types';
 
 // ─── 提示词常量 ────────────────────────────────────────────────────────
-
-const M3_MAX_OUTPUT_TOKENS = 131072;  // 128K，M3 上下文 1,000,000，输出不受限
 
 const TOOLS_PROMPT = `
 可用工具:
@@ -149,7 +147,6 @@ export async function POST(req: Request) {
     const userText = (messages[messages.length - 1]?.parts?.[0] as { text?: string } | undefined)?.text || '';
     const { model: actualModel, classifyUsage } = await strategy.resolveModel(userText);
     const provider = strategy.getProviderName();
-    const isMiniMax = provider === "minimax";
 
     // 多模态处理：图片 + 视频附件
     const { messages: processedMessages, systemInjection: multimodalInjection } =
@@ -179,20 +176,11 @@ export async function POST(req: Request) {
     const result = streamText({
       tools: tools as unknown as Parameters<typeof streamText>[0]['tools'],
       model,
-      maxOutputTokens: isMiniMax ? M3_MAX_OUTPUT_TOKENS : undefined,
       system: systemPrompt,
       messages: modelMessages,
       maxRetries: 5,
       stopWhen: stepCountIs(100),
       abortSignal: req.signal,
-      providerOptions: {
-        anthropic: {
-          thinking: { type: 'adaptive' },
-        },
-        openai: {
-          thinking: { type: 'enabled' },
-        },
-      },
     });
 
     return result.toUIMessageStreamResponse({

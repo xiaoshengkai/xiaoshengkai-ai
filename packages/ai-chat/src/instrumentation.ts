@@ -25,6 +25,10 @@ export async function register(): Promise<void> {
     return;
   }
 
+  // ponytail: 启动时初始化 settings（selection.json + providers.json）— 保证 dispatcher 永远能拿到配置（2026-08-19）
+  const { initSettings } = await import("@/lib/settings/init");
+  initSettings();
+
   const { ensureChromaRunning } = await import("@/lib/rag/chroma-server");
   await ensureChromaRunning();
 }

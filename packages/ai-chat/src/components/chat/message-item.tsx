@@ -4,7 +4,7 @@
 import { BASE } from "@/lib/utils/utils";
 import { useMemo, useState, useCallback } from "react";
 import { isToolUIPart, isReasoningUIPart, type UIMessage } from "ai";
-import { getModelDisplay } from "@/lib/ai/model-display";
+import { getModelDisplay } from "./_model-display";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";

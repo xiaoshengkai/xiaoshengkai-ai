@@ -28,7 +28,7 @@ import {
   SHARED_DB,
   SHARED_COLLECTION,
 } from "@/lib/rag/vector-store";
-import { glm } from "@/lib/ai/providers";
+import { getEmbeddingModel } from "@/lib/core/embedding";
 import { env } from "@/lib/utils/env";
 
 function ok(data: unknown) {
@@ -152,7 +152,7 @@ async function handleSearch(req: NextRequest) {
   let queryVec: number[];
   try {
     const { embedding } = await embed({
-      model: glm.embeddingModel("embedding-3"),
+      model: getEmbeddingModel(),
       value: query,
     });
     queryVec = embedding;

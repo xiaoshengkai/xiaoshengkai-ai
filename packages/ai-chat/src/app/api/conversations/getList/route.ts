@@ -1,4 +1,4 @@
-import { listConversations } from "@/lib/store/conversation-store";
+import { listConversations } from "../_lib/store";
 
 export async function GET() {
   console.log("[conv:getList] 获取对话列表");

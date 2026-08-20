@@ -401,14 +401,15 @@ ai-engineer-journey/
     │       └── providers/      # deepseek.js / glm.js / minimax.js
     ├── ai-chat/                # 业务服务（Next.js）
     │   ├── src/
-    │   │   ├── instrumentation.ts      # 启动时 spawn chroma
-    │   │   ├── lib/
-    │   │   │   ├── ai/          # providers / chat-strategy / mcp-client / processor / model-router ...
-    │   │   │   ├── rag/         # retrieve.ts / vector-store.ts / chroma-server.ts
-    │   │   │   ├── settings/    # store / init / dispatcher / types
-    │   │   │   ├── store/       # conversation-store
-    │   │   │   ├── utils/       # env / utils / types
-    │   │   │   └── prompts/
+     │   │   ├── instrumentation.ts      # 启动时 initSettings + spawn chroma
+     │   │   ├── lib/             # 2026-08-19 重构：lib/ai 拆平级 + 单 caller co-locate
+     │   │   │   ├── core/        # LLM 基础设施：embedding / workflow-model / preprocess-{model,fetch} / fetch-interceptors
+     │   │   │   ├── strategies/  # chat 路由：chat-strategy + 4 provider strategy（classifyTask 在 deepseek.ts）
+     │   │   │   ├── multimodal/  # 附件处理：attachment / image / video / pipeline / modality-detector / multimodal-config / mime
+     │   │   │   ├── rag/         # retrieve.ts / vector-store.ts / chroma-server.ts
+     │   │   │   ├── settings/    # store / init / dispatcher / types
+     │   │   │   ├── mcp-client.ts
+     │   │   │   └── utils/       # utils(cn+BASE) / types / cost / env
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow
     │   │       ├── api/         # chat / memory / workflows / settings / tasks / conversations ...

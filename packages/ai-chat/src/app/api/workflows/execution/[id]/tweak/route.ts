@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
-import { runWorkflowCli } from "@/lib/workflow-cli";
+import { runWorkflowCli } from "../../../_lib/cli";
 
 const DATA_DIR = path.resolve(process.cwd(), "..", "..", "data", "workflows");
 

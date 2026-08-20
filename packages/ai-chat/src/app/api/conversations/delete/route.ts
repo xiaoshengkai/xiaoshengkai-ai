@@ -1,4 +1,4 @@
-import { readConversation, deleteConversation } from "@/lib/store/conversation-store";
+import { readConversation, deleteConversation } from "../_lib/store";
 
 export async function DELETE(req: Request) {
   const id = new URL(req.url).searchParams.get("id");

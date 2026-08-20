@@ -1,4 +1,4 @@
-import { pinConversation } from "@/lib/store/conversation-store";
+import { pinConversation } from "../_lib/store";
 
 export async function POST(req: Request) {
   const url = new URL(req.url);

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import fs from "node:fs";
-import path from "node:path";
 
-const PROMPT_PATH = path.resolve(process.cwd(), "src", "lib", "prompts", "video-content.txt");
+import { VIDEO_CONTENT_PROMPT, buildVideoContentPrompt } from "./_lib/prompt";
+import { callLLM, getWorkflowProvider } from "../../../../../../shared/llm/index.js";
 
 export async function POST(request: Request) {
   const { title, requirement } = await request.json();
@@ -11,17 +10,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "missing title" }, { status: 400 });
   }
 
-  let systemPrompt = "你是一个短视频脚本策划助手，根据用户提供的视频标题生成详细的内容描述。";
-  if (fs.existsSync(PROMPT_PATH)) {
-    systemPrompt = fs.readFileSync(PROMPT_PATH, "utf-8");
-  }
-
   try {
-    const { callLLM, getWorkflowProvider } = await import("../../../../../../shared/llm/index.js");
     console.log(`[generate-content] 调用 LLM: provider=${getWorkflowProvider()}`);
     const { text } = await callLLM({
-      system: systemPrompt,
-      user: `视频标题：${title}\n\n${requirement ? `内容要求：${requirement}\n\n` : ""}请生成内容描述`,
+      system: VIDEO_CONTENT_PROMPT,
+      user: buildVideoContentPrompt({ title, requirement }),
       format: 'text',
     });
 

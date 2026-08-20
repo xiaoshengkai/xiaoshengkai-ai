@@ -1,13 +1,10 @@
 /**
- * 模态识别器
+ * 模态识别器 — 从消息中提取图片/视频附件
  *
- * 从消息中提取图片/视频附件：
- *  - [图片:/api/uploads/xxx.png] 上传标记
- *  - [视频:/api/uploads/xxx.mp4] 上传标记
- *  - https://... 直接 URL
+ * ponytail: 2026-08-19 — 移动到 multimodal/ 子目录，加前缀统一
  */
 
-import { ATTACHMENT_REGEX } from './multimodal-markers';
+import { ATTACHMENT_REGEX } from './attachment';
 import type { Message } from "../utils/types"
 
 export type Modality = 'image' | 'video' | 'unknown';

@@ -1,16 +1,15 @@
 /**
- * 图片处理器
+ * 图片处理器 — AI SDK 5/6 用 {type: 'file', mediaType, data} 格式
  *
- * AI SDK 5 使用 {type: 'file', mediaType, data} 格式传递多媒体。
- * minimax fetch 拦截器会根据 mediaType 把 file 改写成 image_url 或 video_url。
+ * ponytail: 2026-08-19 — 从 image-processor.ts 改名并拆出通用逻辑到 attachment.ts
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { extractAttachments } from './modality-detector';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
-import { IMAGE_URL_REGEX, IMAGE_UPLOAD_REGEX, IMAGE_MARKER_STRIP, IMAGE_MARKER_TRIM } from './multimodal-markers';
+import { IMAGE_URL_REGEX, IMAGE_UPLOAD_REGEX, IMAGE_MARKER_STRIP, downloadRemoteImage } from './attachment';
+import { preprocessChat } from '@/lib/core/preprocess-fetch';
 import type { FilePart, Message, MessagePart, TextPart } from "../utils/types"
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
@@ -18,33 +17,6 @@ const IMAGE_DIR = path.resolve(ROOT_DIR, 'data', 'static', 'images');
 
 /** 本地文件路径对应的 file part */
 type ImageFilePart = FilePart;
-
-/**
- * 下载远程图片到本地（带缓存）
- * 返回本地文件名，失败返回 null
- */
-async function downloadRemoteImage(url: string): Promise<string | null> {
-  if (url.startsWith('/api/uploads/')) return null;
-  const hash = crypto.createHash('md5').update(url).digest('hex').slice(0, 8);
-  const existing = fs.readdirSync(IMAGE_DIR).find(f => f.includes(hash));
-  if (existing) return existing;
-
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!response.ok) return null;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length === 0 || buffer.length > 10 * 1024 * 1024) return null;
-
-    const ext = url.split('?')[0].split('.').pop()?.toLowerCase() || 'png';
-    const filename = `${hash}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
-    fs.mkdirSync(IMAGE_DIR, { recursive: true });
-    fs.writeFileSync(path.join(IMAGE_DIR, filename), buffer);
-    console.log(`[image-cache] downloaded ${filename} (${(buffer.length / 1024).toFixed(1)}KB)`);
-    return filename;
-  } catch {
-    return null;
-  }
-}
 
 export interface ImageProcessResult {
   messages: Message[];
@@ -56,7 +28,7 @@ export interface ImageProcessResult {
 function loadImagesAsFile(filenames: string[]): ImageFilePart[] {
   const out: ImageFilePart[] = [];
   for (const filename of filenames) {
-    const filePath = path.resolve(ROOT_DIR, 'data', 'static', 'images', filename);
+    const filePath = path.resolve(IMAGE_DIR, filename);
     if (!fs.existsSync(filePath)) {
       throw new Error(`图片文件不存在：${filename}`);
     }
@@ -145,7 +117,7 @@ export async function processImagesDirect(messages: Message[]): Promise<Message[
         const strategy = DEFAULT_CONFIG.missingFileStrategy;
         if (strategy === 'error') throw err;
         if (strategy === 'ignore') {
-          console.warn(`[image-processor] 忽略缺失图片: ${(err as Error).message}`);
+          console.warn(`[image] 忽略缺失图片: ${(err as Error).message}`);
           if (!cleanText) continue;
           newParts.push({ type: 'text', text: cleanText });
         } else {
@@ -214,7 +186,7 @@ export async function preprocessImagesDescription(messages: Message[]): Promise<
       for (const att of attachments) {
         if (att.localPath) {
           try {
-            const filePath = path.resolve(ROOT_DIR, 'data', 'static', 'images', att.filename);
+            const filePath = path.resolve(IMAGE_DIR, att.filename);
             if (!fs.existsSync(filePath)) continue;
             const buffer = fs.readFileSync(filePath);
             const ext = path.extname(att.filename).slice(1).toLowerCase();
@@ -238,10 +210,9 @@ export async function preprocessImagesDescription(messages: Message[]): Promise<
   if (!hasAnyImage) return { messages };
 
   const tStart = Date.now();
-  console.log(`[preprocess] 检测到图片，M3 调用中...`);
+  console.log(`[preprocess] 检测到图片，preprocess 调用中...`);
 
-  const { m3ChatComplete } = await import('./m3-raw-fetch');
-  const description = await m3ChatComplete(
+  const description = await preprocessChat(
     [{
       role: 'user',
       content: [
@@ -249,10 +220,10 @@ export async function preprocessImagesDescription(messages: Message[]): Promise<
         ...(openaiMessages[openaiMessages.length - 1]?.content || []),
       ],
     }],
-    { modelName: 'MiniMax-M3', systemPrompt: '' },
+    { modelName: '', systemPrompt: '' },
   );
 
-  console.log(`[preprocess] M3 完成: ${((Date.now() - tStart) / 1000).toFixed(1)}s, ${description?.length || 0} 字`);
+  console.log(`[preprocess] 完成: ${((Date.now() - tStart) / 1000).toFixed(1)}s, ${description?.length || 0} 字`);
 
   const cleanedParts: MessagePart[] = last.parts.map((p): MessagePart => {
     if (p.type !== 'text') return p;

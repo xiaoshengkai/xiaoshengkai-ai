@@ -1,10 +1,12 @@
 import { generateText } from "ai";
-import { deepseek } from "@/lib/ai/providers";
-
-export type ModelTier = "flash" | "pro";
+import type { ChatStrategy } from "./types";
+import type { ProviderConfig } from "@/lib/settings/dispatcher";
+import { getProviderConfig } from "@/lib/settings/dispatcher";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { getWorkflowModel } from "@/lib/core/workflow-model";
 
 export interface ClassifyResult {
-  tier: ModelTier;
+  tier: "pro" | "flash";
   usage: { inputTokens: number; outputTokens: number; totalTokens: number };
 }
 
@@ -32,10 +34,11 @@ Examples:
 "What is Python?" → light
 "Debug this NullPointerException" → heavy`;
 
-export async function classifyTask(query: string): Promise<ClassifyResult> {
+// ponytail: classifyTask 是 DeepSeek 专属（仅 DeepSeek 有 pro/flash 两档），2026-08-19 从 router/task-router.ts 移入
+async function classifyTask(query: string): Promise<ClassifyResult> {
   try {
     const { text, finishReason, usage } = await generateText({
-      model: deepseek(process.env.DEEPSEEK_FLASH_MODEL || "deepseek-v4-flash"),
+      model: getWorkflowModel("flash"),
       maxOutputTokens: 200,
       prompt: `${CLASSIFY_INSTRUCTIONS}
 
@@ -60,3 +63,17 @@ Classification:`,
     return { tier: "pro", usage: { totalTokens: 0, inputTokens: 0, outputTokens: 0 } };
   }
 }
+
+export const createDeepSeekStrategy = (): ChatStrategy => ({
+  async resolveModel(userText: string) {
+    const classify = await classifyTask(userText);
+    // ponytail: model 分级走 dispatcher（2026-08-19 阶段 2），flashModel 字段可选
+    const cfg = getProviderConfig("workflow");
+    const model = classify.tier === "pro" ? cfg.model : (cfg.flashModel ?? cfg.model);
+    return { model, classifyUsage: classify.usage };
+  },
+  getProviderName() { return "deepseek"; },
+  createModel(model: string, cfg: ProviderConfig) {
+    return createOpenAICompatible({ name: "deepseek", baseURL: cfg.baseURL, apiKey: cfg.apiKey })(model);
+  },
+});

@@ -1,4 +1,4 @@
-import { readConversation } from "@/lib/store/conversation-store";
+import { readConversation } from "../_lib/store";
 
 export async function GET(req: Request) {
   const id = new URL(req.url).searchParams.get("id");

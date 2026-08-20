@@ -11,7 +11,7 @@
  */
 
 import { embed } from "ai";
-import { glm } from "@/lib/ai/providers";
+import { getEmbeddingModel } from "@/lib/core/embedding";
 import { searchRelevant, SHARED_DB, SHARED_COLLECTION, CHAT_DB, CHAT_COLLECTION, TOP_K_DEFAULT, listCollections } from "@/lib/rag/vector-store";
 
 export interface RetrievedChunk {
@@ -25,7 +25,7 @@ export async function retrieveRelevantChunks(
 ): Promise<RetrievedChunk[]> {
   if (!query) return [];
   const { embedding: queryVec } = await embed({
-    model: glm.embeddingModel("embedding-3"),
+    model: getEmbeddingModel(),
     value: query,
   });
 

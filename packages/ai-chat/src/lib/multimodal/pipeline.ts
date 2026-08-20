@@ -1,18 +1,17 @@
 /**
- * 处理器工厂 — 根据 provider/model 选策略
+ * 处理器调度器 — 根据 provider/model 选策略
+ *
+ * ponytail: 2026-08-19 — 从 processor.ts 改名，体现"调度"本质
  *
  * 策略：
  * - direct: AI SDK 直传（M3 等支持多模态）
- * - preprocess: M3 描述 → 文字注入 system（DeepSeek 等纯文本 provider）
+ * - preprocess: preprocess model 描述 → 文字注入 system（DeepSeek 等纯文本 provider）
  */
 
 import { getModalityStrategy } from './multimodal-config';
-import { processImagesDirect, preprocessImagesDescription } from './image-processor';
-import { processVideos, preprocessVideoDescription } from './video-processor';
-import {
-  IMAGE_URL_REGEX, VIDEO_URL_REGEX,
-  IMAGE_MARKER_STRIP, VIDEO_MARKER_STRIP,
-} from './multimodal-markers';
+import { processImagesDirect, preprocessImagesDescription } from './image';
+import { processVideos, preprocessVideoDescription } from './video';
+import { IMAGE_URL_REGEX, VIDEO_URL_REGEX, IMAGE_MARKER_STRIP, VIDEO_MARKER_STRIP } from './attachment';
 import type { Message, MessagePart, TextPart } from "../utils/types"
 
 export interface ProcessInput {
@@ -34,7 +33,7 @@ export async function processAttachments({ provider, model, messages }: ProcessI
 
   if (imageStrategy === 'none' && videoStrategy === 'none') {
     if (hasImageOrVideo(messages)) {
-      console.log(`[processor] ${provider}/${model} 不支持多模态 → preprocess 路径`);
+      console.log(`[pipeline] ${provider}/${model} 不支持多模态 → preprocess 路径`);
       const [imgResult, vidDesc] = await Promise.all([
         preprocessImagesDescription(messages),
         preprocessVideoDescription(messages),
@@ -51,7 +50,7 @@ export async function processAttachments({ provider, model, messages }: ProcessI
 
   if (imageStrategy === 'none' || videoStrategy === 'none') {
     if (hasImageOrVideo(messages)) {
-      console.log(`[processor] ${provider}/${model} 部分支持多模态 → 回退 preprocess`);
+      console.log(`[pipeline] ${provider}/${model} 部分支持多模态 → 回退 preprocess`);
       const [imgResult, vidDesc] = await Promise.all([
         preprocessImagesDescription(messages),
         preprocessVideoDescription(messages),
@@ -67,7 +66,7 @@ export async function processAttachments({ provider, model, messages }: ProcessI
   try {
     return { messages: processVideos(await processImagesDirect(messages)) };
   } catch (err) {
-    console.warn(`[processor] 直传失败，回退 preprocess:`, (err as Error).message);
+    console.warn(`[pipeline] 直传失败，回退 preprocess:`, (err as Error).message);
     return processAttachments({ provider: 'minimax', model: 'MiniMax-M3', messages });
   }
 }

@@ -17,7 +17,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { embed } from "ai";
-import { glm } from "../src/lib/ai/providers";
+import { getEmbeddingModel } from "../src/lib/core/embedding";
 import { ChromaClient } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 import { loadNetworkConfig } from "@shared/network.js";
@@ -102,7 +102,7 @@ async function main() {
   for (const query of TEST_QUERIES) {
     // 3a. embed
     const { embedding: queryVec } = await embed({
-      model: glm.embeddingModel("embedding-3"),
+      model: getEmbeddingModel(),
       value: query,
     });
 

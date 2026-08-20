@@ -13,7 +13,7 @@ import { ImageViewerProvider } from "@/components/ui/image-viewer";
 import RightPanel from "@/components/layout/right-panel";
 import { useConversation } from "@/components/layout/conversation-context";
 import { calculateCost, formatTokens } from "@/lib/utils/cost";
-import { uploadFile } from "@/lib/utils/upload-client";
+import { uploadFile } from "./_lib/upload-client";
 import type { AttachedFile } from "@/lib/utils/types";
 import Logo from "@/components/ui/logo";
 

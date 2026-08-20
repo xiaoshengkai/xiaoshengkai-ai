@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runWorkflowCli } from "@/lib/workflow-cli";
+import { runWorkflowCli } from "../../../_lib/cli";
 
 export async function POST(
   request: Request,

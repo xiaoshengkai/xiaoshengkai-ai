@@ -2,8 +2,8 @@
  * 客户端上传 helper — 合并 handlePaste + handleFileChange 的 FileReader+fetch 块
  */
 
-import { BASE } from "./utils";
-import type { UploadResult } from "./types"
+import { BASE } from "@/lib/utils/utils";
+import type { UploadResult } from "@/lib/utils/types"
 
 export function readAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

@@ -1,6 +1,8 @@
 /**
  * 多模态 Provider 注册表 + 配置
  *
+ * ponytail: 2026-08-19 — 移动到 multimodal/ 子目录
+ *
  * 扩展方式：新增 provider/model 只需加配置项，业务代码零改动
  * 配置优先级：环境变量 > JSON 文件 > 代码默认值
  *

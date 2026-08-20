@@ -1,18 +1,17 @@
 /**
- * 视频处理器
+ * 视频处理器 — AI SDK 6 用 {type: 'file', mediaType: 'video/mp4', data: 'data:...'} 格式
  *
- * AI SDK 6 用 {type: 'file', mediaType: 'video/mp4', data: 'data:...'} 格式。
- * minimax fetch 拦截器根据 mediaType 把 file 转成 video_url。
+ * ponytail: 2026-08-19 — 从 video-processor.ts 改名并拆出通用逻辑到 attachment.ts
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { extractAttachments } from './modality-detector';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
-import { VIDEO_URL_REGEX, VIDEO_UPLOAD_REGEX, VIDEO_MARKER_STRIP } from './multimodal-markers';
-import { m3ChatComplete } from './m3-raw-fetch';
+import { VIDEO_URL_REGEX, VIDEO_UPLOAD_REGEX, VIDEO_MARKER_STRIP } from './attachment';
+import { preprocessChat } from '@/lib/core/preprocess-fetch';
+import { extToMime } from "./mime"
 import type { FilePart, Message, MessagePart, TextPart } from "../utils/types"
-import { extToMime } from "../utils/mime"
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
 
@@ -90,7 +89,7 @@ export function processVideos(messages: Message[]): Message[] {
       } catch (err) {
         const strategy = DEFAULT_CONFIG.missingFileStrategy;
         if (strategy === 'error') throw err;
-        console.warn(`[video-processor] 跳过视频: ${(err as Error).message}`);
+        console.warn(`[video] 跳过视频: ${(err as Error).message}`);
         if (!cleanText) continue;
         newParts.push({ type: 'text', text: cleanText });
       }
@@ -125,7 +124,7 @@ interface OpenAIVideoMsg {
   content: OpenAIVideoPart[];
 }
 
-/** 视频预处理：M3 描述 → 文字给纯文本 provider */
+/** 视频预处理：preprocess model 描述 → 文字给纯文本 provider */
 export async function preprocessVideoDescription(messages: Message[]): Promise<string | undefined> {
   const attachments = extractAttachments(messages).filter((a) => a.modality === 'video');
   if (attachments.length === 0) return undefined;
@@ -178,8 +177,8 @@ export async function preprocessVideoDescription(messages: Message[]): Promise<s
     }
   }
 
-  return m3ChatComplete(openaiMessages, {
-    modelName: 'MiniMax-M3',
+  return preprocessChat(openaiMessages, {
+    modelName: '',
     systemPrompt: '请客观描述视频和图片的核心内容，不要做多余事情。用 1-2 句话总结。',
   });
 }

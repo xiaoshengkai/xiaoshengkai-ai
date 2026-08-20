@@ -1,28 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { getApiKey } from "../config.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROVIDERS_PATH = path.resolve(__dirname, "..", "..", "..", "..", "data", "settings", "providers.json");
-
-let GLM_BASE_URL = process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
-let GLM_CHAT_MODEL = process.env.GLM_CHAT_MODEL || "glm-5.2";
-
-try {
-  if (fs.existsSync(PROVIDERS_PATH)) {
-    const p = JSON.parse(fs.readFileSync(PROVIDERS_PATH, "utf-8"));
-    if (p.glm?.baseURL) GLM_BASE_URL = p.glm.baseURL;
-    if (p.glm?.models?.chat) GLM_CHAT_MODEL = p.glm.models.chat;
-  }
-} catch { /* fallback to env */ }
+import { getApiKey, getBaseUrl, getProviderModel } from "../config.js";
 
 export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object' }) {
   const apiKey = getApiKey("glm", "GLM_API_KEY");
   if (!apiKey) throw new Error("未配置 GLM_API_KEY");
 
-  const actualModel = model || GLM_CHAT_MODEL;
-  console.log(`[glm] 当前调用: model=${actualModel} baseURL=${GLM_BASE_URL}`);
+  const baseURL = getBaseUrl("glm", "GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4");
+  const actualModel = model || getProviderModel("glm", "chat", "GLM_CHAT_MODEL", "glm-5.2");
+  console.log(`[glm] 当前调用: model=${actualModel} baseURL=${baseURL}`);
 
   const body = {
     model: actualModel,
@@ -35,7 +19,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   };
   if (format) body.response_format = { type: format };
 
-  const res = await fetch(`${GLM_BASE_URL}/chat/completions`, {
+  const res = await fetch(`${baseURL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

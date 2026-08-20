@@ -26,7 +26,7 @@ interface CallOptions {
 export async function preprocessChat(
   messages: OpenAIMessage[],
   opts: Omit<CallOptions, 'signal'> & { signal?: AbortSignal }
-): Promise<string | undefined> {
+): Promise<string> {
   const cfg = getProviderConfig("preprocess");
   const body = {
     model: opts.modelName || cfg.model,
@@ -47,7 +47,18 @@ export async function preprocessChat(
     body: JSON.stringify(body),
     signal: opts.signal,
   });
-  if (!response.ok) return undefined;
-  const data = await response.json() as { choices?: { message?: { content?: string } }[] };
-  return data.choices?.[0]?.message?.content;
+  const raw = await response.text();
+  if (!response.ok) {
+    throw new Error(`preprocess 调用失败 (${response.status}): ${raw.slice(0, 200)}`);
+  }
+  if (!raw.trim()) throw new Error("preprocess 返回空响应");
+  let data: { choices?: { message?: { content?: string } }[] };
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error(`preprocess 返回无效 JSON: ${raw.slice(0, 200)}`);
+  }
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) throw new Error("preprocess 返回空内容");
+  return content;
 }

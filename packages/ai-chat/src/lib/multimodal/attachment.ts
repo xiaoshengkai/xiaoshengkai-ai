@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { DEFAULT_CONFIG } from './multimodal-config';
 
 export const IMAGE_UPLOAD_REGEX = /\[图片:([^\]]+)\]/g;
 export const VIDEO_UPLOAD_REGEX = /\[视频:([^\]]+)\]/g;
@@ -17,6 +18,18 @@ export const IMAGE_MARKER_TRIM = /\[图片:[^\]]+\]\n?/g;
 export const IMAGE_URL_REGEX = /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi;
 export const VIDEO_URL_REGEX = /https?:\/\/[^\s]+\.(?:mp4|mov|avi|mkv)(?:\?[^\s]*)?/gi;
 export const ATTACHMENT_REGEX = /\[(图片|视频):[^\]]+\]|https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|mp4|mov|avi|mkv)(?:\?[^\s]*)?/gi;
+
+/** 校验内联 base64 媒体数据不超过大小上限（URL 引用跳过） */
+export function assertMediaDataSize(data: string, modality: 'image' | 'video'): void {
+  if (!data.startsWith('data:')) return;
+  const b64 = data.slice(data.indexOf(',') + 1);
+  const pad = (b64.match(/=+$/) || [''])[0].length;
+  const size = Math.floor((b64.length * 3) / 4) - pad;
+  const max = modality === 'image' ? DEFAULT_CONFIG.maxImageFileSize : DEFAULT_CONFIG.maxFileSize;
+  if (size > max) {
+    throw new Error(`${modality === 'image' ? '图片' : '视频'}过大（${(size / 1024 / 1024).toFixed(1)}MB > ${max / 1024 / 1024}MB）`);
+  }
+}
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
 const IMAGE_DIR = path.resolve(ROOT_DIR, 'data', 'static', 'images');

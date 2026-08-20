@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.10.2 (2026-08-20) — 阶段一 settings 分发加固 + 阶段二 多模态管线修复
+
+### 阶段一：settings 分发加固（shared/llm + ai-chat settings）
+- `shared/llm/config.js`：新增 `LLM_SETTINGS_DIR` 测试缝隙、`getProviderModel()`、`assertProviderEnabled()`（unknown/disabled provider 明确抛错，不静默回退）
+- `shared/llm/index.js`：workflow selection fresh-read，`selection.workflow.model` 真正传给 provider（此前路径 bug 一直回退 env）
+- 4 个 provider（deepseek/glm/minimax/qwen）删模块级 baseURL/model 缓存，每次调用 fresh-read（改配置无需重启）
+- ai-chat settings 删 `protocol`/`anthropicBaseURL` 残留（dispatcher/types/设置 UI）；`mcp-client.ts` 删 orphan reload-marker
+- `strategies/deepseek.ts`：pro 档读 chat 选择、flash 档固定 `deepseek-v4-flash`
+
+### 阶段二：多模态管线修复（按实际模态分流 + 失败不静默）
+- 新增 `multimodal/preprocess.ts`：统一图片/视频 preprocess；**只发媒体、单条 user 消息**（根因修复：原来发全量对话含 assistant 轮，preprocess 模型续写回显历史而非描述图片）；远程 URL 转 `image_url`/`video_url`；缺失附件/超大小明确抛错
+- `core/preprocess-fetch.ts`：HTTP 非 2xx、空 body、空 content、无效 JSON 均抛错（不再静默剥离）
+- `pipeline.ts`：按实际存在模态分流；先按历史深度裁剪；图片+视频均需 preprocess 时合并为一次调用
+- `multimodal-config.ts`：Qwen `videoModels: []`（video 禁止 direct）；`maxImageFileSize` 10MB；`isWithinHistoryDepth()`
+- `image.ts`/`video.ts`：删旧重复 preprocess；direct 路径 name-based 去重 + 既有 file part 大小校验；strip 后空消息补 `[图片]`/`[视频]` 占位
+- `attachment.ts`：`assertMediaDataSize()`（内联 base64 不绕过大小上限）
+- `route.ts`：注入描述加绑定引导句（把 `[图片]`/`[视频]` 占位符与描述显式绑定，文本模型不再弃用描述）；`[multimodal] systemInjection len=` + `[preprocess] 描述 len=` 日志
+
+### 测试（新增 packages/shared/test/，统一测试目录）
+- `llm-dispatch.test.js` 3/3（阶段一回归）
+- `ai-chat-multimodal.test.ts` 18/18（含回归：preprocess 请求只含媒体、不带历史对话轮）
+- 运行：根目录 `node --test packages/shared/test/llm-dispatch.test.js`；ai-chat 下 `npx tsx --test ../shared/test/ai-chat-multimodal.test.ts`
+
+### 验收
+- 手工 1-4 通过：MiniMax 图片 direct；DeepSeek 图片/视频/图片+视频 描述注入
+- 5-7（Qwen 图片/视频、preprocess 坏 baseURL 报错）因 Qwen 额度延后
+
 ## v0.10.1 (2026-08-20) — 模型选择取值修复 + 确认弹窗抽组件 + 移除重启机制
 
 ### 模型选择取值修复

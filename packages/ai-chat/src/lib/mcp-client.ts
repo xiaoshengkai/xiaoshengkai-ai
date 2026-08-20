@@ -1,32 +1,11 @@
 import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import fs from "node:fs";
-import path from "node:path";
 
-const SETTINGS_DIR = path.resolve(process.cwd(), "..", "..", "data", "settings");
-const RELOAD_MARKER = path.join(SETTINGS_DIR, "reload-marker.json");
-
+// ponytail: MCP 子进程内 shared/llm 每次调用 fresh-read providers.json，无需重建客户端
 let mcpClient: MCPClient | null = null;
-let lastMarkerAt: string | null = null;
-
-function checkMarker(): boolean {
-  try {
-    if (!fs.existsSync(RELOAD_MARKER)) return false;
-    const { at } = JSON.parse(fs.readFileSync(RELOAD_MARKER, "utf-8"));
-    if (at !== lastMarkerAt) {
-      lastMarkerAt = at;
-      return true;
-    }
-  } catch {}
-  return false;
-}
 
 export async function getMCPClient(): Promise<MCPClient> {
-  if (mcpClient && !checkMarker()) return mcpClient;
-
-  if (mcpClient) {
-    await mcpClient.close().catch(() => {});
-  }
+  if (mcpClient) return mcpClient;
 
   const transport = new StdioClientTransport({
     command: "node",

@@ -107,9 +107,9 @@ function buildSkillList(): string {
 const SKILL_LIST = buildSkillList();
 console.log('[SKILL_LIST]', SKILL_LIST || '(空)');
 
-// ─── MCP 客户端(模块级复用, 支持 reload-marker 检测) ───────────────────
+// ─── MCP 客户端(模块级复用) ──────────────────────────────────────────
 
-// 由 lib/ai/mcp-client.ts 提供, 支持 settings 变更后自动重建
+// 由 lib/mcp-client.ts 提供，MCP 子进程内 shared/llm 每次调用 fresh-read 配置
 
 // ─── POST /api/chat ───────────────────────────────────────────────────
 
@@ -151,6 +151,7 @@ export async function POST(req: Request) {
     // 多模态处理：图片 + 视频附件
     const { messages: processedMessages, systemInjection: multimodalInjection } =
       await processAttachments({ provider, model: actualModel, messages });
+    console.log(`[multimodal] systemInjection len=${multimodalInjection?.length ?? 0}`);
 
     const modelMessages = toModelMessages(processedMessages);
 
@@ -229,7 +230,7 @@ function buildSystemPrompt({
 技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
         ${SKILL_LIST}
         ${TOOLS_PROMPT}
-        ${multimodalInjection ? `\n${multimodalInjection}\n` : ''}
+        ${multimodalInjection ? `\n用户消息中的 [图片]/[视频] 占位符对应的实际内容如下（由视觉模型生成，等同附件本身）。请据此理解并回答用户问题，不要声称看不到附件：\n${multimodalInjection}\n` : ''}
         ${knowledgeContext}`;
 }
 

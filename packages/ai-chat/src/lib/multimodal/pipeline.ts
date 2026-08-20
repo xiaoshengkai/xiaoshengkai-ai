@@ -8,11 +8,12 @@
  * - preprocess: preprocess model 描述 → 文字注入 system（DeepSeek 等纯文本 provider）
  */
 
-import { getModalityStrategy } from './multimodal-config';
-import { processImagesDirect, preprocessImagesDescription } from './image';
-import { processVideos, preprocessVideoDescription } from './video';
-import { IMAGE_URL_REGEX, VIDEO_URL_REGEX, IMAGE_MARKER_STRIP, VIDEO_MARKER_STRIP } from './attachment';
-import type { Message, MessagePart, TextPart } from "../utils/types"
+import { getModalityStrategy, isWithinHistoryDepth } from './multimodal-config';
+import { processImagesDirect, stripImages } from './image';
+import { processVideos, stripVideos } from './video';
+import { preprocessAttachmentsDescription } from './preprocess';
+import { IMAGE_URL_REGEX, VIDEO_URL_REGEX } from './attachment';
+import type { Message, TextPart } from "../utils/types"
 
 export interface ProcessInput {
   provider: string;
@@ -28,70 +29,43 @@ export interface ProcessResult {
 
 /** 处理消息中的图片 + 视频附件 */
 export async function processAttachments({ provider, model, messages }: ProcessInput): Promise<ProcessResult> {
+  const scopedMessages = messages.map((message, index) => {
+    let scoped = message;
+    if (!isWithinHistoryDepth(index, messages.length, 'image')) scoped = stripImages(scoped);
+    if (!isWithinHistoryDepth(index, messages.length, 'video')) scoped = stripVideos(scoped);
+    return scoped;
+  });
   const imageStrategy = getModalityStrategy(provider, model, 'image');
   const videoStrategy = getModalityStrategy(provider, model, 'video');
+  const containsImage = hasImage(scopedMessages);
+  const containsVideo = hasVideo(scopedMessages);
+  if (!containsImage && !containsVideo) return { messages: scopedMessages };
 
-  if (imageStrategy === 'none' && videoStrategy === 'none') {
-    if (hasImageOrVideo(messages)) {
-      console.log(`[pipeline] ${provider}/${model} 不支持多模态 → preprocess 路径`);
-      const [imgResult, vidDesc] = await Promise.all([
-        preprocessImagesDescription(messages),
-        preprocessVideoDescription(messages),
-      ]);
-      const imgDesc = imgResult.systemInjection;
-      console.log(`[preprocess] img desc len=${imgDesc?.length || 0}, vid desc len=${vidDesc?.length || 0}`);
-      return {
-        messages: messages.map(stripBothAttachments),
-        systemInjection: [imgDesc, vidDesc].filter(Boolean).join('\n\n') || undefined,
-      };
-    }
-    return { messages };
+  const preprocessImage = containsImage && imageStrategy === 'none';
+  const preprocessVideo = containsVideo && videoStrategy === 'none';
+  const preprocessModalities = new Set<'image' | 'video'>();
+  if (preprocessImage) preprocessModalities.add('image');
+  if (preprocessVideo) preprocessModalities.add('video');
+  const description = preprocessModalities.size > 0
+    ? await preprocessAttachmentsDescription(scopedMessages, preprocessModalities)
+    : undefined;
+
+  let processed = scopedMessages;
+  if (containsImage) {
+    processed = imageStrategy === 'direct'
+      ? await processImagesDirect(processed)
+      : processed.map(stripImages);
+  }
+  if (containsVideo) {
+    processed = videoStrategy === 'direct'
+      ? processVideos(processed)
+      : processed.map(stripVideos);
   }
 
-  if (imageStrategy === 'none' || videoStrategy === 'none') {
-    if (hasImageOrVideo(messages)) {
-      console.log(`[pipeline] ${provider}/${model} 部分支持多模态 → 回退 preprocess`);
-      const [imgResult, vidDesc] = await Promise.all([
-        preprocessImagesDescription(messages),
-        preprocessVideoDescription(messages),
-      ]);
-      return {
-        messages: messages.map(stripBothAttachments),
-        systemInjection: [imgResult.systemInjection, vidDesc].filter(Boolean).join('\n\n') || undefined,
-      };
-    }
-    return { messages };
-  }
-
-  try {
-    return { messages: processVideos(await processImagesDirect(messages)) };
-  } catch (err) {
-    console.warn(`[pipeline] 直传失败，回退 preprocess:`, (err as Error).message);
-    return processAttachments({ provider: 'minimax', model: 'MiniMax-M3', messages });
-  }
-}
-
-/** 同时剥离图片和视频标记（preprocess 后用） */
-function stripBothAttachments(msg: Message): Message {
   return {
-    ...msg,
-    parts: (msg.parts || []).map((p): MessagePart => {
-      if (p.type !== 'text') return p;
-      const tp = p as TextPart;
-      return {
-        ...tp,
-        text: (tp.text || '')
-          .replace(IMAGE_MARKER_STRIP, '[图片]')
-          .replace(IMAGE_URL_REGEX, '[图片]')
-          .replace(VIDEO_MARKER_STRIP, '[视频]')
-          .replace(VIDEO_URL_REGEX, '[视频]'),
-      };
-    }),
+    messages: processed,
+    systemInjection: description,
   };
-}
-
-function hasImageOrVideo(messages: Message[]): boolean {
-  return hasImage(messages) || hasVideo(messages);
 }
 
 // ponytail: 用 String.search 而非 RegExp.test — 全局 regex 的 .test() 会保留 lastIndex，
@@ -99,6 +73,7 @@ function hasImageOrVideo(messages: Message[]): boolean {
 function hasImage(messages: Message[]): boolean {
   return messages.some((msg) =>
     (msg.parts || []).some((p) => {
+      if (p.type === 'file') return typeof p.mediaType === 'string' && p.mediaType.startsWith('image/');
       if (p.type !== 'text') return false;
       const tp = p as TextPart;
       const text = tp.text || '';
@@ -110,6 +85,7 @@ function hasImage(messages: Message[]): boolean {
 function hasVideo(messages: Message[]): boolean {
   return messages.some((msg) =>
     (msg.parts || []).some((p) => {
+      if (p.type === 'file') return typeof p.mediaType === 'string' && p.mediaType.startsWith('video/');
       if (p.type !== 'text') return false;
       const tp = p as TextPart;
       const text = tp.text || '';

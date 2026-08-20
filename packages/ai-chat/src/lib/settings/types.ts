@@ -1,7 +1,6 @@
 export interface ProviderEntry {
   enabled: boolean;
   baseURL: string;
-  anthropicBaseURL?: string;
   apiKey: string;
   models: {
     chat?: string;

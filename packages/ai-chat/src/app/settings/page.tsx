@@ -11,7 +11,6 @@ interface Providers {
   [key: string]: {
     enabled: boolean;
     baseURL: string;
-    anthropicBaseURL?: string;
     apiKey: string;
     models: Record<string, string>;
   };

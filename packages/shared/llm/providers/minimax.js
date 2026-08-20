@@ -1,31 +1,14 @@
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { getApiKey } from "../config.js";
+import { getApiKey, getBaseUrl, getProviderModel } from "../config.js";
 import { sleep } from "../../utils.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROVIDERS_PATH = path.resolve(__dirname, "..", "..", "..", "..", "data", "settings", "providers.json");
-
-let MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimaxi.com/v1";
-let MINIMAX_IMAGE_MODEL = process.env.MINIMAX_IMAGE_MODEL || "image-01";
-let MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M3";
-
-try {
-  if (fs.existsSync(PROVIDERS_PATH)) {
-    const p = JSON.parse(fs.readFileSync(PROVIDERS_PATH, "utf-8"));
-    if (p.minimax?.baseURL) MINIMAX_BASE_URL = p.minimax.baseURL;
-    if (p.minimax?.models?.image) MINIMAX_IMAGE_MODEL = p.minimax.models.image;
-    if (p.minimax?.models?.chat) MINIMAX_CHAT_MODEL = p.minimax.models.chat;
-  }
-} catch { /* fallback to env */ }
 
 export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object', images = [] }) {
   const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 
-  const actualModel = model || MINIMAX_CHAT_MODEL;
-  console.log(`[minimax] 当前调用: model=${actualModel} baseURL=${MINIMAX_BASE_URL}`);
+  const baseURL = getBaseUrl("minimax", "MINIMAX_BASE_URL", "https://api.minimaxi.com/v1");
+  const actualModel = model || getProviderModel("minimax", "chat", "MINIMAX_CHAT_MODEL", "MiniMax-M3");
+  console.log(`[minimax] 当前调用: model=${actualModel} baseURL=${baseURL}`);
 
   const userContent = images.length > 0
     ? [{ type: "text", text: user }, ...images.map(d => ({ type: "image_url", image_url: { url: d, detail: "default" } }))]
@@ -43,7 +26,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   };
   if (format) body.response_format = { type: format };
 
-  const res = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
+  const res = await fetch(`${baseURL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -68,15 +51,18 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   };
 }
 
-export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIMAX_IMAGE_MODEL, image_url, n = 1, watermark = false, seed } = {}) {
+export async function generateImage(prompt, { aspectRatio = "1:1", model, image_url, n = 1, watermark = false, seed } = {}) {
   const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
+
+  const baseURL = getBaseUrl("minimax", "MINIMAX_BASE_URL", "https://api.minimaxi.com/v1");
+  const actualModel = model || getProviderModel("minimax", "image", "MINIMAX_IMAGE_MODEL", "image-01");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60000);
 
   const body = {
-    model,
+    model: actualModel,
     prompt,
     aspect_ratio: aspectRatio,
     n,
@@ -89,7 +75,7 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model = MINIM
     body.subject_reference = [{ type: "character", image_file: image_url }];
   }
 
-  const res = await fetch(`${MINIMAX_BASE_URL}/image_generation`, {
+  const res = await fetch(`${baseURL}/image_generation`, {
     method: "POST",
     signal: controller.signal,
     headers: {
@@ -130,7 +116,9 @@ export async function generateTTS({ text, voiceId, model = "speech-2.8-hd", outp
   const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 
-  const createRes = await fetch(`${MINIMAX_BASE_URL}/t2a_async_v2`, {
+  const baseURL = getBaseUrl("minimax", "MINIMAX_BASE_URL", "https://api.minimaxi.com/v1");
+
+  const createRes = await fetch(`${baseURL}/t2a_async_v2`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
@@ -148,14 +136,14 @@ export async function generateTTS({ text, voiceId, model = "speech-2.8-hd", outp
 
   for (let i = 0; i < 300; i++) {
     await sleep(2000);
-    const pollRes = await fetch(`${MINIMAX_BASE_URL}/query/t2a_async_query_v2?task_id=${taskId}`, {
+    const pollRes = await fetch(`${baseURL}/query/t2a_async_query_v2?task_id=${taskId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     const pollResult = await pollRes.json();
     const status = (pollResult.status || "").toLowerCase();
 
     if (status === "success") {
-      const fileRes = await fetch(`${MINIMAX_BASE_URL}/files/retrieve?file_id=${pollResult.file_id}`, {
+      const fileRes = await fetch(`${baseURL}/files/retrieve?file_id=${pollResult.file_id}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       const fileResult = await fileRes.json();
@@ -185,7 +173,9 @@ export async function generateBGM({ prompt, model = "music-2.6", outputPath }) {
   const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
   if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
 
-  const res = await fetch(`${MINIMAX_BASE_URL}/music_generation`, {
+  const baseURL = getBaseUrl("minimax", "MINIMAX_BASE_URL", "https://api.minimaxi.com/v1");
+
+  const res = await fetch(`${baseURL}/music_generation`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({

@@ -4,8 +4,7 @@ import type { ProviderConfig } from "@/lib/settings/dispatcher";
 import { getProviderConfig } from "@/lib/settings/dispatcher";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
-// ponytail: DeepSeek 自动路由的两档模型 id（2026-08-20 自包含，不再依赖 workflow/chat 的 model 字符串）
-const DEEPSEEK_PRO = "deepseek-v4-pro";
+// ponytail: DeepSeek 自动路由的 flash 档固定（分类 + 轻任务），pro 档读 chat 选择
 const DEEPSEEK_FLASH = "deepseek-v4-flash";
 
 export interface ClassifyResult {
@@ -73,8 +72,9 @@ Classification:`,
 export const createDeepSeekStrategy = (): ChatStrategy => ({
   async resolveModel(userText: string) {
     const classify = await classifyTask(userText);
-    // ponytail: DeepSeek 自动路由 pro/flash 自包含（2026-08-20），不读 workflow/chat 的 model 字符串
-    const model = classify.tier === "pro" ? DEEPSEEK_PRO : DEEPSEEK_FLASH;
+    // ponytail: pro 档读 chat 选择（settings 可改），flash 档固定（分类 + 轻任务）
+    const cfg = getProviderConfig("chat");
+    const model = classify.tier === "pro" ? cfg.model : DEEPSEEK_FLASH;
     return { model, classifyUsage: classify.usage };
   },
   getProviderName() { return "deepseek"; },

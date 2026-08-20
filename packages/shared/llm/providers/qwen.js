@@ -1,28 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { getApiKey } from "../config.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROVIDERS_PATH = path.resolve(__dirname, "..", "..", "..", "..", "data", "settings", "providers.json");
-
-let QWEN_BASE_URL = process.env.QWEN_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
-let QWEN_CHAT_MODEL = process.env.QWEN_CHAT_MODEL || "qwen3.8-max";
-
-try {
-  if (fs.existsSync(PROVIDERS_PATH)) {
-    const p = JSON.parse(fs.readFileSync(PROVIDERS_PATH, "utf-8"));
-    if (p.qwen?.baseURL) QWEN_BASE_URL = p.qwen.baseURL;
-    if (p.qwen?.models?.chat) QWEN_CHAT_MODEL = p.qwen.models.chat;
-  }
-} catch { /* fallback to env */ }
+import { getApiKey, getBaseUrl, getProviderModel } from "../config.js";
 
 export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object', images = [] }) {
   const apiKey = getApiKey("qwen", "QWEN_API_KEY");
   if (!apiKey) throw new Error("未配置 QWEN_API_KEY");
 
-  const actualModel = model || QWEN_CHAT_MODEL;
-  console.log(`[qwen] 当前调用: model=${actualModel} baseURL=${QWEN_BASE_URL}`);
+  const baseURL = getBaseUrl("qwen", "QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1");
+  const actualModel = model || getProviderModel("qwen", "chat", "QWEN_CHAT_MODEL", "qwen3.8-max");
+  console.log(`[qwen] 当前调用: model=${actualModel} baseURL=${baseURL}`);
 
   const userContent = images.length > 0
     ? [{ type: "text", text: user }, ...images.map(d => ({ type: "image_url", image_url: { url: d } }))]
@@ -46,7 +30,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   let res;
   let data;
   try {
-    res = await fetch(`${QWEN_BASE_URL}/chat/completions`, {
+    res = await fetch(`${baseURL}/chat/completions`, {
       method: "POST",
       signal: controller.signal,
       headers: {
@@ -79,9 +63,6 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
 
 // ─── 图片生成（Qwen-Image，DashScope 原生接口，同步）───────────────────────
 
-// 图片原生接口 host 跟 chat 的 compatible-mode 是同一个 host（workspace 域名随 baseURL 走）
-const QWEN_IMAGE_URL = `${QWEN_BASE_URL.replace(/\/compatible-mode\/v1\/?$/, "")}/api/v1/services/aigc/multimodal-generation/generation`;
-
 // 比例 → qwen size（宽*高），qwen-image-3.0 支持 512²~2048²、比例 1:8~8:1
 // ponytail: 1K 档（短边 ≤1024、≤1MP），对齐 MiniMax image-01 预设，控制成本 ¥0.25/张
 const ASPECT_TO_SIZE = {
@@ -99,6 +80,10 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model = "qwen
   if (n > 6) throw new Error("qwen-image 单次最多 6 张，请减小 n");
   const apiKey = getApiKey("qwen", "QWEN_API_KEY");
   if (!apiKey) throw new Error("未配置 QWEN_API_KEY");
+
+  // 图片原生接口 host 跟 chat 的 compatible-mode 是同一个 host（workspace 域名随 baseURL 走）
+  const baseURL = getBaseUrl("qwen", "QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1");
+  const imageUrl = `${baseURL.replace(/\/compatible-mode\/v1\/?$/, "")}/api/v1/services/aigc/multimodal-generation/generation`;
 
   const content = image_url
     ? [{ image: image_url }, { text: prompt }]
@@ -118,7 +103,7 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model = "qwen
   const timeout = setTimeout(() => controller.abort(), 120000);
 
   try {
-    const res = await fetch(QWEN_IMAGE_URL, {
+    const res = await fetch(imageUrl, {
       method: "POST",
       signal: controller.signal,
       headers: {

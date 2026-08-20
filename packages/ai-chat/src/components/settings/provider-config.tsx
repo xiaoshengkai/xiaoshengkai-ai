@@ -8,7 +8,6 @@ interface ProviderConfigProps {
   config: {
     enabled: boolean;
     baseURL: string;
-    anthropicBaseURL?: string;
     apiKey: string;
     models: Record<string, string>;
   };
@@ -72,19 +71,6 @@ export default function ProviderConfigCard({ id, label, config, onChange }: Prov
             style={{ boxShadow: "var(--shadow-sm)" }}
           />
         </div>
-
-        {local.anthropicBaseURL !== undefined && (
-          <div>
-            <label className="text-muted-foreground block mb-0.5">Anthropic BASE_URL (聊天)</label>
-            <input
-              type="text"
-              value={local.anthropicBaseURL}
-              onChange={(e) => update({ anthropicBaseURL: e.target.value })}
-              className="w-full px-2 py-1 border-2 border-border bg-card text-xs focus:outline-none focus:border-ring"
-              style={{ boxShadow: "var(--shadow-sm)" }}
-            />
-          </div>
-        )}
 
         <div>
           <label className="text-muted-foreground block mb-0.5">API_KEY</label>

@@ -32,16 +32,16 @@ export const DEFAULT_MULTIMODAL_REGISTRY: Record<string, ProviderCapabilities> =
   minimax: {
     provider: 'minimax',
     imageModels: ['MiniMax-M3'],
-    videoModels: [],  // TODO: @ai-sdk/anthropic 不支持 video，等 provider 升级后恢复
+    videoModels: [],  // TODO: @ai-sdk/openai-compatible 不支持 video，等 provider 升级后恢复
     videoFps: 1,
     description: 'MiniMax M3 多模态（图片直传，视频 preprocess）',
   },
   qwen: {
     provider: 'qwen',
     imageModels: ['qwen3.8-max', 'qwen-vl-max'],
-    videoModels: ['qwen3.8-max'],
+    videoModels: [],  // @ai-sdk/openai-compatible 暂不支持 video file part
     videoFps: 1,
-    description: '通义千问 3.8-Max 多模态（image_url + video_url）',
+    description: '通义千问 3.8-Max 多模态（图片直传，视频 preprocess）',
   },
 };
 
@@ -53,7 +53,9 @@ export interface MultimodalConfig {
   imageHistoryDepth: number | 'all';
   /** 视频历史深度（视频 base64 巨大，默认 1） */
   videoHistoryDepth: number;
-  /** 单文件大小上限（字节）—M3 限制：图片 10MB，视频 50MB */
+  /** 图片单文件大小上限（字节） */
+  maxImageFileSize: number;
+  /** 视频单文件大小上限（字节） */
   maxFileSize: number;
   /** 缺失文件时的策略 */
   missingFileStrategy: 'error' | 'ignore' | 'preprocess';
@@ -62,6 +64,7 @@ export interface MultimodalConfig {
 export const DEFAULT_CONFIG: MultimodalConfig = {
   imageHistoryDepth: 'all',
   videoHistoryDepth: 1,
+  maxImageFileSize: 10 * 1024 * 1024,
   maxFileSize: 50 * 1024 * 1024,  // 50MB（M3 base64 视频上限）
   missingFileStrategy: 'error',
 };
@@ -78,6 +81,12 @@ export function readHistoryDepth(modality: Modality): number | 'all' {
   if (raw === '*' || raw === 'all') return 'all';
   const n = Number(raw);
   return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+export function isWithinHistoryDepth(index: number, total: number, modality: Modality): boolean {
+  if (index === total - 1) return true;
+  const depth = readHistoryDepth(modality);
+  return depth === 'all' || total - index <= depth;
 }
 
 /**

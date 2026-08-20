@@ -68,6 +68,13 @@ function resetSteps(state, template, params) {
   state.error = null;
 }
 
+/** 末步完成时的整体终态：有 warning 步则为 completed_with_warnings（不被"完成"吞掉） */
+export function deriveTerminalStatus(steps) {
+  return steps.some(s => s.status === "warning") ? "completed_with_warnings" : "completed";
+}
+
+const TERMINAL_STATUSES = ["completed", "completed_with_warnings", "failed"];
+
 export function listExecutions() {
   if (!fs.existsSync(DATA_DIR)) return [];
   const dirs = fs.readdirSync(DATA_DIR)
@@ -85,7 +92,8 @@ export function listExecutions() {
           templateLabel: template.label || state.template,
           status: state.status,
           totalSteps: state.steps.length,
-          completedSteps: state.steps.filter(s => s.status === "completed" || s.status === "skipped" || s.status === "warning").length,
+          completedSteps: state.steps.filter(s => s.status === "completed" || s.status === "skipped").length,
+          warningSteps: state.steps.filter(s => s.status === "warning").length,
           failedStep: failedStep ? failedStep.name : null,
           failedError: failedStep ? failedStep.error : null,
           startedAt: state.startedAt,
@@ -320,14 +328,23 @@ export function deleteExecution(executionId) {
 export async function runNextStep(executionId) {
   const dir = path.join(DATA_DIR, executionId);
   const state = readState(dir);
-  if (state.status === "completed" || state.status === "failed") {
-    return { ok: false, error: "工作流已结束" };
+  if (TERMINAL_STATUSES.includes(state.status)) {
+    return { ok: false, error: "执行已结束" };
   }
 
   // 防止并发：检查是否有正在运行的步骤
   const running = state.steps.find(s => s.status === "running");
   if (running) {
-    return { ok: false, error: `步骤 "${running.name}" 正在执行中，请等待完成` };
+    // ponytail: 无心跳机制，running 超 30 分钟视为 worker 已死（合法步骤上限是 render 超时 5 分钟），下次动作自愈
+    const age = Date.now() - new Date(running.startedAt || 0).getTime();
+    if (running.startedAt && age > 30 * 60 * 1000) {
+      console.warn(`[engine] 孤儿 running 步骤 "${running.name}" (${Math.round(age / 60000)}min) 重置为 pending`);
+      running.status = "pending";
+      running.startedAt = null;
+      writeState(dir, state);
+    } else {
+      return { ok: false, error: `步骤 "${running.name}" 正在执行中，请等待完成` };
+    }
   }
 
   const nextIdx = state.steps.findIndex(s => s.status === "pending");
@@ -389,7 +406,7 @@ export async function runNextStep(executionId) {
     freshState.steps[nextIdx].elapsed = elapsed;
 
     if (nextIdx === template.steps.length - 1) {
-      freshState.status = "completed";
+      freshState.status = deriveTerminalStatus(freshState.steps);
       freshState.completedAt = new Date().toISOString();
     }
 
@@ -430,7 +447,7 @@ export async function runAllSteps(executionId) {
     const result = await runNextStep(executionId);
     if (!result.ok) return result;
     const state = getExecution(executionId);
-    if (!state || state.status === "completed" || state.status === "failed") return result;
+    if (!state || TERMINAL_STATUSES.includes(state.status)) return result;
   }
   return { ok: true, status: "all_done" };
 }

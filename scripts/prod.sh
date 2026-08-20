@@ -13,6 +13,10 @@ PROXY_PORT=$(read_config "ports.aiChat.prodProxy")
 # 停止全部服务
 npm run stop
 
+# 质量门禁：测试 + 类型检查必须通过才构建
+npm run test
+npm run typecheck
+
 # 重新构建
 npm run build
 

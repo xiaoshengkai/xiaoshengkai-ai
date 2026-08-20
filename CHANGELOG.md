@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.10.4 (2026-08-20) — TTS 超时 + 孤儿步骤自愈
+
+### 背景
+任务 5d959842270c tweak 后 TTS 等待 ~8 分钟，期间 step=running、UI 转圈、next/auto 被守卫挡住，形似卡死（最终 poll 上限内自解）。暴露三类脆弱点。
+
+### 修复
+- `shared/llm/providers/minimax.js` generateTTS：create/poll/files-retrieve fetch 加 `AbortSignal.timeout(30s)`、下载 120s（原来无超时，单个 hang 请求可阻塞 forever）；poll 每 30s 打 `[tts] 轮询 i/300 status=` 日志（长等待可见，不再"静默像死"）
+- `engine.js` runNextStep：孤儿守卫——running 步 `startedAt` 超 30 分钟视为 worker 已死，重置 pending 继续（合法步骤上限是 render 超时 5 分钟，30 分钟安全；多服务器场景不做启动扫描，避免误伤）
+- 详情页：running 步也显示「重做」按钮（即时手动解卡；engine retryStep 本就允许任意状态）
+
+### 测试
+- `tts-timeout.test.js`：不可达 baseURL，generateTTS 40s 内必抛（shared 测试 7/7）
+
+### 外部事实记录
+- MiniMax Music API 对新用户停服 → BGM 步永久 warning（用户决定保持现状：视频静音；开关 enable_bgm=no / bgm_file 上传）
+- MiniMax TTS 队列偶发慢（~8min），现有 300×2s poll 上限可覆盖
+
+## v0.10.3 (2026-08-20) — 机械门禁 + 阶段三 工作流 warning 与轮询
+
+### P0 机械门禁（把"记得跑"变"必须过"）
+- 根 `package.json` 加 `test`（= `test:shared` 6 个 + `test:mm` 18 个）与 `typecheck`（tsc --noEmit）
+- `prod.sh` 加门禁：build 前必须 `npm run test && npm run typecheck`；不引新依赖（无 husky/CI；将来有 remote 原样搬进 Actions）
+
+### P1 阶段三：warning 不被吞 + 轮询收敛
+- `engine.js` 新增 `deriveTerminalStatus()`：末步完成但有 warning 步 → 终态 `completed_with_warnings`；`TERMINAL_STATUSES` 统一 runNextStep 守卫与 runAllSteps 终止判断
+- `completedSteps` 不再把 warning 计成 completed；列表 API 新增 `warningSteps` 字段
+- 列表页：条件轮询（仅有 running 执行时 5s 轮询）；徽章 `⚠️ 完成(有警告)` + 黄色状态 bar + 排序优先级紧随 running
+- 详情页：轮询收敛为"有 running step 或 tweakTask running 才轮询"（warning 卡住/等待手动 next 不再 2s 空转）；新终态停轮询/解锁；进度行显示 `· N 警告`
+- 回归：`engine-status.test.js` 3 个（终态纯函数）
+- 修收敛回归：auto/next 的 POST 在服务端阻塞、客户端看不到 running step → 轮询条件加 `autoLoading || nextLoading`；`handleAuto` 返回后补 `fetchExecution()`。浏览器实测：点自动执行不刷新实时翻态，终态后轮询停
+
 ## v0.10.2 (2026-08-20) — 阶段一 settings 分发加固 + 阶段二 多模态管线修复
 
 ### 阶段一：settings 分发加固（shared/llm + ai-chat settings）

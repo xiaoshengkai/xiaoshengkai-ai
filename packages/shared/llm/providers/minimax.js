@@ -121,6 +121,7 @@ export async function generateTTS({ text, voiceId, model = "speech-2.8-hd", outp
   const createRes = await fetch(`${baseURL}/t2a_async_v2`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(30000),
     body: JSON.stringify({
       model,
       text,
@@ -138,18 +139,21 @@ export async function generateTTS({ text, voiceId, model = "speech-2.8-hd", outp
     await sleep(2000);
     const pollRes = await fetch(`${baseURL}/query/t2a_async_query_v2?task_id=${taskId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(30000),
     });
     const pollResult = await pollRes.json();
     const status = (pollResult.status || "").toLowerCase();
+    if (i % 15 === 0) console.log(`[tts] 轮询 ${i + 1}/300 status=${status}`);
 
     if (status === "success") {
       const fileRes = await fetch(`${baseURL}/files/retrieve?file_id=${pollResult.file_id}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(30000),
       });
       const fileResult = await fileRes.json();
       const downloadUrl = fileResult.file?.download_url;
       if (!downloadUrl) throw new Error("TTS 下载链接获取失败");
-      const audioRes = await fetch(downloadUrl);
+      const audioRes = await fetch(downloadUrl, { signal: AbortSignal.timeout(120000) });
       let buffer = Buffer.from(await audioRes.arrayBuffer());
       if (!(buffer.length >= 3 && buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33)) {
         const mp3 = extractMp3FromTar(buffer);

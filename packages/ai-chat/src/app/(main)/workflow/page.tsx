@@ -67,11 +67,15 @@ export default function WorkflowPage() {
     } catch { /* ignore */ }
   }, []);
 
+  const hasRunning = executions.some((e) => e.status === "running");
+
   useEffect(() => {
     fetchExecutions(); fetchTemplates();
+    // ponytail: 无 running 执行时不轮询，状态变化由用户操作触发 fetch
+    if (!hasRunning) return;
     const timer = setInterval(fetchExecutions, 5000);
     return () => clearInterval(timer);
-  }, [fetchExecutions, fetchTemplates]);
+  }, [fetchExecutions, fetchTemplates, hasRunning]);
 
   const handleCreate = useCallback(async () => {
     if (!selectedTemplate) return;
@@ -152,7 +156,7 @@ export default function WorkflowPage() {
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
   };
 
-  const statusPriority: Record<string, number> = { failed: 0, running: 1, pending: 2, completed: 3 };
+  const statusPriority: Record<string, number> = { failed: 0, running: 1, completed_with_warnings: 1.5, pending: 2, completed: 3 };
   const sortedExecutions = [...executions].sort((a, b) => {
     const pa = statusPriority[a.status] ?? 99;
     const pb = statusPriority[b.status] ?? 99;
@@ -188,6 +192,7 @@ export default function WorkflowPage() {
             {sortedExecutions.map(exe => {
               const statusBar = exe.status === "failed" ? "var(--destructive)"
                 : exe.status === "running" ? "var(--yellow)"
+                : exe.status === "completed_with_warnings" ? "var(--yellow)"
                 : exe.status === "completed" ? "var(--blue)" : "var(--muted-foreground)";
               const pct = Math.round((exe.completedSteps / exe.totalSteps) * 100);
               return (
@@ -198,6 +203,7 @@ export default function WorkflowPage() {
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                       exe.status === "completed" ? "bg-lime" :
+                      exe.status === "completed_with_warnings" ? "bg-yellow" :
                       exe.status === "running" ? "bg-yellow animate-pulse" :
                       exe.status === "failed" ? "bg-destructive" : "bg-muted-foreground"
                     }`} />
@@ -207,10 +213,12 @@ export default function WorkflowPage() {
                     <span className={`inline-block text-xs px-1.5 py-0.5 shrink-0 ${
                       exe.status === "failed" ? "bg-destructive text-white" :
                       exe.status === "running" ? "bg-yellow text-foreground" :
+                      exe.status === "completed_with_warnings" ? "bg-yellow text-foreground" :
                       exe.status === "completed" ? "text-foreground" :
                       "bg-muted text-muted-foreground"
                     }`}>
                       {exe.status === "completed" ? "✅ 完成" :
+                       exe.status === "completed_with_warnings" ? "⚠️ 完成(有警告)" :
                        exe.status === "running" ? "🔄 执行中" :
                        exe.status === "failed" ? "❌ 失败" : "⏸️ 待执行"}
                     </span>

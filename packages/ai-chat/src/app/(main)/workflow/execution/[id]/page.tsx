@@ -93,10 +93,13 @@ export default function ExecutionDetailPage() {
     } catch { /* ignore */ }
   }, [id, activeStepId, locked]);
 
+  const anyStepRunning = execution?.steps?.some((s: ExecutionStep) => s.status === "running") === true;
+  const isTerminalStatus = execution?.status === "completed" || execution?.status === "completed_with_warnings" || execution?.status === "failed";
+
   useEffect(() => {
     clientLog(id, "INFO", `useEffect run: executionStatus=${execution?.status}`);
     fetchExecution();
-    if (execution?.status === "completed" || execution?.status === "failed") {
+    if (isTerminalStatus) {
       clientLog(id, "INFO", `useEffect skip polling: status=${execution?.status}`);
       return;
     }
@@ -104,16 +107,21 @@ export default function ExecutionDetailPage() {
       clientLog(id, "INFO", `useEffect skip polling: tweakTask running`);
       return;
     }
+    // ponytail: 无 running step 且无阻塞中的 next/auto 请求时不轮询
+    // （auto/next 的 POST 在服务端阻塞执行，期间客户端看不到 running step，靠 loading 态维持轮询）
+    if (!anyStepRunning && !autoLoading && !nextLoading) {
+      return;
+    }
     clientLog(id, "INFO", `useEffect start polling: status=${execution?.status}`);
     const timer = setInterval(fetchExecution, 2000);
     return () => clearInterval(timer);
-  }, [fetchExecution, execution?.status, execution?.tweakTask?.status, id]);
+  }, [fetchExecution, execution?.status, execution?.tweakTask?.status, anyStepRunning, isTerminalStatus, autoLoading, nextLoading, id]);
 
   useEffect(() => {
-    if (execution?.status === "completed" || execution?.status === "failed") {
+    if (isTerminalStatus) {
       setLocked(false);
     }
-  }, [execution?.status]);
+  }, [isTerminalStatus]);
 
   // 当 tweakTask 状态变化时轮询
   useEffect(() => {
@@ -156,9 +164,10 @@ export default function ExecutionDetailPage() {
     try {
       await fetch(`${BASE}/api/workflows/execution/${id}/auto`, { method: "POST" });
       toast("🟢 自动执行已启动");
+      fetchExecution();
     } catch { toast("🔴 请求失败"); }
     setAutoLoading(false);
-  }, [id]);
+  }, [id, fetchExecution]);
 
   const handleRetry = useCallback(async (stepId: string) => {
     setRetrying(stepId);
@@ -307,9 +316,10 @@ export default function ExecutionDetailPage() {
 
   if (!execution) return null;
 
-  const completed = execution.steps.filter(s => s.status === "completed" || s.status === "skipped" || s.status === "warning").length;
+  const completed = execution.steps.filter(s => s.status === "completed" || s.status === "skipped").length;
+  const warnings = execution.steps.filter(s => s.status === "warning").length;
   const activeStep = execution.steps.find(s => s.id === activeStepId) || execution.steps[0];
-  const isDone = execution.status === "completed" || execution.status === "failed";
+  const isDone = execution.status === "completed" || execution.status === "completed_with_warnings" || execution.status === "failed";
   const isRunning = execution.status === "running";
   const isTweakRunning = execution.tweakTask?.status === "running";
   const isV2 = execution.template === "tech-video";
@@ -382,7 +392,7 @@ export default function ExecutionDetailPage() {
       <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]">
         <div className="overflow-auto border-r border-border p-3 space-y-1.5">
           {isV2 ? renderV2Steps() : renderDefaultSteps()}
-          <p className="text-xs text-muted-foreground text-center pt-2">{completed}/{execution.steps.length} 步完成</p>
+          <p className="text-xs text-muted-foreground text-center pt-2">{completed}/{execution.steps.length} 步完成{warnings > 0 ? ` · ${warnings} 警告` : ""}</p>
         </div>
 
         <div className="overflow-auto p-4">
@@ -675,7 +685,7 @@ export default function ExecutionDetailPage() {
                 disabled={skipping === step.id} className="text-xs text-muted-foreground/70 hover:text-muted-foreground cursor-pointer"
                 title="跳过">{skipping === step.id ? "..." : "跳过"}</button>
             )}
-            {(done || fail || warn) && (
+            {(done || fail || warn || run) && (
               <button onClick={(e) => { e.stopPropagation(); handleRetry(step.id); }}
                 disabled={retrying === step.id} className="text-xs text-muted-foreground/70 hover:text-blue cursor-pointer"
                 title="重新执行"><RefreshCw className="w-3 h-3" /></button>

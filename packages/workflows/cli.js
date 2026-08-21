@@ -1,4 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 const [command, ...args] = process.argv.slice(2);
+
+const TEMPLATES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "templates");
 
 // 第 1 层：stdout 纯 JSON 契约 — 任何非 JSON 输出转到 stderr
 const realStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -27,7 +33,7 @@ async function main() {
   if (command === "start") {
     const { template, params } = JSON.parse(args[0]);
     const { createExecution } = await import("./engine.js");
-    const result = createExecution(template, params);
+    const result = createExecution(template, params || {});
     process.stdout.write(JSON.stringify({ ok: true, executionId: result.executionId }));
   } else if (command === "run") {
     const { executionId } = JSON.parse(args[0]);
@@ -44,22 +50,43 @@ async function main() {
     const result = await runAllSteps(executionId);
     process.stdout.write(JSON.stringify(result));
   } else if (command === "get") {
+    const { executionId } = JSON.parse(args[0]);
     const { getExecution } = await import("./engine.js");
-    const state = getExecution(args[0]);
+    const state = getExecution(executionId);
     if (state) {
       process.stdout.write(JSON.stringify(state));
     } else {
       process.stdout.write(JSON.stringify({ error: "not found" }));
     }
-  } else if (command === "tweak") {
-    const { executionId } = JSON.parse(args[0]);
-    const { tweakExecution } = await import("./engine.js");
-    const result = await tweakExecution(executionId);
-    process.stdout.write(JSON.stringify(result));
+  } else if (command === "templates") {
+    if (!fs.existsSync(TEMPLATES_DIR)) {
+      process.stdout.write(JSON.stringify({ templates: [] }));
+    } else {
+      const templates = fs.readdirSync(TEMPLATES_DIR)
+        .filter(f => fs.statSync(path.join(TEMPLATES_DIR, f)).isDirectory())
+        .map(f => {
+          const t = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f, "template.json"), "utf-8"));
+          return { id: f, ...t };
+        });
+      process.stdout.write(JSON.stringify({ templates }));
+    }
+  } else if (command === "tweak-auto") {
+    const { executionId, feedback, images } = JSON.parse(args[0]);
+    const { tweakAuto } = await import("./lib/tweak-auto.js");
+    const result = await tweakAuto(executionId, feedback, images);
+    process.stdout.write(JSON.stringify(result || { ok: true }));
   } else if (command === "switch-version") {
     const { executionId, version } = JSON.parse(args[0]);
-    const { switchScriptVersion } = await import("./engine.js");
-    const result = switchScriptVersion(executionId, version);
+    const { DATA_DIR, readState } = await import("./lib/state.js");
+    const state = readState(path.join(DATA_DIR, executionId));
+    let mod;
+    try {
+      mod = await import(`./templates/${state.template}/lib/switch-version.js`);
+    } catch {
+      process.stdout.write(JSON.stringify({ ok: false, error: "该模板不支持版本切换" }));
+      return;
+    }
+    const result = mod.switchVersion(executionId, version);
     process.stdout.write(JSON.stringify(result));
   } else if (command === "list") {
     const { listExecutions } = await import("./engine.js");
@@ -71,10 +98,12 @@ async function main() {
     deleteExecution(executionId);
     process.stdout.write(JSON.stringify({ ok: true }));
   } else if (command === "retry") {
+    // 组合命令：重置步骤后立即执行（原 ai-chat retry 路由的两次调用收敛于此）
     const { executionId, stepId } = JSON.parse(args[0]);
-    const { retryStep } = await import("./engine.js");
+    const { retryStep, runNextStep } = await import("./engine.js");
     retryStep(executionId, stepId);
-    process.stdout.write(JSON.stringify({ ok: true }));
+    const result = await runNextStep(executionId);
+    process.stdout.write(JSON.stringify(result));
   } else if (command === "skip") {
     const { executionId, stepId } = JSON.parse(args[0]);
     const { skipStep } = await import("./engine.js");

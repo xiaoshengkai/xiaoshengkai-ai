@@ -1,13 +1,16 @@
-import { NextResponse } from "next/server";
+/**
+ * video-generation 特有动作：生成视频内容描述（LLM）
+ * 从 ai-chat app/api/workflows/generate-content 迁入；由 capability custom 原语调用
+ */
 
-import { VIDEO_CONTENT_PROMPT, buildVideoContentPrompt } from "./_lib/prompt";
 import { callLLM, getWorkflowProvider } from "@app/shared/llm/index.js";
+import { VIDEO_CONTENT_PROMPT, buildVideoContentPrompt } from "./prompt.js";
 
-export async function POST(request: Request) {
+export async function handle({ request }) {
   const { title, requirement } = await request.json();
   console.log(`[generate-content] 开始: title="${title}"`);
   if (!title) {
-    return NextResponse.json({ error: "missing title" }, { status: 400 });
+    return Response.json({ ok: false, error: "missing title" }, { status: 400 });
   }
 
   try {
@@ -19,10 +22,10 @@ export async function POST(request: Request) {
     });
 
     console.log(`[generate-content] 完成: ${text.length} chars`);
-    return NextResponse.json({ content: text });
+    return { content: text };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[generate-content] 失败: ${message}`);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return Response.json({ ok: false, error: message }, { status: 500 });
   }
 }

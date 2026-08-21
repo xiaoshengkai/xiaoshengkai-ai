@@ -1,0 +1,6 @@
+[
+  { "type": "custom", "method": "POST", "path": "/generate-content", "handler": "generate-content" },
+  { "type": "upload", "method": "POST", "path": "/upload", "destDir": "data/static/audio", "allowExt": [".mp3", ".wav", ".m4a", ".ogg"], "error": "不支持的音频格式" },
+  { "type": "cli", "method": "POST", "path": "/execution/:id/tweak", "command": "tweak-auto", "args": { "executionId": "param.id", "feedback": "body.feedback", "images": "body.imagePaths" }, "required": ["feedback"], "detached": true, "respond": { "ok": true, "status": "running" } },
+  { "type": "cli", "method": "POST", "path": "/execution/:id/switch-version", "command": "switch-version", "args": { "executionId": "param.id", "version": "body.version" }, "required": ["version"], "timeout": 10000 }
+]

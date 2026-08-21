@@ -272,6 +272,8 @@ packages/skills/
 ```
 /workflow 页面
   → POST /api/workflows/execute
+  → ai-chat catch-all（app/api/workflows/[[...path]]）委托 @app/workflows/http
+  → 通用 dispatcher（@app/shared/capability.js）按 actions.json 匹配动作
   → spawn node packages/workflows/cli.js start '{"template":..,"params":..}'
   → 返回 executionId
   → 逐步 spawn cli.js next（单步执行，每步返回 preview）
@@ -279,7 +281,15 @@ packages/skills/
   → 日志写到 logs/workflows/
 ```
 
-CLI 子命令：`start`（创建执行）/ `run`（一次跑完）/ `next`（单步）。
+**声明式能力注册（v0.11.0）**：ai-chat 对 workflows/tasks 只保留 1 个 catch-all 挂载点（10 行纯委托），能力 100% 在包内。动作由 actions.json 声明，4 原语：`cli`（spawn cli.js）/ `stream`（文件流 + Range）/ `upload`（formData 写盘）/ `custom`（包内 JS handler）。
+
+- `workflows/actions.json`：引擎级 10 动作（templates/execute/executions/get/delete/file/next/auto/retry/skip）
+- `templates/<name>/actions.json`：模板特有动作；video-generation 声明 generate-content/upload/tweak/switch-version
+- `tasks/actions.json`：list/run/edit/dashboard（handler 在 tasks/lib/handlers.js）
+
+CLI 子命令：`start`（创建执行）/ `run`（一次跑完）/ `next`（单步）/ `templates`（模板列表）/ `retry`（组合：重置+执行）/ `tweak-auto`（微调全流程编排）/ `switch-version`（按模板分发到 templates/<t>/lib/switch-version.js）。
+
+**引擎与模板边界**：engine.js 是纯模板无关的步骤编排；脚本版本/微调等 video 概念在 templates/video-generation/lib/（tweak.js/switch-version.js/script-version.js）；模板不 import engine.js，cli 是子进程组合层。
 
 ### 步骤类型
 
@@ -327,7 +337,11 @@ CLI 子命令：`start`（创建执行）/ `run`（一次跑完）/ `next`（单
 
 ```
 packages/tasks/
+├── package.json                   # @app/tasks workspace 包
 ├── scheduler.js                   # 常驻调度进程（日志复用 @app/shared/logger.js）
+├── actions.json                   # HTTP 动作声明（list/run/edit/dashboard）
+├── http.js                        # 能力 HTTP 入口（ai-chat catch-all 委托）
+├── lib/handlers.js                # 动作 handler（原 ai-chat tasks 路由迁入）
 └── <task-name>/
     ├── task.json                  # { name, description, cron, enabled, html? }
     └── index.js                   # export async function run()
@@ -394,6 +408,7 @@ ai-engineer-journey/
 └── packages/
     ├── shared/                 # 跨包共享模块（@app/shared workspace 包，裸导入）
     │   ├── package.json        # name: @app/shared（private, type: module）
+    │   ├── capability.js       # 通用能力 dispatcher（actions.json 4 原语）
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir
@@ -413,7 +428,7 @@ ai-engineer-journey/
      │   │   │   └── utils/       # utils(cn+BASE) / types / cost / env
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow
-    │   │       ├── api/         # chat / memory / workflows / settings / tasks / conversations ...
+    │   │       ├── api/         # chat / memory / settings / conversations ... + workflows、tasks 仅 catch-all 挂载点
     │   │       ├── note/[taskId]/page.tsx
     │   │       ├── preview/[taskId]/route.ts
     │   │       ├── settings/page.tsx
@@ -438,15 +453,22 @@ ai-engineer-journey/
     │       ├── document/        # 2 tools（convertDocument / convertDocumentBatch）
     │       └── todo/            # 6 tools（暂未注册）
     ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
-    ├── tasks/                   # 定时任务（scheduler.js + daily-reminder-am + precious-metals）
-    └── workflows/               # 工作流引擎
+    ├── tasks/                   # 定时任务（@app/tasks：scheduler.js + actions.json/http.js + daily-reminder-am + precious-metals）
+    └── workflows/               # 工作流引擎（@app/workflows workspace 包）
+        ├── package.json
+        ├── actions.json         # 引擎级 HTTP 动作声明（10 个）
+        ├── http.js              # 能力 HTTP 入口（合并引擎+模板 actions）
         ├── cli.js               # 命令行入口
-        ├── engine.js            # 工作流执行引擎
+        ├── engine.js            # 工作流执行引擎（纯步骤编排，无 video 概念）
         ├── lib/
         │   ├── executor.js
-        │   ├── state.js         # DATA_DIR / readState / writeState / saveVideoVersion（engine 与模板共用）
+        │   ├── state.js         # DATA_DIR / LOG_DIR / readState / writeState / saveVideoVersion（engine 与模板共用）
+        │   ├── skip-when.js     # skipWhen 条件求值（engine 与模板共用）
+        │   ├── tweak-auto.js    # tweak 全流程编排（running→tweak→auto→done/failed）
         │   └── step-types/      # ai.js / script.js / tool.js
         └── templates/
             ├── tech-video/      # 技术视频工作流
             └── video-generation/# 视频生成工作流
+                ├── actions.json # 模板级动作（generate-content/upload/tweak/switch-version）
+                └── lib/         # prompt/generate-content/tweak/switch-version/script-version/tweak-builder/...
 ```

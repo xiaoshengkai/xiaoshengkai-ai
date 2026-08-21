@@ -1,0 +1,6 @@
+[
+  { "type": "custom", "method": "GET",  "path": "/",                "handler": "list" },
+  { "type": "custom", "method": "POST", "path": "/",                "handler": "run" },
+  { "type": "custom", "method": "PUT",  "path": "/",                "handler": "edit" },
+  { "type": "custom", "method": "GET",  "path": "/:name/dashboard", "handler": "dashboard" }
+]

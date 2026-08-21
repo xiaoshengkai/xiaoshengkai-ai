@@ -1,10 +1,5 @@
 /**
- * 短视频脚本策划 prompt
- *
- * ponytail: 2026-08-19 — 从 video-content.txt 改成 .ts 导出常量
- *   - 编译期类型安全，无 fs I/O
- *   - buildVideoContentPrompt helper 处理输入拼接
- *   - 删了 fs.existsSync fallback 逻辑（不再需要默认兜底）
+ * 短视频脚本策划 prompt（从 ai-chat generate-content/_lib/prompt.ts 迁入）
  */
 
 export const VIDEO_CONTENT_PROMPT = `你是短视频脚本策划助手。根据视频标题生成内容描述，用于后续生成短视频脚本。
@@ -38,12 +33,6 @@ export const VIDEO_CONTENT_PROMPT = `你是短视频脚本策划助手。根据�
 - 直接输出 Markdown，不要代码块包裹
 - 不要"好的"、"以下是"等开场废话`;
 
-export interface VideoContentInput {
-  title: string;
-  requirement?: string;
-}
-
-/** 拼装 user prompt（附加 title + 可选 requirement） */
-export function buildVideoContentPrompt(input: VideoContentInput): string {
-  return `视频标题：${input.title}\n${input.requirement ? `\n附加要求：${input.requirement}\n` : ""}\n请生成内容描述。`;
+export function buildVideoContentPrompt({ title, requirement }) {
+  return `视频标题：${title}\n${requirement ? `\n附加要求：${requirement}\n` : ""}\n请生成内容描述。`;
 }

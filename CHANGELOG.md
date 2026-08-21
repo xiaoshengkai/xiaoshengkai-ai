@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.11.0 (2026-08-21) — 阶段三：声明式能力注册（workflows/tasks 收敛进包）
+
+### 背景
+ai-chat 的 app/api 里堆着 15 个 workflows/tasks 路由：薄 CLI 包装、tweak 113 行后台编排（直接写 engine 的 state.json）、video-generation 特有能力（generate-content/upload）。能力逻辑泄漏在宿主应用里，与「ai-chat 只做注册」的目标架构相悖。
+设计文档：`docs/superpowers/specs/2026-08-21-capability-registration-design.md`
+
+### 新架构：actions.json + 通用 dispatcher
+- `packages/shared/capability.js`：通用 dispatcher，4 原语（cli/stream/upload/custom）；路径模式 `:param` + 尾部 `*`；required 校验（version=0 不误杀）；notFound→404；detached fire&forget；stdout JSON 提取 + dotenv 噪音过滤 + 错误消息清洗
+- `packages/workflows/actions.json`：引擎级 10 动作（templates/execute/executions/get/delete/file/next/auto/retry/skip）
+- `packages/workflows/templates/video-generation/actions.json`：模板级 4 动作（generate-content/upload/tweak/switch-version）；http.js 自动扫描合并 templates/*/actions.json（重复 method+path 启动即报错）
+- `packages/tasks/actions.json`：4 动作（list/run/edit/dashboard，全 custom）
+- workflows/tasks 各加 package.json（@app/workflows、@app/tasks workspace 包）
+- ai-chat 只剩 2 个挂载点：`app/api/{workflows,tasks}/[[...path]]/route.ts`（各 10 行纯委托），删 15 个旧路由 + `_lib/cli.ts` + `_lib/prompt.ts`
+
+### engine 瘦身：video 概念迁出
+- `tweakExecution`/`switchScriptVersion`/`initScriptHistory`/脚本版本读写/`resetSteps`/TWEAK_LIMIT 迁往 `templates/video-generation/lib/{tweak,switch-version,script-version}.js`（engine.js -275 行）
+- `evaluateSkipWhen` 抽 `lib/skip-when.js`（engine 与模板共用）；LOG_DIR 移入 `lib/state.js`
+- cli 按模板分发：`switch-version` 动态 import `templates/<t>/lib/switch-version.js`；新增 `tweak-auto`（import `templates/<t>/lib/tweak.js`，模板无该文件→明确报错）；新增 `templates` 命令；`retry` 收敛为组合命令（retryStep+runNextStep，原 ai-chat 两次调用）；`get` 统一 JSON 参数契约
+- 原则保持：模板不 import engine.js（阶段二确立）
+
+### tweak 编排收编
+- ai-chat 113 行后台编排迁往 `packages/workflows/lib/tweak-auto.js`：写 tweakTask running → 模板 tweak → completed+version → runAllSteps → done/failed
+- 修掉 ai-chat 直写 engine state.json 的泄漏（全部经 lib/state.js，子进程内完成）
+- tweak 日志从 logs/app（前置拼接）改为 logs/workflows 日期日志
+
+### 保留不变
+子进程执行边界、console 劫持隔离、detached 长任务、全部 URL/请求/响应契约（前端零改动）
+
+### 验证
+- capability.test.js 11 个（匹配/解析/4 原语/required/notFound/Range/穿越守卫）；test:shared 18/18、test:mm 18/18、typecheck、build 全过
+- dev server 端到端 curl 14+4 接口全通：templates/executions/execute/get(404 映射)/delete/next/retry/skip/switch-version/tweak（后台流水线 running→failed 状态机 + 日志）/file 全量+Range 206/upload 成功+拒绝/generate-content 真调 LLM 成功/tasks list/run-404/edit/dashboard HTML
+- mcp（30 tools）+ scheduler 冒烟通过
+
+### 坑记录
+- Next webpack 打包的代码（http.js/handlers.js）不能用 import.meta.url 定位磁盘文件 → 沿用 process.cwd()=packages/ai-chat 约定
+- Node ESM 裸导入子路径必须带 .js 后缀（`@app/workflows/http.js`）
+- `/api/tasks` 本体无路径段 → 必须 `[[...path]]` 可选捕获 + segments 空值兜底
+- 删路由后须清 `.next/types` 残留 validator，否则 typecheck/build 报已删模块
+
 ## v0.10.5 (2026-08-21) — 架构优化：shared 真包化 + 反向依赖消除
 
 ### 背景

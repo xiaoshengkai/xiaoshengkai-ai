@@ -1,0 +1,12 @@
+[
+  { "type": "cli", "method": "GET",    "path": "/templates",           "command": "templates" },
+  { "type": "cli", "method": "POST",   "path": "/execute",             "command": "start",  "args": { "template": "body.template", "params": "body.params" }, "required": ["template"] },
+  { "type": "cli", "method": "GET",    "path": "/executions",          "command": "list" },
+  { "type": "cli", "method": "GET",    "path": "/execution/:id",       "command": "get",    "args": { "executionId": "param.id" }, "notFound": { "field": "error", "value": "not found" } },
+  { "type": "cli", "method": "DELETE", "path": "/execution/:id",       "command": "delete", "args": { "executionId": "param.id" } },
+  { "type": "stream", "method": "GET", "path": "/execution/:id/file/*" },
+  { "type": "cli", "method": "POST",   "path": "/execution/:id/next",  "command": "next",   "args": { "executionId": "param.id" }, "timeout": 900000 },
+  { "type": "cli", "method": "POST",   "path": "/execution/:id/auto",  "command": "auto",   "args": { "executionId": "param.id" }, "detached": true },
+  { "type": "cli", "method": "POST",   "path": "/execution/:id/retry", "command": "retry",  "args": { "executionId": "param.id", "stepId": "body.stepId" }, "required": ["stepId"], "timeout": 300000 },
+  { "type": "cli", "method": "POST",   "path": "/execution/:id/skip",  "command": "skip",   "args": { "executionId": "param.id", "stepId": "body.stepId" }, "required": ["stepId"], "timeout": 10000 }
+]

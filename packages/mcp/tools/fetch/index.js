@@ -4,7 +4,7 @@ import * as cheerio from "cheerio";
 import fs from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
-import { downloadsDir } from "../../../shared/utils.js";
+import { downloadsDir } from "@app/shared/utils.js";
 
 const RESOURCE_TAGS = [
   { selector: 'link[href]', attr: 'href' },

@@ -3,11 +3,11 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { executeStep, loadTemplate } from "./lib/executor.js";
-import { createDateLogger } from "../shared/logger.js";
+import { DATA_DIR, ensureDir, readState, writeState } from "./lib/state.js";
+import { createDateLogger } from "@app/shared/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
-const DATA_DIR = path.join(PROJECT_ROOT, "data", "workflows");
 const LOG_DIR = path.join(PROJECT_ROOT, "logs", "workflows");
 
 const MAX_EXECUTIONS = 50;
@@ -183,14 +183,6 @@ export async function startExecution(templateName, params) {
   });
 
   return { executionId };
-}
-
-function writeState(dir, state) {
-  fs.writeFileSync(path.join(dir, "state.json"), JSON.stringify(state, null, 2));
-}
-
-function readState(dir) {
-  return JSON.parse(fs.readFileSync(path.join(dir, "state.json"), "utf-8"));
 }
 
 async function runSteps(dir, state, template, params, logger) {
@@ -497,20 +489,9 @@ export function editStepOutput(executionId, stepId, output) {
 
 const TWEAK_LIMIT = 99999;
 const SCRIPTS_DIRNAME = "scripts";
-const VIDEOS_DIRNAME = "videos";
-
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-}
 
 function getScriptsDir(execDir) {
   const d = path.join(execDir, SCRIPTS_DIRNAME);
-  ensureDir(d);
-  return d;
-}
-
-function getVideosDir(execDir) {
-  const d = path.join(execDir, VIDEOS_DIRNAME);
   ensureDir(d);
   return d;
 }
@@ -718,25 +699,4 @@ export function switchScriptVersion(executionId, version) {
     logger.error(`[switch] stack: ${e.stack}`);
     return { ok: false, error: e.message };
   }
-}
-
-export function saveVideoVersion(executionId, version, videoPath) {
-  const dir = path.join(DATA_DIR, executionId);
-  const state = readState(dir);
-  if (!state.scriptHistory) return { ok: false, error: "无历史记录" };
-
-  const entry = state.scriptHistory.find(h => h.version === version);
-  if (!entry) return { ok: false, error: `版本 v${version} 不存在` };
-
-  // 拷贝视频到版本目录
-  const videosDir = getVideosDir(dir);
-  const ext = path.extname(videoPath);
-  const dest = path.join(videosDir, `v${version}${ext}`);
-  if (fs.existsSync(videoPath)) {
-    fs.copyFileSync(videoPath, dest);
-  }
-
-  entry.videoFile = `videos/v${version}${ext}`;
-  writeState(dir, state);
-  return { ok: true, videoFile: entry.videoFile };
 }

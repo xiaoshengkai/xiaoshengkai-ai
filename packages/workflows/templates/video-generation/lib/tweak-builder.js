@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { callLLM } from "../../../../shared/llm/index.js";
-import { parseJSON } from "../../../../shared/llm/parse-json.js";
+import { callLLM } from "@app/shared/llm/index.js";
+import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { validateScript } from "./schema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

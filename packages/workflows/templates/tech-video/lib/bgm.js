@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { getDurationSec } from "./tts.js";
 import { ERRORS } from "./errors.js";
-import { sleep } from "../../../../shared/utils.js";
-import { generateBGM as sharedGenerateBGM } from "../../../../shared/llm/index.js";
+import { sleep } from "@app/shared/utils.js";
+import { generateBGM as sharedGenerateBGM } from "@app/shared/llm/index.js";
 
 export async function generateBGM(scriptJson, executionDir, bgmFilePath) {
   const startTime = Date.now();

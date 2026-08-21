@@ -1,6 +1,6 @@
 import axios from "axios";
 import { config } from "../config.js";
-import { sleep } from "../../shared/utils.js";
+import { sleep } from "@app/shared/utils.js";
 
 const SINA_URL = "https://hq.sinajs.cn";
 

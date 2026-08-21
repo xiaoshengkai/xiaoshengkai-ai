@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { VIDEO_CONTENT_PROMPT, buildVideoContentPrompt } from "./_lib/prompt";
-import { callLLM, getWorkflowProvider } from "../../../../../../shared/llm/index.js";
+import { callLLM, getWorkflowProvider } from "@app/shared/llm/index.js";
 
 export async function POST(request: Request) {
   const { title, requirement } = await request.json();

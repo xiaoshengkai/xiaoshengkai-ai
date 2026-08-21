@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.10.5 (2026-08-21) — 架构优化：shared 真包化 + 反向依赖消除
+
+### 背景
+- shared 无 package.json，4 个消费者（ai-chat/mcp/workflows/tasks）靠相对路径连接（最深 `../../../../shared`）；ai-chat 另有私有 `@shared` tsconfig 别名，导入方式不统一
+- `templates/video-generation/lib/render.js` 动态 `import("../../../engine.js")` 取 `saveVideoVersion`——模板反向依赖引擎
+
+### 阶段 1：shared 真包化
+- 新增 `packages/shared/package.json`（`@app/shared`，private，type module，无 exports 字段 → Node 默认子路径解析）
+- `npm install` 生成 workspaces 软链 `node_modules/@app/shared → ../../packages/shared`
+- 26 个文件 42 处 import 全改裸导入 `@app/shared/...`：mcp 16 / workflows 17 / tasks 3 / ai-chat 6（含 generate-content/route.ts 的 6 层相对路径）
+- 删 ai-chat tsconfig 的 `@shared/*` paths 别名（node_modules 解析，moduleResolution bundler）
+
+### 阶段 2：反向依赖消除
+- 新增 `packages/workflows/lib/state.js`：从 engine.js 迁出 DATA_DIR / VIDEOS_DIRNAME / ensureDir / readState / writeState / getVideosDir / saveVideoVersion
+- engine.js 改 `import { DATA_DIR, ensureDir, readState, writeState } from "./lib/state.js"`（-44 行）
+- render.js 动态导入改 `../../../lib/state.js`；模板→引擎反向依赖清零
+
+### 验证
+- typecheck ✓ / test:shared 7/7 ✓ / test:mm 18/18 ✓ / workflows cli list ✓ / mcp 启动（30 tools）✓ / tasks scheduler（2 任务）✓ / npm run build ✓
+- 风险点确认：shared/llm/config.js 靠 import.meta.url 定位 data/settings，软链后 Node 解析真实路径，不受影响
+
+### 文档
+- design.md 更新 shared/（@app/shared workspace 包）与 workflows/lib/state.js 树
+
 ## v0.10.4 (2026-08-20) — TTS 超时 + 孤儿步骤自愈
 
 ### 背景

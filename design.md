@@ -327,7 +327,7 @@ CLI 子命令：`start`（创建执行）/ `run`（一次跑完）/ `next`（单
 
 ```
 packages/tasks/
-├── scheduler.js                   # 常驻调度进程（日志复用 ../shared/logger.js）
+├── scheduler.js                   # 常驻调度进程（日志复用 @app/shared/logger.js）
 └── <task-name>/
     ├── task.json                  # { name, description, cron, enabled, html? }
     └── index.js                   # export async function run()
@@ -392,7 +392,8 @@ ai-engineer-journey/
 ├── logs/                       # 日志（app/ + tasks/）
 ├── site/                       # 博客静态文件
 └── packages/
-    ├── shared/                 # 跨包共享模块
+    ├── shared/                 # 跨包共享模块（@app/shared workspace 包，裸导入）
+    │   ├── package.json        # name: @app/shared（private, type: module）
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir
@@ -443,6 +444,7 @@ ai-engineer-journey/
         ├── engine.js            # 工作流执行引擎
         ├── lib/
         │   ├── executor.js
+        │   ├── state.js         # DATA_DIR / readState / writeState / saveVideoVersion（engine 与模板共用）
         │   └── step-types/      # ai.js / script.js / tool.js
         └── templates/
             ├── tech-video/      # 技术视频工作流

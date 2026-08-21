@@ -6,8 +6,8 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { marked } from "marked";
 import puppeteer from "puppeteer";
-import { shortId, downloadsDir } from "../../../shared/utils.js";
-import { loadNetworkConfig } from "../../../shared/network.js";
+import { shortId, downloadsDir } from "@app/shared/utils.js";
+import { loadNetworkConfig } from "@app/shared/network.js";
 
 const TAG = "[doc]";
 

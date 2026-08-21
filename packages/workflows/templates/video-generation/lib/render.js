@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import ffprobeInstaller from "@ffprobe-installer/ffprobe";
 import { getAudioDuration } from "./bgm.js";
-import { createDateLogger } from "../../../../shared/logger.js";
+import { createDateLogger } from "@app/shared/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..", "..", "..", "..", "..");
@@ -232,7 +232,7 @@ export async function renderMP4(workDir, allHtml, globalCss, globalJsAnimation, 
 
   // 保存视频版本
   try {
-    const { saveVideoVersion } = await import("../../../engine.js");
+    const { saveVideoVersion } = await import("../../../lib/state.js");
     const statePath = path.join(workDir, "state.json");
     if (fs.existsSync(statePath)) {
       const state = JSON.parse(fs.readFileSync(statePath, "utf-8"));

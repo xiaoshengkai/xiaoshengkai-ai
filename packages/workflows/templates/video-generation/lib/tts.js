@@ -1,4 +1,4 @@
-import { generateTTS as sharedGenerateTTS } from "../../../../shared/llm/index.js";
+import { generateTTS as sharedGenerateTTS } from "@app/shared/llm/index.js";
 
 export async function generateTTS(text, voiceId, workDir, enableTts) {
   console.log(`[tts] enableTts="${enableTts}"`);

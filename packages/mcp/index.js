@@ -1,7 +1,7 @@
 import "./lib/env.js";
 import fs from "node:fs";
 import path from "node:path";
-import { createLogger } from "../shared/logger.js";
+import { createLogger } from "@app/shared/logger.js";
 
 // ─── 日志系统 ───
 createLogger("MCP", path.join(path.dirname(new URL(import.meta.url).pathname), "..", "..", "logs", "app"));

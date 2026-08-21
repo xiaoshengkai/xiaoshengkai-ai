@@ -5,11 +5,11 @@ import os from "node:os";
 import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
-import { callLLM as callProviderLLM, generateImage, getWorkflowProvider } from "../../../shared/llm/index.js";
-import { getApiKey } from "../../../shared/llm/config.js";
-import { sleep, shortId, downloadsDir } from "../../../shared/utils.js";
+import { callLLM as callProviderLLM, generateImage, getWorkflowProvider } from "@app/shared/llm/index.js";
+import { getApiKey } from "@app/shared/llm/config.js";
+import { sleep, shortId, downloadsDir } from "@app/shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
-import { parseJSON } from "../../../shared/llm/parse-json.js";
+import { parseJSON } from "@app/shared/llm/parse-json.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
 const TAG = "[xhs]";

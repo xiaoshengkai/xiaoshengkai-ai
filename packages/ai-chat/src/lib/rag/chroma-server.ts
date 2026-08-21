@@ -23,7 +23,7 @@ import { spawn, type ChildProcess } from "child_process";
 import { existsSync, mkdirSync } from "fs";
 import { join, resolve } from "path";
 import { env } from "../utils/env"
-import { loadNetworkConfig } from "@shared/network.js"
+import { loadNetworkConfig } from "@app/shared/network.js"
 
 // 从 config/network.json 读 chroma host+port（共享读取器）
 const NET_CONFIG = loadNetworkConfig();

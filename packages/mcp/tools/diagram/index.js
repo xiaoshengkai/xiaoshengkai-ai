@@ -4,9 +4,9 @@ import path from "node:path";
 import os from "node:os";
 import { execSync } from "node:child_process";
 import puppeteer from "puppeteer";
-import { callLLM, callMultimodalLLM, getMultimodalProvider, getWorkflowProvider } from "../../../shared/llm/index.js";
-import { getApiKey } from "../../../shared/llm/config.js";
-import { sleep, shortId } from "../../../shared/utils.js";
+import { callLLM, callMultimodalLLM, getMultimodalProvider, getWorkflowProvider } from "@app/shared/llm/index.js";
+import { getApiKey } from "@app/shared/llm/config.js";
+import { sleep, shortId } from "@app/shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
 
 const TAG = "[diagram]";

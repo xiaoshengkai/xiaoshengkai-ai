@@ -15,7 +15,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { createLogger } from "@shared/logger.js";
+import { createLogger } from "@app/shared/logger.js";
 
 // ─── 日志系统 ───
 createLogger("NEXT", path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..", "..", "logs", "app"));

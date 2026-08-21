@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { ERRORS } from "./errors.js";
-import { sleep } from "../../../../shared/utils.js";
-import { generateTTS as sharedGenerateTTS } from "../../../../shared/llm/index.js";
+import { sleep } from "@app/shared/utils.js";
+import { generateTTS as sharedGenerateTTS } from "@app/shared/llm/index.js";
 
 export function getDurationSec(filePath) {
   return new Promise((resolve, reject) => {

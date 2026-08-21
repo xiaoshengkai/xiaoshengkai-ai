@@ -2,8 +2,8 @@ import { ChromaClient } from "chromadb";
 import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { embed } from "ai";
-import { loadNetworkConfig } from "../../shared/network.js";
-import { getApiKey, getBaseUrl } from "../../shared/llm/config.js";
+import { loadNetworkConfig } from "@app/shared/network.js";
+import { getApiKey, getBaseUrl } from "@app/shared/llm/config.js";
 
 const SHARED_DB = "shared";
 const CHAT_DB = "chat";

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import path from "node:path";
 import os from "node:os";
-import { shortId, sleep } from "../../../shared/utils.js";
+import { shortId, sleep } from "@app/shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
-import { generateImage } from "../../../shared/llm/index.js";
+import { generateImage } from "@app/shared/llm/index.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "hf-tasks");
 

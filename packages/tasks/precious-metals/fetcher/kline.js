@@ -1,6 +1,6 @@
 import axios from "axios";
 import { config } from "../config.js";
-import { sleep } from "../../shared/utils.js";
+import { sleep } from "@app/shared/utils.js";
 
 const GLOBAL_KLINE_URL =
   "https://stock2.finance.sina.com.cn/futures/api/json_v2.php/GlobalFuturesService.getGlobalFuturesDailyKLine";

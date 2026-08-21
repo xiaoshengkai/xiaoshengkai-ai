@@ -1,5 +1,5 @@
-import { callLLM } from "../../../shared/llm/index.js";
-import { parseJSON } from "../../../shared/llm/parse-json.js";
+import { callLLM } from "@app/shared/llm/index.js";
+import { parseJSON } from "@app/shared/llm/parse-json.js";
 
 export async function execAiStep(step, vars, executionDir) {
   let prompt = step.prompt;

@@ -3,8 +3,8 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { ERRORS } from "./errors.js";
-import { sleep } from "../../../../shared/utils.js";
-import { generateBGM as sharedGenerateBGM } from "../../../../shared/llm/index.js";
+import { sleep } from "@app/shared/utils.js";
+import { generateBGM as sharedGenerateBGM } from "@app/shared/llm/index.js";
 
 export async function generateBGM(bgmPrompt, executionDir, bgmFilePath) {
   const startTime = Date.now();

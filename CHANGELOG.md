@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.1 (2026-08-24) — 修复会话置顶不生效
+
+### 根因
+- `left-sidebar.tsx` 的 `handlePin` 只翻转 `pinned` 标志、未重排列表——排序逻辑只存在于 `fetchConversations`（挂载/refreshKey 时执行），所以置顶后会话不跳到顶部
+- `store.ts` 的 `pinConversation` 置顶时 `updatedAt = Date.now()`，取消置顶后污染时间排序（本应回落原时间位却排到未置顶组最前）
+
+### 修复
+- 抽 `sortConversations(list)` 纯函数（pinned 优先 + updatedAt 倒序），`fetchConversations` 与 `handlePin` 复用
+- `handlePin` 乐观更新后重排：置顶当场跳顶、取消回落到原时间位
+- `pinConversation` 删 `updatedAt = Date.now()`，置顶/取消置顶只改 `pinned` 标志
+
+### 验证
+- `npm run typecheck` 通过；置顶/取消的跳位与回落靠人工点击确认（纯前端 UI 排序，无组件测试基建）
+
 ## 文档体系 (2026-08-21) — 三文档拆分 + md 命名统一
 
 非代码版本发布，记录文档基础设施变更。

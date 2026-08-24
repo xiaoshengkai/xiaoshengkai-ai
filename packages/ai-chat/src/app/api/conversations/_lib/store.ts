@@ -75,7 +75,6 @@ export function pinConversation(id: string, pinned: boolean): ConversationRecord
   const record = readConversation(id);
   if (!record) return null;
   record.pinned = pinned;
-  record.updatedAt = Date.now();
   writeFileSync(filePath(id), JSON.stringify(record, null, 2));
   return record;
 }

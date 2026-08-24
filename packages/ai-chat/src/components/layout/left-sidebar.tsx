@@ -43,6 +43,14 @@ const menuItems = [
   { href: "/settings", label: "设置", icon: Settings },
 ];
 
+function sortConversations(list: Conversation[]) {
+  return [...list].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+}
+
 export default function LeftSidebar({
   activeConversationId,
   onNewConversation,
@@ -60,13 +68,7 @@ export default function LeftSidebar({
       const res = await fetch(`${BASE}/api/conversations/getList`);
       if (res.ok) {
         const data = await res.json();
-        // 排序：置顶在前，然后按时间倒序
-        data.sort((a: Conversation, b: Conversation) => {
-          if (a.pinned && !b.pinned) return -1;
-          if (!a.pinned && b.pinned) return 1;
-          return (b.updatedAt || 0) - (a.updatedAt || 0);
-        });
-        setConversations(data);
+        setConversations(sortConversations(data));
       }
     } catch { /* ignore */ }
   }, []);
@@ -105,7 +107,9 @@ export default function LeftSidebar({
     setMenuOpen(null);
     try {
       await fetch(`${BASE}/api/conversations/pin?id=${id}&pinned=${!pinned}`, { method: "POST" });
-      setConversations(prev => prev.map(c => c.id === id ? { ...c, pinned: !pinned } : c));
+      setConversations(prev => sortConversations(
+        prev.map(c => c.id === id ? { ...c, pinned: !pinned } : c)
+      ));
     } catch { /* ignore */ }
   };
 

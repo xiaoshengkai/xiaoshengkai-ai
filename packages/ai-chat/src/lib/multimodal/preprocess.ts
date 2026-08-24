@@ -50,12 +50,7 @@ export async function preprocessAttachmentsDescription(
         const modality = file.mediaType.startsWith("image/") ? "image"
           : file.mediaType.startsWith("video/") ? "video" : null;
         if (!modality || !modalities.has(modality) || !isWithinHistoryDepth(index, total, modality)) continue;
-        try {
-          assertMediaDataSize(file.data, modality);
-        } catch (e) {
-          console.warn(`[preprocess] 忽略超限附件: ${(e as Error).message}`);
-          continue;
-        }
+        assertMediaDataSize(file.data, modality);
         if (seen.has(file.data)) continue;
         content.push(mediaPart(modality, file.data));
         seen.add(file.data);
@@ -71,12 +66,7 @@ export async function preprocessAttachmentsDescription(
 
         let url: string | null = null;
         if (attachment.localPath) {
-          try {
-            url = localData(attachment.modality, attachment.filename);
-          } catch (e) {
-            console.warn(`[preprocess] 忽略缺失${attachment.modality === "image" ? "图片" : "视频"}: ${(e as Error).message}`);
-            continue;
-          }
+          url = localData(attachment.modality, attachment.filename);
         } else if (attachment.modality === "image") {
           // 远程图片：先下载到本地缓存，过期/403 则跳过，避免直接交给模型 fetch 失败
           let local: string | null = null;

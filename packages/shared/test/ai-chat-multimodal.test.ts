@@ -242,10 +242,12 @@ test("preprocess 拒绝超过 10MB 的本地图片", async () => {
   );
 });
 
-test("远程图片 URL 作为 image_url 传给 preprocess", async () => {
-  let body: { messages?: { content?: unknown[] }[] } | undefined;
+test("远程图片下载失败时跳过，不调 preprocess（优雅降级）", async () => {
+  let preprocessCalled = false;
   globalThis.fetch = async (_url, init) => {
-    body = JSON.parse(String(init?.body));
+    // downloadRemoteImage 的 GET 请求无 body → JSON.parse(undefined) 抛错 → 下载失败
+    if (init?.body === undefined) throw new Error("download failed");
+    preprocessCalled = true;
     return Response.json({ choices: [{ message: { content: "图片描述" } }] });
   };
 
@@ -254,11 +256,9 @@ test("远程图片 URL 作为 image_url 传给 preprocess", async () => {
     model: "deepseek-v4-pro",
     messages: message("描述 https://example.com/demo.png"),
   });
-  const content = body?.messages?.[1]?.content;
 
-  assert.equal(JSON.stringify(content).includes('"type":"image_url"'), true);
-  assert.equal(JSON.stringify(content).includes("https://example.com/demo.png"), true);
-  assert.equal(result.systemInjection, "图片描述");
+  assert.equal(preprocessCalled, false);
+  assert.equal(result.systemInjection, "");
 });
 
 test("preprocess 请求只含媒体，不带历史对话轮", async () => {

@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.2 (2026-08-24) — 修复历史过期图片导致聊天 500
+
+### 根因
+会话历史里残留过期 OSS 签名图 URL（`Expires` 已过）时，DeepSeek 等纯文本模型走 preprocess 路径，`preprocess.ts` 把原始 URL 直接发给 MiniMax-M3 描述，M3 fetch 过期 URL 得 403 → `preprocess 调用失败 (400): remote returned status 403` → 整条聊天 500。
+
+### 修复
+- `preprocess.ts` 远程图片先 `downloadRemoteImage()` 下载到本地缓存再 base64（对齐 direct 路径）；下载失败（过期/403）跳过该附件
+- 本地文件/超限附件/缺失文件均 try/catch 降级跳过，不再抛错
+- 一个附件都没解析出来时返回空描述（不调 LLM、不阻断对话）；空描述在 `buildSystemPrompt` 中不注入
+
+### 验证
+- typecheck + build 通过
+- curl 确认过期 OSS URL 返回 403（`downloadRemoteImage` `!response.ok` → null → 跳过）
+
 ## v0.11.1 (2026-08-24) — 修复会话置顶不生效
 
 ### 根因

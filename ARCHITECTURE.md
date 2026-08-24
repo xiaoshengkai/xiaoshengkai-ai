@@ -1,7 +1,7 @@
 # 代码实现说明
 
 > **本文档是"代码现在怎么组织"的单一真相源**：目录结构、模块职责、各子系统实现机制。
-> 设计决策 / 规范 / 约定 / 部署见 `design.md`；版本变更历史见 `CHANGELOG.md`。
+> 设计决策 / 规范 / 约定 / 部署见 `DESIGN.md`；版本变更历史见 `CHANGELOG.md`。
 >
 > **同步规则**：目录结构 / 模块职责 / 包依赖发生变化时同步更新本文档；纯逻辑改动不涉及结构的不用动。
 
@@ -31,7 +31,7 @@ tasks/scheduler.js（常驻 cron 进程，独立于 ai-chat）
 ai-engineer-journey/
 ├── package.json                # npm workspaces 根配置
 ├── .env / .env.example         # 共享环境变量
-├── design.md                   # 设计决策 / 规范 / 部署
+├── DESIGN.md                   # 设计决策 / 规范 / 部署
 ├── ARCHITECTURE.md             # 本文档（代码实现说明）
 ├── CHANGELOG.md
 ├── config/

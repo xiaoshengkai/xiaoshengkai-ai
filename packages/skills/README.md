@@ -17,8 +17,8 @@ MCP    = 执行（How）        ← 工具函数，执行具体操作
 flowchart TB
   subgraph SKILLS["📚 Skills 知识库（packages/skills/）"]
     direction LR
-    S1["video/<br/>SKILL.md"]
-    S2["其他/<br/>SKILL.md"]
+    S1["image-styles/<br/>SKILL.md"]
+    S2["blog / task / xiaohongshu-note<br/>github-gem-seeker ..."]
   end
 
   subgraph MCP["🔧 MCP Server（discovery）"]
@@ -52,13 +52,13 @@ flowchart TB
 
 ```markdown
 ---
-name: video
-description: 生成高质量视频内容
+name: task
+description: 创建定时任务（目录结构 + task.json + index.js 约定）
 ---
 
-# 图表生成规则
+# 定时任务创建规则
 
-## 形状词汇表
+## 目录约定
 ...
 ```
 

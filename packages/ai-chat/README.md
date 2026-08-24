@@ -7,7 +7,7 @@
 - 流式对话（`useChat` + `streamText`）
 - RAG 知识库检索（Chroma + 智谱 embedding-3）
 - 知识库 CRUD（LLM 通过 MCP 工具自主增删改查）
-- MCP 工具调用（时间/文件/知识库/多模态生成）
+- MCP 工具调用（文件/知识库/图片/图表/小红书/文档/抓取/Shell，30 tools）
 - 视频预览：iframe 嵌入（`rehype-raw`）
 - Chroma 自动启动（Next.js instrumentation）
 
@@ -63,4 +63,4 @@ npm run dev
 
 ## 详细设计
 
-见 [design.md](../../design.md)
+见 [DESIGN.md](../../DESIGN.md) 与 [ARCHITECTURE.md](../../ARCHITECTURE.md)

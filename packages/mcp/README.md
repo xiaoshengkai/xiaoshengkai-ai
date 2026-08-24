@@ -1,53 +1,45 @@
 # mcp
 
-统一 MCP 服务器，为 AI Chat 提供工具调用和 skill 知识加载能力。
+统一 MCP 服务器（`@modelcontextprotocol/sdk`，stdio 传输），为 AI Chat 提供 30 个工具与 skill 知识加载能力。由 ai-chat 的 `lib/mcp-client.ts` spawn `node ../mcp/index.js` 拉起。
 
 ## 架构
 
 ```mermaid
 flowchart TB
-  subgraph MCP["🔧 MCP Server（node-mcp）"]
+  subgraph MCP["🔧 MCP Server（packages/mcp）"]
     direction TB
     ENTRY["index.js 统一入口"]
-    SKILL["tools/skill.js<br/>loadSkill（1 tool）"]
-    EXEC["tools/exec.js<br/>exec（1 tool）"]
-    MEDIA["tools/media/<br/>图片/视频（7 tools）"]
-    CHROMA["tools/chroma.js<br/>知识管理（5 tools）"]
-    FILE["tools/file.js<br/>文件操作（10 tools）"]
-    TODO["tools/todo.js<br/>待办管理（6 tools）"]
-    FETCH["tools/fetch.js<br/>网页抓取（2 tools）"]
+    SKILL["tools/skill/<br/>loadSkill（1 tool）"]
+    EXEC["tools/exec/<br/>Shell 执行（1 tool）"]
+    FETCH["tools/fetch/<br/>网页抓取（2 tools）"]
+    FILE["tools/file/<br/>文件操作（10 tools）"]
+    CHROMA["tools/chroma/<br/>知识库（5 tools）"]
+    MEDIA["tools/media/<br/>图片生成（3 tools）"]
+    DIAGRAM["tools/diagram/<br/>图表生成（2 tools）"]
     XHS["tools/xiaohongshu/<br/>小红书笔记（4 tools）"]
-    ENTRY --> SKILL
-    ENTRY --> EXEC
-    ENTRY --> MEDIA
-    ENTRY --> CHROMA
-    ENTRY --> FILE
-    ENTRY --> TODO
-    ENTRY --> FETCH
-    ENTRY --> XHS
+    DOC["tools/document/<br/>文档转换（2 tools）"]
+    ENTRY --> SKILL & EXEC & FETCH & FILE & CHROMA & MEDIA & DIAGRAM & XHS & DOC
   end
 
   subgraph SKILLS["📚 Skills 知识库（packages/skills/）"]
     direction TB
     SK1["skills/✱/SKILL.md<br/>静态知识文件"]
-    SK2["loadSkill 工具<br/>→ 扫描目录<br/>→ 解析 frontmatter<br/>→ 按需返回内容"]
+    SK2["loadSkill 工具<br/>→ 扫描目录 → 解析 frontmatter → 按需返回内容"]
     SK1 --> SK2
   end
 
   subgraph AI["🤖 AI Chat（packages/ai-chat/）"]
-    AI1["route.ts"]
-    AI2["DeepSeek Agent"]
-    AI1 --> AI2
-    AI2 -->|"stdio MCP"| ENTRY
+    AI1["lib/mcp-client.ts<br/>stdio spawn + 客户端缓存"]
   end
 
+  AI1 -->|"stdio MCP"| ENTRY
   SKILL -.->|"读取"| SK1
 ```
 
 ## 设计理念
 
 ```
-MCP  = 执行（How）   ← 工具函数，执行具体操作（调 API、读写文件、查数据库）
+MCP   = 执行（How）   ← 工具函数，执行具体操作（调 API、读写文件、查数据库）
 Skill = 知识（What）  ← 静态文件，描述"怎么做得好"（规则、最佳实践、风格指南）
 
 两者互补：Skill 提供背景知识，MCP 工具负责执行。
@@ -57,58 +49,46 @@ Skill = 知识（What）  ← 静态文件，描述"怎么做得好"（规则、
 
 ```
 mcp/
-├── index.js              # 统一入口，注册所有工具
+├── index.js              # 统一入口，注册所有工具模块
 ├── lib/
 │   ├── env.js            # 统一 dotenv 加载
-│   ├── chroma.js         # 共享 Chroma 搜索逻辑
-│   └── minimax.js        # 共享 MiniMax 图片生成
+│   ├── chroma.js         # 共享 Chroma 客户端（network.json + providers.json 配置）
+│   └── task-state.js     # 异步任务状态（图片/图表等长任务）
 ├── tools/
-│   ├── skill/index.js     # 技能加载（1 tool）
-│   ├── exec/index.js      # Shell 命令执行（1 tool）
-│   ├── diagram/index.js   # 图表生成（1 tool）
-│   ├── todo/index.js      # 时间 + Todo（6 tools）
-│   ├── file/index.js      # 文件系统操作（10 tools）
-│   ├── chroma/index.js    # 知识库 CRUD（5 tools）
-│   ├── fetch/index.js     # 网页爬取（2 tools）
-│   ├── xiaohongshu/        # 小红书笔记（4 tools）
+│   ├── skill/index.js    # 技能加载（1 tool）
+│   ├── exec/index.js     # Shell 命令执行（1 tool）
+│   ├── fetch/index.js    # 网页抓取 / 整站爬取（2 tools）
+│   ├── file/index.js     # 文件系统操作（10 tools）
+│   ├── chroma/index.js   # 知识库增删查（5 tools）
+│   ├── media/index.js    # 图片生成（3 tools）
+│   ├── diagram/          # 图表生成（2 tools）
 │   │   ├── index.js
 │   │   └── templates/
-│   │       ├── knowledge.md
-│   │       └── knowledge/
-│   │           └── finance.md
-│   └── media/             # 多模态生成（7 tools）
-│       ├── image.js      # 图片生成（2 tools）
-│       ├── video.js      # 视频/语音（5 tools）
-│       ├── audio.js      # TTS/BGM 工具函数
-│       ├── html-builder.js # HTML 构建工具
-│       └── utils.js
-├── templates/
-│   ├── animation.html    # 动画骨架模板
-│   ├── default.md        # Neo-Brutalist 风格描述
-│   └── cream.md          # 奶油风格描述
+│   ├── xiaohongshu/      # 小红书笔记（4 tools）
+│   │   ├── index.js
+│   │   └── templates/
+│   ├── document/index.js # 文档转换（2 tools，依赖 pandoc）
+│   └── todo/index.js     # 待办管理（6 tools，暂未注册）
+├── examples/default.md
 ├── package.json
 └── README.md
 ```
 
-## 工具一览
+## 工具一览（30 个已注册）
 
-### 技能加载（skill）
+### 技能与执行（skill / exec）
 
 | 工具 | 说明 |
 |------|------|
 | `loadSkill` | 加载领域知识。不传 name 返回可用 skill 列表，传 name 加载完整内容 |
 | `exec` | 执行 shell 命令。可在项目根或 skills/ 目录下运行脚本，默认超时 60s |
 
-### 时间与待办（todo）
+### 网页抓取（fetch）
 
 | 工具 | 说明 |
 |------|------|
-| `getCurrentTime` | 获取当前日期和时间 |
-| `getTodoList` | 查询待办事项列表 |
-| `addTodoItem` | 新增待办事项 |
-| `editTodoItem` | 编辑待办事项 |
-| `deleteTodoItem` | 删除待办事项 |
-| `getTodoDetail` | 获取待办事项详情 |
+| `fetchPage` | 获取网页内容（可下载到本地，支持 cookies） |
+| `crawlSite` | 爬取整站（可限制深度/页数，可下载） |
 
 ### 文件系统（file）
 
@@ -135,68 +115,53 @@ mcp/
 | `deleteKnowledge` | 软删除笔记（3 秒内可恢复） |
 | `restoreKnowledgeById` | 撤销最近的软删除 |
 
-### 多模态生成（media）
+### 图片生成（media）
 
-| 工具 | 状态 | 说明 |
-|------|------|------|
-| `generateImage` | ✅ | 根据文本描述生成图片 |
-| `generateImageFromImage` | ✅ | 根据参考图和描述生成新图片 |
-| `generateHTMLPreview` | ✅ | 生成 GSAP HTML 预览（不渲染），返回 taskId 后用 renderVideo 渲染 |
-| `renderVideo` | ✅ | 将 HTML 预览渲染为 MP4 视频 |
-| `checkTaskProgress` | ✅ | 查询动画预览和视频渲染任务进度 |
-| `generateVideo` | 🔲 | 文生视频（暂未实现） |
-| `generateSpeech` | 🔲 | 文生语音（暂未实现） |
+| 工具 | 说明 |
+|------|------|
+| `generateImage` | 根据文本描述生成图片（异步，返回 taskId） |
+| `generateImageFromImage` | 根据参考图和描述生成新图片 |
+| `checkImageProgress` | 查询图片生成任务进度 |
 
 ### 图表生成（diagram）
 
-| 工具 | 状态 | 说明 |
-|------|------|------|
-| `generateDiagram` | ✅ | 根据描述生成图表，Mermaid（流程图/时序图/ER图等）+ D2（架构图/拓扑图等）双引擎，3 套主题，4 层校验，失败自修复 |
-
-**总计：37 个工具（35 已实现，2 预留）**
+| 工具 | 说明 |
+|------|------|
+| `generateDiagram` | 根据描述生成图表，Mermaid + D2 双引擎，失败自修复重试 |
+| `checkDiagramProgress` | 查询图表生成任务进度 |
 
 ### 小红书笔记（xiaohongshu）
 
-| 工具 | 状态 | 说明 |
-|------|------|------|
-| `generateXiaohongshuNote` | ✅ | 根据主题和模板生成笔记（含封面/插画/标签），自动检索记忆库，异步生成配图 |
-| `updateXiaohongshuNote` | ✅ | 修改已生成的笔记（标题/摘要/正文/标签/替换图片） |
-| `checkXiaohongshuNoteProgress` | ✅ | 查询笔记生成进度，轮询等图片就绪 |
-| `exportXiaohongshuNote` | ✅ | 导出笔记为本地文件夹（HTML + MD + 图片下载） |
+| 工具 | 说明 |
+|------|------|
+| `generateXiaohongshuNote` | 根据主题和模板生成笔记（含封面/插画/标签），自动检索记忆库，异步生成配图 |
+| `updateXiaohongshuNote` | 修改已生成的笔记（标题/摘要/正文/标签/替换图片） |
+| `checkXiaohongshuNoteProgress` | 查询笔记生成进度，轮询等图片就绪 |
+| `exportXiaohongshuNote` | 导出笔记为本地文件夹（HTML + MD + 图片下载） |
+
+### 文档转换（document）
+
+| 工具 | 说明 |
+|------|------|
+| `convertDocument` | Markdown / HTML / 纯文本 → PDF 或 Word |
+| `convertDocumentBatch` | 批量转换目录下的 Markdown |
+
+> `tools/todo/`（6 tools：getCurrentTime + 待办 CRUD）代码存在但未在 index.js 注册。
 
 ## 运行
 
 ```bash
-node index.js
+node index.js   # 一般不手动跑，由 ai-chat 按需 spawn
 ```
 
-## 环境变量
+## 配置
 
-在项目根目录 `.env` 统一配置：
-
-```bash
-DEEPSEEK_API_KEY=sk-xxx
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
-DEEPSEEK_PRO_MODEL=deepseek-v4-pro
-DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
-GLM_API_KEY=xxx
-GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
-GLM_EMBEDDING_MODEL=embedding-3
-MINIMAX_API_KEY=xxx
-MINIMAX_BASE_URL=https://api.minimaxi.com/v1
-MINIMAX_IMAGE_MODEL=image-01
-```
-
-| 模块 | 依赖的 Key |
-|------|-----------|
-| chroma | GLM_API_KEY, GLM_BASE_URL, GLM_EMBEDDING_MODEL |
-| media | MINIMAX_API_KEY, MINIMAX_BASE_URL, MINIMAX_IMAGE_MODEL, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_FLASH_MODEL |
-| xiaohongshu | DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_PRO_MODEL, MINIMAX_API_KEY, MINIMAX_BASE_URL, MINIMAX_IMAGE_MODEL |
-| diagram | DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_FLASH_MODEL |
+- **模型 / API Key**：`data/settings/providers.json` 为真源（每次调用 fresh-read，改配置无需重启），`.env` 只作默认值兜底；读取逻辑在 `@app/shared/llm/config.js`
+- **端口 / host**：`config/network.json`，经 `@app/shared/network.js` 的 `loadNetworkConfig()` 读取
+- **外部依赖**：document 工具需要系统安装 `pandoc`
 
 ## 技术栈
 
 - [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 - `@modelcontextprotocol/sdk` + `zod`
 - stdio 传输（子进程 stdin/stdout）
-- Node.js ESM

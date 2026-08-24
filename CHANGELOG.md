@@ -1,5 +1,16 @@
 # Changelog
 
+## 文档体系 (2026-08-21) — 三文档拆分 + md 命名统一
+
+非代码版本发布，记录文档基础设施变更。
+
+- 新增 `ARCHITECTURE.md`：代码实现单一真相源（包拓扑 / 目录结构 / 能力注册机制 / 知识库 / SKILL / 工作流 / 定时任务 / MCP 章节）；新建项目级 `AGENTS.md`（本地文件，已 gitignore）：会话先读 ARCHITECTURE.md + 结构变化同步 + 验证门禁
+- `design.md` → `DESIGN.md`（md 命名统一大写），瘦身 474→232 行只留设计决策/规范；mermaid 策略模式 / API 表 / .env 示例补 qwen
+- 根 README 纠偏：30 tools / 7 模块（补 preprocess）/ 工作流引擎 / proxy.cjs / 日志路径；文档区加 ARCHITECTURE / DESIGN 链接
+- `packages/mcp/README.md` 重写（对齐 30 tools 实况，删过时 video 工具描述）；ai-chat README 瘦身为指针+包内特有内容；workflows/tasks/shared 补指针 README（锚点指向 ARCHITECTURE.md）；skills README 修过时引用
+
+相关提交：41ec6bb / 60e8933 / 4aba768 / 538a508
+
 ## v0.11.0 (2026-08-21) — 阶段三：声明式能力注册（workflows/tasks 收敛进包）
 
 ### 背景

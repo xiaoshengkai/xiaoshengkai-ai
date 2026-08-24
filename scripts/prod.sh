@@ -32,6 +32,14 @@ echo "代理已启动 → http://${LOCAL}:${PROXY_PORT}"
 nohup node packages/tasks/scheduler.js > /tmp/scheduler.log 2>&1 &
 echo '定时任务调度器已启动'
 
+# 本地 SearXNG（首次自动 clone+install）
+nohup bash packages/services/search/searxng/start.sh > logs/app/searxng.log 2>&1 &
+echo '搜索服务 SearXNG 已启动'
+
+# 搜索编排服务
+nohup node packages/services/search/server.js > logs/app/search-service.log 2>&1 &
+echo '搜索编排服务已启动'
+
 # Tailscale Funnel
 tailscale funnel --bg --https=443 $PROXY_PORT
 echo '内网穿透已启动'

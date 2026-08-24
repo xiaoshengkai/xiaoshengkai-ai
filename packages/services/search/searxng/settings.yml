@@ -1,0 +1,74 @@
+# SearXNG 专属配置（输出 json）
+# 端口不在这里配置：由 start.sh 读取 config/network.json 后通过 SEARXNG_PORT 覆盖
+
+use_default_settings: true
+
+general:
+  instance_name: "Local Search"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "zh-CN"
+  formats:
+    - json
+
+server:
+  secret_key: "change-me-local-search"
+  limiter: false
+  public_instance: false
+  image_proxy: false
+  bind_address: "127.0.0.1"
+
+engines:
+  - name: baidu
+    engine: baidu
+    shortcut: bd
+    disabled: false
+
+  - name: sogou
+    engine: sogou
+    shortcut: sg
+    disabled: false
+
+  - name: bing
+    engine: bing
+    shortcut: bi
+    disabled: false
+
+  - name: baidu images
+    baidu_category: images
+    categories: [images]
+    engine: baidu
+    shortcut: bdi
+    disabled: false
+
+  - name: sogou images
+    engine: sogou_images
+    shortcut: sogoui
+    disabled: false
+
+  - name: bing images
+    engine: bing_images
+    shortcut: bii
+    disabled: false
+
+  - name: sogou videos
+    engine: sogou_videos
+    shortcut: sogouv
+    disabled: false
+
+  - name: bing videos
+    engine: bing_videos
+    shortcut: biv
+    disabled: false
+
+  - name: bing news
+    engine: bing_news
+    shortcut: bin
+    disabled: false
+
+  - name: sogou wechat
+    engine: sogou_wechat
+    shortcut: sogouw
+    disabled: false

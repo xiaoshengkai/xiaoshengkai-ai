@@ -1,6 +1,6 @@
 # mcp
 
-统一 MCP 服务器（`@modelcontextprotocol/sdk`，stdio 传输），为 AI Chat 提供 30 个工具与 skill 知识加载能力。由 ai-chat 的 `lib/mcp-client.ts` spawn `node ../mcp/index.js` 拉起。
+统一 MCP 服务器（`@modelcontextprotocol/sdk`，stdio 传输），为 AI Chat 提供 33 个工具与 skill 知识加载能力。由 ai-chat 的 `lib/mcp-client.ts` spawn `node ../mcp/index.js` 拉起。
 
 ## 架构
 
@@ -11,14 +11,14 @@ flowchart TB
     ENTRY["index.js 统一入口"]
     SKILL["tools/skill/<br/>loadSkill（1 tool）"]
     EXEC["tools/exec/<br/>Shell 执行（1 tool）"]
-    FETCH["tools/fetch/<br/>网页抓取（2 tools）"]
+    SEARCH["tools/search/<br/>联网搜索与抓取（5 tools）"]
     FILE["tools/file/<br/>文件操作（10 tools）"]
     CHROMA["tools/chroma/<br/>知识库（5 tools）"]
     MEDIA["tools/media/<br/>图片生成（3 tools）"]
     DIAGRAM["tools/diagram/<br/>图表生成（2 tools）"]
     XHS["tools/xiaohongshu/<br/>小红书笔记（4 tools）"]
     DOC["tools/document/<br/>文档转换（2 tools）"]
-    ENTRY --> SKILL & EXEC & FETCH & FILE & CHROMA & MEDIA & DIAGRAM & XHS & DOC
+    ENTRY --> SKILL & EXEC & SEARCH & FILE & CHROMA & MEDIA & DIAGRAM & XHS & DOC
   end
 
   subgraph SKILLS["📚 Skills 知识库（packages/skills/）"]
@@ -57,7 +57,7 @@ mcp/
 ├── tools/
 │   ├── skill/index.js    # 技能加载（1 tool）
 │   ├── exec/index.js     # Shell 命令执行（1 tool）
-│   ├── fetch/index.js    # 网页抓取 / 整站爬取（2 tools）
+│   ├── search/index.js   # 联网搜索与抓取（5 tools，调 packages/services/search）
 │   ├── file/index.js     # 文件系统操作（10 tools）
 │   ├── chroma/index.js   # 知识库增删查（5 tools）
 │   ├── media/index.js    # 图片生成（3 tools）
@@ -74,7 +74,7 @@ mcp/
 └── README.md
 ```
 
-## 工具一览（30 个已注册）
+## 工具一览（33 个已注册）
 
 ### 技能与执行（skill / exec）
 
@@ -83,12 +83,15 @@ mcp/
 | `loadSkill` | 加载领域知识。不传 name 返回可用 skill 列表，传 name 加载完整内容 |
 | `exec` | 执行 shell 命令。可在项目根或 skills/ 目录下运行脚本，默认超时 60s |
 
-### 网页抓取（fetch）
+### 联网搜索与抓取（search）
 
 | 工具 | 说明 |
 |------|------|
-| `fetchPage` | 获取网页内容（可下载到本地，支持 cookies） |
-| `crawlSite` | 爬取整站（可限制深度/页数，可下载） |
+| `searchWeb` | 联网搜索（本地 SearXNG，分类 general/images/videos/news/wechat） |
+| `scrapeWebPage` | 抓指定 URL 正文为 Markdown（Firecrawl Cloud） |
+| `mapWebsite` | 发现网站内所有 URL（Firecrawl Cloud /map） |
+| `crawlWebsite` | 抓网站多页正文（Firecrawl Cloud /crawl，最多 20 页） |
+| `parseDocument` | 解析在线 PDF 为 Markdown（Firecrawl Cloud） |
 
 ### 文件系统（file）
 

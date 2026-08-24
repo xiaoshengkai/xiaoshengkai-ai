@@ -1,0 +1,10 @@
+{
+  "name": "@app/search-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "联网搜索服务：本地 SearXNG + Firecrawl Cloud 正文抓取",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

@@ -15,9 +15,11 @@
     "tasks:start": "node packages/tasks/scheduler.js",
     "tasks:stop": "kill $(lsof -t -i:4567) 2>/dev/null || true",
     "tasks:run": "node -e \"import('./packages/tasks/$TASK/index.js').then(m=>m.run())\"",
-    "test": "npm run test:shared && npm run test:mm",
+    "test": "npm run test:shared && npm run test:mm && npm run test:search",
     "test:shared": "node --test packages/shared/test/*.test.js",
     "test:mm": "npm exec -w packages/ai-chat -- tsx --test ../shared/test/ai-chat-multimodal.test.ts",
+    "test:search": "node --test packages/services/search/test/normalize.test.js",
+    "test:search:live": "node --test packages/services/search/test/live.test.js",
     "typecheck": "npm exec -w packages/ai-chat tsc -- --noEmit --incremental false",
     "test:video-v2": "node packages/workflows/templates/tech-video/test.js"
   },

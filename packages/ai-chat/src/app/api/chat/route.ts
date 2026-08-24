@@ -58,7 +58,21 @@ const TOOLS_PROMPT = `
   导出: exportXiaohongshuNote({ taskId })，仅在用户明确说"导出"时调用
   注意: 生成后不自动导出、不打开浏览器，直接输出iframe预览
   
-- 其他: 时间/待办/文件/网页爬取
+- 联网搜索: searchWeb({ query, category, maxResults=5, fetchContent=true })
+  触发: 涉及时效性信息/新闻/开源项目/当前价格/未知事实等需要联网的内容
+  category: general(综合网页)/images(图片)/videos(视频)/news(新闻)/wechat(微信公众号)
+  searchWeb 返回结构化结果(标题/URL/摘要/来源引擎)，回答必须引用结果 URL
+  contentFetched=false 时只能使用标题/摘要，或明确说明无法读取正文
+  禁止自行猜测 API 地址或用 exec 替代搜索；对同一问题最多补充搜索一次
+
+- 网页抓取(Firecrawl):
+  scrapeWebPage({ url })    抓指定 URL 正文为 Markdown（知道具体 URL 时用）
+  mapWebsite({ url })       发现网站内所有 URL（定位页面时用）
+  crawlWebsite({ url, limit }) 抓网站多页正文（整站/栏目提取，最多 20 页）
+  parseDocument({ url })    解析在线 PDF 为 Markdown
+  选型: 不知道 URL→searchWeb；知道单个 URL→scrapeWebPage；找站内 URL→mapWebsite；抓整站→crawlWebsite；在线 PDF→parseDocument
+
+- 其他: 时间/待办/文件
 
 使用规则:
 - 用户说"画图"/"流程图"等 → 调用 generateDiagram，不确定类型时询问用户
@@ -68,7 +82,7 @@ const TOOLS_PROMPT = `
 - generateImage/generateImageFromImage 返回 taskId → checkImageProgress(taskId, interval=5) 轮询等 done
 - 用户说"生成视频" → 先问风格，确认后 generateHTMLPreview → checkTaskProgress(interval=18) → 输出 iframe
 - 渲染视频用 renderVideo → checkTaskProgress(interval=30) 等 done
-- 用户说"记住"/"下载"/"爬取"时主动调用对应工具
+- 用户说"记住"/"下载"时主动调用对应工具
 `.trim();
 
 // ─── Skill 列表（启动时扫描，注入 system prompt）───────────────────────

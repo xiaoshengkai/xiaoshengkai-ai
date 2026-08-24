@@ -1,6 +1,6 @@
 {
   "hosts": {
-    "local": "localhost",
+    "local": "127.0.0.1",
     "public": "node.tailddce43.ts.net"
   },
   "ports": {
@@ -9,6 +9,8 @@
       "prodDirect": 4567,
       "prodProxy": 4321
     },
-    "chroma": 8000
+    "chroma": 8000,
+    "searxng": 8080,
+    "searchService": 8090
   }
 }

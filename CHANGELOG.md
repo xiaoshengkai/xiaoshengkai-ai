@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.11.4 (2026-08-24) — 搜索能力扩展：5 工具 + SearXNG 分类 + Firecrawl 全套
+
+### 变更
+- MCP search 模块 1 tool → 5 tools（工具总数 29 → 33）
+  - `searchWeb`：新增 `category`（general/images/videos/news/wechat）/ `language` / `timeRange` / `page` 参数
+  - `scrapeWebPage`：抓指定 URL 为 Markdown（Firecrawl /v2/scrape）
+  - `mapWebsite`：发现站内 URL（Firecrawl /v2/map）
+  - `crawlWebsite`：抓网站多页（Firecrawl /v2/crawl + GET status，服务内部轮询，≤20 页）
+  - `parseDocument`：解析在线 PDF（Firecrawl /v2/scrape + parsers:["pdf"]）
+- SearXNG 启用 10 个引擎：baidu/sogou/bing + 各自 images/videos/news + sogou wechat
+- `config/network.json` 的 `hosts.local` 改为 `127.0.0.1`，所有服务地址从 config 读取（不再硬编码）
+- Search Service 新增 `/scrape /map /crawl /parse` 端点
+
+### 类别→引擎映射
+general→baidu/sogou/bing；images→百度/搜狗/必应图片；videos→搜狗/必应视频；news→必应新闻；wechat→搜狗微信。general/news 抓前 3 条正文，其余只返回摘要/缩略图（不消耗 Firecrawl 额度）。
+
+### 踩坑
+- Firecrawl `/v2/scrape` 的 `parsers` 枚举仅支持 `"pdf"`（docx/doc 需走 `/v2/parse` 文件上传，未接入）
+- Firecrawl GET 请求不能带 body → `firecrawl()` 按 method 决定是否传 body
+- 残留旧 search-service 进程占 8090 端口致新代码请求打到旧进程（EADDRINUSE），需先 kill
+
+### 验证
+- `npm run test`：shared 18 + mm 18 + search 5 全过
+- `npm run test:search:live`：真实 Firecrawl scrape/map/crawl/parse 5 项通过
+- typecheck + build 通过
+- 端到端实测：general/images/wechat 搜索、scrape、map(17 URL)、crawl(2 页)、parse(PDF) 全通
+
+## v0.11.3 (2026-08-24) — 联网搜索能力（searchWeb）
+
+### 背景
+MCP 原本只有 `fetchPage`（访问已知 URL）和 `crawlSite`（单站爬取），没有真正的搜索能力。模型查询实时信息时只能凭知识猜 API 地址、用 `exec` 临时写 Python，失败后无限盲试。
+
+### 变更
+- **删除** `packages/mcp/tools/fetch/`（fetchPage / crawlSite），MCP 工具 30 → 29
+- **新增** `packages/mcp/tools/search/`：`searchWeb` 工具（薄适配，调搜索服务）
+- **新增** `packages/services/search/`：独立 Node 服务（非 npm workspace 包）
+  - 本地 SearXNG（Python venv，仅 baidu/sogou/bing，输出 json）
+  - Firecrawl Cloud `/v2/scrape` 抓前 3 条正文转 Markdown
+  - 编排：URL 去重、限额（≤10 结果、≤3 正文）、引擎状态
+- `config/network.json` 增 `ports.searxng`(8080) / `ports.searchService`(8090)
+- `.env` 增 `FIRECRAWL_API_KEY`（`.env.example` 未动，key 不入库）
+- `scripts/{dev,prod,stop}.sh` 接入 SearXNG + 搜索服务启停
+- `route.ts` TOOLS_PROMPT 加 searchWeb 使用规则（引用来源、禁止 exec 替代搜索）
+
+### 失败语义
+- 三引擎全失败才报错；部分失败返回 `degraded=true` + 引擎状态（如 sogou 被 CAPTCHA 拦截）
+- 单条 Firecrawl 抓取失败不丢弃搜索结果（`contentFetched=false` + `contentError`）
+
+### 验证
+- `npm run test`：shared 18 + mm 18 + search 3 全过
+- `npm run test:search:live`：真实 Firecrawl 抓 example.com 通过
+- typecheck + build 通过
+- 端到端实测：SearXNG baidu 9 条 + Firecrawl 抓 3 条正文成功（sogou CAPTCHA 正确标记 degraded）
+
 ## v0.11.2 (2026-08-24) — 修复历史过期图片导致聊天 500
 
 ### 根因

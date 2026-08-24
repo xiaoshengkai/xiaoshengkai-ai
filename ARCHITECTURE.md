@@ -16,7 +16,7 @@ npm workspaces（根 package.json，packages/*）
      │
 ai-chat（Next.js，组合根）──注册──▶ workflows / tasks / mcp / skills
      │                                （能力 100% 在包内，ai-chat 只留挂载点）
-     ├─ stdio spawn ──▶ mcp（30 tools，自包含）
+     ├─ stdio spawn ──▶ mcp（33 tools，自包含）
      ├─ stdio spawn ──▶ chromadb（Python standalone :8000）
      └─ catch-all 委托 ─▶ @app/workflows/http、@app/tasks/http
 
@@ -77,8 +77,10 @@ ai-engineer-journey/
     │   │       └── layout.tsx / globals.css
     │   ├── scripts/             # generate-embeddings / verify-migration
     │   └── package.json
-    ├── mcp/                     # MCP 工具服务（30 tools，详见「MCP 系统」）
+    ├── mcp/                     # MCP 工具服务（33 tools，详见「MCP 系统」）
     ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
+    ├── services/                # 独立常驻服务（非 npm workspace 内聚目录）
+    │   └── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
     ├── tasks/                   # 定时任务（@app/tasks，详见「定时任务系统」）
     └── workflows/               # 工作流引擎（@app/workflows，详见「工作流系统」）
         ├── package.json
@@ -292,7 +294,7 @@ packages/mcp/
 └── tools/
     ├── skill/               # 1 tool：loadSkill（扫描 packages/skills）
     ├── exec/                # 1 tool：Shell 命令执行（项目根 + skills/ 目录）
-    ├── fetch/               # 2 tools：fetchPage / crawlSite
+    ├── search/              # 5 tools：searchWeb / scrapeWebPage / mapWebsite / crawlWebsite / parseDocument
     ├── file/                # 10 tools：文件读写（相对路径基于项目根）
     ├── chroma/              # 5 tools：知识库增删查
     ├── media/               # 3 tools：generateImage / generateImageFromImage / checkImageProgress
@@ -302,4 +304,43 @@ packages/mcp/
     └── todo/                # 6 tools（暂未注册）
 ```
 
-共 30 个已注册工具。skill / exec 与 `packages/skills/` 联动：AI 在 system prompt 看到 `<available_skills>` 列表，按需 `loadSkill` 加载，用 `exec` 运行 skill 内脚本。
+共 33 个已注册工具。skill / exec 与 `packages/skills/` 联动：AI 在 system prompt 看到 `<available_skills>` 列表，按需 `loadSkill` 加载，用 `exec` 运行 skill 内脚本。
+
+## 搜索服务系统
+
+`packages/services/search/` 是独立常驻 Node 服务（非 npm workspace 包），提供联网搜索与网页抓取能力，MCP 的 search 模块薄适配调用。
+
+```
+packages/services/search/
+├── server.js             # Node HTTP 服务（/search /scrape /map /crawl /parse /health /ready）
+├── lib/
+│   ├── searxng.js        # 调本地 SearXNG JSON API（类别→引擎映射）
+│   ├── firecrawl.js      # 调 Firecrawl Cloud（scrape/map/crawl/parse，crawl 内部轮询）
+│   └── search.js         # 编排：去重、限额（≤10 结果、≤3 正文、≤20 页）、引擎状态
+├── searxng/              # 本地 SearXNG Python 子服务（start.sh: clone→venv→install→run）
+│   ├── settings.yml      # 启用 baidu/sogou/bing 系列引擎 + json 输出
+│   └── start.sh          # host/port 从 config/network.json 读取（SEARXNG_PORT/BIND_ADDRESS 覆盖）
+└── test/                 # normalize 单元测试 + live 真实集成测试
+```
+
+### searchWeb 类别映射
+
+| category | 引擎 | 抓正文 |
+|---|---|---|
+| general | baidu / sogou / bing | ✅ 前 3 条 |
+| images | baidu images / sogou images / bing images | ❌ |
+| videos | sogou videos / bing videos | ❌ |
+| news | bing news | ✅ 前 3 条 |
+| wechat | sogou wechat | ❌ |
+
+### Firecrawl 工具
+
+- `scrapeWebPage`：POST /v2/scrape → Markdown
+- `mapWebsite`：POST /v2/map → 站点 URL 列表
+- `crawlWebsite`：POST /v2/crawl + GET status（内部轮询，≤20 页）
+- `parseDocument`：POST /v2/scrape + parsers:["pdf"]（仅 PDF）
+
+- 端口：`config/network.json` 的 `hosts.local`(127.0.0.1) + `ports.searxng`(8080) / `ports.searchService`(8090)
+- Firecrawl key：根 `.env` 的 `FIRECRAWL_API_KEY`
+- 搜索失败语义：类别内引擎全失败才报错；部分失败返回 `degraded=true` + 引擎状态
+- 正文抓取失败不丢弃搜索结果（`contentFetched=false` + `contentError`）

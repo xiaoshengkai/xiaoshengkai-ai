@@ -54,10 +54,14 @@ flowchart TD
     direction TB
     A1["ai-chat (Next.js)"]
     A2["chromadb (standalone)<br/>:8000, data/chroma/"]
-    A4["mcp (stdio)<br/>30 tools: skill/exec/fetch/file/chroma/media/diagram/xiaohongshu/document"]
+    A4["mcp (stdio)<br/>33 tools: skill/exec/search/file/chroma/media/diagram/xiaohongshu/document"]
+    A5["searxng (python venv)<br/>:8080, baidu/sogou/bing"]
+    A6["search-service (node)<br/>:8090, SearXNG + Firecrawl"]
     A1 -->|"instrumentation spawn"| A2
     A1 -->|"HTTP :8000"| A2
     A1 -->|"stdio spawn"| A4
+    A4 -->|"HTTP :8090"| A6
+    A6 -->|"HTTP :8080"| A5
   end
 ```
 
@@ -80,6 +84,7 @@ flowchart TD
 | MiniMax | `https://api.minimaxi.com/v1` | 图片生成、图片理解、TTS/BGM |
 | MiniMax-M3 | `https://api.minimaxi.com/v1/chat/completions` | 对话/图片理解（OpenAI 兼容） |
 | 阿里 Qwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 对话（qwen3.8-max，已接入，额度待配置） |
+| Firecrawl Cloud | `https://api.firecrawl.dev` | 网页正文抓取（scrape/map/crawl/parse，key 在 `.env`） |
 
 ### 本地依赖
 
@@ -112,7 +117,7 @@ flowchart TD
 2. 智谱 `embedding-3` 生成查询向量
 3. Chroma cosine 检索 Top-5 知识片段（动态多表：shared + chat 全部 collection）
 4. 注入 `knowledgeContext` + `SKILL_LIST` 到 system prompt
-5. 启动/复用 1 个 MCP client（stdio spawn `node ../mcp/index.js`，30 tools）
+5. 启动/复用 1 个 MCP client（stdio spawn `node ../mcp/index.js`，33 tools）
 6. `streamText` 按策略模式路由（deepseek / minimax / glm / qwen，DeepSeek 经 classifyTask 分 pro/flash）
 7. SSE 流式返回，图表/视频通过 iframe 预览
 

@@ -10,7 +10,7 @@ Neo-Brutalism 糖果色 AI 对话助手，集成 RAG 知识库、MCP 工具调�
 - 📚 RAG 知识库检索（Chroma + 智谱 embedding-3，动态多表检索）
 - 🧠 主题学习笔记（learn-* collection，按主题隔离）
 - 📝 小红书笔记自动生成：对话内容 → 带封面/插画/标签的完整笔记，4 种模板 + 二级类目，聊天内嵌预览 + 独立页面，导出 HTML/MD/图片
-- 🔧 30 个 MCP 工具（文件/知识库/图片/图表/小红书笔记/文档转换/网页抓取/Shell/skill 加载）
+- 🔧 33 个 MCP 工具（文件/知识库/图片/图表/小红书笔记/文档转换/联网搜索与抓取/Shell/skill 加载）
 - 🎨 Neo-Brutalism 糖果色 UI（shadcn/ui + 自定义 CSS，多主题可切换）
 - 📝 个人博客（Neo-Brutalism 糖果屋风，笔记自动同步，Tailscale Funnel 内网穿透）
 - 🖼️ 文生图 + 图生图（MiniMax），异步模式，73 种视觉风格可选

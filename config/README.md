@@ -17,7 +17,7 @@
 ```jsonc
 {
   "hosts": {
-    "local": "localhost",                 // 本机地址，dev/prod 都用它
+    "local": "127.0.0.1",                 // 本机地址，dev/prod 都用它
     "public": "node.tailddce43.ts.net"   // 公网域名（tailscale funnel 暴露）
   },
   "ports": {
@@ -27,6 +27,8 @@
       "prodProxy": 4321       // proxy.cjs 监听端口（MCP 工具访问入口）
     },
     "chroma": 8000            // chroma-server 端口
+    "searxng": 8080           // 本地 SearXNG 搜索服务端口
+    "searchService": 8090     // 搜索编排服务（Node）端口
   }
 }
 ```

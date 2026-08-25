@@ -39,10 +39,11 @@ ai-engineer-journey/
 │   └── README.md               # 字段 + 消费者清单
 ├── scripts/                    # 部署 / 运维脚本
 │   ├── prod.sh / dev.sh / stop.sh / log.sh
+│   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
 │   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs
 ├── data/                       # 运行时数据（chroma / tasks / settings / static / workflows）
-├── logs/                       # 日志（app/ + tasks/ + workflows/）
+├── logs/                       # 日志（app/ + tasks/ + services/ + workflows/）
 ├── site/                       # 博客静态文件
 └── packages/
     ├── shared/                 # 跨包共享模块（@app/shared workspace 包，裸导入）
@@ -236,11 +237,11 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
        │                           │
        ▼                           │
   scheduler 进程（常驻）            │
-  ├─ 扫描 packages/tasks/*/task.json       │
+  ├─ 扫描 packages/tasks/tasks/*/task.json │
   ├─ node-cron 注册每个 cron 表达式        │
   └─ 触发时 → import task → run() → 写日志 │
                                     │
-  logs/tasks/<name>.log             │
+  logs/tasks/tasks-YYYY-MM-DD.log   │
   data/tasks/<name>/index.json      │
   data/tasks/<name>/.lock           │
 ```
@@ -251,12 +252,14 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 packages/tasks/
 ├── package.json                   # @app/tasks workspace 包
 ├── scheduler.js                   # 常驻调度进程（日志复用 @app/shared/logger.js）
+├── run-task.js                    # 手动触发入口（npm run tasks:run，复用同一日志）
 ├── actions.json                   # HTTP 动作声明（list/run/edit/dashboard）
 ├── http.js                        # 能力 HTTP 入口（ai-chat catch-all 委托）
 ├── lib/handlers.js                # 动作 handler（列表/执行/编辑/仪表盘）
-└── <task-name>/
-    ├── task.json                  # { name, description, cron, enabled, html? }
-    └── index.js                   # export async function run()
+└── tasks/                         # 任务目录（每任务一个子目录）
+    └── <task-name>/
+        ├── task.json              # { name, description, cron, enabled, html? }
+        └── index.js               # export async function run()
 ```
 
 ### 任务约定
@@ -266,7 +269,7 @@ packages/tasks/
 - 仪表盘必须用原生 HTML/CSS/JS（允许 CDN），禁止 React/Vue/构建工具
 - 任务执行互斥：同一任务不允许重叠执行（`.lock` 文件）
 - 状态追踪：`data/tasks/<name>/index.json` 记录 lastRun/lastStatus/lastError
-- 日志隔离：`logs/tasks/<name>.log`，与应用日志 `logs/app/` 同级
+- 日志隔离：cron 与手动触发（`run-task.js`）写 `logs/tasks/tasks-YYYY-MM-DD.log`；HTTP「立即执行」写 `logs/tasks/<name>.log`
 
 ### 日志结构
 
@@ -276,8 +279,11 @@ logs/
 │   └── app-YYYY-MM-DD.log
 ├── workflows/                     # 工作流日志（按日，含执行 id 前缀）
 │   └── workflows-YYYY-MM-DD.log
+├── services/                      # 搜索子服务日志（search-service + searxng）
+│   └── services-YYYY-MM-DD.log
 └── tasks/                         # 任务日志
-    └── <task-name>.log
+    ├── tasks-YYYY-MM-DD.log       # cron + 手动触发（按日）
+    └── <task-name>.log            # HTTP「立即执行」（每任务一个）
 ```
 
 ## MCP 系统
@@ -318,7 +324,8 @@ packages/services/search/
 │   ├── firecrawl.js      # 调 Firecrawl Cloud（scrape/map/crawl/parse，crawl 内部轮询）
 │   └── search.js         # 编排：去重、限额（≤10 结果、≤3 正文、≤20 页）、引擎状态
 ├── searxng/              # 本地 SearXNG Python 子服务（start.sh: clone→venv→install→run）
-│   ├── settings.yml      # 启用 baidu/sogou/bing 系列引擎 + json 输出
+│   ├── settings.yml      # 启用 baidu/sogou/bing 系列引擎 + json 输出；无用默认引擎 inactive 掉
+│   ├── limiter.toml      # 空 limiter 配置（消除 missing config 警告，用内置 schema 默认值）
 │   └── start.sh          # host/port 从 config/network.json 读取（SEARXNG_PORT/BIND_ADDRESS 覆盖）
 └── test/                 # normalize 单元测试 + live 真实集成测试
 ```

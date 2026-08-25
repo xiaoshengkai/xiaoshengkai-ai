@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.11.5 (2026-08-25) — 定时任务目录收拢 + 日志体系收敛 + searxng 噪音治理
+
+### 变更
+- **tasks 目录收拢**：任务目录统一移入 `packages/tasks/tasks/`（引擎文件留顶层）；`.gitignore` 仪表盘匹配改 `packages/tasks/**/dashboard.html`
+- **手动触发写日志**：新增 `packages/tasks/run-task.js`，`npm run tasks:run` 改经它执行，日志与 cron 一样写 `tasks-YYYY-MM-DD.log`（此前手动触发不留痕）
+- **服务日志统一**：新增 `scripts/log-wrap.js`，search-service / searxng 改经它启动，统一写 `logs/services/services-YYYY-MM-DD.log`（倒序 + 按日 + 7 天清理）；`dev.sh` / `prod.sh` / `stop.sh` 同步
+- **searxng 噪音治理**：`settings.yml` 用 `inactive: true` 禁用 wikidata / torch / ahmia（403 限流 / 缺依赖噪音）；新增 `limiter.toml` 消除缺失警告
+
+### 踩坑
+- searxng 禁用默认引擎要用 `inactive: true` 而非 `disabled: true`——`load_engines()` 只跳过 inactive，disabled 引擎照样 import + init 产生报错
+- `precious-metals/history.js` 原 4 级 `..` 把历史写到了项目外（`~/Desktop/AI/data/`）；目录下移一层后 4 级恰好到项目根，自愈（新历史正确落到 `data/precious-metals/`）
+- `createDateLogger` 只返回 logger 方法、不自动包装 console.log，需手动包（scheduler / run-task.js / log-wrap 均手动包）
+- searxng git 版本检测报错（`could not expand include path '~/.gitcinclude'`）根因是 `version.py` 调 git 时剥离 HOME；无害（仅版本号 fallback），未修
+
+### 验证
+- `TASK=precious-metals npm run tasks:run` 链路通（行情 17/17、宏观 12/12、微信推送成功）
+- `TASK=daily-reminder-am npm run tasks:run` 日志正常写入 tasks 日文件
+- `npm run prod` 通过；重启后 services 日志 wikidata/torch/ahmia/limiter 全消，仅剩 git config（无害）
+- 功能验证：`:8090/ready` → `{ok, searxngReady:true, firecrawlConfigured:true}`；`:8080/healthz` → OK
+
 ## v0.11.4 (2026-08-24) — 搜索能力扩展：5 工具 + SearXNG 分类 + Firecrawl 全套
 
 ### 变更

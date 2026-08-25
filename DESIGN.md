@@ -178,6 +178,33 @@ CHROMA_CODE_DB=code
 
 明确不在 config 里：API key、LLM endpoint、`BASE_PATH`、Chroma DB 名。
 
+## 日志规范
+
+### 统一约定
+
+所有日志统一三条规则：**倒序（新日志在前，prepend 写入）**、**按日轮转（`xxx-YYYY-MM-DD.log`）**、**保留 7 天自动清理**。由 `packages/shared/logger.js` 的 `createLogger` / `createDateLogger` 实现。
+
+> 注意：倒序与 `tail -f` 不兼容（新日志写文件顶部，`tail -f` 盯底部会吐旧行）。看实时日志用 `cat` / 编辑器，勿依赖 `tail -f`。
+
+### 日志目录
+
+| 目录 | 文件 | 写者 |
+|---|---|---|
+| `logs/app/` | `app-YYYY-MM-DD.log` | ai-chat（instrumentation）+ MCP |
+| `logs/tasks/` | `tasks-YYYY-MM-DD.log` | scheduler + 手动触发（run-task.js） |
+| `logs/tasks/` | `<task-name>.log` | HTTP「立即执行」（handlers） |
+| `logs/services/` | `services-YYYY-MM-DD.log` | search-service + searxng（经 log-wrap） |
+| `logs/workflows/` | `workflows-YYYY-MM-DD.log` | 工作流引擎 |
+
+### 子服务日志（log-wrap）
+
+search-service / searxng 是独立进程，不 import 共享 logger。统一用 `scripts/log-wrap.js <item> -- <cmd>` 包装启动：spawn 子进程、逐行把 stdout→`LOG` / stderr→`ERR` 写进 `services-YYYY-MM-DD.log`，子进程退出即退出、SIGTERM 转发。dev.sh / prod.sh 里 SearXNG 与搜索服务都走它。
+
+### 踩坑备忘
+
+- `createDateLogger` 只返回 logger 方法、**不自动包装 `console.log`**，需手动包（scheduler / run-task.js / log-wrap 都手动包）。
+- searxng 禁用默认引擎要用 **`inactive: true`** 而非 `disabled: true`——`load_engines()` 只跳过 `inactive`，`disabled` 引擎照样 import + init 产生报错噪音；`disabled` 仅在搜索阶段过滤引擎。
+
 ## 图片生成经验
 
 ### OSS 签名 URL 规则
@@ -226,6 +253,6 @@ npm run log    # 查看实时日志
 
 端口 / host 集中在 `config/network.json`，改这里全局同步。
 
-- 日志文件：`logs/app-YYYY-MM-DD.log`（按日轮转）
+- 日志文件：见「日志规范」小节（`logs/{app,tasks,services,workflows}/` 按日轮转、倒序）
 - 博客静态文件：`site/`，由 `proxy.cjs` 直接 serve
 - Tailscale Funnel 提供内网穿透，无需公网 IP

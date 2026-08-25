@@ -2,11 +2,11 @@
 DEV_PORT=$(node -e "console.log(require('./config/network.json').ports.aiChat.dev)")
 
 # 本地 SearXNG（首次自动 clone+install，后台运行）
-nohup bash packages/services/search/searxng/start.sh > logs/app/searxng.log 2>&1 &
+nohup node scripts/log-wrap.js searxng -- bash packages/services/search/searxng/start.sh &
 SEARXNG_PID=$!
 
 # 搜索编排服务
-nohup node packages/services/search/server.js > logs/app/search-service.log 2>&1 &
+nohup node scripts/log-wrap.js search-service -- node packages/services/search/server.js &
 SEARCH_PID=$!
 
 # 定时任务调度器

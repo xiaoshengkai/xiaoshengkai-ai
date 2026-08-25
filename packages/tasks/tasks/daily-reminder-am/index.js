@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BRIDGE_DATA_DIR = path.resolve(
-  __dirname, "..", "..", "..", "data", "tasks", "daily-reminder-am", "bridge-data"
+  __dirname, "..", "..", "..", "..", "data", "tasks", "daily-reminder-am", "bridge-data"
 );
 
 /**

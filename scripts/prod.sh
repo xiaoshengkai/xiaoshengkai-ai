@@ -33,11 +33,11 @@ nohup node packages/tasks/scheduler.js > /tmp/scheduler.log 2>&1 &
 echo '定时任务调度器已启动'
 
 # 本地 SearXNG（首次自动 clone+install）
-nohup bash packages/services/search/searxng/start.sh > logs/app/searxng.log 2>&1 &
+nohup node scripts/log-wrap.js searxng -- bash packages/services/search/searxng/start.sh &
 echo '搜索服务 SearXNG 已启动'
 
 # 搜索编排服务
-nohup node packages/services/search/server.js > logs/app/search-service.log 2>&1 &
+nohup node scripts/log-wrap.js search-service -- node packages/services/search/server.js &
 echo '搜索编排服务已启动'
 
 # Tailscale Funnel

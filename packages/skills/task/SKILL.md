@@ -96,8 +96,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 ## 日志
 
-任务执行日志自动写入 `logs/tasks/<name>.log`，无需任务自己处理。
+任务执行日志自动写入 `logs/tasks/tasks-YYYY-MM-DD.log`，无需任务自己处理。
 
 ## 示例
 
-参考 `packages/tasks/precious-metals/`。
+参考 `packages/tasks/tasks/precious-metals/`。

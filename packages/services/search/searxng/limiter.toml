@@ -1,0 +1,2 @@
+# 空 limiter 配置：使用 searx 内置 schema 默认值。
+# 搜索服务是本地使用，settings.yml 已设 server.limiter: false，此文件仅为消除 "missing config file" 警告。

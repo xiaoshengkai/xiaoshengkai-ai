@@ -72,3 +72,14 @@ engines:
     engine: sogou_wechat
     shortcut: sogouw
     disabled: false
+
+  # 以下默认引擎对搜索服务无用，且启动时产生噪音（wikidata 403 限流、torch/ahmia 缺依赖）
+  # 用 inactive（而非 disabled）：load_engines 只在 inactive=true 时跳过加载，disabled 仍会 import + init
+  - name: wikidata
+    inactive: true
+
+  - name: torch
+    inactive: true
+
+  - name: ahmia
+    inactive: true

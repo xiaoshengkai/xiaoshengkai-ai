@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createDateLogger } from "@app/shared/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TASKS_DIR = __dirname;
+const TASKS_DIR = path.join(__dirname, "tasks");
 const DATA_DIR = path.resolve(__dirname, "..", "..", "data", "tasks");
 const LOG_DIR = path.resolve(__dirname, "..", "..", "logs", "tasks");
 

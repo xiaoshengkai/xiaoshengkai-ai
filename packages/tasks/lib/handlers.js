@@ -9,7 +9,7 @@ import { execFile } from "node:child_process";
 
 // ponytail: 被 Next webpack 打包，沿用 process.cwd() = packages/ai-chat 约定
 const PROJECT_ROOT = path.resolve(process.cwd(), "..", "..");
-const TASKS_DIR = path.join(PROJECT_ROOT, "packages", "tasks");
+const TASKS_DIR = path.join(PROJECT_ROOT, "packages", "tasks", "tasks");
 const DATA_DIR = path.join(PROJECT_ROOT, "data", "tasks");
 const LOG_DIR = path.join(PROJECT_ROOT, "logs", "tasks");
 

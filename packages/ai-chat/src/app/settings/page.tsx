@@ -100,8 +100,7 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-foreground font-heading">系统设置</h2>
           <span className="text-xs text-muted-foreground font-mono hidden md:inline">
-            6 模块 · 4 Provider · 实时生效
-          </span>
+            7 模块 · 4 Provider · 实时生效</span>
         </div>
         <div className="flex gap-2">
           <button
@@ -133,13 +132,14 @@ export default function SettingsPage() {
       {/* 模型选择 */}
       <div>
         <h2 className="text-sm font-bold text-foreground mb-3 font-heading">📌 模块模型选择</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <ModuleSelector module="chat" current={selection.chat} onChange={handleSelectionChange} />
           <ModuleSelector module="media" current={selection.media} onChange={handleSelectionChange} />
+          <ModuleSelector module="vision" current={selection.vision || { provider: "minimax", model: "MiniMax-M3" }} onChange={handleSelectionChange} />
           <ModuleSelector module="vector" current={selection.vector} onChange={handleSelectionChange} />
           <ModuleSelector module="workflow" current={selection.workflow} onChange={handleSelectionChange} />
           <ModuleSelector module="tts" current={selection.tts || { provider: "minimax", model: "speech-2.8-hd" }} onChange={handleSelectionChange} />
-          <ModuleSelector module="bgm" current={selection.bgm || { provider: "minimax", model: "music-2.6" }} onChange={handleSelectionChange} />
+          <ModuleSelector module="music" current={selection.music || { provider: "qwen", model: "fun-music-v1" }} onChange={handleSelectionChange} />
         </div>
       </div>
 

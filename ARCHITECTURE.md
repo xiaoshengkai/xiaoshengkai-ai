@@ -16,7 +16,7 @@ npm workspaces（根 package.json，packages/*）
      │
 ai-chat（Next.js，组合根）──注册──▶ workflows / tasks / mcp / skills
      │                                （能力 100% 在包内，ai-chat 只留挂载点）
-     ├─ stdio spawn ──▶ mcp（33 tools，自包含）
+     ├─ stdio spawn ──▶ mcp（35 tools，自包含）
      ├─ stdio spawn ──▶ chromadb（Python standalone :8000）
      └─ catch-all 委托 ─▶ @app/workflows/http、@app/tasks/http
 
@@ -54,7 +54,7 @@ ai-engineer-journey/
     │   ├── utils.js            # sleep / shortId / downloadsDir
     │   ├── test/               # 共享测试（capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal）
     │   └── llm/                # LLM 共享封装
-    │       ├── index.js        # callLLM / generateTTS / generateBGM / generateImage / provider 读取
+    │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
     │       ├── config.js       # providers.json / selection.json fresh-read（真源，env 兜底）
     │       ├── parse-json.js   # 容错 JSON 解析
     │       └── providers/      # deepseek.js / glm.js / minimax.js / qwen.js
@@ -78,7 +78,7 @@ ai-engineer-journey/
     │   │       └── layout.tsx / globals.css
     │   ├── scripts/             # generate-embeddings / verify-migration
     │   └── package.json
-    ├── mcp/                     # MCP 工具服务（33 tools，详见「MCP 系统」）
+    ├── mcp/                     # MCP 工具服务（35 tools，详见「MCP 系统」）
     ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
     ├── services/                # 独立常驻服务（非 npm workspace 内聚目录）
     │   └── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
@@ -303,14 +303,14 @@ packages/mcp/
     ├── search/              # 5 tools：searchWeb / scrapeWebPage / mapWebsite / crawlWebsite / parseDocument
     ├── file/                # 10 tools：文件读写（相对路径基于项目根）
     ├── chroma/              # 5 tools：知识库增删查
-    ├── media/               # 3 tools：generateImage / generateImageFromImage / checkImageProgress
+    ├── media/               # 5 tools：generateImage / generateImageFromImage / checkImageProgress / generateMusic / checkMusicProgress
     ├── diagram/             # 2 tools：generateDiagram / checkDiagramProgress（Mermaid/D2）
     ├── xiaohongshu/         # 4 tools：小红书笔记生成/修稿/导出/进度
     ├── document/            # 2 tools：convertDocument / convertDocumentBatch（Pandoc→PDF/Word）
     └── todo/                # 6 tools（暂未注册）
 ```
 
-共 33 个已注册工具。skill / exec 与 `packages/skills/` 联动：AI 在 system prompt 看到 `<available_skills>` 列表，按需 `loadSkill` 加载，用 `exec` 运行 skill 内脚本。
+共 35 个已注册工具。skill / exec 与 `packages/skills/` 联动：AI 在 system prompt 看到 `<available_skills>` 列表，按需 `loadSkill` 加载，用 `exec` 运行 skill 内脚本。
 
 ## 搜索服务系统
 

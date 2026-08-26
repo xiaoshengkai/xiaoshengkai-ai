@@ -3,10 +3,9 @@ import {
   callLLM as callMiniMax,
   generateImage as generateMiniMaxImage,
   generateTTS as generateMiniMaxTTS,
-  generateBGM as generateMiniMaxBGM,
 } from "./providers/minimax.js";
 import { callLLM as callGLM } from "./providers/glm.js";
-import { callLLM as callQwen, generateImage as generateQwenImage } from "./providers/qwen.js";
+import { callLLM as callQwen, generateImage as generateQwenImage, generateBGM as generateQwenBGM, generateMusic as generateQwenMusic } from "./providers/qwen.js";
 import { readSelection, assertProviderEnabled } from "./config.js";
 
 // 工作流文字生成 selection（每次 fresh-read，切 provider/model 无需重启）
@@ -37,14 +36,10 @@ export async function callLLM(params) {
   return caller({ ...params, model: params.model || model });
 }
 
-// ─── 多态模型（多模态：文本+图片+视频）──────────────────────────────────
-
-const MULTIMODAL_MODELS = { minimax: "MiniMax-M3", qwen: "qwen3.8-max" };
+// ─── 多模态模型（视觉评估：selection.vision）───────────────────────────
 
 export function getMultimodalProvider() {
-  const provider = getWorkflowProvider();
-  if (MULTIMODAL_MODELS[provider]) return { provider, model: MULTIMODAL_MODELS[provider] };
-  return { provider: "minimax", model: "MiniMax-M3" };
+  return readModuleSelection("vision", { provider: "minimax", model: "MiniMax-M3" });
 }
 
 export async function callMultimodalLLM(params) {
@@ -79,10 +74,9 @@ export async function generateImage(prompt, opts = {}) {
   return gen(prompt, { ...opts, model: actualModel });
 }
 
-// ─── TTS / BGM 分发器（selection.tts / selection.bgm）──────────────────
+// ─── TTS / 音乐分发器（selection.tts / selection.music）─────────────────
 
 const TTS_PROVIDERS = { minimax: generateMiniMaxTTS };
-const BGM_PROVIDERS = { minimax: generateMiniMaxBGM };
 
 export async function generateTTS(params) {
   const { provider, model } = readModuleSelection("tts", { provider: "minimax", model: "speech-2.8-hd" });
@@ -94,12 +88,28 @@ export async function generateTTS(params) {
   return gen({ ...params, model: actualModel });
 }
 
+// 纯背景音乐（工作流用，落盘）
+const BGM_PROVIDERS = { qwen: generateQwenBGM };
+
 export async function generateBGM(params) {
-  const { provider, model } = readModuleSelection("bgm", { provider: "minimax", model: "music-2.6" });
+  const { provider, model } = readModuleSelection("music", { provider: "qwen", model: "fun-music-v1" });
   const gen = BGM_PROVIDERS[provider];
   if (!gen) throw new Error(`不支持的 BGM provider: ${provider}`);
   assertProviderEnabled(provider);
   const actualModel = params.model || model;
-  console.log(`[bgm] provider=${provider}, model=${actualModel}`);
+  console.log(`[music] provider=${provider}, model=${actualModel}`);
+  return gen({ ...params, model: actualModel });
+}
+
+// 整首歌（含人声/歌词，MCP 工具用，返回 URL）
+const MUSIC_PROVIDERS = { qwen: generateQwenMusic };
+
+export async function generateMusic(params) {
+  const { provider, model } = readModuleSelection("music", { provider: "qwen", model: "fun-music-v1" });
+  const gen = MUSIC_PROVIDERS[provider];
+  if (!gen) throw new Error(`不支持的整首歌 provider: ${provider}（仅 qwen/fun-music-v1）`);
+  assertProviderEnabled(provider);
+  const actualModel = params.model || model;
+  console.log(`[music] provider=${provider}, model=${actualModel}`);
   return gen({ ...params, model: actualModel });
 }

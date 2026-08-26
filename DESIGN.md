@@ -54,7 +54,7 @@ flowchart TD
     direction TB
     A1["ai-chat (Next.js)"]
     A2["chromadb (standalone)<br/>:8000, data/chroma/"]
-    A4["mcp (stdio)<br/>33 tools: skill/exec/search/file/chroma/media/diagram/xiaohongshu/document"]
+    A4["mcp (stdio)<br/>35 tools: skill/exec/search/file/chroma/media/diagram/xiaohongshu/document"]
     A5["searxng (python venv)<br/>:8080, baidu/sogou/bing"]
     A6["search-service (node)<br/>:8090, SearXNG + Firecrawl"]
     A1 -->|"instrumentation spawn"| A2

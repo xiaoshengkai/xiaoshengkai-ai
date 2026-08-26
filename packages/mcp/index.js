@@ -30,6 +30,19 @@ checkPandoc().then((v) => {
 
 const server = new McpServer({ name: "node-mcp", version: "2.0.0" });
 
+// 中心面包屑：每个工具调用记录工具名（模型名由工具内 provider 日志输出）
+const origTool = server.tool.bind(server);
+server.tool = (name, description, schema, handler) =>
+  origTool(name, description, schema, async (args, extra) => {
+    console.log(`[mcp] ▶ 调用工具: ${name}`);
+    const t0 = Date.now();
+    try {
+      return await handler(args, extra);
+    } finally {
+      console.log(`[mcp] ■ 工具完成: ${name} 耗时 ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    }
+  });
+
 const modules = [
   { name: "skill", register: registerSkill },
   { name: "exec", register: registerExec },

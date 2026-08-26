@@ -20,7 +20,7 @@ const MODEL_LABELS: Record<string, string> = {
   image: "图片",
   embedding: "向量",
   tts: "TTS",
-  bgm: "BGM",
+  music: "音乐",
 };
 
 const MODEL_TYPE_COLORS: Record<string, string> = {
@@ -29,7 +29,7 @@ const MODEL_TYPE_COLORS: Record<string, string> = {
   image: "bg-lime-soft text-foreground border-lime",
   embedding: "bg-purple-soft text-foreground border-purple",
   tts: "bg-orange-soft text-foreground border-orange",
-  bgm: "bg-pink-soft text-foreground border-pink",
+  music: "bg-pink-soft text-foreground border-pink",
 };
 
 function getModelLabel(key: string) {

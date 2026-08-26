@@ -170,34 +170,3 @@ export async function generateTTS({ text, voiceId, model = "speech-2.8-hd", outp
   }
   throw new Error("TTS 任务超时");
 }
-
-// ─── BGM 音乐生成 ──────────────────────────────────────────────────────
-
-export async function generateBGM({ prompt, model = "music-2.6", outputPath }) {
-  const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
-  if (!apiKey) throw new Error("未配置 MINIMAX_API_KEY");
-
-  const baseURL = getBaseUrl("minimax", "MINIMAX_BASE_URL", "https://api.minimaxi.com/v1");
-
-  const res = await fetch(`${baseURL}/music_generation`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      prompt: prompt || "轻快电子",
-      is_instrumental: true,
-      output_format: "url",
-      audio_setting: { sample_rate: 32000, bitrate: 128000, format: "mp3", channel: 2 },
-    }),
-  });
-  const result = await res.json();
-  if (result.base_resp?.status_code !== 0) {
-    throw new Error(`BGM 生成失败: ${result.base_resp?.status_msg}`);
-  }
-  const downloadUrl = result.data?.audio;
-  if (!downloadUrl) throw new Error("BGM 下载链接获取失败");
-  const audioRes = await fetch(downloadUrl);
-  const buffer = Buffer.from(await audioRes.arrayBuffer());
-  fs.writeFileSync(outputPath, buffer);
-  return { path: outputPath };
-}

@@ -8,7 +8,7 @@ export interface ProviderEntry {
     image?: string;
     embedding?: string;
     tts?: string;
-    bgm?: string;
+    music?: string;
   };
 }
 
@@ -19,7 +19,7 @@ export interface SelectionEntry {
   flashModel?: string;
 }
 
-export type Module = 'chat' | 'media' | 'vector' | 'workflow' | 'preprocess' | 'tts' | 'bgm';
+export type Module = 'chat' | 'media' | 'vector' | 'workflow' | 'preprocess' | 'tts' | 'music' | 'vision';
 
 export type Providers = Record<string, ProviderEntry>;
 export type Selection = Record<Module, SelectionEntry>;

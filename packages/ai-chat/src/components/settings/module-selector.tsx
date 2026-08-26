@@ -22,6 +22,15 @@ const MODULE_OPTIONS: Record<string, { label: string; icon: string; providers: {
       { id: "qwen", label: "Qwen-Image-3.0-Pro", model: "qwen-image-3.0-pro" },
     ],
   },
+  vision: {
+    label: "视觉评估",
+    icon: "👁️",
+    providers: [
+      { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3" },
+      { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max" },
+      { id: "qwen", label: "Qwen3-VL-Flash", model: "qwen3-vl-flash" },
+    ],
+  },
   vector: {
     label: "向量模型",
     icon: "📊",
@@ -46,11 +55,11 @@ const MODULE_OPTIONS: Record<string, { label: string; icon: string; providers: {
       { id: "minimax", label: "MiniMax speech-2.8-hd", model: "speech-2.8-hd" },
     ],
   },
-  bgm: {
-    label: "BGM 音乐生成",
+  music: {
+    label: "音乐生成",
     icon: "🎵",
     providers: [
-      { id: "minimax", label: "MiniMax music-2.6", model: "music-2.6" },
+      { id: "qwen", label: "Fun-Music V1", model: "fun-music-v1" },
     ],
   },
 };

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { getApiKey, getBaseUrl, getProviderModel } from "../config.js";
 
 export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object', images = [] }) {
@@ -128,4 +129,58 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model = "qwen
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// ─── 音乐生成（Fun-Music，DashScope 原生接口，同步）───────────────────────
+
+async function callMusicApi({ model, prompt, lyrics, gender, isInstrumental }) {
+  const apiKey = getApiKey("qwen", "QWEN_API_KEY");
+  if (!apiKey) throw new Error("未配置 QWEN_API_KEY");
+  const baseURL = getBaseUrl("qwen", "QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1");
+  const url = `${baseURL.replace(/\/compatible-mode\/v1\/?$/, "")}/api/v1/services/audio/music/generation`;
+
+  const input = {};
+  if (isInstrumental) {
+    input.is_instrumental = true;
+    if (prompt) input.prompt = prompt;
+  } else {
+    if (lyrics) input.lyrics = lyrics;
+    if (prompt) input.prompt = prompt;
+    if (gender) input.gender = gender;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 180000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, input }),
+    });
+    const data = await res.json();
+    const audioUrl = data.output?.audio?.url;
+    if (!audioUrl) throw new Error(data.message || data.code || `Qwen 音乐生成失败 (${res.status})`);
+    return audioUrl;
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("音乐生成超时（180s）");
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// 纯背景音乐（工作流用）：下载落盘
+export async function generateBGM({ prompt, model = "fun-music-v1", outputPath }) {
+  const audioUrl = await callMusicApi({ model, prompt: prompt || "轻快电子", isInstrumental: true });
+  const audioRes = await fetch(audioUrl, { signal: AbortSignal.timeout(120000) });
+  const buffer = Buffer.from(await audioRes.arrayBuffer());
+  fs.writeFileSync(outputPath, buffer);
+  return { path: outputPath };
+}
+
+// 整首歌（MCP 工具用）：返回音频 URL（24h 有效）
+export async function generateMusic({ prompt, lyrics, gender, isInstrumental = false, model = "fun-music-v1" }) {
+  const audioUrl = await callMusicApi({ model, prompt, lyrics, gender, isInstrumental });
+  return { url: audioUrl };
 }

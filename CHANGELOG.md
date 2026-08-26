@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.11.6 (2026-08-26) — 视觉评估独立模块 + 音乐生成迁移 qwen + MCP 工具面包屑
+
+### 变更
+- **视觉评估独立模块**：新增 `vision` selection 模块（面板「👁️ 视觉评估」），可选 MiniMax-M3 / Qwen3.8-Max / Qwen3-VL-Flash；`getMultimodalProvider()` 改读 `selection.vision`（原硬编码 `MULTIMODAL_MODELS` 已删）
+- **generateDiagram 修复**：`generateCode` 加 `format:""`（原默认 `json_object`，DeepSeek 要求 prompt 含 "json" 导致 400）；视觉评估不再硬回退 MiniMax（原 workflow=deepseek 时回退 minimax 触发 429）
+- **音乐生成迁移**：`bgm` 模块改名 `music`（面板「🎵 音乐生成」），移除 minimax（已不支持），仅留 qwen `fun-music-v1`；新增 `generateMusic` / `checkMusicProgress` 两个 MCP 工具（整首歌：prompt/lyrics/gender/is_instrumental，返回 24h 有效 URL）；media 工具 3 → 5，工具总数 33 → 35
+- **MCP 工具面包屑日志**：`mcp/index.js` 包一层 `server.tool`，每次调用记 `▶ 调用工具: <name>` / `■ 工具完成: <name> 耗时 Xs`（模型名复用工具内 provider 日志）
+- **设置页网格**：模块模型选择最多 4 列（`lg:grid-cols-3` → `lg:grid-cols-4`）
+
+### 踩坑
+- fun-music 走 DashScope 原生端点（`/api/v1/services/audio/music/generation`），非 compatible-mode，需 `baseURL.replace(/\/compatible-mode\/v1\/?$/,"")` 变换（同 qwen generateImage）
+- qwen3-vl-flash 默认关思考，`enable_thinking:false` 是 no-op；qwen3.8-max 默认开思考，false 恰好关掉——故 qwen.js 写死的 `enable_thinking:false` 无需按 model 条件化
+- 工作流模板 `bgm`（bgm_prompt/bgm.mp3/BGM 步骤/engine.js bgm_file）是工作流自有概念，与 selection 模块 key 解耦；迁移只改 selection key，工作流 `generateBGM` 函数名保留
+
+### 验证
+- `npm run typecheck` + `npm run test`（shared 18 / mm 18 / search 5 全绿）
+- `node --check` 各改动 js 通过
+
 ## v0.11.5 (2026-08-25) — 定时任务目录收拢 + 日志体系收敛 + searxng 噪音治理
 
 ### 变更

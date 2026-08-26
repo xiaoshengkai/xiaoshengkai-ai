@@ -13,7 +13,7 @@ const DEFAULT_PROVIDERS: Providers = {
     enabled: true,
     baseURL: env.MINIMAX_BASE_URL,
     apiKey: env.MINIMAX_API_KEY,
-    models: { chat: "MiniMax-M3", text: "MiniMax-M3", image: "image-01", tts: "speech-2.8-hd", bgm: "music-2.6" },
+    models: { chat: "MiniMax-M3", text: "MiniMax-M3", image: "image-01", tts: "speech-2.8-hd" },
   },
   glm: {
     enabled: true,
@@ -25,7 +25,7 @@ const DEFAULT_PROVIDERS: Providers = {
     enabled: true,
     baseURL: env.QWEN_BASE_URL,
     apiKey: env.QWEN_API_KEY,
-    models: { chat: "qwen3.8-max", image: "qwen-image-3.0-pro" },
+    models: { chat: "qwen3.8-max", image: "qwen-image-3.0-pro", music: "fun-music-v1" },
   },
 };
 
@@ -36,7 +36,8 @@ const DEFAULT_SELECTION: Selection = {
   workflow: { provider: "deepseek", model: "deepseek-v4-pro", flashModel: "deepseek-v4-flash" },
   preprocess: { provider: "minimax", model: "MiniMax-M3" },
   tts: { provider: "minimax", model: "speech-2.8-hd" },
-  bgm: { provider: "minimax", model: "music-2.6" },
+  music: { provider: "qwen", model: "fun-music-v1" },
+  vision: { provider: "minimax", model: "MiniMax-M3" },
 };
 
 export function initSettings() {
@@ -58,11 +59,13 @@ export function initSettings() {
   if (!sel.chat) {
     writeSelection({ ...DEFAULT_SELECTION, ...sel });
   }
-  // ponytail: 旧 selection 缺 tts/bgm/preprocess, 补默认值
+  // ponytail: 旧 selection 缺 tts/music/preprocess, 补默认值
   if (sel.chat) {
     if (!sel.tts) sel.tts = { provider: "minimax", model: "speech-2.8-hd" };
-    if (!sel.bgm) sel.bgm = { provider: "minimax", model: "music-2.6" };
+    if (!sel.music) sel.music = { provider: "qwen", model: "fun-music-v1" };
+    delete (sel as Record<string, unknown>).bgm;
     if (!sel.preprocess) sel.preprocess = { provider: "minimax", model: "MiniMax-M3" };
+    if (!sel.vision) sel.vision = { provider: "minimax", model: "MiniMax-M3" };
     if (!sel.workflow) sel.workflow = DEFAULT_SELECTION.workflow;
     writeSelection(sel);
   }

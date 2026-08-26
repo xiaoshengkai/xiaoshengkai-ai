@@ -183,6 +183,7 @@ async function generateCode(prompt, opts) {
   const { text: content } = await callLLM({
     system: systemPrompt,
     user: prompt,
+    format: "",
   });
 
   if (!content) throw new Error("DeepSeek 返回空内容");

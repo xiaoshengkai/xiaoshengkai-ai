@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.11.7 (2026-08-27) — qwen3.8-flash 接入 + 视觉/preprocess 迁 qwen + 模型可用性打标
+
+### 变更
+- **qwen3.8-flash 接入**：聊天 / MCP工作流 / 视觉评估三处面板加 `Qwen3.8-Flash`；`multimodal-config` 的 `imageModels` 加 `qwen3.8-flash`（支持图片直传）；`cost.ts` 补价（输入 ¥1/M、输出 ¥3/M）
+- **视觉评估迁 qwen**：修复 404（`qwen3-vl-flash` 不在 token-plan 模型列表）——vision 默认改 `qwen3.8-max`，面板删除/标注该模型
+- **preprocess 迁 qwen**：修复 429（minimax 配额耗尽）——preprocess 默认改 `qwen3.8-max`，加迁移 `minimax → qwen3.8-max`；`preprocess-fetch.ts` body 按 provider 分支（minimax 用 `reasoning_split`，qwen 用 `enable_thinking`，参数不通用）
+- **模型可用性枚举**：`Availability = "api" | "plan" | "both"`，面板按类型打标「仅 API 支持」/「仅 Coding Plan 支持」；`qwen3-vl-flash`、`fun-music-v1` 标 `api`（token-plan 无此模型），其余 `both`。不禁用、可点（便于临时换 key 后仍可选用）
+- **preprocess 提示词通用化**：从「1-2 句话总结」改为「忠实提取器」（转写全部文字 + 表格/图表结构带数据 + 视觉信息 + 不编造），修复传图只拿到结构、解析不出细节的问题
+
+### 踩坑
+- token-plan 模型列表 ≠ dashscope 官方：`qwen3-vl-flash`、`fun-music-v1` 在官方有、token-plan 无（404 model_not_found）；可用视觉模型只有 `qwen3.8-max/flash` 等千问家族
+- qwen 与 minimax 的 chat 参数不通用：`reasoning_split`（minimax）vs `enable_thinking`（qwen），同 body 会导致 400
+- preprocess 原 prompt「1-2 句话总结」让 qwen3.8-max 只返回表格结构（列名），丢品牌名/数字等细节
+
+### 验证
+- `npm run typecheck` + `npm run test`（shared 18 / mm 18 / search 5 全绿）
+
 ## v0.11.6 (2026-08-26) — 视觉评估独立模块 + 音乐生成迁移 qwen + MCP 工具面包屑
 
 ### 变更

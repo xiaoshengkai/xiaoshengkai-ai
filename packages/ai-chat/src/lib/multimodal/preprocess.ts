@@ -97,7 +97,7 @@ export async function preprocessAttachmentsDescription(
   // ponytail: 只发媒体、单条 user 消息 — 带历史 assistant 轮会让 preprocess 模型续写对话而非描述图片
   const description = await preprocessChat([{ role: "user", content }], {
     modelName: "",
-    systemPrompt: "请客观描述图片和视频的核心内容，不要做多余事情。用 1-2 句话总结。",
+    systemPrompt: "你是图片与视频内容的忠实提取器。请尽可能完整地还原画面信息：\n1. 转写所有可见文字（原样、不缩写、不省略）；\n2. 若含表格、图表、列表，逐项给出结构、行列标题及其中所有数字、单位、数据；\n3. 描述主体对象、场景、布局、配色等视觉信息；\n4. 不要只做概括总结，不要遗漏细节，也不要编造图中不存在的内容。",
   });
   console.log(`[preprocess] 描述 len=${description.length}`);
   return description;

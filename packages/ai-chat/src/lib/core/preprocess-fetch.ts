@@ -28,15 +28,17 @@ export async function preprocessChat(
   opts: Omit<CallOptions, 'signal'> & { signal?: AbortSignal }
 ): Promise<string> {
   const cfg = getProviderConfig("preprocess");
-  const body = {
+  const body: Record<string, unknown> = {
     model: opts.modelName || cfg.model,
-    reasoning_split: true,
     messages: [
       { role: 'system', content: opts.systemPrompt },
       ...messages,
     ],
     stream: false,
   };
+  // minimax 用 reasoning_split，qwen 用 enable_thinking（参数不通用，按 provider 分支）
+  if (cfg.provider === "minimax") body.reasoning_split = true;
+  else body.enable_thinking = false;
 
   const response = await fetch(`${cfg.baseURL}/chat/completions`, {
     method: 'POST',

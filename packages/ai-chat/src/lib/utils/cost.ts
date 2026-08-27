@@ -5,6 +5,7 @@ const PRICING: Record<string, { input: number; output: number; cny?: boolean }> 
   "deepseek-v4-flash": { input: 0.27, output: 1.10 },
   "MiniMax-M3":       { input: 0.55, output: 2.19 },
   "qwen3.8-max":      { input: 12, output: 36, cny: true },
+  "qwen3.8-flash":    { input: 1, output: 3, cny: true },
 };
 
 const USD_TO_CNY = 7.2;

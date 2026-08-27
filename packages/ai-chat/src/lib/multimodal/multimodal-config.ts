@@ -38,7 +38,7 @@ export const DEFAULT_MULTIMODAL_REGISTRY: Record<string, ProviderCapabilities> =
   },
   qwen: {
     provider: 'qwen',
-    imageModels: ['qwen3.8-max', 'qwen-vl-max'],
+    imageModels: ['qwen3.8-max', 'qwen3.8-flash', 'qwen-vl-max'],
     videoModels: [],  // @ai-sdk/openai-compatible 暂不支持 video file part
     videoFps: 1,
     description: '通义千问 3.8-Max 多模态（图片直传，视频 preprocess）',

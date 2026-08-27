@@ -3,63 +3,76 @@
 import { BASE } from "@/lib/utils/utils";
 import { useCallback } from "react";
 
-const MODULE_OPTIONS: Record<string, { label: string; icon: string; providers: { id: string; label: string; model?: string; multimodal?: boolean }[] }> = {
+type Availability = "api" | "plan" | "both";
+
+interface ModelOption {
+  id: string;
+  label: string;
+  model?: string;
+  multimodal?: boolean;
+  availability: Availability;
+}
+
+const MODULE_OPTIONS: Record<string, { label: string; icon: string; providers: ModelOption[] }> = {
   chat: {
     label: "聊天模型",
     icon: "💬",
     providers: [
-      { id: "deepseek", label: "DeepSeek (自动路由)", model: "deepseek-v4-pro", multimodal: false },
-      { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3", multimodal: true },
-      { id: "glm", label: "GLM-5.2", model: "glm-5.2", multimodal: false },
-      { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max", multimodal: true },
+      { id: "deepseek", label: "DeepSeek (自动路由)", model: "deepseek-v4-pro", multimodal: false, availability: "both" },
+      { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3", multimodal: true, availability: "both" },
+      { id: "glm", label: "GLM-5.2", model: "glm-5.2", multimodal: false, availability: "both" },
+      { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max", multimodal: true, availability: "both" },
+      { id: "qwen", label: "Qwen3.8-Flash", model: "qwen3.8-flash", multimodal: true, availability: "both" },
     ],
   },
   media: {
     label: "图片生成",
     icon: "🖼️",
     providers: [
-      { id: "minimax", label: "MiniMax image-01", model: "image-01" },
-      { id: "qwen", label: "Qwen-Image-3.0-Pro", model: "qwen-image-3.0-pro" },
+      { id: "minimax", label: "MiniMax image-01", model: "image-01", availability: "both" },
+      { id: "qwen", label: "Qwen-Image-3.0-Pro", model: "qwen-image-3.0-pro", availability: "both" },
     ],
   },
   vision: {
     label: "视觉评估",
     icon: "👁️",
     providers: [
-      { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3" },
-      { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max" },
-      { id: "qwen", label: "Qwen3-VL-Flash", model: "qwen3-vl-flash" },
+      { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3", availability: "both" },
+      { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max", availability: "both" },
+      { id: "qwen", label: "Qwen3.8-Flash", model: "qwen3.8-flash", availability: "both" },
+      { id: "qwen", label: "Qwen3-VL-Flash", model: "qwen3-vl-flash", availability: "api" },
     ],
   },
   vector: {
     label: "向量模型",
     icon: "📊",
     providers: [
-      { id: "glm", label: "智谱 embedding-3", model: "embedding-3" },
+      { id: "glm", label: "智谱 embedding-3", model: "embedding-3", availability: "both" },
     ],
   },
   workflow: {
     label: "MCP/工作流/定时任务",
     icon: "🔧",
     providers: [
-      { id: "deepseek", label: "DeepSeek Pro (自动路由)", model: "deepseek-v4-pro", multimodal: false },
-      { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3", multimodal: true },
-      { id: "glm", label: "GLM-5.2", model: "glm-5.2", multimodal: false },
-      { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max", multimodal: true },
+      { id: "deepseek", label: "DeepSeek Pro (自动路由)", model: "deepseek-v4-pro", multimodal: false, availability: "both" },
+      { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3", multimodal: true, availability: "both" },
+      { id: "glm", label: "GLM-5.2", model: "glm-5.2", multimodal: false, availability: "both" },
+      { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max", multimodal: true, availability: "both" },
+      { id: "qwen", label: "Qwen3.8-Flash", model: "qwen3.8-flash", multimodal: true, availability: "both" },
     ],
   },
   tts: {
     label: "TTS 语音合成",
     icon: "🎙️",
     providers: [
-      { id: "minimax", label: "MiniMax speech-2.8-hd", model: "speech-2.8-hd" },
+      { id: "minimax", label: "MiniMax speech-2.8-hd", model: "speech-2.8-hd", availability: "both" },
     ],
   },
   music: {
     label: "音乐生成",
     icon: "🎵",
     providers: [
-      { id: "qwen", label: "Fun-Music V1", model: "fun-music-v1" },
+      { id: "qwen", label: "Fun-Music V1", model: "fun-music-v1", availability: "api" },
     ],
   },
 };
@@ -102,6 +115,16 @@ export default function ModuleSelector({ module, current, onChange, disabled }: 
               {opt.multimodal && (
                 <span className="shrink-0 self-start px-1.5 py-0.5 text-[10px] bg-purple-soft text-foreground border-2 border-purple font-bold">
                   多模态
+                </span>
+              )}
+              {opt.availability === "api" && (
+                <span className="shrink-0 self-start px-1.5 py-0.5 text-[10px] bg-orange-soft text-foreground border-2 border-orange font-bold">
+                  仅 API 支持
+                </span>
+              )}
+              {opt.availability === "plan" && (
+                <span className="shrink-0 self-start px-1.5 py-0.5 text-[10px] bg-blue-soft text-foreground border-2 border-blue font-bold">
+                  仅 Coding Plan 支持
                 </span>
               )}
             </button>

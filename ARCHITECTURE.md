@@ -57,7 +57,7 @@ ai-engineer-journey/
     │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
     │       ├── config.js       # providers.json / selection.json fresh-read（真源，env 兜底）
     │       ├── parse-json.js   # 容错 JSON 解析
-    │       └── providers/      # deepseek.js / glm.js / minimax.js / qwen.js
+    │       └── providers/      # deepseek.js / glm.js / minimax.js / qwen.js / volcengine.js(Seedream 图片)
     ├── ai-chat/                # 业务服务（Next.js，组合根）
     │   ├── src/
     │   │   ├── instrumentation.ts      # 启动时 initSettings + spawn chroma
@@ -70,7 +70,7 @@ ai-engineer-journey/
     │   │   │   ├── mcp-client.ts
     │   │   │   └── utils/       # utils(cn+BASE) / types / cost / env
     │   │   └── app/
-    │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow
+    │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）
     │   │       ├── api/         # chat / memory / settings / conversations ... + workflows、tasks 仅 catch-all 挂载点
     │   │       ├── note/[taskId]/page.tsx
     │   │       ├── preview/[taskId]/route.ts
@@ -85,21 +85,24 @@ ai-engineer-journey/
     ├── tasks/                   # 定时任务（@app/tasks，详见「定时任务系统」）
     └── workflows/               # 工作流引擎（@app/workflows，详见「工作流系统」）
         ├── package.json
-        ├── actions.json         # 引擎级 HTTP 动作声明（10 个）
+        ├── actions.json         # 引擎级 HTTP 动作声明（18 个：执行 10 + 资产库 8）
         ├── http.js              # 能力 HTTP 入口（合并引擎+模板 actions）
         ├── cli.js               # 命令行入口（子进程组合层）
         ├── engine.js            # 工作流执行引擎（纯步骤编排，无 video 概念）
         ├── lib/
         │   ├── executor.js      # 步骤执行 + 模板加载
         │   ├── state.js         # DATA_DIR / LOG_DIR / readState / writeState / saveVideoVersion（engine 与模板共用）
+        │   ├── assets.js        # 资产库 handler（角色参考图 / 风格，工作流级通用）
         │   ├── skip-when.js     # skipWhen 条件求值（engine 与模板共用）
         │   ├── tweak-auto.js    # tweak 全流程编排（running→tweak→auto→done/failed）
         │   └── step-types/      # ai.js / script.js / tool.js
         └── templates/
             ├── tech-video/      # 科技风短视频（7 步：script/validate/tts-scenes/bgm/sfx-pick/render/concat）
-            └── video-generation/# 视频生成（4 步：script/tts/bgm/render）
-                ├── actions.json # 模板级动作（generate-content/upload/tweak/switch-version）
-                └── lib/         # prompt / generate-content / tweak / switch-version / script-version / tweak-builder / schema / render / tts / bgm / ...
+            ├── video-generation/# 视频生成（4 步：script/tts/bgm/render）
+            │   ├── actions.json # 模板级动作（generate-content/upload/tweak/switch-version）
+            │   └── lib/         # prompt / generate-content / tweak / switch-version / script-version / tweak-builder / schema / render / tts / bgm / ...
+            └── comic-generation/# 漫画生成（2 步：script/generate-pages）
+                └── lib/         # storyboard / generate-pages
 ```
 
 ## 能力注册机制（v0.11.0）
@@ -122,7 +125,7 @@ ai-chat 对 workflows/tasks 只保留 1 个 catch-all 挂载点（`app/api/{work
 
 **动作声明位置**：
 
-- `workflows/actions.json`：引擎级 10 动作（templates / execute / executions / get / delete / file / next / auto / retry / skip）
+- `workflows/actions.json`：引擎级 18 动作（执行 10：templates / execute / executions / get / delete / file / next / auto / retry / skip；资产库 8：characters 列表/生成/保存/删除/文件流 + styles 列表/创建/删除）
 - `templates/<name>/actions.json`：模板特有动作；video-generation 声明 generate-content / upload / tweak / switch-version；http.js 启动时扫描合并，method+path 重复即抛错
 - `tasks/actions.json`：list / run / edit / dashboard（handler 在 `tasks/lib/handlers.js`）
 
@@ -183,13 +186,14 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 ### 执行链路
 
 ```
-/workflow 页面
+/workflow（主页：类型卡片）
+  → /workflow/type/[templateId]（类型页：该类型执行记录 + 直接创建 + comic 专属资产库）
   → POST /api/workflows/execute
   → catch-all 委托 @app/workflows/http → dispatcher 匹配 actions.json
   → spawn node cli.js start '{"template":..,"params":..}'
   → 返回 executionId
   → 逐步 spawn cli.js next（单步执行，每步返回 preview）
-  → 执行状态持久化到 data/workflows/<executionId>/
+  → 执行状态持久化到 data/workflows/tasks/<executionId>/
   → 日志写到 logs/workflows/
 ```
 
@@ -216,6 +220,24 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 - `templates/tech-video/`：科技风短视频（script.json 驱动 + 逐场景 TTS + BGM + SFX + 硬字幕 + SRT）
 - `templates/video-generation/`：视频生成（含微调/版本切换/内容生成等模板级动作）
+- `templates/comic-generation/`：漫画生成（故事→AI 分镜→逐页生成漫画图；角色参考图锁人物一致性 + 风格库锁画风）
+
+### 资产库（工作流级通用）
+
+角色参考图 / 风格是**跨执行复用的持久资产**，独立于单次执行，存放于 `data/workflows/assets/`：
+
+```
+data/workflows/
+  tasks/<executionId>/           # 执行记录（DATA_DIR）
+  assets/
+    characters/<id>.png/.json    # 角色参考图（图片 + 名称/描述/时间）
+    styles/<id>.json             # 风格（名称/描述/时间，纯文本）
+```
+
+- 资产 handler 在 `workflows/lib/assets.js`（custom 原语，被 webpack 打包，`process.cwd()` 定位）
+- 角色参考图是「生成预览 → 人工判断 → 填名保存」两步式；风格手动创建
+- 图片文件经 `GET /assets/characters/*`（stream 原语，`dir` 字段自定义指向 assets/characters）
+- comic 模板用 `characterRef` / `styleId` 参数引用资产；`generate-pages` 读资产文件 + base64 作 `subject_reference`
 
 ## 定时任务系统
 

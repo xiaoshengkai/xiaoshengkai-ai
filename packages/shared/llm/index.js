@@ -6,6 +6,7 @@ import {
 } from "./providers/minimax.js";
 import { callLLM as callGLM } from "./providers/glm.js";
 import { callLLM as callQwen, generateImage as generateQwenImage, generateBGM as generateQwenBGM, generateMusic as generateQwenMusic } from "./providers/qwen.js";
+import { generateImage as generateVolcImage } from "./providers/volcengine.js";
 import { readSelection, assertProviderEnabled } from "./config.js";
 
 // 工作流文字生成 selection（每次 fresh-read，切 provider/model 无需重启）
@@ -62,6 +63,7 @@ function readModuleSelection(module, fallback) {
 const IMAGE_GENERATORS = {
   minimax: generateMiniMaxImage,
   qwen: generateQwenImage,
+  volcengine: generateVolcImage,
 };
 
 export async function generateImage(prompt, opts = {}) {

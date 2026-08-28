@@ -8,5 +8,14 @@
   { "type": "cli", "method": "POST",   "path": "/execution/:id/next",  "command": "next",   "args": { "executionId": "param.id" }, "timeout": 900000 },
   { "type": "cli", "method": "POST",   "path": "/execution/:id/auto",  "command": "auto",   "args": { "executionId": "param.id" }, "detached": true },
   { "type": "cli", "method": "POST",   "path": "/execution/:id/retry", "command": "retry",  "args": { "executionId": "param.id", "stepId": "body.stepId" }, "required": ["stepId"], "timeout": 300000 },
-  { "type": "cli", "method": "POST",   "path": "/execution/:id/skip",  "command": "skip",   "args": { "executionId": "param.id", "stepId": "body.stepId" }, "required": ["stepId"], "timeout": 10000 }
+  { "type": "cli", "method": "POST",   "path": "/execution/:id/skip",  "command": "skip",   "args": { "executionId": "param.id", "stepId": "body.stepId" }, "required": ["stepId"], "timeout": 10000 },
+  { "type": "cli", "method": "POST",   "path": "/execution/:id/tweak", "command": "tweak-auto", "args": { "executionId": "param.id", "feedback": "body.feedback", "images": "body.imagePaths", "pages": "body.pages" }, "required": ["feedback"], "detached": true, "respond": { "ok": true, "status": "running" } },
+  { "type": "custom", "method": "GET",    "path": "/assets/characters",          "handler": "list-characters" },
+  { "type": "custom", "method": "POST",   "path": "/assets/characters/generate", "handler": "generate-character" },
+  { "type": "custom", "method": "POST",   "path": "/assets/characters",          "handler": "save-character" },
+  { "type": "custom", "method": "DELETE", "path": "/assets/characters/:id",      "handler": "delete-character" },
+  { "type": "stream", "method": "GET",    "path": "/assets/characters/*",        "dir": "data/workflows/assets/characters" },
+  { "type": "custom", "method": "GET",    "path": "/assets/styles",              "handler": "list-styles" },
+  { "type": "custom", "method": "POST",   "path": "/assets/styles",              "handler": "create-style" },
+  { "type": "custom", "method": "DELETE", "path": "/assets/styles/:id",          "handler": "delete-style" }
 ]

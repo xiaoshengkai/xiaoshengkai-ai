@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Root, Portal, Backdrop, Popup, Header, Title, Close } from "@/components/ui/drawer";
+import { ImageViewerProvider, useImageViewer } from "@/components/ui/image-viewer";
 
 interface ExecutionStep {
   id: string; name: string; type: string; previewType?: string; previewField?: string;
@@ -71,6 +72,8 @@ export default function ExecutionDetailPage() {
   const [switchingVersion, setSwitchingVersion] = useState<number | null>(null);
   const [scriptJsonTab, setScriptJsonTab] = useState<"script" | "state">("script");
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; tweak?: boolean }[]>([]);
+  const [tweakPages, setTweakPages] = useState<number[]>([]);
 
   const fetchExecution = useCallback(async () => {
     try {
@@ -97,9 +100,29 @@ export default function ExecutionDetailPage() {
   const isTerminalStatus = execution?.status === "completed" || execution?.status === "completed_with_warnings" || execution?.status === "failed";
 
   useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${BASE}/api/workflows/templates`);
+        if (res.ok) setTemplates(((await res.json()).templates || []) as { id: string; tweak?: boolean }[]);
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  const supportsTweak = templates.find(t => t.id === execution?.template)?.tweak === true;
+  const isComic = execution?.template === "comic-generation";
+  const comicPages: { page: number }[] = (() => {
+    try {
+      const g = execution?.steps?.find(s => s.id === "generate-pages");
+      if (!g?.output) return [];
+      const out = typeof g.output === "string" ? JSON.parse(g.output) : g.output;
+      return (out?.pages || []) as { page: number }[];
+    } catch { return []; }
+  })();
+
+  useEffect(() => {
     clientLog(id, "INFO", `useEffect run: executionStatus=${execution?.status}`);
     fetchExecution();
-    if (isTerminalStatus) {
+    if (isTerminalStatus && !retrying) {
       clientLog(id, "INFO", `useEffect skip polling: status=${execution?.status}`);
       return;
     }
@@ -107,15 +130,15 @@ export default function ExecutionDetailPage() {
       clientLog(id, "INFO", `useEffect skip polling: tweakTask running`);
       return;
     }
-    // ponytail: 无 running step 且无阻塞中的 next/auto 请求时不轮询
-    // （auto/next 的 POST 在服务端阻塞执行，期间客户端看不到 running step，靠 loading 态维持轮询）
-    if (!anyStepRunning && !autoLoading && !nextLoading) {
+    // ponytail: 无 running step 且无阻塞中的 next/auto/retry 请求时不轮询
+    // （next/auto/retry 的 POST 在服务端阻塞执行，期间客户端看不到 running step，靠 loading 态维持轮询）
+    if (!anyStepRunning && !autoLoading && !nextLoading && !retrying) {
       return;
     }
     clientLog(id, "INFO", `useEffect start polling: status=${execution?.status}`);
     const timer = setInterval(fetchExecution, 2000);
     return () => clearInterval(timer);
-  }, [fetchExecution, execution?.status, execution?.tweakTask?.status, anyStepRunning, isTerminalStatus, autoLoading, nextLoading, id]);
+  }, [fetchExecution, execution?.status, execution?.tweakTask?.status, anyStepRunning, isTerminalStatus, autoLoading, nextLoading, retrying, id]);
 
   useEffect(() => {
     if (isTerminalStatus) {
@@ -123,21 +146,25 @@ export default function ExecutionDetailPage() {
     }
   }, [isTerminalStatus]);
 
-  // 当 tweakTask 状态变化时轮询
+  // 当 tweakTask 状态变化时轮询（仅支持 tweak 的模板）
   useEffect(() => {
+    if (!supportsTweak) return;
     if (execution?.tweakTask?.status === "running") {
       const timer = setInterval(fetchExecution, 2000);
       return () => clearInterval(timer);
     }
-  }, [execution?.tweakTask?.status, fetchExecution]);
+  }, [supportsTweak, execution?.tweakTask?.status, fetchExecution]);
 
   useEffect(() => {
+    if (!supportsTweak) return;
     if (execution?.tweakTask?.status === "done") {
-      toast(`🟢 视频生成完成`);
+      toast(`🟢 微调完成`);
+      fetchExecution();
     } else if (execution?.tweakTask?.status === "failed") {
-      toast(`🔴 视频生成失败: ${execution.tweakTask.error}`);
+      toast(`🔴 微调失败: ${execution.tweakTask.error}`);
+      fetchExecution();
     }
-  }, [execution?.tweakTask?.status]);
+  }, [supportsTweak, execution?.tweakTask?.status, fetchExecution]);
 
   const handleNext = useCallback(async () => {
     setNextLoading(true);
@@ -257,6 +284,7 @@ export default function ExecutionDetailPage() {
 
   const handleTweak = useCallback(async () => {
     if (!tweakFeedback.trim()) { toast("🔴 请输入反馈"); return; }
+    if (isComic && tweakPages.length !== 1) { toast("🔴 请选择要重生成的一页"); return; }
     const uploading = tweakImages.filter(i => i.isUploading);
     if (uploading.length > 0) { toast("🔴 图片上传中，请稍候"); return; }
     clientLog(id, "INFO", `handleTweak start: feedback="${tweakFeedback}" images=${tweakImages.length}`);
@@ -269,7 +297,7 @@ export default function ExecutionDetailPage() {
       const imagePaths = tweakImages.map(i => i.path).filter(Boolean);
       const res = await fetch(`${BASE}/api/workflows/execution/${id}/tweak`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedback: tweakFeedback, imagePaths }),
+        body: JSON.stringify({ feedback: tweakFeedback, imagePaths, pages: isComic ? tweakPages : undefined }),
       });
       const data = await res.json();
       clientLog(id, "INFO", `handleTweak response: ok=${data.ok} status=${data.status}`);
@@ -281,7 +309,7 @@ export default function ExecutionDetailPage() {
       }
     } catch { toast("🔴 请求失败"); }
     setTweaking(false);
-  }, [id, tweakFeedback, tweakImages, fetchExecution]);
+  }, [id, tweakFeedback, tweakImages, fetchExecution, isComic, tweakPages]);
 
   const handleSwitchVersion = useCallback(async (version: number) => {
     setSwitchingVersion(version);
@@ -338,9 +366,10 @@ export default function ExecutionDetailPage() {
   }
 
   return (
+    <ImageViewerProvider>
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-4 py-3 border-b-[3px] border-border shrink-0">
-        <a href="/workflow" className="text-muted-foreground/70 hover:text-muted-foreground"><ArrowLeft className="w-4 h-4" /></a>
+        <a href={`/workflow/type/${execution.template}`} className="text-muted-foreground/70 hover:text-muted-foreground"><ArrowLeft className="w-4 h-4" /></a>
         <div className="flex items-center gap-2 flex-1">
           <h2 className="text-sm font-bold text-foreground">{execution.template}</h2>
           {isV2 && sceneList.length > 0 && (
@@ -353,8 +382,8 @@ export default function ExecutionDetailPage() {
             📋 脚本
           </button>
         )}
-        {isDone && (
-          <button onClick={() => setShowTweak(true)}
+        {isDone && supportsTweak && (
+          <button onClick={() => { setShowTweak(true); if (isComic) setTweakPages([]); }}
             disabled={isTweakRunning}
             className={`brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold ${isTweakRunning ? "bg-muted text-muted-foreground" : "bg-purple text-white"}`}>
             <Edit3 className="w-3 h-3" /> 微调
@@ -453,7 +482,7 @@ export default function ExecutionDetailPage() {
             }
 
             // 兜底：PreviewPanel
-            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} onRetry={() => handleRetry(activeStep.id)} retrying={retrying === activeStep.id} />;
+            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} imageVersion={`${execution.tweakCount ?? 0}-${execution.completedAt ?? ""}`} onRetry={() => handleRetry(activeStep.id)} retrying={retrying === activeStep.id} />;
           })()}
           {activeStep.id === "concat" && (
             <DownloadPanel executionId={execution.executionId} />
@@ -490,10 +519,24 @@ export default function ExecutionDetailPage() {
         >
           <AlertDialogHeader>
             <AlertDialogTitle className="font-extrabold text-lg text-foreground">
-              微调脚本
+              {isComic ? "微调漫画" : "微调脚本"}
             </AlertDialogTitle>
           </AlertDialogHeader>
           <div className="py-2 space-y-3">
+            {isComic && comicPages.length > 0 && (
+              <div>
+                <label className="text-xs font-bold text-foreground block mb-1.5">重生成哪一页？（单选）</label>
+                <div className="flex gap-2 flex-wrap">
+                  {comicPages.map(p => (
+                    <label key={p.page} className="inline-flex items-center gap-1 text-xs border-2 border-border px-2 py-1 cursor-pointer">
+                      <input type="radio" name="tweak-page" checked={tweakPages.includes(p.page)}
+                        onChange={() => setTweakPages([p.page])} />
+                      第 {p.page} 页
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <label className="text-xs font-bold text-foreground block mb-1.5">
                 你想调整哪里？
@@ -616,6 +659,7 @@ export default function ExecutionDetailPage() {
         </Root>
       )}
     </div>
+    </ImageViewerProvider>
   );
 
   function renderV2Steps() {
@@ -818,7 +862,7 @@ function DownloadPanel({ executionId }: { executionId: string }) {
   );
 }
 
-function PreviewPanel({ step, executionId, currentScriptVersion, onRetry, retrying }: { step: ExecutionStep; executionId: string; currentScriptVersion?: number; onRetry: () => void; retrying: boolean }) {
+function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, onRetry, retrying }: { step: ExecutionStep; executionId: string; currentScriptVersion?: number; imageVersion?: string; onRetry: () => void; retrying: boolean }) {
   const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
   const version = currentScriptVersion ?? 0;
 
@@ -949,7 +993,11 @@ function PreviewPanel({ step, executionId, currentScriptVersion, onRetry, retryi
           <h3 className="text-xs font-bold text-foreground">{step.name}</h3>
           <span className="text-xs text-foreground px-1.5 py-0.5">✅ 完成</span>
         </div>
-        <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}?v=${version}` : undefined} executionId={executionId} onRetry={onRetry} retrying={retrying} />
+        {pt === "images" ? (
+          <ImagesGallery output={step.output} executionId={executionId} v={imageVersion} />
+        ) : (
+          <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}?v=${version}` : undefined} executionId={executionId} onRetry={onRetry} retrying={retrying} />
+        )}
       </div>
     </div>
   );
@@ -1010,6 +1058,54 @@ function LoadingState({ text }: { text: string }) {
         <div className="h-full w-1/2 bg-primary rounded-full animate-[slide_1.5s_ease-in-out_infinite]" />
       </div>
       <style>{`@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`}</style>
+    </div>
+  );
+}
+
+function ImagesGallery({ output, executionId, v }: { output: string | null; executionId: string; v?: string }) {
+  const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
+  const { register, open } = useImageViewer();
+  const [exporting, setExporting] = useState(false);
+  let pages: { page: number; file: string; dialogue?: string }[] = [];
+  try {
+    const out = typeof output === "string" ? JSON.parse(output) : output;
+    if (out && Array.isArray(out.pages)) pages = out.pages;
+  } catch { /* ignore */ }
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${executionId}/export`, { method: "POST" });
+      const data = await res.json();
+      if (data.ok) toast(`🟢 已导出到 ${data.exportDir}`);
+      else toast(`🔴 ${data.error || "导出失败"}`);
+    } catch { toast("🔴 请求失败"); }
+    setExporting(false);
+  }, [executionId]);
+
+  if (pages.length === 0) return <p className="text-xs text-muted-foreground/70">暂无图片</p>;
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="flex flex-col w-full max-w-md">
+        {pages.map(p => {
+          const src = `${fileBase}/${p.file}${v ? `?v=${v}` : ""}`;
+          const idx = register(src);
+          return (
+            <div key={p.page} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt={`第 ${p.page} 页`} loading="lazy"
+                className="w-full block cursor-zoom-in"
+                onClick={() => open(idx)} />
+              <span className="absolute top-1 left-1 px-1.5 py-0.5 text-xs font-bold bg-black/60 text-white">{p.page}</span>
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={handleExport} disabled={exporting}
+        className={`brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold mt-4 ${exporting ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground"}`}>
+        <Download className="w-3 h-3" />{exporting ? "导出中..." : "导出到 Downloads"}
+      </button>
     </div>
   );
 }

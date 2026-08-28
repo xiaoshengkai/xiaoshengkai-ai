@@ -23,5 +23,9 @@ export const env = {
   QWEN_BASE_URL: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
   QWEN_API_KEY: process.env.QWEN_API_KEY || '',
 
+  VOLCENGINE_BASE_URL: process.env.VOLCENGINE_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3',
+  VOLCENGINE_API_KEY: process.env.VOLCENGINE_API_KEY || '',
+  VOLCENGINE_IMAGE_MODEL: process.env.VOLCENGINE_IMAGE_MODEL || 'doubao-seedream-5-0-lite-260128',
+
   CHROMA_URL: `http://${NET_CONFIG.hosts.local}:${NET_CONFIG.ports.chroma}`,
 } as const;

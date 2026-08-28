@@ -31,6 +31,7 @@ const MODULE_OPTIONS: Record<string, { label: string; icon: string; providers: M
     providers: [
       { id: "minimax", label: "MiniMax image-01", model: "image-01", availability: "both" },
       { id: "qwen", label: "Qwen-Image-3.0-Pro", model: "qwen-image-3.0-pro", availability: "both" },
+      { id: "volcengine", label: "Doubao Seedream 5.0 Lite", model: "doubao-seedream-5-0-lite-260128", availability: "both" },
     ],
   },
   vision: {

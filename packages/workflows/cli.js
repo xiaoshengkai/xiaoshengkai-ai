@@ -66,14 +66,14 @@ async function main() {
         .filter(f => fs.statSync(path.join(TEMPLATES_DIR, f)).isDirectory())
         .map(f => {
           const t = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f, "template.json"), "utf-8"));
-          return { id: f, ...t };
+          return { id: f, ...t, tweak: fs.existsSync(path.join(TEMPLATES_DIR, f, "lib", "tweak.js")) };
         });
       process.stdout.write(JSON.stringify({ templates }));
     }
   } else if (command === "tweak-auto") {
-    const { executionId, feedback, images } = JSON.parse(args[0]);
+    const { executionId, feedback, images, pages } = JSON.parse(args[0]);
     const { tweakAuto } = await import("./lib/tweak-auto.js");
-    const result = await tweakAuto(executionId, feedback, images);
+    const result = await tweakAuto(executionId, feedback, images, pages);
     process.stdout.write(JSON.stringify(result || { ok: true }));
   } else if (command === "switch-version") {
     const { executionId, version } = JSON.parse(args[0]);

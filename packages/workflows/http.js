@@ -7,6 +7,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { createCapabilityHandler, loadActions } from "@app/shared/capability.js";
 import { handle as generateContent } from "./templates/video-generation/lib/generate-content.js";
+import { handle as comicExport } from "./templates/comic-generation/lib/export.js";
+import { handle as comicGenerateContent } from "./templates/comic-generation/lib/generate-content.js";
+import {
+  listCharacterHandler,
+  generateCharacterHandler,
+  saveCharacterHandler,
+  deleteCharacterHandler,
+  listStyleHandler,
+  createStyleHandler,
+  deleteStyleHandler,
+} from "./lib/assets.js";
 
 // ponytail: 本文件被 Next webpack 打包，import.meta.url 不可靠；
 // 沿用仓库约定 process.cwd() = packages/ai-chat（dev/prod 均如此）
@@ -16,6 +27,15 @@ const CLI_PATH = path.join(ROOT, "cli.js");
 
 const CUSTOM_HANDLERS = {
   "generate-content": generateContent,
+  "comic-export": comicExport,
+  "comic-generate-content": comicGenerateContent,
+  "list-characters": listCharacterHandler,
+  "generate-character": generateCharacterHandler,
+  "save-character": saveCharacterHandler,
+  "delete-character": deleteCharacterHandler,
+  "list-styles": listStyleHandler,
+  "create-style": createStyleHandler,
+  "delete-style": deleteStyleHandler,
 };
 
 function collectActions() {
@@ -32,7 +52,7 @@ function collectActions() {
     const key = `${a.method} ${a.path}`;
     if (seen.has(key)) throw new Error(`duplicate workflow action: ${key}`);
     seen.add(key);
-    if (a.type === "stream") return { ...a, dir: path.join(PROJECT_ROOT, "data", "workflows") };
+    if (a.type === "stream") return { ...a, dir: path.join(PROJECT_ROOT, a.dir || "data/workflows/tasks") };
     if (a.type === "upload") return { ...a, destDir: path.join(PROJECT_ROOT, a.destDir) };
     if (a.type === "custom") {
       const handler = CUSTOM_HANDLERS[a.handler];

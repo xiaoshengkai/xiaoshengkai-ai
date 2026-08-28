@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.11.9 (2026-08-28) — 接入火山引擎 Seedream 图片模型 + 漫画微调/分镜优化
+
+### 变更
+- **火山引擎图片模型**：新增 `shared/llm/providers/volcengine.js`（Doubao Seedream 5.0 lite），接入 `IMAGE_GENERATORS`；密钥/baseURL/model 放 `.env`（VOLCENGINE_*），`env.ts`+`init.ts` 注册，启动时自动种子进 `data/settings/providers.json`；设置页「图片生成」加选项、配置卡自动出现
+- **漫画微调复用通用 loading**：`comic lib/tweak.js` 驱动 generate-pages 步 running/completed，前端现有 step-running loading 自动显示；微调弹窗页选择默认不全选 + 空选拦截
+- **分镜优化**：storyboard 提示词四要素（背景/人物/构图/说话人）+ 单镜头禁分格 + 对白≤3句硬校验；generate-pages 删除"已存在跳过"（重试=重生成）
+- **重试轮询修复**：execution 页轮询条件加 `retrying`，重试后自动显示 loading 无需手动刷新
+- **joke-comic SKILL**：新增内涵段子漫画创作技能
+- **dialogue 改数组**：分镜 `dialogue` 为字符串数组（每元素「名字: 台词」），计数/生图/微调归一化兼容旧 string
+- **画廊条漫+序号**：`ImagesGallery` 改无间隔连续竖排（条漫），每页左上角半透明序号徽章；去对白文本块
+- **微调后图片自动刷新**：画廊图片 URL 加 `?v=<tweakCount>-<completedAt>` 缓存破坏 + 微调 done/failed 时 `fetchExecution()`，无需手动刷新
+- **微调只提交本次反馈**：prompt 反馈块仅含本次 `feedback`，`tweakHistory` 仍累积但仅记录/日志不喂 AI（避免历史指令干扰指定页）
+- **微调单选+参考图回退**：页选择改 radio 单选（一次一页）；参考图优先级 上传/粘贴图 > 角色参考图 > 当前页（不再用坏页当基底，错误不被保留）
+- **prompt 强化**：每说话人仅一个气泡尾部指向该人物/左人左泡右人右泡；画面干净无黑点
+- **日志增强**：storyboard/generate-pages/tweak 打印提交给 AI 的最终 prompt 全文（system+user / 图片 prompt）+ AI 原始返回
+
+### 踩坑
+- Seedream baseURL 用 `/api/plan/v3`（plan key），文档示例为 `/api/v3`；存 `.env` 可在设置页改
+- `initSettings` 只种子**缺失**的 DEFAULT_PROVIDERS，不覆盖已有；新 provider 要进 `init.ts`+`env.ts` 才能从 `.env` 自动同步
+
+### 验证
+- typecheck+build 全绿；Seedream 文生图实测返回 URL；启动后 providers.json 自动含 volcengine
+
+## v0.11.8 (2026-08-27) — 漫画生成工作流 + 工作流级资产库 + 执行记录存储下沉
+
+### 变更
+- **漫画生成工作流**：新增 `templates/comic-generation/`（2 步：script 分镜 → generate-pages 逐页生成），故事文本 → AI 分镜（含角色/关系解析）→ 逐页生成漫画图（对白直接画进画面），执行详情页新增 `images` 画廊预览
+- **工作流级资产库**：新增角色参考图库 + 风格库（`lib/assets.js` + 引擎级 8 个 actions），跨执行复用。角色参考图「描述→AI 生成→预览→填名保存」两步式，风格纯文本手动创建；`http.js` 注册 7 个 custom handler + 1 个 stream（`dir` 字段自定义）
+- **存储重构**：执行记录从 `data/workflows/<id>/` 下沉到 `data/workflows/tasks/<id>/`（`state.js` DATA_DIR 一处改，engine 等 6 处零改动）；资产库落 `data/workflows/assets/{characters,styles}`；`http.js` stream 原语支持 per-action `dir`（默认 `data/workflows/tasks`）
+- **一致性机制**：每页用全员参考图 base64 作 `subject_reference`（minimax）/`image_url`（qwen）+ 风格 prompt + 固定 seed
+- **工作流页面三层路由**：`/workflow`（类型卡片）→ `/workflow/type/[templateId]`（该类型执行记录 + 直接创建 + comic 专属资产库）→ `/workflow/execution/[id]`（详情）；「创建工作流」直接弹当前类型表单（去掉选类型步骤）
+- **资产库移入漫画类型页**：角色参考图 / 风格拆为两个独立按钮+抽屉（原 tab 形式）；角色参考图生成支持**上传参考图（图生图）**，`generateCharacterHandler` 透传 `image_url`
+- **逐页生成耗时日志**：`generate-pages.js` 每页记录生成/下载耗时 + 总耗时
+- **画廊左右滑动**：`ImagesGallery` 接入 `image-viewer`（`ImageViewerProvider` + `register/open`），点图放大、←/→ 切换、页码
+- **漫画隐藏微调**：执行详情页「微调」按钮仅 `video-generation` 显示（漫画无 tweak，消除「该模板不支持微调」报错）
+
+### 踩坑
+- 工作流资产（参考图/风格）是跨执行持久数据，不能放 `data/workflows/` 下——`listExecutions` 会扫描所有子目录读 state.json，混入会误判为执行记录且计数错乱；下沉到 `tasks/` 后与 `assets/` 平级天然隔离
+- `tool` 步骤 args 只展开 output 的 string 字段，数组字段（如分镜 `pages`）不会进 `vars`；故 storyboard 把 `pages` 序列化成 `pagesJson` string 字段传参
+
+### 验证
+- `npm run typecheck` + `npm run test:shared`（18 全绿）
+- 后端自检：actions 合并无重复（22 个）、matchPath 资产路由正确（list/生成/保存/删除/文件流互不冲突）
+
 ## v0.11.7 (2026-08-27) — qwen3.8-flash 接入 + 视觉/preprocess 迁 qwen + 模型可用性打标
 
 ### 变更

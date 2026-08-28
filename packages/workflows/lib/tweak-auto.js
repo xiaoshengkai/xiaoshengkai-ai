@@ -24,7 +24,7 @@ function setTweakStatus(executionId, status, error) {
   } catch { /* ignore */ }
 }
 
-export async function tweakAuto(executionId, feedback, images) {
+export async function tweakAuto(executionId, feedback, images, pages) {
   const logger = createDateLogger("workflows", LOG_DIR, executionId);
 
   const dir = path.join(DATA_DIR, executionId);
@@ -33,6 +33,7 @@ export async function tweakAuto(executionId, feedback, images) {
     status: "running",
     feedback,
     images: images || [],
+    pages: pages || [],
     startedAt: new Date().toISOString(),
     completedAt: null,
     version: null,
@@ -71,8 +72,17 @@ export async function tweakAuto(executionId, feedback, images) {
       error: null,
       feedback,
       images: images || [],
+      pages: pages || [],
     };
     writeState(dir, fresh);
+
+    // rerun=false：模板 tweak 已直接重生成产物（如漫画图生图），无需重跑步骤
+    if (data.rerun === false) {
+      setTweakStatus(executionId, "done");
+      logger.info("[tweak-auto] tweak completed (rerun=false), skip auto");
+      return { ok: true };
+    }
+
     logger.info(`[tweak-auto] tweak completed v${data.version}, starting auto...`);
 
     const { runAllSteps } = await import("../engine.js");

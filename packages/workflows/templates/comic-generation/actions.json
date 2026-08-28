@@ -1,0 +1,4 @@
+[
+  { "type": "custom", "method": "POST", "path": "/execution/:id/export", "handler": "comic-export" },
+  { "type": "custom", "method": "POST", "path": "/comic-generate-content", "handler": "comic-generate-content" }
+]

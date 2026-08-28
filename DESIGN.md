@@ -93,6 +93,18 @@ flowchart TD
 | `data/chroma/` | 运行时持久化 | Chroma 数据 |
 | `packages/mcp/` | 必选 | MCP 服务器集合 |
 
+### 工作流数据存储
+
+执行记录与资产库分离（v0.11.8 起）：
+
+| 路径 | 内容 |
+|---|---|
+| `data/workflows/tasks/<executionId>/` | 工作流执行记录（state.json + 产物） |
+| `data/workflows/assets/characters/` | 角色参考图（图片 + 元信息，跨执行复用） |
+| `data/workflows/assets/styles/` | 风格（纯文本，跨执行复用） |
+
+决策：资产（参考图/风格）是跨执行持久数据，不能与执行记录混放（`listExecutions` 扫描目录会误判）；故执行记录下沉 `tasks/`、资产独立 `assets/`，统一收拢在 `data/workflows/` 命名空间下。资产库定位为**工作流级通用**（非某模板专属），comic 模板通过 `characterRef`/`styleId` 参数引用。
+
 ## API 约定
 
 ### POST /api/chat
@@ -224,6 +236,18 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 - system prompt 已明确规则：URL 必须原样输出，不得修改
 - `generateImage` 工具描述已强调"必须原样使用不得修改任何字符"
 - 遇到 `SignatureDoesNotMatch` 错误，重新生成比尝试修复链接更高效
+
+### 火山引擎 Seedream 图片模型
+
+- 新增 provider `volcengine`（Doubao Seedream 5.0 lite），仅图片生成（`IMAGE_GENERATORS`）。
+- 密钥/baseURL/model 放 `.env`（`VOLCENGINE_*`），`env.ts`+`init.ts` 注册，启动时 `initSettings` 种子进 `data/settings/providers.json`（真源仍为 providers.json，env 兜底）。
+- baseURL 用 `/api/plan/v3`（plan key 端点），文档示例为 `/api/v3`，可在设置页改。
+
+### 漫画文字渲染决策（AI 画气泡，非程序叠加）
+
+- 生图模型画中文易乱码、气泡归属易错；曾尝试「图文分离 + puppeteer 程序化气泡叠加」（中文无乱码、归属正确），但叠加气泡与画面脱节、观感差，**已回退**。
+- 最终决策：气泡框+中文仍由生图模型直接画，靠提示词减轻问题：对白≤3 短句（数组）、气泡内标注说话人名字、cast 左右位置提示、每说话人单气泡尾部指向该人物、画面干净无黑点。
+- 微调（tweak）为**指定单页**：参考图优先级 上传/粘贴图 > 角色参考图 > 当前页（不用坏页当基底，避免错误被保留）；只提交本次反馈（历史仅记录不喂 AI）。
 
 ## 已知问题
 

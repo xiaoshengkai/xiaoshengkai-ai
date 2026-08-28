@@ -25,6 +25,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   minimax: "MiniMax",
   glm: "智谱 GLM",
   qwen: "通义千问",
+  volcengine: "火山引擎 Doubao",
 };
 
 export default function SettingsPage() {

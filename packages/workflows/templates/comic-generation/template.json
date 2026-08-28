@@ -1,0 +1,34 @@
+{
+  "name": "comic-generation",
+  "label": "漫画生成",
+  "description": "故事文本 → AI 分镜 → 逐页生成漫画图（对白直接画进画面，参考图锁人物一致性）",
+  "params": [
+    { "name": "title", "label": "故事标题", "type": "text", "required": false },
+    { "name": "content", "label": "故事内容（含角色与关系）", "type": "textarea", "required": true, "placeholder": "剧情 + 角色名字/外貌 + 角色关系，如：小明（20岁男生，红T恤）是小红的哥哥…" },
+    { "name": "characterRef", "label": "角色参考图", "type": "text", "required": true },
+    { "name": "styleId", "label": "风格", "type": "text", "required": true },
+    { "name": "pageCount", "label": "页数（可选，留空 AI 决定）", "type": "number", "required": false }
+  ],
+  "steps": [
+    {
+      "id": "script",
+      "name": "AI 生成分镜脚本",
+      "type": "tool",
+      "previewType": "json",
+      "previewField": "script",
+      "module": "./lib/storyboard.js",
+      "function": "generateStoryboard",
+      "args": ["{content}", "{title}", "{pageCount}"]
+    },
+    {
+      "id": "generate-pages",
+      "name": "逐页生成漫画",
+      "type": "tool",
+      "previewType": "images",
+      "previewField": "pages",
+      "module": "./lib/generate-pages.js",
+      "function": "generatePages",
+      "args": ["{script.pagesJson}", "{characterRef}", "{styleId}", "{executionDir}"]
+    }
+  ]
+}

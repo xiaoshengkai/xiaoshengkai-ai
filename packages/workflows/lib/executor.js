@@ -31,6 +31,6 @@ export function loadTemplates() {
     .filter(f => fs.statSync(path.join(TEMPLATES_DIR, f)).isDirectory())
     .map(f => {
       const t = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f, "template.json"), "utf-8"));
-      return { ...t, id: f };
+      return { ...t, id: f, tweak: fs.existsSync(path.join(TEMPLATES_DIR, f, "lib", "tweak.js")) };
     });
 }

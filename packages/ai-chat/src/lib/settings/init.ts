@@ -27,6 +27,12 @@ const DEFAULT_PROVIDERS: Providers = {
     apiKey: env.QWEN_API_KEY,
     models: { chat: "qwen3.8-max", image: "qwen-image-3.0-pro", music: "fun-music-v1" },
   },
+  volcengine: {
+    enabled: true,
+    baseURL: env.VOLCENGINE_BASE_URL,
+    apiKey: env.VOLCENGINE_API_KEY,
+    models: { image: env.VOLCENGINE_IMAGE_MODEL },
+  },
 };
 
 const DEFAULT_SELECTION: Selection = {

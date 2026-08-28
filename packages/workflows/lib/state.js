@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..");
 
-export const DATA_DIR = path.join(PROJECT_ROOT, "data", "workflows");
+export const DATA_DIR = path.join(PROJECT_ROOT, "data", "workflows", "tasks");
 export const LOG_DIR = path.join(PROJECT_ROOT, "logs", "workflows");
 export const VIDEOS_DIRNAME = "videos";
 

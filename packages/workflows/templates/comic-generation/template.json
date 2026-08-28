@@ -7,7 +7,7 @@
     { "name": "content", "label": "故事内容（含角色与关系）", "type": "textarea", "required": true, "placeholder": "剧情 + 角色名字/外貌 + 角色关系，如：小明（20岁男生，红T恤）是小红的哥哥…" },
     { "name": "characterRef", "label": "角色参考图", "type": "text", "required": true },
     { "name": "styleId", "label": "风格", "type": "text", "required": true },
-    { "name": "pageCount", "label": "页数（可选，留空 AI 决定）", "type": "number", "required": false }
+    { "name": "pageCount", "label": "最少页数（可选，留空 AI 决定）", "type": "number", "required": false }
   ],
   "steps": [
     {

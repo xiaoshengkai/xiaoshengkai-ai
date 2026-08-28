@@ -84,6 +84,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 - 禁止使用 React/Vue/构建工具
 - 文件名在 `task.json` 的 `html` 字段声明
 - 页面在 `/schedule` 页面中可点击打开
+- **视觉风格必须跟随项目主体样式**：先读项目根目录 `DESIGN.md`，照它的配色、边框、阴影、圆角、字体规范来写，不要自行设计风格
 
 ## 创建步骤
 

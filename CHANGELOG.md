@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.11.10 (2026-08-28) — 漫画微调改图片编辑 + 逐页容错/占位图 + preprocess 合并 vision
+
+### 变更
+- **漫画微调 = 图片编辑（不再重新生成）**：`comic lib/tweak.js` 底图固定为当前页（编辑语义），prompt 改「保持构图不变只做局部修改」；上传图交给 vision 模型（`callMultimodalLLM`）读成「修改意图」文字并入反馈；生成失败的页回退角色参考图做全新生成
+- **逐页容错 + 占位图**：`generate-pages.js` 每页 try/catch（如敏感内容），失败只标记该页 `error` 并继续，不再中断整批；幂等复用已存在页文件（重试只补缺页、不重生成好页）；前端 `ImagesGallery` 对失败页渲染占位图 +「微调这页」按钮（新增 `onTweakPage` 回调）
+- **最少页数参数**：`pageCount` 语义从「恰好 N 页」改「至少 N 页」（label「最少页数」），`validateStoryboard` 加硬校验 `pages.length < min` 自动重试
+- **preprocess 合并进 vision（根治 401）**：删除独立 preprocess 模块（`core/preprocess-fetch.ts` / `core/preprocess-model.ts`），`preprocess.ts` 复用 `callMultimodalLLM`（跟随 vision provider）；设置页删 preprocess 选项、`types.ts`/`init.ts` 清理、`selection.json` 清残留
+- **移除视频能力**：前端上传 `accept` 去 video 类型 + `/api/upload` 删 video 分支；`pipeline.ts` 视频无条件 `stripVideos` 静默丢弃；`video.ts` 删 `processVideos`/`loadVideosAsFile` 死代码，只留 `stripVideos`
+
+### 踩坑
+- `callMiniMax.callLLM` 默认 `format='json_object'` 会强制 JSON 输出，preprocess 要自由文本，需显式传 `format: null` 跳过 `response_format`
+- tweak 上传图路径是 `/api/uploads/<filename>`（URL 路径非本地路径），需 `resolveUploadPath` 转 `data/static/images/<filename>` 才能读文件
+
+### 验证
+- typecheck + test（shared 18 + mm 9 + search 5）+ build 全绿
+- 真实验证 `callMultimodalLLM`（minimax M3）读图返回描述、无 401
+
 ## v0.11.9 (2026-08-28) — 接入火山引擎 Seedream 图片模型 + 漫画微调/分镜优化
 
 ### 变更

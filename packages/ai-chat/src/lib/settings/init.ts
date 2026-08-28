@@ -40,7 +40,6 @@ const DEFAULT_SELECTION: Selection = {
   media: { provider: "minimax", model: "image-01" },
   vector: { provider: "glm", model: "embedding-3" },
   workflow: { provider: "deepseek", model: "deepseek-v4-pro", flashModel: "deepseek-v4-flash" },
-  preprocess: { provider: "qwen", model: "qwen3.8-max" },
   tts: { provider: "minimax", model: "speech-2.8-hd" },
   music: { provider: "qwen", model: "fun-music-v1" },
   vision: { provider: "qwen", model: "qwen3.8-max" },
@@ -70,9 +69,7 @@ export function initSettings() {
     if (!sel.tts) sel.tts = { provider: "minimax", model: "speech-2.8-hd" };
     if (!sel.music) sel.music = { provider: "qwen", model: "fun-music-v1" };
     delete (sel as Record<string, unknown>).bgm;
-    if (!sel.preprocess) sel.preprocess = { provider: "qwen", model: "qwen3.8-max" };
     if (!sel.vision) sel.vision = { provider: "qwen", model: "qwen3.8-max" };
-    if (sel.preprocess?.provider === "minimax") sel.preprocess = { provider: "qwen", model: "qwen3.8-max" };
     if (!sel.workflow) sel.workflow = DEFAULT_SELECTION.workflow;
     writeSelection(sel);
   }

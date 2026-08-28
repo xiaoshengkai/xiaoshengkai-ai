@@ -37,3 +37,5 @@ packages/tasks/**/dashboard.html
 # search service (SearXNG 源码 clone + venv，首次启动自动生成)
 packages/services/search/searxng/searxng-src/
 packages/services/search/searxng/venv/
+
+nohup.out

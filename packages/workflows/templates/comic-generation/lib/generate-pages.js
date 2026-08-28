@@ -45,36 +45,52 @@ export async function generatePages(pagesJson, characterRef, styleId, executionD
 
   const totalStart = Date.now();
   const result = [];
+  let failed = 0;
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
     const pageNo = p.page || i + 1;
     const file = `pages/page-${String(pageNo).padStart(2, "0")}.png`;
     const filePath = path.join(executionDir, file);
 
+    // 幂等：已存在的页直接复用（重试只补缺页，不重生成好页）
+    if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+      console.log(`[generate-pages] 第 ${pageNo}/${pages.length} 页已存在，复用`);
+      result.push({ page: pageNo, file, dialogue: p.dialogue || [] });
+      continue;
+    }
+
     const t0 = Date.now();
     console.log(`[generate-pages] 生成第 ${pageNo}/${pages.length} 页...`);
     const prompt = buildPrompt(p, styleDesc);
     console.log(`[generate-pages] 第 ${pageNo} 页 提交AI图片prompt (aspectRatio=2:3, seed=${SEED}, 参考图base64长度=${refB64.length}):\n${prompt}`);
-    const genStart = Date.now();
-    const urls = await generateImage(prompt, {
-      aspectRatio: "2:3",
-      image_url: refB64,
-      seed: SEED,
-    });
-    const genElapsed = ((Date.now() - genStart) / 1000).toFixed(1);
-    const url = urls[0];
-    if (!url) throw new Error(`第 ${pageNo} 页未生成图片`);
+    try {
+      const genStart = Date.now();
+      const urls = await generateImage(prompt, {
+        aspectRatio: "2:3",
+        image_url: refB64,
+        seed: SEED,
+      });
+      const genElapsed = ((Date.now() - genStart) / 1000).toFixed(1);
+      const url = urls[0];
+      if (!url) throw new Error(`第 ${pageNo} 页未生成图片`);
 
-    const dlStart = Date.now();
-    const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
-    if (!res.ok) throw new Error(`第 ${pageNo} 页图片下载失败 (${res.status})`);
-    fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
-    const dlElapsed = ((Date.now() - dlStart) / 1000).toFixed(1);
-    console.log(`[generate-pages] 第 ${pageNo} 页完成 (生成 ${genElapsed}s, 下载 ${dlElapsed}s, 合计 ${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+      const dlStart = Date.now();
+      const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
+      if (!res.ok) throw new Error(`第 ${pageNo} 页图片下载失败 (${res.status})`);
+      fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
+      const dlElapsed = ((Date.now() - dlStart) / 1000).toFixed(1);
+      console.log(`[generate-pages] 第 ${pageNo} 页完成 (生成 ${genElapsed}s, 下载 ${dlElapsed}s, 合计 ${((Date.now() - t0) / 1000).toFixed(1)}s)`);
 
-    result.push({ page: pageNo, file, dialogue: p.dialogue || [] });
+      result.push({ page: pageNo, file, dialogue: p.dialogue || [] });
+    } catch (err) {
+      // 单页失败（如敏感内容）不中断整批，标记 error 后继续，前端展示占位图
+      failed++;
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[generate-pages] 第 ${pageNo} 页失败: ${message}`);
+      result.push({ page: pageNo, file, dialogue: p.dialogue || [], error: message });
+    }
   }
 
-  console.log(`[generate-pages] 全部完成: ${result.length} 页, 总耗时 ${((Date.now() - totalStart) / 1000).toFixed(1)}s`);
+  console.log(`[generate-pages] 全部完成: ${result.length} 页 (失败 ${failed} 页), 总耗时 ${((Date.now() - totalStart) / 1000).toFixed(1)}s`);
   return { pages: result };
 }

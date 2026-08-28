@@ -19,7 +19,7 @@ export interface SelectionEntry {
   flashModel?: string;
 }
 
-export type Module = 'chat' | 'media' | 'vector' | 'workflow' | 'preprocess' | 'tts' | 'music' | 'vision';
+export type Module = 'chat' | 'media' | 'vector' | 'workflow' | 'tts' | 'music' | 'vision';
 
 export type Providers = Record<string, ProviderEntry>;
 export type Selection = Record<Module, SelectionEntry>;

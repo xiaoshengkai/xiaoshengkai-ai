@@ -311,6 +311,11 @@ export default function ExecutionDetailPage() {
     setTweaking(false);
   }, [id, tweakFeedback, tweakImages, fetchExecution, isComic, tweakPages]);
 
+  const openTweakForPage = useCallback((page: number) => {
+    setTweakPages([page]);
+    setShowTweak(true);
+  }, []);
+
   const handleSwitchVersion = useCallback(async (version: number) => {
     setSwitchingVersion(version);
     try {
@@ -482,7 +487,7 @@ export default function ExecutionDetailPage() {
             }
 
             // 兜底：PreviewPanel
-            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} imageVersion={`${execution.tweakCount ?? 0}-${execution.completedAt ?? ""}`} onRetry={() => handleRetry(activeStep.id)} retrying={retrying === activeStep.id} />;
+            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} imageVersion={`${execution.tweakCount ?? 0}-${execution.completedAt ?? ""}`} onRetry={() => handleRetry(activeStep.id)} retrying={retrying === activeStep.id} onTweakPage={openTweakForPage} />;
           })()}
           {activeStep.id === "concat" && (
             <DownloadPanel executionId={execution.executionId} />
@@ -862,7 +867,7 @@ function DownloadPanel({ executionId }: { executionId: string }) {
   );
 }
 
-function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, onRetry, retrying }: { step: ExecutionStep; executionId: string; currentScriptVersion?: number; imageVersion?: string; onRetry: () => void; retrying: boolean }) {
+function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, onRetry, retrying, onTweakPage }: { step: ExecutionStep; executionId: string; currentScriptVersion?: number; imageVersion?: string; onRetry: () => void; retrying: boolean; onTweakPage?: (page: number) => void }) {
   const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
   const version = currentScriptVersion ?? 0;
 
@@ -994,7 +999,7 @@ function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, o
           <span className="text-xs text-foreground px-1.5 py-0.5">✅ 完成</span>
         </div>
         {pt === "images" ? (
-          <ImagesGallery output={step.output} executionId={executionId} v={imageVersion} />
+          <ImagesGallery output={step.output} executionId={executionId} v={imageVersion} onTweakPage={onTweakPage} />
         ) : (
           <PreviewContent type={pt} value={value} src={fileTypes.includes(pt) ? `${fileBase}/${value}?v=${version}` : undefined} executionId={executionId} onRetry={onRetry} retrying={retrying} />
         )}
@@ -1062,11 +1067,12 @@ function LoadingState({ text }: { text: string }) {
   );
 }
 
-function ImagesGallery({ output, executionId, v }: { output: string | null; executionId: string; v?: string }) {
+function ImagesGallery({ output, executionId, v, onTweakPage }: { output: string | null; executionId: string; v?: string; onTweakPage?: (page: number) => void }) {
   const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
   const { register, open } = useImageViewer();
   const [exporting, setExporting] = useState(false);
-  let pages: { page: number; file: string; dialogue?: string }[] = [];
+
+  let pages: { page: number; file: string; dialogue?: string; error?: string }[] = [];
   try {
     const out = typeof output === "string" ? JSON.parse(output) : output;
     if (out && Array.isArray(out.pages)) pages = out.pages;
@@ -1089,6 +1095,25 @@ function ImagesGallery({ output, executionId, v }: { output: string | null; exec
     <div className="flex flex-col items-center">
       <div className="flex flex-col w-full max-w-md">
         {pages.map(p => {
+          if (p.error) {
+            return (
+              <div key={p.page} className="relative">
+                <div className="w-full aspect-[2/3] flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border bg-muted p-4"
+                  style={{ boxShadow: "2px 2px 0 var(--muted)" }}>
+                  <span className="text-2xl">🖼️</span>
+                  <p className="text-xs font-bold text-muted-foreground">第 {p.page} 页生成失败</p>
+                  <p className="text-[10px] text-muted-foreground/70 text-center break-words max-h-16 overflow-hidden">{p.error}</p>
+                  {onTweakPage && (
+                    <button onClick={() => onTweakPage(p.page)}
+                      className="brutal-btn px-3 py-1 text-xs font-bold bg-purple text-white mt-1">
+                      微调这页
+                    </button>
+                  )}
+                </div>
+                <span className="absolute top-1 left-1 px-1.5 py-0.5 text-xs font-bold bg-black/60 text-white">{p.page}</span>
+              </div>
+            );
+          }
           const src = `${fileBase}/${p.file}${v ? `?v=${v}` : ""}`;
           const idx = register(src);
           return (

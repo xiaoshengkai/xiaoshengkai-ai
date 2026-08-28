@@ -242,7 +242,7 @@ export default function ChatPage() {
       return await uploadFile(file);
     } catch (err) {
       toast.error((err as Error).message);
-      return { path: '', name, modality: file.type.startsWith('video/') ? 'video' : 'image' };
+      return { path: '', name, modality: 'image' };
     }
   }, []);
 
@@ -405,7 +405,7 @@ export default function ChatPage() {
               />
               <div className="flex items-center justify-between px-3 pt-1 pb-2">
                 <div className="flex items-center gap-1">
-                  <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                  <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="brutal-btn bg-card px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"

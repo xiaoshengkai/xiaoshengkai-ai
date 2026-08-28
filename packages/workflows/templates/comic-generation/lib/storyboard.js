@@ -11,11 +11,15 @@ function countDialogueLines(d) {
   return 0;
 }
 
-function validateStoryboard(script) {
+function validateStoryboard(script, minPages) {
   const errors = [];
   if (!script || typeof script !== "object") return ["脚本不是对象"];
   if (!Array.isArray(script.pages) || script.pages.length === 0) {
     return ["pages 必须是非空数组"];
+  }
+  const min = Number(minPages);
+  if (min > 0 && script.pages.length < min) {
+    errors.push(`页数不足：要求至少 ${min} 页，实际只有 ${script.pages.length} 页`);
   }
   script.pages.forEach((p, i) => {
     if (!p.imagePrompt || typeof p.imagePrompt !== "string") errors.push(`第 ${i + 1} 页缺少 imagePrompt`);
@@ -33,7 +37,7 @@ export async function generateStoryboard(content, title, pageCount) {
   if (!storyText) throw new Error("缺少故事内容");
 
   const pageConstraint = pageCount && Number(pageCount) > 0
-    ? `\n## 页数\n必须生成恰好 ${pageCount} 页。`
+    ? `\n## 页数\n必须生成至少 ${pageCount} 页（对话密集可适当多页，但不少于 ${pageCount} 页）。`
     : "\n## 页数\n根据故事与对话密度自然决定页数；对话密集时拆成多页，不设上限。";
 
   const system = `你是专业的漫画分镜师。把故事拆成漫画分镜，每页一个画面。
@@ -80,7 +84,7 @@ ${pageConstraint}
 
     try {
       const script = parseJSON(text);
-      const errors = validateStoryboard(script);
+      const errors = validateStoryboard(script, pageCount);
       if (errors.length > 0) {
         errors.forEach(e => { if (!allErrors.includes(e)) allErrors.push(e); });
         console.warn(`[storyboard] 校验失败: ${errors.join("; ")}`);

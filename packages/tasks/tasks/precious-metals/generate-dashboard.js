@@ -8,6 +8,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DASHBOARD_FILE = path.join(__dirname, "dashboard.html");
 const FOREX_HISTORY_API = "https://api.frankfurter.app/2024-07-01..";
 
+/**
+ * 金融仪表盘生成器 —— Neo-Brutalism 糖果色版
+ * 严格遵循项目根目录 DESIGN.md 的 UI 风格（与 hot-news 一家人）：
+ * - 纯白背景 #FFFFFF / 次背景 #F5F5F5
+ * - 纯黑实线边框(2-3px) + 零模糊纯黑硬阴影(Npx Npx 0 #000)
+ * - 主色电光黄 #FFE135(黑字)，粉/蓝/紫/橙/深绿糖果色点缀
+ * - 直角(无圆角)
+ * - 字体: Inter / Plus Jakarta Sans / JetBrains Mono
+ *
+ * 金融语义保留：红涨(#E6162D) 绿跌(#16A34A)
+ */
+
+// 市场分类糖果色主题
+const CATEGORY_THEME = {
+  metals: { color: "#E6A700", soft: "#FFF3C4" },
+  energy: { color: "#FB923C", soft: "#FFE7D3" },
+  agriculture: { color: "#16A34A", soft: "#D9F2E2" },
+  commodities: { color: "#4D7CFE", soft: "#D6E4FF" },
+  stocks: { color: "#E6162D", soft: "#FFDCE0" },
+  realestate: { color: "#8B5CF6", soft: "#E8DEFF" },
+};
+
 function fmt(val, decimals = 2) {
   if (val == null) return "--";
   return Number(val).toFixed(decimals);
@@ -34,6 +56,37 @@ async function fetchForexHistory() {
     console.log(`[DASHBOARD] 外汇历史获取失败: ${err.message}`);
     return [];
   }
+}
+
+// 渲染单个市场条目（保留红涨绿跌 + 52 周范围条）
+function renderMarketItem(item, theme) {
+  if (item.error) {
+    return `<div class="item-row"><span class="item-name">${item.emoji} ${escapeHtml(item.name)}</span><span class="item-price muted">获取失败</span></div>`;
+  }
+  const chg = item.change != null ? (item.change >= 0 ? "up" : "down") : "neutral";
+  const chgText = item.change != null ? (item.change >= 0 ? "▲" : "▼") + Math.abs(item.change).toFixed(2) + "%" : "--";
+  const priceText = item.priceCny != null
+    ? `¥${fmt(item.priceCny)}<span class="sub">${fmt(item.price)}${item.unit}</span>`
+    : `${fmt(item.price)}${item.unit}`;
+
+  const hasRange = item.high52 != null && item.low52 != null && item.price != null && item.high52 !== item.low52;
+  const rangePct = hasRange ? ((item.price - item.low52) / (item.high52 - item.low52)) * 100 : 0;
+  const clampedPct = Math.max(0, Math.min(100, rangePct));
+
+  return `
+  <div class="item-row">
+    <div class="item-top">
+      <span class="item-name">${item.emoji} ${escapeHtml(item.name)}</span>
+      <span class="item-price">${priceText}</span>
+      <span class="change ${chg}">${chgText}</span>
+    </div>
+    ${hasRange ? `
+    <div class="range">
+      <span class="range-label">${item.cnyUnit ? "¥" + fmt(item.lowCny) : fmt(item.low52, 0)}</span>
+      <div class="range-bar"><div class="range-fill" style="width:${clampedPct.toFixed(0)}%;background:${theme.color}"></div></div>
+      <span class="range-label">${item.cnyUnit ? "¥" + fmt(item.highCny) : fmt(item.high52, 0)}</span>
+    </div>` : ""}
+  </div>`;
 }
 
 export async function generateDashboard(data) {
@@ -88,6 +141,9 @@ export async function generateDashboard(data) {
     history: forexHistory,
   });
 
+  // 宏观指标数量
+  const macroCount = macroData.length;
+
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -95,97 +151,173 @@ export async function generateDashboard(data) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>金融仪表盘</title>
 <style>
+:root{
+  --bg:#FFFFFF;
+  --muted:#F5F5F5;
+  --ink:#000000;
+  --yellow:#FFE135;
+  --up:#E6162D;
+  --down:#16A34A;
+  --font-body:'Inter',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  --font-title:'Plus Jakarta Sans','Inter',-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-.header{text-align:center;padding:24px 16px 16px;background:linear-gradient(135deg,#1e293b,#0f172a);border-bottom:1px solid #334155}
-.header h1{font-size:clamp(20px,5vw,28px);font-weight:700;color:#f8fafc}
-.header .time{font-size:13px;color:#64748b;margin-top:6px}
-.container{max-width:1400px;margin:0 auto;padding:16px}
-.section-title{font-size:18px;font-weight:600;color:#94a3b8;margin:24px 0 12px;padding-bottom:8px;border-bottom:1px solid #334155}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
-.card{background:#1e293b;border-radius:10px;padding:14px 16px;border:1px solid #334155}
-.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.card-header .label{font-size:14px;font-weight:600;color:#94a3b8}
-.card-header .freq{font-size:11px;color:#64748b;background:#334155;padding:2px 8px;border-radius:4px}
-.item-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e293b}
+body{font-family:var(--font-body);background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* ===== 顶部 ===== */
+.header{background:var(--yellow);border-bottom:3px solid var(--ink);padding:32px 20px 26px}
+.header-inner{max-width:1120px;margin:0 auto}
+.brand{
+  display:inline-block;font-family:var(--font-title);font-weight:800;
+  font-size:clamp(24px,5vw,34px);letter-spacing:-0.5px;
+  background:var(--yellow);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);
+  padding:10px 22px;
+}
+.meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.stat{
+  background:var(--bg);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);
+  padding:8px 14px;font-family:var(--font-mono);font-size:12.5px;font-weight:700;
+}
+.stat b{font-size:15px}
+
+/* ===== 主体 ===== */
+.container{max-width:1120px;margin:0 auto;padding:30px 18px 50px}
+
+.section-title{
+  font-family:var(--font-title);font-weight:800;font-size:19px;
+  display:flex;align-items:center;gap:10px;
+  margin:28px 0 16px;padding-bottom:10px;border-bottom:3px solid var(--ink);
+}
+.section-title .tag{
+  font-family:var(--font-mono);font-size:12px;font-weight:800;
+  background:var(--yellow);border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);
+  padding:2px 8px;
+}
+
+/* ===== 市场行情卡片 ===== */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
+.card{
+  background:var(--bg);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);
+  padding:14px 16px 6px;transition:transform .1s, box-shadow .1s;
+}
+.card:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 var(--ink)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.card-header .label{
+  font-family:var(--font-title);font-weight:800;font-size:15px;
+  border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);padding:3px 12px;
+}
+.card-header .count{font-family:var(--font-mono);font-size:13px;font-weight:800}
+
+.item-row{padding:9px 0;border-bottom:2px solid var(--muted)}
 .item-row:last-child{border-bottom:none}
-.item-name{font-size:14px;color:#cbd5e1;flex:1}
-.item-price{text-align:right;font-size:14px;font-weight:600;color:#f8fafc}
-.item-price .sub{font-size:11px;color:#64748b;display:block}
-.item-change{font-size:13px;font-weight:600;margin-left:10px;min-width:60px;text-align:right}
-.up{color:#ef4444}.down{color:#22c55e}.neutral{color:#64748b}
-.range-bar{height:3px;background:#334155;border-radius:2px;margin-top:4px;position:relative}
-.range-bar .fill{height:100%;background:#475569;border-radius:2px;position:absolute;left:0}
-.range-labels{display:flex;justify-content:space-between;font-size:10px;color:#64748b;margin-top:2px}
-.macro-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-.macro-card{background:#1e293b;border-radius:10px;padding:14px 16px;border:1px solid #334155}
-.macro-card .title{font-size:14px;color:#94a3b8;margin-bottom:4px}
-.macro-card .value-row{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
-.macro-card .value{font-size:28px;font-weight:700;color:#f8fafc}
-.macro-card .unit{font-size:14px;color:#64748b}
-.macro-card .prev{font-size:12px;color:#64748b}
-.macro-card .prev .up{color:#ef4444}.macro-card .prev .down{color:#22c55e}
-.macro-card .date{font-size:11px;color:#475569}
-.macro-card canvas{width:100%;height:80px;margin-top:8px}
-.forex-bar{text-align:center;padding:8px;font-size:13px;color:#64748b;background:#1e293b;border-radius:8px;margin-top:16px}
-.footer{text-align:center;padding:24px;font-size:12px;color:#475569}
+.item-top{display:flex;align-items:baseline;gap:8px}
+.item-name{flex:1;font-size:14px;font-weight:700}
+.item-price{font-family:var(--font-mono);font-weight:800;font-size:15px;white-space:nowrap}
+.item-price .sub{font-size:11px;color:#888;font-weight:600;display:block;text-align:right}
+.item-price.muted{color:#aaa;font-weight:600;font-size:13px}
+.change{
+  font-family:var(--font-mono);font-weight:800;font-size:12px;
+  border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);
+  padding:2px 8px;min-width:60px;text-align:center;white-space:nowrap;
+}
+.change.up{background:var(--up);color:#fff}
+.change.down{background:var(--down);color:#fff}
+.change.neutral{background:var(--muted);color:#888}
+
+.range{display:flex;align-items:center;gap:8px;margin-top:7px}
+.range-label{font-family:var(--font-mono);font-size:10px;font-weight:700;color:#666;white-space:nowrap}
+.range-bar{flex:1;height:8px;background:var(--muted);border:2px solid var(--ink)}
+.range-fill{height:100%;display:block}
+
+/* ===== 宏观卡片 ===== */
+.macro-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.macro-card{
+  background:var(--bg);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);
+  padding:14px 16px;transition:transform .1s, box-shadow .1s;
+}
+.macro-card:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 var(--ink)}
+.macro-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin-bottom:6px}
+.macro-title .freq{
+  font-family:var(--font-mono);font-size:10.5px;font-weight:800;
+  background:var(--yellow);border:1.5px solid var(--ink);box-shadow:1.5px 1.5px 0 var(--ink);
+  padding:1px 6px;
+}
+.macro-value{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.macro-value .value{font-family:var(--font-mono);font-size:30px;font-weight:800;letter-spacing:-1px}
+.macro-value .unit{font-family:var(--font-mono);font-size:14px;font-weight:700;color:#555}
+.chg-chip{
+  font-family:var(--font-mono);font-weight:800;font-size:11px;
+  border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);padding:1px 7px;
+}
+.chg-chip.up{background:var(--up);color:#fff}
+.chg-chip.down{background:var(--down);color:#fff}
+.macro-card .prev{font-family:var(--font-mono);font-size:11px;color:#888;margin-top:4px}
+.macro-card .date{font-family:var(--font-mono);font-size:11px;color:#aaa;margin-top:2px}
+.macro-card canvas{width:100%;height:88px;border:2px solid var(--ink);background:#fff;margin-top:10px;display:block}
+
+.footer{
+  max-width:1120px;margin:0 auto;padding:0 18px 50px;
+  text-align:center;font-family:var(--font-mono);font-size:12px;color:#666;
+}
+
+@media (max-width:640px){
+  .grid{grid-template-columns:1fr}
+  .macro-grid{grid-template-columns:1fr}
+  .item-top{flex-wrap:wrap}
+  .item-name{flex-basis:100%}
+}
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>📊 金融仪表盘</h1>
-  <div class="time">更新时间: ${updateTime} | 美元/人民币: ${data.usdCny != null ? data.usdCny.toFixed(4) : "--"}</div>
+  <div class="header-inner">
+    <span class="brand">📊 金融仪表盘</span>
+    <div class="meta">
+      <span class="stat">🕙 <b>${updateTime}</b></span>
+      <span class="stat">💱 美元/人民币 <b>${data.usdCny != null ? data.usdCny.toFixed(4) : "--"}</b></span>
+      <span class="stat">📈 市场分类 <b>${marketData.length}</b></span>
+      <span class="stat">🏛️ 宏观指标 <b>${macroCount}</b></span>
+    </div>
+  </div>
 </div>
+
 <div class="container">
-  <div class="section-title">📈 市场行情</div>
+  <div class="section-title">📈 市场行情 <span class="tag">${marketData.length} 类</span></div>
   <div class="grid">
-    ${marketData.map(cat => `
+    ${marketData.map(cat => {
+      const theme = CATEGORY_THEME[cat.key] || { color: "#FFE135", soft: "#FFF3C4" };
+      return `
     <div class="card">
-      <div class="card-header"><span class="label">${escapeHtml(cat.label)}</span></div>
-      ${cat.items.map(item => {
-        if (item.error) {
-          return `<div class="item-row"><span class="item-name">${item.emoji} ${escapeHtml(item.name)}</span><span class="item-price">获取失败</span></div>`;
-        }
-        const chg = item.change != null ? (item.change >= 0 ? "up" : "down") : "neutral";
-        const chgText = item.change != null ? (item.change >= 0 ? "▲" : "▼") + Math.abs(item.change).toFixed(2) + "%" : "--";
-        const priceText = item.priceCny != null
-          ? `¥${fmt(item.priceCny)}<span class="sub">${fmt(item.price)}${item.unit}</span>`
-          : `${fmt(item.price)}${item.unit}`;
-        const hasRange = item.high52 != null && item.low52 != null && item.price != null && item.high52 !== item.low52;
-        const rangePct = hasRange ? ((item.price - item.low52) / (item.high52 - item.low52)) * 100 : 0;
-        const clampedPct = Math.max(0, Math.min(100, rangePct));
-        return `
-        <div class="item-row">
-          <span class="item-name">${item.emoji} ${escapeHtml(item.name)}</span>
-          <span class="item-price">${priceText}</span>
-          <span class="item-change ${chg}">${chgText}</span>
-        </div>
-        ${hasRange ? `
-        <div class="range-bar"><div class="fill" style="width:${clampedPct.toFixed(0)}%"></div></div>
-        <div class="range-labels"><span>${item.cnyUnit ? "¥" + fmt(item.lowCny) : fmt(item.low52, 0)}</span><span>${item.cnyUnit ? "¥" + fmt(item.highCny) : fmt(item.high52, 0)}</span></div>
-        ` : ""}`;
-      }).join("")}
-    </div>`).join("")}
+      <div class="card-header">
+        <span class="label" style="background:${theme.soft}">${escapeHtml(cat.label)}</span>
+        <span class="count" style="color:${theme.color}">${cat.items.length} 项</span>
+      </div>
+      ${cat.items.map(item => renderMarketItem(item, theme)).join("")}
+    </div>`;
+    }).join("")}
   </div>
 
-  <div class="section-title">🏛️ 宏观经济</div>
-  <div class="macro-grid" id="macro-grid">
-    ${macroData.map((ind, i) => `
+  <div class="section-title">🏛️ 宏观经济 <span class="tag">${macroCount} 项</span></div>
+  <div class="macro-grid">
+    ${macroData.map((ind, i) => {
+      const diff = (ind.prevValue != null && ind.value != null && ind.prevValue !== ind.value) ? ind.value - ind.prevValue : null;
+      return `
     <div class="macro-card">
-      <div class="title">${ind.emoji} ${escapeHtml(ind.name)} <span style="font-size:11px;color:#64748b">${ind.freq}</span></div>
-      <div class="value-row">
+      <div class="macro-title">${ind.emoji} ${escapeHtml(ind.name)} <span class="freq">${ind.freq}</span></div>
+      <div class="macro-value">
         <span class="value">${ind.value != null ? fmt(ind.value) : "--"}</span>
         <span class="unit">${ind.unit}</span>
+        ${diff != null ? `<span class="chg-chip ${diff > 0 ? "up" : "down"}">${diff > 0 ? "▲" : "▼"}${fmt(Math.abs(diff))}${ind.unit}</span>` : ""}
       </div>
-      ${ind.prevValue != null && ind.value != null ? `
-      <div class="prev">上期: ${fmt(ind.prevValue)}${ind.unit} <span class="${ind.value > ind.prevValue ? "up" : ind.value < ind.prevValue ? "down" : ""}">${ind.value > ind.prevValue ? "▲" : ind.value < ind.prevValue ? "▼" : ""}${fmt(Math.abs(ind.value - ind.prevValue))}${ind.unit}</span></div>
-      ` : ""}
+      ${ind.prevValue != null ? `<div class="prev">上期 ${fmt(ind.prevValue)}${ind.unit}</div>` : ""}
       <div class="date">${ind.date || "--"}</div>
-      <canvas id="chart-${i}" width="600" height="160"></canvas>
-    </div>`).join("")}
+      <canvas id="chart-${i}"></canvas>
+    </div>`;
+    }).join("")}
   </div>
 </div>
-<div class="footer">金融仪表盘 · 数据来源: 新浪财经 / 东方财富</div>
+<div class="footer">金融仪表盘 · 数据来源: 新浪财经 / 东方财富 · Neo-Brutalism</div>
 
 <script>
 const MACRO_DATA = ${JSON.stringify(macroData)};
@@ -228,8 +360,8 @@ function drawChart(canvas, history) {
 
   function render(hoverIdx) {
     ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     ctx.beginPath();
     let first = true;
@@ -240,7 +372,7 @@ function drawChart(canvas, history) {
     ctx.stroke();
 
     for (const p of points) {
-      ctx.fillStyle = '#22c55e';
+      ctx.fillStyle = '#000000';
       ctx.beginPath();
       ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
       ctx.fill();
@@ -248,42 +380,42 @@ function drawChart(canvas, history) {
 
     if (hoverIdx != null) {
       const p = points[hoverIdx];
-      ctx.fillStyle = '#f8fafc';
+      ctx.fillStyle = '#FFE135';
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#22c55e';
+      ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2;
       ctx.stroke();
 
       const label = p.date + '  ' + p.value.toFixed(2);
-      ctx.font = '11px system-ui';
+      ctx.font = '700 11px "JetBrains Mono", ui-monospace, monospace';
       const tw = ctx.measureText(label).width;
-      let lx = p.x - tw / 2 - 6;
-      let ly = p.y - 20;
+      let lx = p.x - tw / 2 - 8;
+      let ly = p.y - 22;
       if (lx < 2) lx = 2;
-      if (lx + tw + 12 > w) lx = w - tw - 14;
+      if (lx + tw + 16 > w) lx = w - tw - 18;
       if (ly < 2) ly = p.y + 12;
-      ctx.fillStyle = '#1e293b';
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#FFE135';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(lx, ly, tw + 12, 18, 4);
+      ctx.rect(lx, ly, tw + 16, 20);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#f8fafc';
+      ctx.fillStyle = '#000000';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, lx + 6, ly + 9);
+      ctx.fillText(label, lx + 8, ly + 10);
     }
 
-    ctx.fillStyle = '#64748b';
-    ctx.font = '10px system-ui';
+    ctx.fillStyle = '#000000';
+    ctx.font = '700 10px "JetBrains Mono", ui-monospace, monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
-    if (points[0]) ctx.fillText(points[0].date, pad.left, h - 2);
+    if (points[0]) ctx.fillText(points[0].date, pad.left, h - 3);
     ctx.textAlign = 'right';
-    if (points[points.length - 1]) ctx.fillText(points[points.length - 1].date, w - pad.right, h - 2);
+    if (points[points.length - 1]) ctx.fillText(points[points.length - 1].date, w - pad.right, h - 3);
   }
 
   render();

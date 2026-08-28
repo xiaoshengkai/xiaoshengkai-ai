@@ -15,6 +15,7 @@
 - **微调单选+参考图回退**：页选择改 radio 单选（一次一页）；参考图优先级 上传/粘贴图 > 角色参考图 > 当前页（不再用坏页当基底，错误不被保留）
 - **prompt 强化**：每说话人仅一个气泡尾部指向该人物/左人左泡右人右泡；画面干净无黑点
 - **日志增强**：storyboard/generate-pages/tweak 打印提交给 AI 的最终 prompt 全文（system+user / 图片 prompt）+ AI 原始返回
+- **hot-news 定时任务**：新增每日热点新闻聚合（baidu/douyin/sina/toutiao/weibo/zhihu 六源并行抓取 → 关键词分类去重 → HTML 仪表盘 `dashboard.html`）
 
 ### 踩坑
 - Seedream baseURL 用 `/api/plan/v3`（plan key），文档示例为 `/api/v3`；存 `.env` 可在设置页改

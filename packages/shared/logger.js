@@ -1,28 +1,61 @@
 import fs from "node:fs";
 import path from "node:path";
 
+const MAX_DAYS = 7;
+
+// 本地时区日期（与内容时间戳 toLocaleString 一致）。
+// 弃用 toISOString().slice(0,10)：那是 UTC，CST 凌晨 0-8 点会错一天。
+function localDateString(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// 清理超过 MAX_DAYS 的日志文件
+function cleanOldLogs(logDir, prefix) {
+  try {
+    const cutoff = Date.now() - MAX_DAYS * 86400000;
+    const files = fs.readdirSync(logDir).filter(f => f.startsWith(prefix) && f.endsWith(".log"));
+    for (const f of files) {
+      const dateStr = f.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+      if (dateStr && new Date(dateStr).getTime() < cutoff) {
+        fs.unlinkSync(path.join(logDir, f));
+      }
+    }
+  } catch { /* ignore */ }
+}
+
 export function createLogger(source, logDir) {
   fs.mkdirSync(logDir, { recursive: true });
-  const LOG_FILE = path.join(logDir, `app-${new Date().toISOString().slice(0, 10)}.log`);
-
-  const MAX_DAYS = 7;
-  const files = fs.readdirSync(logDir).filter(f => f.endsWith(".log"));
-  for (const f of files) {
-    const dateStr = f.match(/\d{4}-\d{2}-\d{2}/)?.[0];
-    if (dateStr && Date.now() - new Date(dateStr).getTime() > MAX_DAYS * 86400000) {
-      fs.unlinkSync(path.join(logDir, f));
-    }
-  }
+  const safeSource = String(source || "app");
+  let lastCleanDate = localDateString();
+  cleanOldLogs(logDir, "app-");
 
   const origLog = console.log;
   const origErr = console.error;
   const origWarn = console.warn;
   const origInfo = console.info;
 
+  // 倒序缓存：最新在前，跨天切文件时才读一次磁盘
+  let buffer = "";
+  let bufferFile = "";
+
   function writeLog(level, args) {
-    const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${source}] [${level}] ${args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ")}\n`;
-    const old = fs.existsSync(LOG_FILE) ? fs.readFileSync(LOG_FILE, "utf-8") : "";
-    fs.writeFileSync(LOG_FILE, line + old);
+    // 每次写日志动态算「今天」的文件名：跨天自动切文件（不再用启动时固化的常量）
+    const today = localDateString();
+    if (today !== lastCleanDate) {
+      lastCleanDate = today;
+      cleanOldLogs(logDir, "app-");
+    }
+    const file = path.join(logDir, `app-${today}.log`);
+    if (bufferFile !== file) {
+      bufferFile = file;
+      buffer = fs.existsSync(file) ? fs.readFileSync(file, "utf-8") : "";
+    }
+    const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${safeSource}] [${level}] ${args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ")}\n`;
+    buffer = line + buffer;
+    fs.writeFileSync(file, buffer);
   }
 
   console.log = (...args) => { origLog(...args); writeLog("LOG", args); };
@@ -31,48 +64,33 @@ export function createLogger(source, logDir) {
   console.info = (...args) => { origInfo(...args); writeLog("INFO", args); };
 }
 
-export function createItemLogger(logDir, itemName) {
-  fs.mkdirSync(logDir, { recursive: true });
-  const logFile = path.join(logDir, `${itemName}.log`);
-
-  function writeln(level, args) {
-    const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${level}] ${args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ")}\n`;
-    const old = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf-8") : "";
-    fs.writeFileSync(logFile, line + old);
-  }
-
-  return {
-    log: (...args) => writeln("LOG", args),
-    info: (...args) => writeln("INFO", args),
-    error: (...args) => writeln("ERR", args),
-    warn: (...args) => writeln("WARN", args),
-  };
-}
-
 export function createDateLogger(source, logDir, itemName) {
   const absLogDir = path.resolve(logDir);
   fs.mkdirSync(absLogDir, { recursive: true });
-  const today = new Date().toISOString().slice(0, 10);
   const safeSource = String(source || "app").replace(/[/\\:*?"<>|\s]/g, "_");
   const safeItemName = String(itemName || "main").replace(/[/\\:*?"<>|\s]/g, "_");
-  const LOG_FILE = path.join(absLogDir, `${safeSource}-${today}.log`);
+  let lastCleanDate = localDateString();
+  cleanOldLogs(absLogDir, `${safeSource}-`);
 
-  const MAX_DAYS = 7;
-  try {
-    const files = fs.readdirSync(absLogDir).filter(f => f.startsWith(`${safeSource}-`) && f.endsWith(".log"));
-    for (const f of files) {
-      const dateStr = f.match(/\d{4}-\d{2}-\d{2}/)?.[0];
-      if (dateStr && Date.now() - new Date(dateStr).getTime() > MAX_DAYS * 86400000) {
-        fs.unlinkSync(path.join(absLogDir, f));
-      }
-    }
-  } catch { /* ignore */ }
+  // 倒序缓存：最新在前，跨天切文件时才读一次磁盘
+  let buffer = "";
+  let bufferFile = "";
 
   function writeln(level, args) {
+    // 动态算「今天」文件名，跨天自动切
+    const today = localDateString();
+    if (today !== lastCleanDate) {
+      lastCleanDate = today;
+      cleanOldLogs(absLogDir, `${safeSource}-`);
+    }
+    const file = path.join(absLogDir, `${safeSource}-${today}.log`);
+    if (bufferFile !== file) {
+      bufferFile = file;
+      buffer = fs.existsSync(file) ? fs.readFileSync(file, "utf-8") : "";
+    }
     const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${safeSource}] [${safeItemName}] [${level}] ${args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ")}\n`;
-    let old = "";
-    try { old = fs.readFileSync(LOG_FILE, "utf-8"); } catch { /* ignore */ }
-    fs.writeFileSync(LOG_FILE, line + old);
+    buffer = line + buffer;
+    fs.writeFileSync(file, buffer);
   }
 
   return {

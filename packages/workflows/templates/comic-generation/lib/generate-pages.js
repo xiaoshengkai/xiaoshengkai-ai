@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateImage } from "@app/shared/llm/index.js";
+import { readState, writeState } from "../../../lib/state.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..", "..", "..");
@@ -12,6 +13,18 @@ const SEED = 42;
 
 function readJson(p) {
   try { return JSON.parse(fs.readFileSync(p, "utf-8")); } catch { return null; }
+}
+
+// 每页开始处理前，把进度写进 state，前端轮询可实时显示「第 N/29 页」
+function updateProgress(executionDir, pageNo, total) {
+  try {
+    const st = readState(executionDir);
+    const gs = st.steps?.find(s => s.id === "generate-pages");
+    if (gs) {
+      gs.progress = `${pageNo}/${total} 页`;
+      writeState(executionDir, st);
+    }
+  } catch { /* ignore */ }
 }
 
 function buildPrompt(p, styleDesc) {
@@ -51,6 +64,8 @@ export async function generatePages(pagesJson, characterRef, styleId, executionD
     const pageNo = p.page || i + 1;
     const file = `pages/page-${String(pageNo).padStart(2, "0")}.png`;
     const filePath = path.join(executionDir, file);
+
+    updateProgress(executionDir, pageNo, pages.length);
 
     // 幂等：已存在的页直接复用（重试只补缺页，不重生成好页）
     if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {

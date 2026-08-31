@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.11.12 (2026-08-31) — 日志系统重构 + 漫画逐页进度 + joke-comic SKILL 数据驱动升级
+
+### 变更
+- **日志系统重构**（`shared/logger.js`）：跨天自动切文件（修复长驻进程启动时固化文件名、跨天写错文件）；本地时区日期（弃用 `toISOString` 的 UTC，凌晨会错一天）；**恢复倒序展示**（最新在上）；跨天清理过期日志（>7 天）；内存 buffer 优化（避免每次读全文件）
+- **漫画逐页进度**：`generate-pages.js` 每页把 `progress="N/29 页"` 写进 state，前端执行详情页 running 时实时显示「正在执行... N/29 页」
+- **joke-comic SKILL 数据驱动升级**：手写「母题库/语言梗技法库/金句三技巧」替换为从 2613 条真实段子提炼的「反转结构公式」（总纲 + 6 子类，各配真实正例 + 何时用 + 占比）；新增「爆点榨取法」（数字对比/跨域对标/跨代延伸/绝杀补刀/升维荒诞 5 维度 + 房贷 40 年示范）；新增「烂梗黑名单」（过时/用滥，与低俗解耦）；创作流程加「检索素材」步骤（`searchKnowledge` learn-jokes）；规则去重归位（一条规则只出现一次）
+- **素材库建设**：A-Joke 笑话 2613 条导入 chroma `chat/learn-jokes`（打标「类型+内核」+ 去重 state），作为段子生成的案例弹药库
+
+### 踩坑
+- minimax Token Plan 429 限流无法批量打标 → 临时用 deepseek-v4-flash（JSON 完整，pro 是推理模型 reasoning 吃满 maxTokens 会截断）
+- 日志「倒序」意味着每次写全文件（O(n²)），app 日志大时慢；workflows 日志几 KB 无感
+
+### 验证
+- typecheck + test（shared 18 + mm 9 + search 5 全绿）；logger 倒序自检通过（文件首行=最新）
+
 ## v0.11.11 (2026-08-28) — joke-comic SKILL 优化：笑点具体化 + 语言梗库 + 分镜对齐 comic
 
 ### 变更

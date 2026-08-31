@@ -16,6 +16,7 @@ import { ImageViewerProvider, useImageViewer } from "@/components/ui/image-viewe
 interface ExecutionStep {
   id: string; name: string; type: string; previewType?: string; previewField?: string;
   status: string; output: string | null; error: string | null; elapsed?: string;
+  progress?: string;
 }
 
 interface Execution {
@@ -884,7 +885,7 @@ function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, o
   }
 
   if (step.status === "running") {
-    return <LoadingState text="正在执行..." />;
+    return <LoadingState text={step.progress ? `正在执行... ${step.progress}` : "正在执行..."} />;
   }
 
   if (step.status === "skipped") {

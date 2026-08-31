@@ -2,6 +2,7 @@ import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 
 const MAX_DIALOGUE_LINES = 3;
+const MAX_DIALOGUE_CHARS = 12;
 const MULTI_PANEL_RE = /分格|上下两部分|双分|多格|分成上下|上半.*下半/;
 
 function countDialogueLines(d) {
@@ -11,7 +12,18 @@ function countDialogueLines(d) {
   return 0;
 }
 
-function validateStoryboard(script, minPages) {
+function dialogueLines(d) {
+  if (!d) return [];
+  if (Array.isArray(d)) return d.map(s => String(s).trim()).filter(Boolean);
+  if (typeof d === "string") return d.split("\n").map(s => s.trim()).filter(Boolean);
+  return [];
+}
+
+function dialogueContentLength(line) {
+  return String(line).replace(/^.*?[：:]/, "").replace(/\s/g, "").length;
+}
+
+export function validateStoryboard(script, minPages) {
   const errors = [];
   if (!script || typeof script !== "object") return ["脚本不是对象"];
   if (!Array.isArray(script.pages) || script.pages.length === 0) {
@@ -23,9 +35,15 @@ function validateStoryboard(script, minPages) {
   }
   script.pages.forEach((p, i) => {
     if (!p.imagePrompt || typeof p.imagePrompt !== "string") errors.push(`第 ${i + 1} 页缺少 imagePrompt`);
+    if (!p.sceneId || typeof p.sceneId !== "string") errors.push(`第 ${i + 1} 页缺少 sceneId`);
+    if (!p.scenePrompt || typeof p.scenePrompt !== "string") errors.push(`第 ${i + 1} 页缺少 scenePrompt`);
     if (p.dialogue === undefined) errors.push(`第 ${i + 1} 页缺少 dialogue`);
-    const n = countDialogueLines(p.dialogue);
+    const lines = dialogueLines(p.dialogue);
+    const n = lines.length;
     if (n > MAX_DIALOGUE_LINES) errors.push(`第 ${i + 1} 页对白 ${n} 句过密（≤${MAX_DIALOGUE_LINES}），请拆成多页`);
+    lines.forEach(line => {
+      if (dialogueContentLength(line) > MAX_DIALOGUE_CHARS) errors.push(`第 ${i + 1} 页对白过长（>${MAX_DIALOGUE_CHARS}字）：${line}`);
+    });
     if (n > 0 && (!Array.isArray(p.cast) || p.cast.length === 0)) errors.push(`第 ${i + 1} 页有对白但缺少 cast（说话人位置），请补充`);
     if (MULTI_PANEL_RE.test(p.imagePrompt || "")) errors.push(`第 ${i + 1} 页 imagePrompt 含多格/上下分屏，每页只画一个镜头，请拆分`);
   });
@@ -42,21 +60,25 @@ export async function generateStoryboard(content, title, pageCount) {
 
   const system = `你是专业的漫画分镜师。把故事拆成漫画分镜，每页一个画面。
 
+每页必须包含场景连续性字段：
+- sceneId：同一地点、同一道具布局、同一连续对话使用同一个英文短横线 id，如 "bank-counter"；换时间/地点/剧情阶段才换新 id。
+- scenePrompt：该 sceneId 的固定场景描述，同一 sceneId 必须逐字一致，写清地点、环境道具、人物基础站位、镜头轴线。
+
 每页 imagePrompt 必须包含四要素（缺一不可）：
-1.【背景】时间+地点+环境道具（如"白天·开放式办公区，显示器/咖啡杯/绿植"），每页都要交代，不可省略。
+1.【背景】只写本页新增变化，不重复完整固定场景；固定场景放 scenePrompt。
 2.【人物】本页出场的每个角色：名字+位置（左/右/前景/背景）+动作+表情。角色外貌由参考图锁定，用名字指代即可，不要重复描述外貌。
 3.【构图】单一景别（特写/中景/全景）+机位。每页只画一个镜头、单一构图，禁止"分格/上下两部分/双分格/多格堆叠"。
 4.【说话人】明确谁在说话、朝向与位置，使对白气泡能对准人物。
-5.【cast】本页每个出场说话角色的位置：[{"name":"角色名","side":"left|right|center"}]，用于程序化放置对白气泡，必须与【人物】位置一致。
+5.【cast】本页每个出场说话角色的位置：[{"name":"角色名","side":"left|right|center"}]，必须与【人物】位置一致。
 
 对白规则：
 - dialogue 为字符串数组，每个元素一句「名字: 台词」。
-- 每页对白≤3 句（1-2 个来回）。对话密集必须拆成多页，宁可页数多，不可一页堆对话。
+- 每页对白≤3 句（1-2 个来回）。每句台词正文≤12个汉字，长句必须拆成多页或压缩表达。
 - 谁说谁必须与故事原文严格对应，不得张冠李戴、不得合并/省略说话人。
 - 无对白页 dialogue 为空数组 []。
 
 只输出 JSON，格式：
-{ "title": "标题", "pages": [ { "page": 1, "imagePrompt": "【背景】白天·办公区【人物】左:小张(皱眉) 右:PM(前倾)【构图】中景【说话人】PM在说话", "cast": [{"name":"小张","side":"left"},{"name":"PM","side":"right"}], "dialogue": ["PM: …", "小张: …"] } ] }`;
+{ "title": "标题", "pages": [ { "page": 1, "sceneId": "office-desk", "scenePrompt": "固定场景：白天·开放式办公区，小张在左，PM在右，桌上有显示器、咖啡杯和绿植，镜头轴线保持左右对话。", "imagePrompt": "【背景】PM身体前倾【人物】左:小张(皱眉) 右:PM(前倾)【构图】中景【说话人】PM在说话", "cast": [{"name":"小张","side":"left"},{"name":"PM","side":"right"}], "dialogue": ["PM: …", "小张: …"] } ] }`;
 
   const user = `故事标题: ${title || "未命名"}
 故事内容:

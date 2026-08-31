@@ -31,11 +31,33 @@ function toDataUrl(filePath) {
 }
 
 // 上传图路径可能是 /api/uploads/<filename>（前端 upload API 返回），转成本地文件
-function resolveUploadPath(p) {
+function resolveUploadPath(p, projectRoot = PROJECT_ROOT) {
   if (!p) return null;
   const m = String(p).match(/^\/api\/uploads\/(.+)$/);
-  if (m) return path.join(PROJECT_ROOT, "data", "static", "images", m[1]);
+  if (m) return path.join(projectRoot, "data", "static", "images", m[1]);
   return fs.existsSync(p) ? p : null;
+}
+
+export function replaceComicPage(execDir, pageNo, imagePath, projectRoot = PROJECT_ROOT) {
+  const state = readState(execDir);
+  const genStep = state.steps?.find(s => s.id === "generate-pages");
+  const pages = genStep?.output?.pages;
+  if (!Array.isArray(pages)) return { ok: false, error: "暂无漫画页" };
+
+  const page = pages.find(p => Number(p.page) === Number(pageNo));
+  if (!page?.file) return { ok: false, error: `第 ${pageNo} 页不存在` };
+
+  const src = resolveUploadPath(imagePath, projectRoot);
+  if (!src || !fs.existsSync(src)) return { ok: false, error: "替换图片不存在" };
+
+  const dest = path.join(execDir, page.file);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, dest);
+  page.replaced = true;
+  page.replacedAt = new Date().toISOString();
+  state.tweakCount = (state.tweakCount || 0) + 1;
+  writeState(execDir, state);
+  return { ok: true, file: page.file };
 }
 
 /** 上传图交给 vision 模型读成「修改意图」文字，失败降级返回空（不阻断微调） */

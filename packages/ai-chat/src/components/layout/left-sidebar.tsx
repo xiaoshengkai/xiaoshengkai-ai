@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   Pin,
   Trash2,
+  Pencil,
 } from "lucide-react";
 
 interface Conversation {
@@ -61,6 +62,8 @@ export default function LeftSidebar({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
   const { clearMessagesRef, refreshKey } = useConversation();
 
   const fetchConversations = useCallback(async () => {
@@ -100,6 +103,22 @@ export default function LeftSidebar({
     try {
       await fetch(`${BASE}/api/conversations/delete?id=${id}`, { method: "DELETE" });
       setConversations(prev => prev.filter(c => c.id !== id));
+    } catch { /* ignore */ }
+  };
+
+  const startRename = (conv: Conversation) => {
+    setMenuOpen(null);
+    setEditingId(conv.id);
+    setDraft(conv.title);
+  };
+
+  const commitRename = async (id: string) => {
+    const title = draft.trim().slice(0, 30);
+    setEditingId(null);
+    if (!title) return;
+    try {
+      const res = await fetch(`${BASE}/api/conversations/rename?id=${encodeURIComponent(id)}&title=${encodeURIComponent(title)}`, { method: "POST" });
+      if (res.ok) setConversations(prev => prev.map(c => c.id === id ? { ...c, title } : c));
     } catch { /* ignore */ }
   };
 
@@ -146,7 +165,22 @@ export default function LeftSidebar({
               className={`group flex items-center gap-2 px-2 py-1.5 cursor-pointer text-sm font-mono border-2 relative
                 ${activeConversationId === conv.id ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
             >
-              <span className="flex-1 truncate">{conv.title}</span>
+              {editingId === conv.id ? (
+                <input
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename(conv.id);
+                    else if (e.key === "Escape") setEditingId(null);
+                  }}
+                  onBlur={() => commitRename(conv.id)}
+                  className="flex-1 min-w-0 bg-card text-foreground border-2 border-border px-1 text-sm font-mono focus:outline-none"
+                />
+              ) : (
+                <span className="flex-1 truncate">{conv.title}</span>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -170,6 +204,13 @@ export default function LeftSidebar({
                   >
                     <Pin className="size-3.5" />
                     <span>{conv.pinned ? "取消置顶" : "置顶"}</span>
+                  </button>
+                  <button
+                    onClick={() => startRename(conv)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono hover:bg-muted cursor-pointer w-full text-foreground"
+                  >
+                    <Pencil className="size-3.5" />
+                    <span>重命名</span>
                   </button>
                   <button
                     onClick={() => handleDelete(conv.id)}

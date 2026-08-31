@@ -71,9 +71,9 @@ async function main() {
       process.stdout.write(JSON.stringify({ templates }));
     }
   } else if (command === "tweak-auto") {
-    const { executionId, feedback, images, pages } = JSON.parse(args[0]);
+    const { executionId, feedback, images, pages, mode } = JSON.parse(args[0]);
     const { tweakAuto } = await import("./lib/tweak-auto.js");
-    const result = await tweakAuto(executionId, feedback, images, pages);
+    const result = await tweakAuto(executionId, feedback, images, pages, mode);
     process.stdout.write(JSON.stringify(result || { ok: true }));
   } else if (command === "switch-version") {
     const { executionId, version } = JSON.parse(args[0]);

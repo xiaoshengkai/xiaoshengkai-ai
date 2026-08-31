@@ -52,7 +52,7 @@ ai-engineer-journey/
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir
-    │   ├── test/               # 共享测试（capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal）
+    │   ├── test/               # 共享测试（capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store）
     │   └── llm/                # LLM 共享封装
     │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
     │       ├── config.js       # providers.json / selection.json fresh-read（真源，env 兜底）
@@ -102,7 +102,8 @@ ai-engineer-journey/
             │   ├── actions.json # 模板级动作（generate-content/upload/tweak/switch-version）
             │   └── lib/         # prompt / generate-content / tweak / switch-version / script-version / tweak-builder / schema / render / tts / bgm / ...
             └── comic-generation/# 漫画生成（2 步：script/generate-pages）
-                └── lib/         # storyboard / generate-pages
+                ├── actions.json # 模板级动作（export / scene-group / generate-content）
+                └── lib/         # storyboard / generate-pages / tweak / scene-groups / export / generate-content
 ```
 
 ## 能力注册机制（v0.11.0）
@@ -126,7 +127,7 @@ ai-chat 对 workflows/tasks 只保留 1 个 catch-all 挂载点（`app/api/{work
 **动作声明位置**：
 
 - `workflows/actions.json`：引擎级 18 动作（执行 10：templates / execute / executions / get / delete / file / next / auto / retry / skip；资产库 8：characters 列表/生成/保存/删除/文件流 + styles 列表/创建/删除）
-- `templates/<name>/actions.json`：模板特有动作；video-generation 声明 generate-content / upload / tweak / switch-version；http.js 启动时扫描合并，method+path 重复即抛错
+- `templates/<name>/actions.json`：模板特有动作；video-generation 声明 generate-content / upload / tweak / switch-version；comic-generation 声明 export / scene-group / generate-content；http.js 启动时扫描合并，method+path 重复即抛错
 - `tasks/actions.json`：list / run / edit / dashboard（handler 在 `tasks/lib/handlers.js`）
 
 **路径匹配**：`:name` 捕获段、尾部 `*` 捕获剩余段；`required` 对 undefined/null/"" 判缺（`version=0` 合法）。
@@ -220,7 +221,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 - `templates/tech-video/`：科技风短视频（script.json 驱动 + 逐场景 TTS + BGM + SFX + 硬字幕 + SRT）
 - `templates/video-generation/`：视频生成（含微调/版本切换/内容生成等模板级动作）
-- `templates/comic-generation/`：漫画生成（故事→AI 分镜→逐页生成漫画图；角色参考图锁人物一致性 + 风格库锁画风）
+- `templates/comic-generation/`：漫画生成（故事→AI 分镜→逐页生成漫画图；`sceneId/scenePrompt` 锁连续场景，首张同场景页作锚点；角色参考图锁人物一致性 + 风格库锁画风；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
 
 ### 资产库（工作流级通用）
 

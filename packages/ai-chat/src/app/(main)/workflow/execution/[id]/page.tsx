@@ -37,6 +37,12 @@ const V2_GROUPS = [
   { label: "合成", stepIds: ["concat"] },
 ];
 
+function sceneLabel(p: { sceneId?: string; scenePrompt?: string }): string {
+  const t = (p.scenePrompt || "").replace(/^固定场景[:：]\s*/, "").trim();
+  if (t) return t.length > 16 ? `${t.slice(0, 16)}…` : t;
+  return p.sceneId || "未命名场景";
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return "-";
   const d = new Date(iso);
@@ -68,6 +74,7 @@ export default function ExecutionDetailPage() {
   const [locked, setLocked] = useState(false);
   const [showTweak, setShowTweak] = useState(false);
   const [tweakFeedback, setTweakFeedback] = useState("");
+  const [tweakMode, setTweakMode] = useState<"ai" | "replace">("ai");
   const [tweakImages, setTweakImages] = useState<{ id: string; url: string; path: string | null; isUploading: boolean }[]>([]);
   const [tweaking, setTweaking] = useState(false);
   const [switchingVersion, setSwitchingVersion] = useState<number | null>(null);
@@ -117,6 +124,14 @@ export default function ExecutionDetailPage() {
       if (!g?.output) return [];
       const out = typeof g.output === "string" ? JSON.parse(g.output) : g.output;
       return (out?.pages || []) as { page: number }[];
+    } catch { return []; }
+  })();
+  const comicScriptPages: { page: number; sceneId?: string; scenePrompt?: string }[] = (() => {
+    try {
+      const s = execution?.steps?.find(step => step.id === "script");
+      const out = typeof s?.output === "string" ? JSON.parse(s.output) : s?.output;
+      const script = typeof out?.script === "string" ? JSON.parse(out.script) : out?.script;
+      return (script?.pages || []) as { page: number; sceneId?: string; scenePrompt?: string }[];
     } catch { return []; }
   })();
 
@@ -225,6 +240,18 @@ export default function ExecutionDetailPage() {
     setSkipping(null);
   }, [id, fetchExecution]);
 
+  const handleSceneGroup = useCallback(async (page: number, mode: "merge-prev" | "new-scene") => {
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${id}/scene-group`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page, mode }),
+      });
+      const data = await res.json();
+      if (data.ok) { toast("🟢 场景分组已更新"); fetchExecution(); }
+      else toast(`🔴 ${data.error}`);
+    } catch { toast("🔴 请求失败"); }
+  }, [id, fetchExecution]);
+
   const handleDelete = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}/api/workflows/execution/${id}`, { method: "DELETE" });
@@ -259,58 +286,67 @@ export default function ExecutionDetailPage() {
   }, []);
 
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
-    const files = Array.from(e.clipboardData.files).filter(f => f.type.startsWith("image/"));
-    if (files.length === 0) return;
+    const files = Array.from(e.clipboardData.items || [])
+      .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+      .map(item => item.getAsFile())
+      .filter((f): f is File => Boolean(f));
+    const fallback = Array.from(e.clipboardData.files || []).filter(f => f.type.startsWith("image/"));
+    const images = files.length ? files : fallback;
+    if (images.length === 0) return;
     e.preventDefault();
-    const remaining = 4 - tweakImages.length;
-    for (const f of files.slice(0, remaining)) {
+    const limit = tweakMode === "replace" ? 1 : 4;
+    const remaining = limit - tweakImages.length;
+    for (const f of images.slice(0, remaining)) {
       await uploadImage(f);
     }
-    if (files.length > remaining) toast("🟡 最多 4 张图片");
-  }, [tweakImages.length, uploadImage]);
+    if (images.length > remaining) toast(`🟡 最多 ${limit} 张图片`);
+  }, [tweakImages.length, uploadImage, tweakMode]);
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const remaining = 4 - tweakImages.length;
+    const limit = tweakMode === "replace" ? 1 : 4;
+    const remaining = limit - tweakImages.length;
     for (const f of files.slice(0, remaining)) {
       await uploadImage(f);
     }
-    if (files.length > remaining) toast("🟡 最多 4 张图片");
+    if (files.length > remaining) toast(`🟡 最多 ${limit} 张图片`);
     e.target.value = "";
-  }, [tweakImages.length, uploadImage]);
+  }, [tweakImages.length, uploadImage, tweakMode]);
 
   const removeImage = useCallback((id: string) => {
     setTweakImages(prev => prev.filter(i => i.id !== id));
   }, []);
 
   const handleTweak = useCallback(async () => {
-    if (!tweakFeedback.trim()) { toast("🔴 请输入反馈"); return; }
-    if (isComic && tweakPages.length !== 1) { toast("🔴 请选择要重生成的一页"); return; }
+    const imagePaths = tweakImages.map(i => i.path).filter(Boolean);
+    if (tweakMode === "ai" && !tweakFeedback.trim()) { toast("🔴 请输入反馈"); return; }
+    if (isComic && tweakPages.length !== 1) { toast("🔴 请选择要处理的一页"); return; }
+    if (tweakMode === "replace" && imagePaths.length !== 1) { toast("🔴 请上传或粘贴 1 张替换图"); return; }
     const uploading = tweakImages.filter(i => i.isUploading);
     if (uploading.length > 0) { toast("🔴 图片上传中，请稍候"); return; }
-    clientLog(id, "INFO", `handleTweak start: feedback="${tweakFeedback}" images=${tweakImages.length}`);
+    clientLog(id, "INFO", `handleTweak start: mode=${tweakMode} feedback="${tweakFeedback}" images=${tweakImages.length}`);
     setTweaking(true);
     setTweakFeedback("");
     setTweakImages([]);
     setShowTweak(false);
 
     try {
-      const imagePaths = tweakImages.map(i => i.path).filter(Boolean);
       const res = await fetch(`${BASE}/api/workflows/execution/${id}/tweak`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedback: tweakFeedback, imagePaths, pages: isComic ? tweakPages : undefined }),
+        body: JSON.stringify({ mode: tweakMode, feedback: tweakFeedback, imagePaths, pages: isComic ? tweakPages : undefined }),
       });
       const data = await res.json();
       clientLog(id, "INFO", `handleTweak response: ok=${data.ok} status=${data.status}`);
       if (data.ok) {
-        toast(`🟢 微调已提交，正在生成中...`);
+        toast(tweakMode === "replace" ? "🟢 图片替换已提交" : `🟢 微调已提交，正在生成中...`);
         fetchExecution();
+        if (tweakMode === "replace") window.setTimeout(fetchExecution, 500);
       } else {
         toast(`🔴 ${data.error}`);
       }
     } catch { toast("🔴 请求失败"); }
     setTweaking(false);
-  }, [id, tweakFeedback, tweakImages, fetchExecution, isComic, tweakPages]);
+  }, [id, tweakFeedback, tweakImages, fetchExecution, isComic, tweakPages, tweakMode]);
 
   const openTweakForPage = useCallback((page: number) => {
     setTweakPages([page]);
@@ -389,7 +425,7 @@ export default function ExecutionDetailPage() {
           </button>
         )}
         {isDone && supportsTweak && (
-          <button onClick={() => { setShowTweak(true); if (isComic) setTweakPages([]); }}
+          <button onClick={() => { setShowTweak(true); setTweakMode("ai"); if (isComic) setTweakPages([]); }}
             disabled={isTweakRunning}
             className={`brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold ${isTweakRunning ? "bg-muted text-muted-foreground" : "bg-purple text-white"}`}>
             <Edit3 className="w-3 h-3" /> 微调
@@ -461,6 +497,20 @@ export default function ExecutionDetailPage() {
                       state.json
                     </button>
                   </div>
+                  {isComic && scriptJsonTab === "script" && comicScriptPages.some(p => Boolean(p.sceneId)) &&
+                    execution.steps.find(s => s.id === "generate-pages")?.status === "pending" && (
+                    <div className="mb-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">场景分组（生图前确认）：同场景页面复用同一背景与机位。</p>
+                      {comicScriptPages.map((p, idx) => (
+                        <div key={p.page} className="border-2 border-border bg-card p-2 text-xs flex items-start gap-2">
+                          <span className="font-bold shrink-0">第 {p.page} 页</span>
+                          <span className="text-muted-foreground flex-1">{sceneLabel(p)}</span>
+                          <button disabled={idx === 0} onClick={() => handleSceneGroup(p.page, "merge-prev")} className="underline disabled:opacity-40">并入上一场景</button>
+                          <button onClick={() => handleSceneGroup(p.page, "new-scene")} className="underline">从此页新场景</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <pre className="text-xs bg-yellow-soft p-4 border-[3px] border-border shadow-md overflow-auto max-h-[70vh] whitespace-pre-wrap">
                     {scriptJsonTab === "script"
                       ? (() => {
@@ -522,6 +572,7 @@ export default function ExecutionDetailPage() {
       <AlertDialog open={showTweak} onOpenChange={setShowTweak}>
         <AlertDialogContent className="max-w-lg rounded-none border-2 border-[var(--border)]"
           style={{ boxShadow: "4px 4px 0 var(--border)", background: "#fff" }}
+          onPaste={handlePaste}
         >
           <AlertDialogHeader>
             <AlertDialogTitle className="font-extrabold text-lg text-foreground">
@@ -529,6 +580,12 @@ export default function ExecutionDetailPage() {
             </AlertDialogTitle>
           </AlertDialogHeader>
           <div className="py-2 space-y-3">
+            {isComic && (
+              <div className="flex gap-2 text-xs">
+                <button onClick={() => setTweakMode("ai")} className={`px-2 py-1 border-2 border-border font-bold ${tweakMode === "ai" ? "bg-purple text-white" : "bg-card"}`}>AI 微调</button>
+                <button onClick={() => setTweakMode("replace")} className={`px-2 py-1 border-2 border-border font-bold ${tweakMode === "replace" ? "bg-purple text-white" : "bg-card"}`}>直接替换图片</button>
+              </div>
+            )}
             {isComic && comicPages.length > 0 && (
               <div>
                 <label className="text-xs font-bold text-foreground block mb-1.5">重生成哪一页？（单选）</label>
@@ -544,18 +601,26 @@ export default function ExecutionDetailPage() {
               </div>
             )}
             <div>
+              {tweakMode === "replace" && (
+                <div className="border-2 border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  上传或 Ctrl+V 粘贴 1 张图片，确认后直接替换选中页，不调用 AI。
+                </div>
+              )}
+              {tweakMode === "ai" && (
+              <>
               <label className="text-xs font-bold text-foreground block mb-1.5">
                 你想调整哪里？
               </label>
               <textarea
                 value={tweakFeedback}
                 onChange={(e) => setTweakFeedback(e.target.value)}
-                onPaste={handlePaste}
-                placeholder="例如：第3帧太快了&#10;把背景换成蓝色&#10;标题字号加大"
+                placeholder="例如：修复手部、减少错字、背景更干净"
                 className="w-full h-28 px-3 py-2 text-sm border-2 border-[var(--border)] rounded-none resize-none focus:outline-none focus:border-[var(--purple)] bg-card"
                 style={{ boxShadow: "2px 2px 0 var(--muted)" }}
                 disabled={tweaking || (execution.tweakCount !== undefined && execution.tweakLimit !== undefined && execution.tweakCount >= execution.tweakLimit)}
               />
+              </>
+              )}
               {tweakImages.length > 0 && (
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {tweakImages.map(img => (
@@ -572,11 +637,11 @@ export default function ExecutionDetailPage() {
               )}
               <div className="flex items-center gap-2 mt-1.5">
                 <label className="text-xs text-muted-foreground/70 cursor-pointer underline hover:text-muted-foreground">
-                  <input type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" disabled={tweakImages.length >= 4} />
+                  <input type="file" accept="image/*" multiple={tweakMode === "ai"} onChange={handleFileSelect} className="hidden" disabled={tweakImages.length >= (tweakMode === "replace" ? 1 : 4)} />
                   上传图片
                 </label>
                 <span className="text-xs text-muted-foreground/70">或 Ctrl+V 粘贴截图</span>
-                <span className="text-xs text-muted-foreground/50 ml-auto">{tweakImages.length}/4</span>
+                <span className="text-xs text-muted-foreground/50 ml-auto">{tweakImages.length}/{tweakMode === "replace" ? 1 : 4}</span>
               </div>
             </div>
           </div>
@@ -596,7 +661,7 @@ export default function ExecutionDetailPage() {
             </button>
             <button
               onClick={handleTweak}
-              disabled={tweaking || !tweakFeedback.trim() || (execution.tweakCount !== undefined && execution.tweakLimit !== undefined && execution.tweakCount >= execution.tweakLimit)}
+              disabled={tweaking || (tweakMode === "ai" && !tweakFeedback.trim()) || (execution.tweakCount !== undefined && execution.tweakLimit !== undefined && execution.tweakCount >= execution.tweakLimit)}
               className="px-4 py-1.5 text-xs font-bold cursor-pointer"
               style={{
                 border: "2px solid var(--border)",

@@ -9,6 +9,7 @@ import { createCapabilityHandler, loadActions } from "@app/shared/capability.js"
 import { handle as generateContent } from "./templates/video-generation/lib/generate-content.js";
 import { handle as comicExport } from "./templates/comic-generation/lib/export.js";
 import { handle as comicGenerateContent } from "./templates/comic-generation/lib/generate-content.js";
+import { handle as comicSceneGroup } from "./templates/comic-generation/lib/scene-groups.js";
 import {
   listCharacterHandler,
   generateCharacterHandler,
@@ -29,6 +30,7 @@ const CUSTOM_HANDLERS = {
   "generate-content": generateContent,
   "comic-export": comicExport,
   "comic-generate-content": comicGenerateContent,
+  "comic-scene-group": comicSceneGroup,
   "list-characters": listCharacterHandler,
   "generate-character": generateCharacterHandler,
   "save-character": saveCharacterHandler,

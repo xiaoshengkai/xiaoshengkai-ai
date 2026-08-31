@@ -12,7 +12,7 @@ const ASPECT_TO_SIZE = {
   "21:9": "3136x1344",
 };
 
-export async function generateImage(prompt, { aspectRatio = "1:1", model, image_url, n = 1, watermark = false } = {}) {
+export async function generateImage(prompt, { aspectRatio = "1:1", model, image_url, n = 1, watermark = false, seed } = {}) {
   const apiKey = getApiKey("volcengine", "VOLCENGINE_API_KEY");
   if (!apiKey) throw new Error("未配置 VOLCENGINE_API_KEY");
 
@@ -28,6 +28,7 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model, image_
     watermark,
   };
   if (image_url) body.image = image_url;
+  if (seed !== undefined) body.seed = seed;
   if (n > 1) {
     body.sequential_image_generation = "auto";
     body.sequential_image_generation_options = { max_images: n };

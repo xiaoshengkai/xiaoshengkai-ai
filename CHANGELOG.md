@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.11.13 (2026-08-31) — 漫画场景连续性 + 直接替换页图
+
+### 变更
+- **漫画分镜场景分组**：`storyboard.js` 要求每页输出 `sceneId` + `scenePrompt`；同一连续场景复用固定场景描述，换时间/地点/剧情阶段才换 `sceneId`
+- **降低气泡错字率**：分镜校验增加单句对白正文 ≤12 字，长句触发重试拆页；仍保留 AI 原生气泡，不做程序化叠字
+- **场景锚点图**：`generate-pages.js` 同一 `sceneId` 的第一页作为锚点，后续页优先参考该锚点，并把固定场景描述写入图片 prompt
+- **分镜后手动修正分组**：执行详情页的 `script.json` 预览中，漫画页可点「并入上一场景」或「从此页新场景」；后端新增 `/execution/:id/scene-group`
+- **微调直接替换图片**：漫画微调弹窗新增 `AI 微调` / `直接替换图片` 模式；直接替换要求选 1 页 + 上传/粘贴 1 张图，不调用 AI，直接覆盖对应页图片
+- **直接替换刷新修复**：替换成功时递增 `tweakCount`，复用图片 `?v=` 缓存破坏；弹窗级监听粘贴事件，直接替换模式隐藏 textarea 后仍可 Ctrl+V
+- **聊天重命名**：侧边栏对话菜单加「重命名」（内联 input，Enter/失焦提交、Esc 取消）；新增 `POST /api/conversations/rename`；记录加 `titleLocked`，重命名后 AI 回复触发的自动 save 不再覆盖用户标题
+- **场景面板中文化+展示条件**：执行详情页场景分组面板仅在「comic + 分镜含 sceneId + 生图未开始」时展示；场景名取 scenePrompt 中文摘要，不再显示英文 slug/no-scene；顶部加说明行
+- **joke-comic SKILL 对齐**：分镜规格补 sceneId/scenePrompt（对齐工作流硬校验）；数字诡辩正例换成房贷 40 年（原正例与烂梗黑名单自相矛盾）；明确「画面里具体说话的拟人角色入 cast，抽象概念不入」
+- **Seedream seed 透传**：`volcengine.js` 不再丢弃 `seed` 参数
+
+### 验证
+- 新增 `comic-workflow.test.js` 覆盖对白长度/场景字段、场景 prompt、直接替换页图、场景分组更新
+- `node --test packages/shared/test/comic-workflow.test.js`、`npm run typecheck`、`npm run test`、`npm run build` 全绿
+
 ## v0.11.12 (2026-08-31) — 日志系统重构 + 漫画逐页进度 + joke-comic SKILL 数据驱动升级
 
 ### 变更

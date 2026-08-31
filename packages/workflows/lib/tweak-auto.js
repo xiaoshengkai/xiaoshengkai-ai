@@ -24,7 +24,7 @@ function setTweakStatus(executionId, status, error) {
   } catch { /* ignore */ }
 }
 
-export async function tweakAuto(executionId, feedback, images, pages) {
+export async function tweakAuto(executionId, feedback, images, pages, mode) {
   const logger = createDateLogger("workflows", LOG_DIR, executionId);
 
   const dir = path.join(DATA_DIR, executionId);
@@ -34,6 +34,7 @@ export async function tweakAuto(executionId, feedback, images, pages) {
     feedback,
     images: images || [],
     pages: pages || [],
+    mode: mode || "ai",
     startedAt: new Date().toISOString(),
     completedAt: null,
     version: null,
@@ -48,6 +49,19 @@ export async function tweakAuto(executionId, feedback, images, pages) {
     setTweakStatus(executionId, "failed", "该模板不支持微调");
     logger.error("[tweak-auto] 该模板不支持微调: " + state.template);
     return { ok: false, error: "该模板不支持微调" };
+  }
+
+  if (mode === "replace") {
+    const page = pages?.[0];
+    const image = images?.[0];
+    const data = tweakMod.replaceComicPage?.(dir, page, image);
+    if (!data?.ok) {
+      setTweakStatus(executionId, "failed", data?.error || "replace failed");
+      return { ok: false, error: data?.error };
+    }
+    setTweakStatus(executionId, "done");
+    logger.info(`[tweak-auto] replaced page ${page}: ${data.file}`);
+    return { ok: true };
   }
 
   try {
@@ -73,6 +87,7 @@ export async function tweakAuto(executionId, feedback, images, pages) {
       feedback,
       images: images || [],
       pages: pages || [],
+      mode: mode || "ai",
     };
     writeState(dir, fresh);
 

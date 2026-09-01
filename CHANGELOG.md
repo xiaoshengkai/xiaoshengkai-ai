@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.15 (2026-09-01) — 工作流手动步进卡死修复 + 场景分组按钮修复
+
+### 变更
+- **「下一步」按钮卡死修复**：执行页原用整体 `status === "running"` 禁用「下一步/自动执行」，但引擎 `runNextStep` 完成非末步后不写终态（status 保持 running）→ 手动步进模式第 1 步完成后按钮永久禁用，v0.11.13「生图前确认」暂停变死局；改用步骤级活动信号 `anyStepRunning || isTweakRunning` 判定禁用
+- **列表「待下一步」态**：`listExecutions` 增加 `runningSteps`；列表页对 running 但无 running 步骤且未完成显示「⏸ 待下一步」（不脉冲），消除「🔄 执行中」误导
+- **场景分组按钮报「第 undefined 页不存在」修复**：capability dispatcher 的 custom 原语只传 `{params, rest, request}` 不传 `body`，`scene-groups.js` 却解构 `body`；对齐 generate-content.js 约定改 `request.json()`
+
+### 踩坑
+- prod 是 `next start`（无热更），代码改动必须 `scripts/prod.sh` 重建+重启才生效；后台跑 prod.sh 要 detached 启动，否则 shell 超时 kill（SIGTERM, npm code 143）会连带杀掉刚起的服务
+
+### 验证
+- typecheck + test（22+11+5）全绿；prod 已 redeploy
+- scene-group 真实 curl：new-scene → ok（sceneId subway-car-2）、merge-prev 无损还原；卡住执行刷新后按钮可点
+
 ## v0.11.14 (2026-09-01) — DeepSeek vision 模型接入 + 设置页模型概况（余额/可用性差异抹平）
 
 ### 变更

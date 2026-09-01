@@ -16,7 +16,7 @@ interface Template {
 
 interface Execution {
   executionId: string; title: string; template: string; templateLabel: string; status: string;
-  totalSteps: number; completedSteps: number; startedAt: string; completedAt: string | null;
+   totalSteps: number; completedSteps: number; runningSteps?: number; startedAt: string; completedAt: string | null;
   failedStep: string | null; failedError: string | null;
 }
 
@@ -362,6 +362,7 @@ export default function WorkflowTypePage() {
                 : exe.status === "completed_with_warnings" ? "var(--yellow)"
                 : exe.status === "completed" ? "var(--blue)" : "var(--muted-foreground)";
               const pct = Math.round((exe.completedSteps / exe.totalSteps) * 100);
+              const awaiting = exe.status === "running" && (exe.runningSteps || 0) === 0 && exe.completedSteps < exe.totalSteps;
               return (
                 <div key={exe.executionId}
                   className="brutal-btn bg-card p-3 cursor-pointer"
@@ -371,7 +372,7 @@ export default function WorkflowTypePage() {
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                       exe.status === "completed" ? "bg-lime" :
                       exe.status === "completed_with_warnings" ? "bg-yellow" :
-                      exe.status === "running" ? "bg-yellow animate-pulse" :
+                      exe.status === "running" ? (awaiting ? "bg-yellow" : "bg-yellow animate-pulse") :
                       exe.status === "failed" ? "bg-destructive" : "bg-muted-foreground"
                     }`} />
                     <span className="text-sm font-bold text-foreground truncate">
@@ -386,7 +387,7 @@ export default function WorkflowTypePage() {
                     }`}>
                       {exe.status === "completed" ? "✅ 完成" :
                        exe.status === "completed_with_warnings" ? "⚠️ 完成(有警告)" :
-                       exe.status === "running" ? "🔄 执行中" :
+                       exe.status === "running" ? (awaiting ? "⏸ 待下一步" : "🔄 执行中") :
                        exe.status === "failed" ? "❌ 失败" : "⏸️ 待执行"}
                     </span>
                     <div className="flex-1" />

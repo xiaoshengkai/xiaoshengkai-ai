@@ -390,8 +390,8 @@ export default function ExecutionDetailPage() {
   const warnings = execution.steps.filter(s => s.status === "warning").length;
   const activeStep = execution.steps.find(s => s.id === activeStepId) || execution.steps[0];
   const isDone = execution.status === "completed" || execution.status === "completed_with_warnings" || execution.status === "failed";
-  const isRunning = execution.status === "running";
   const isTweakRunning = execution.tweakTask?.status === "running";
+  const isRunning = anyStepRunning || isTweakRunning;
   const isV2 = execution.template === "tech-video";
 
   // 解析场景信息

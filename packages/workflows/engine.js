@@ -37,6 +37,7 @@ export function listExecutions() {
           status: state.status,
           totalSteps: state.steps.length,
           completedSteps: state.steps.filter(s => s.status === "completed" || s.status === "skipped").length,
+          runningSteps: state.steps.filter(s => s.status === "running").length,
           warningSteps: state.steps.filter(s => s.status === "warning").length,
           failedStep: failedStep ? failedStep.name : null,
           failedError: failedStep ? failedStep.error : null,

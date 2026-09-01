@@ -40,6 +40,7 @@ export function updateSceneGroup(executionId, pageNo, mode) {
   return result;
 }
 
-export async function handle({ params, body }) {
-  return updateSceneGroup(params.id, body?.page, body?.mode);
+export async function handle({ params, request }) {
+  const { page, mode } = await request.json().catch(() => ({}));
+  return updateSceneGroup(params.id, page, mode);
 }

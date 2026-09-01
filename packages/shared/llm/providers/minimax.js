@@ -72,7 +72,7 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model, image_
   };
   if (seed != null) body.seed = seed;
   if (image_url) {
-    body.subject_reference = [{ type: "character", image_file: image_url }];
+    body.subject_reference = [{ type: "character", image_file: Array.isArray(image_url) ? image_url[0] : image_url }];
   }
 
   const res = await fetch(`${baseURL}/image_generation`, {

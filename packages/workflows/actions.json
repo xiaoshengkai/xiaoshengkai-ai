@@ -7,7 +7,7 @@
   { "type": "stream", "method": "GET", "path": "/execution/:id/file/*" },
   { "type": "cli", "method": "POST",   "path": "/execution/:id/next",  "command": "next",   "args": { "executionId": "param.id" }, "timeout": 900000 },
   { "type": "cli", "method": "POST",   "path": "/execution/:id/auto",  "command": "auto",   "args": { "executionId": "param.id" }, "detached": true },
-  { "type": "cli", "method": "POST",   "path": "/execution/:id/retry", "command": "retry",  "args": { "executionId": "param.id", "stepId": "body.stepId" }, "required": ["stepId"], "timeout": 300000 },
+  { "type": "cli", "method": "POST",   "path": "/execution/:id/retry", "command": "retry",  "args": { "executionId": "param.id", "stepId": "body.stepId", "force": "body.force" }, "required": ["stepId"], "timeout": 1200000 },
   { "type": "cli", "method": "POST",   "path": "/execution/:id/skip",  "command": "skip",   "args": { "executionId": "param.id", "stepId": "body.stepId" }, "required": ["stepId"], "timeout": 10000 },
   { "type": "cli", "method": "POST",   "path": "/execution/:id/tweak", "command": "tweak-auto", "args": { "executionId": "param.id", "feedback": "body.feedback", "images": "body.imagePaths", "pages": "body.pages", "mode": "body.mode" }, "detached": true, "respond": { "ok": true, "status": "running" } },
   { "type": "custom", "method": "GET",    "path": "/assets/characters",          "handler": "list-characters" },

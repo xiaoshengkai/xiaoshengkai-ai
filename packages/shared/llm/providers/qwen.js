@@ -87,7 +87,7 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model = "qwen
   const imageUrl = `${baseURL.replace(/\/compatible-mode\/v1\/?$/, "")}/api/v1/services/aigc/multimodal-generation/generation`;
 
   const content = image_url
-    ? [{ image: image_url }, { text: prompt }]
+    ? [{ image: Array.isArray(image_url) ? image_url[0] : image_url }, { text: prompt }]
     : [{ text: prompt }];
 
   const parameters = {

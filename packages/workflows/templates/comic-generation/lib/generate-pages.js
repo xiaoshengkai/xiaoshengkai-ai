@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { generateImage } from "@app/shared/llm/index.js";
 import { readState, writeState } from "../../../lib/state.js";
@@ -13,6 +14,42 @@ const SEED = 42;
 
 function readJson(p) {
   try { return JSON.parse(fs.readFileSync(p, "utf-8")); } catch { return null; }
+}
+
+export function buildDialogueInstructions(dialogue, cast = []) {
+  const lines = (Array.isArray(dialogue) ? dialogue : String(dialogue || "").split("\n"))
+    .map(line => String(line).trim())
+    .filter(Boolean);
+  const sideZh = { left: "左", right: "右", center: "中间" };
+
+  return lines.flatMap(line => {
+    const match = line.match(/^\s*([^：:]+)[：:]\s*(.*)$/s);
+    const speaker = match?.[1]?.trim() || "";
+    const text = match?.[2]?.trim() || line;
+    const person = cast.find(c => c.name === speaker);
+    const side = sideZh[person?.side];
+    return [
+      `气泡内只写：${text}`,
+      ...(speaker && side ? [`说话人定位（禁止绘制）：${side}侧的${speaker}；气泡尾巴尖端必须指向并接触${side}侧的${speaker}。`] : []),
+    ];
+  });
+}
+
+export function buildCharacterFidelityInstructions() {
+  return [
+    "人物造型必须复用参考图中的具体设计：沿用参考图的服装、发型、眼镜等特征和描边粗细，禁止简化成无特征的白身、细线或断线轮廓。",
+    "人物是画面主体：每个人物高度占画面高度的50%-70%，位于画面中部，禁止把人物画得极小或大面积留白。",
+    "画风文字描述与参考图冲突时，一律以参考图为准。",
+  ];
+}
+
+export function buildVisualHierarchyInstructions() {
+  return [
+    "视觉层级固定为：背景最低层，人物位于背景上方，气泡、尾巴和文字位于最高层。",
+    "背景、道具、扶手、门框和座椅不得穿过或遮挡人物轮廓、脸部，也不得进入气泡区域。人物脸部和主体轮廓必须完整清晰可见。",
+    "必须覆盖参考锚点的基础脸和姿态，按本页分镜重新绘制眼睛、嘴型、身体倾斜、人物距离、动作线和情绪符号，使表情与当前台词强烈匹配。",
+    "气泡、尾巴和文字不得被背景、道具或人物遮挡。",
+  ];
 }
 
 // 每页开始处理前，把进度写进 state，前端轮询可实时显示「第 N/29 页」
@@ -37,11 +74,26 @@ export function buildPrompt(p, styleDesc) {
     const sideZh = { left: "左", right: "右", center: "中间" };
     parts.push("人物位置：" + p.cast.map(c => `${c.name}在${sideZh[c.side] || "中间"}`).join("、") + "；每个对白气泡靠近对应说话人。");
   }
-  const dialogueText = Array.isArray(p.dialogue) ? p.dialogue.join("\n") : (p.dialogue || "");
-  if (dialogueText) parts.push(`对白气泡文字（尽量准确画进画面，气泡内标注说话人名字）：\n${dialogueText}`);
+  parts.push(...buildDialogueInstructions(p.dialogue, p.cast));
+  parts.push(...buildCharacterFidelityInstructions());
+  parts.push(...buildVisualHierarchyInstructions());
   parts.push("每个说话人仅一个气泡，气泡尾部指向该人物；左人左泡、右人右泡，不得合并/重复/颠倒。");
   parts.push("同一场景ID必须沿用固定场景描述的空间布局、道具位置和人物左右关系，只改变本页动作、表情和对白。");
   parts.push("画面干净，无多余黑点、污渍、杂线。");
+  return parts.join("\n\n");
+}
+
+export function buildAnchorPrompt(p, styleDesc) {
+  const parts = [];
+  if (styleDesc) parts.push(`画风：${styleDesc}`);
+  if (p.sceneId) parts.push(`场景ID：${p.sceneId}`);
+  if (p.scenePrompt) parts.push(p.scenePrompt);
+  if (Array.isArray(p.cast) && p.cast.length) {
+    const sideZh = { left: "左", right: "右", center: "中间" };
+    parts.push("人物基础站位：" + p.cast.map(c => `${c.name}在${sideZh[c.side] || "中间"}`).join("、"));
+  }
+  parts.push(...buildCharacterFidelityInstructions());
+  parts.push("生成该场景的干净基础画面，保持固定人物站位、镜头轴线、背景和道具布局；人物统一使用无明显情绪的基础脸和静止基础姿态，供正式页覆盖重绘。背景和道具必须全部位于人物轮廓后方，不得穿过或遮挡人物轮廓、脸部。禁止出现任何文字、对白框、气泡和气泡尾巴。");
   return parts.join("\n\n");
 }
 
@@ -53,12 +105,46 @@ export async function generatePages(pagesJson, characterRef, styleId, executionD
   const charImgPath = path.join(ASSETS_DIR, "characters", `${characterRef}.png`);
   if (!fs.existsSync(charImgPath)) throw new Error(`角色参考图不存在: ${characterRef}`);
   const styleDesc = styleMeta?.description || "";
+  const force = readState(executionDir).steps?.find(s => s.id === "generate-pages")?.retryForce === true;
 
   const pagesDir = path.join(executionDir, "pages");
+  const anchorsDir = path.join(executionDir, "anchors");
   fs.mkdirSync(pagesDir, { recursive: true });
+  fs.mkdirSync(anchorsDir, { recursive: true });
 
   const charRefB64 = `data:image/png;base64,${fs.readFileSync(charImgPath).toString("base64")}`;
   const sceneAnchors = new Map();
+
+  async function getSceneAnchor(page) {
+    if (!page.sceneId) return null;
+    if (sceneAnchors.has(page.sceneId)) return sceneAnchors.get(page.sceneId);
+
+    const anchorPrompt = buildAnchorPrompt(page, styleDesc);
+    const anchorPath = path.join(anchorsDir, `${createHash("sha256").update(anchorPrompt).digest("hex").slice(0, 16)}.png`);
+    if (!force && fs.existsSync(anchorPath) && fs.statSync(anchorPath).size > 0) {
+      sceneAnchors.set(page.sceneId, anchorPath);
+      return anchorPath;
+    }
+
+    try {
+      console.log(`[generate-pages] 生成场景 ${page.sceneId} 的无气泡锚点...`);
+      const urls = await generateImage(anchorPrompt, {
+        aspectRatio: "2:3",
+        image_url: charRefB64,
+        seed: SEED,
+      });
+      if (!urls[0]) throw new Error("未生成图片");
+      const res = await fetch(urls[0], { signal: AbortSignal.timeout(120000) });
+      if (!res.ok) throw new Error(`图片下载失败 (${res.status})`);
+      fs.writeFileSync(anchorPath, Buffer.from(await res.arrayBuffer()));
+      sceneAnchors.set(page.sceneId, anchorPath);
+      return anchorPath;
+    } catch (err) {
+      console.warn(`[generate-pages] 场景 ${page.sceneId} 锚点失败，回退角色参考图: ${err.message}`);
+      sceneAnchors.set(page.sceneId, null);
+      return null;
+    }
+  }
 
   const totalStart = Date.now();
   const result = [];
@@ -72,9 +158,8 @@ export async function generatePages(pagesJson, characterRef, styleId, executionD
     updateProgress(executionDir, pageNo, pages.length);
 
     // 幂等：已存在的页直接复用（重试只补缺页，不重生成好页）
-    if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+    if (!force && fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
       console.log(`[generate-pages] 第 ${pageNo}/${pages.length} 页已存在，复用`);
-      if (p.sceneId && !sceneAnchors.has(p.sceneId)) sceneAnchors.set(p.sceneId, filePath);
       result.push({ page: pageNo, file, dialogue: p.dialogue || [], sceneId: p.sceneId || null });
       continue;
     }
@@ -82,16 +167,17 @@ export async function generatePages(pagesJson, characterRef, styleId, executionD
     const t0 = Date.now();
     console.log(`[generate-pages] 生成第 ${pageNo}/${pages.length} 页...`);
     const prompt = buildPrompt(p, styleDesc);
-    const sceneAnchor = p.sceneId ? sceneAnchors.get(p.sceneId) : null;
-    const refB64 = sceneAnchor && fs.existsSync(sceneAnchor)
+    const sceneAnchor = await getSceneAnchor(p);
+    const anchorB64 = sceneAnchor && fs.existsSync(sceneAnchor)
       ? `data:image/png;base64,${fs.readFileSync(sceneAnchor).toString("base64")}`
-      : charRefB64;
-    console.log(`[generate-pages] 第 ${pageNo} 页 提交AI图片prompt (aspectRatio=2:3, seed=${SEED}, 参考=${sceneAnchor ? "场景锚点" : "角色参考图"}, 参考图base64长度=${refB64.length}):\n${prompt}`);
+      : null;
+    const refInput = anchorB64 ? [anchorB64, charRefB64] : charRefB64;
+    console.log(`[generate-pages] 第 ${pageNo} 页 提交AI图片prompt (aspectRatio=2:3, seed=${SEED}, 参考=${anchorB64 ? "场景锚点+角色参考图" : "角色参考图"}):\n${prompt}`);
     try {
       const genStart = Date.now();
       const urls = await generateImage(prompt, {
         aspectRatio: "2:3",
-        image_url: refB64,
+        image_url: refInput,
         seed: SEED,
       });
       const genElapsed = ((Date.now() - genStart) / 1000).toFixed(1);
@@ -102,7 +188,6 @@ export async function generatePages(pagesJson, characterRef, styleId, executionD
       const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
       if (!res.ok) throw new Error(`第 ${pageNo} 页图片下载失败 (${res.status})`);
       fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
-      if (p.sceneId && !sceneAnchors.has(p.sceneId)) sceneAnchors.set(p.sceneId, filePath);
       const dlElapsed = ((Date.now() - dlStart) / 1000).toFixed(1);
       console.log(`[generate-pages] 第 ${pageNo} 页完成 (生成 ${genElapsed}s, 下载 ${dlElapsed}s, 合计 ${((Date.now() - t0) / 1000).toFixed(1)}s)`);
 

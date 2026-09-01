@@ -212,15 +212,15 @@ export default function ExecutionDetailPage() {
     setAutoLoading(false);
   }, [id, fetchExecution]);
 
-  const handleRetry = useCallback(async (stepId: string) => {
+  const handleRetry = useCallback(async (stepId: string, force = true) => {
     setRetrying(stepId);
     try {
       const res = await fetch(`${BASE}/api/workflows/execution/${id}/retry`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stepId }),
+        body: JSON.stringify({ stepId, force }),
       });
       const data = await res.json();
-      if (data.ok) { toast("🟢 已重新执行"); fetchExecution(); }
+      if (data.ok) { toast(force ? "🟢 已重新生成" : "🟢 已继续执行"); fetchExecution(); }
       else toast(`🔴 ${data.error}`);
     } catch { toast("🔴 请求失败"); }
     setRetrying(null);
@@ -538,7 +538,7 @@ export default function ExecutionDetailPage() {
             }
 
             // 兜底：PreviewPanel
-            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} imageVersion={`${execution.tweakCount ?? 0}-${execution.completedAt ?? ""}`} onRetry={() => handleRetry(activeStep.id)} retrying={retrying === activeStep.id} onTweakPage={openTweakForPage} />;
+            return <PreviewPanel step={activeStep} executionId={execution.executionId} currentScriptVersion={execution.currentScriptVersion} imageVersion={`${execution.tweakCount ?? 0}-${execution.completedAt ?? ""}`} onRetry={() => handleRetry(activeStep.id, activeStep.status === "completed")} retrying={retrying === activeStep.id} onTweakPage={openTweakForPage} />;
           })()}
           {activeStep.id === "concat" && (
             <DownloadPanel executionId={execution.executionId} />
@@ -801,9 +801,9 @@ export default function ExecutionDetailPage() {
                 title="跳过">{skipping === step.id ? "..." : "跳过"}</button>
             )}
             {(done || fail || warn || run) && (
-              <button onClick={(e) => { e.stopPropagation(); handleRetry(step.id); }}
+              <button onClick={(e) => { e.stopPropagation(); handleRetry(step.id, step.status === "completed"); }}
                 disabled={retrying === step.id} className="text-xs text-muted-foreground/70 hover:text-blue cursor-pointer"
-                title="重新执行"><RefreshCw className="w-3 h-3" /></button>
+                title={step.status === "completed" ? "重新生成" : "继续/重试"}><RefreshCw className="w-3 h-3" /></button>
             )}
           </div>
         </div>
@@ -1008,7 +1008,7 @@ function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, o
               disabled={retrying}
               className="brutal-btn bg-primary text-primary-foreground px-4 py-2 text-sm font-bold"
             >
-              {retrying ? "重做中..." : "🔄 重新执行"}
+              {retrying ? "重新生成中..." : "🔄 重新生成"}
             </button>
           </div>
         </div>
@@ -1026,7 +1026,7 @@ function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, o
         <pre className="text-xs text-red-600 whitespace-pre-wrap break-words bg-red-100/50 p-2 rounded">{step.error || "未知错误"}</pre>
         <div className="flex items-center gap-2 mt-3">
           <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-          <p className="text-xs text-red-400">点击左侧「重做」按钮重新执行</p>
+          <p className="text-xs text-red-400">点击左侧「继续/重试」按钮补跑失败步骤</p>
         </div>
       </div>
     );
@@ -1045,7 +1045,7 @@ function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, o
           disabled={retrying}
           className="mt-3 brutal-btn bg-orange text-white px-4 py-1.5 text-xs font-bold"
         >
-          {retrying ? "重做中..." : "🔄 重新执行"}
+          {retrying ? "继续执行中..." : "🔄 继续/重试"}
         </button>
       </div>
     );

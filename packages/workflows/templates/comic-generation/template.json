@@ -18,7 +18,7 @@
       "previewField": "script",
       "module": "./lib/storyboard.js",
       "function": "generateStoryboard",
-      "args": ["{content}", "{title}", "{pageCount}"]
+      "args": ["{content}", "{title}", "{pageCount}", "{styleId}"]
     },
     {
       "id": "generate-pages",

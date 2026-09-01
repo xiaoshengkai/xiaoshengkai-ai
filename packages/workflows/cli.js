@@ -99,9 +99,9 @@ async function main() {
     process.stdout.write(JSON.stringify({ ok: true }));
   } else if (command === "retry") {
     // 组合命令：重置步骤后立即执行（原 ai-chat retry 路由的两次调用收敛于此）
-    const { executionId, stepId } = JSON.parse(args[0]);
+    const { executionId, stepId, force } = JSON.parse(args[0]);
     const { retryStep, runNextStep } = await import("./engine.js");
-    retryStep(executionId, stepId);
+    retryStep(executionId, stepId, { force: Boolean(force) });
     const result = await runNextStep(executionId);
     process.stdout.write(JSON.stringify(result));
   } else if (command === "skip") {

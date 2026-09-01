@@ -341,6 +341,7 @@ export async function runNextStep(executionId) {
     freshState.steps[nextIdx].status = "completed";
     freshState.steps[nextIdx].output = output;
     freshState.steps[nextIdx].elapsed = elapsed;
+    delete freshState.steps[nextIdx].retryForce;
 
     if (nextIdx === template.steps.length - 1) {
       freshState.status = deriveTerminalStatus(freshState.steps);
@@ -389,17 +390,21 @@ export async function runAllSteps(executionId) {
   return { ok: true, status: "all_done" };
 }
 
-export function retryStep(executionId, stepId) {
+export function retryStep(executionId, stepId, { force = false } = {}) {
   const dir = path.join(DATA_DIR, executionId);
   const state = readState(dir);
   const stepIdx = state.steps.findIndex(s => s.id === stepId);
   if (stepIdx < 0) throw new Error("步骤不存在");
 
-  state.steps[stepIdx].status = "pending";
-  state.steps[stepIdx].output = null;
-  state.steps[stepIdx].error = null;
-  state.steps[stepIdx].startedAt = null;
-  state.steps[stepIdx].elapsed = null;
+  for (let i = stepIdx; i < state.steps.length; i++) {
+    if (state.steps[i].status === "skipped") continue;
+    state.steps[i].status = "pending";
+    state.steps[i].output = null;
+    state.steps[i].error = null;
+    state.steps[i].startedAt = null;
+    state.steps[i].elapsed = null;
+    if (force) state.steps[i].retryForce = true;
+  }
 
   state.status = "running";
   state.currentStep = stepIdx;

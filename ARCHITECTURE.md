@@ -201,7 +201,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 ### CLI 子命令
 
-`start`（创建执行）/ `run`（一次跑完）/ `next`（单步）/ `get` / `list` / `delete` / `templates`（模板列表）/ `retry`（组合：重置+执行）/ `skip` / `auto`（detached 后台跑完）/ `tweak-auto`（微调全流程编排）/ `switch-version`（按模板分发）。
+`start`（创建执行）/ `run`（一次跑完）/ `next`（单步）/ `get` / `list` / `delete` / `templates`（模板列表）/ `retry`（组合：重置+执行；`force=true` 表示主动重新生成，普通补跑继续复用已生成产物）/ `skip` / `auto`（detached 后台跑完）/ `tweak-auto`（微调全流程编排）/ `switch-version`（按模板分发）。
 
 ### 引擎与模板边界
 
@@ -222,7 +222,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 - `templates/tech-video/`：科技风短视频（script.json 驱动 + 逐场景 TTS + BGM + SFX + 硬字幕 + SRT）
 - `templates/video-generation/`：视频生成（含微调/版本切换/内容生成等模板级动作）
-- `templates/comic-generation/`：漫画生成（故事→AI 分镜→逐页生成漫画图；`sceneId/scenePrompt` 锁连续场景，首张同场景页作锚点；角色参考图锁人物一致性 + 风格库锁画风；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
+- `templates/comic-generation/`：漫画生成（故事→AI 分镜→每个 `sceneId` 生成无文字/无气泡锚点→逐页生成漫画图；`sceneId/scenePrompt` + 独立锚点锁连续场景且不继承成品页气泡；角色参考图锁人物一致性 + 风格库锁画风；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
 
 ### 资产库（工作流级通用）
 
@@ -230,7 +230,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 ```
 data/workflows/
-  tasks/<executionId>/           # 执行记录（DATA_DIR）
+  tasks/<executionId>/           # 执行记录（state.json + pages/ + comic 的 anchors/）
   assets/
     characters/<id>.png/.json    # 角色参考图（图片 + 名称/描述/时间）
     styles/<id>.json             # 风格（名称/描述/时间，纯文本）

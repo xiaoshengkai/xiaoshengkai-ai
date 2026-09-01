@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { generateImage, callMultimodalLLM } from "@app/shared/llm/index.js";
 import { createDateLogger } from "@app/shared/logger.js";
 import { DATA_DIR, LOG_DIR, readState, writeState } from "../../../lib/state.js";
+import { buildDialogueInstructions, buildVisualHierarchyInstructions } from "./generate-pages.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..", "..", "..");
@@ -136,8 +137,6 @@ export async function tweak(executionId) {
       const story = storyPages.find(s => s.page === g.page) || {};
       const filePath = path.join(dir, g.file);
 
-      const storyDialogue = Array.isArray(story.dialogue) ? story.dialogue.join("\n") : (story.dialogue || "");
-
       // 底图：当前页优先（编辑）；当前页不存在（生成失败过）回退角色参考图（全新生成）
       const pageExists = fs.existsSync(filePath);
       const baseSource = pageExists ? filePath : (fs.existsSync(charImgPath) ? charImgPath : null);
@@ -156,7 +155,9 @@ export async function tweak(executionId) {
         if (story.imagePrompt) parts.push(`画面：${story.imagePrompt}`);
         parts.push("人物位置按分镜设定；每个对白气泡靠近对应说话人。");
       }
-      if (storyDialogue) parts.push(`对白气泡文字应为（如本次修改涉及文字）：\n${storyDialogue}`);
+      const dialogueInstructions = buildDialogueInstructions(story.dialogue, story.cast);
+      if (dialogueInstructions.length) parts.push(`如本次修改涉及文字：\n${dialogueInstructions.join("\n")}`);
+      parts.push(...buildVisualHierarchyInstructions());
       parts.push(`修改要求：\n${feedback}`);
       if (visionDesc) parts.push(`用户上传参考图描述：\n${visionDesc}`);
       parts.push("每个说话人仅一个气泡，气泡尾部指向该人物；左人左泡、右人右泡，不得合并/重复/颠倒。");

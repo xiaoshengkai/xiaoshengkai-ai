@@ -8,16 +8,15 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   const actualModel = model || getProviderModel("deepseek", "chat", "DEEPSEEK_PRO_MODEL", "deepseek-v4-pro");
   console.log(`[deepseek] 当前调用: model=${actualModel} baseURL=${baseURL}`);
 
-  if (images.length > 0) {
-    console.warn(`[deepseek] 用户上传了 ${images.length} 张参考图,DeepSeek 不支持视觉,仅基于文字反馈推理`);
-    user = `[用户上传了 ${images.length} 张参考图,DeepSeek 不支持视觉,请基于以下文字反馈和已有 script 推理]\n${user}`;
-  }
+  const userContent = images.length > 0
+    ? [{ type: "text", text: user }, ...images.map(d => ({ type: "image_url", image_url: { url: d } }))]
+    : user;
 
   const body = {
     model: actualModel,
     messages: [
       { role: 'system', content: system },
-      { role: 'user', content: user },
+      { role: 'user', content: userContent },
     ],
     temperature,
     max_tokens: maxTokens,

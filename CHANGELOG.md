@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.11.14 (2026-09-01) — DeepSeek vision 模型接入 + 设置页模型概况（余额/可用性差异抹平）
+
+### 变更
+- **DeepSeek 多模态模型接入**：视觉评估模块新增 `deepseek-v4-flash-vision-exp`；`deepseek.js` `callLLM` 从「拒图+文字注入」改为 `image_url` 块原生直传（同 qwen.js 协议），`callMultimodalLLM` 可用 DeepSeek 读图
+- **模型概况（差异抹平）**：新增 `shared/llm/balance.js` — DeepSeek `GET /user/balance` 真实余额 / 火山方舟 `GetAFPUsage`（HMAC-SHA256 签名 V4，AK/SK，日/月免费包额度）/ MiniMax·GLM·Qwen 无主动接口则 1-token ping 探测 chat 模型（报错=不可用，15s 超时）；统一归一化 `{status, available, balanceText, error}`
+- **概况融合进设置页**：删独立概况块；Provider 配置卡标题行带 🟢/🔴 + 余量/错误；「模块配置」改名「模型配置」并移到「模块模型选择」上方；每个模型选项加可用点；新增 `GET /api/settings/balance`（并发查询 + 各模块当前模型可用性）
+- **错误码中文化**：余额/探测错误按 HTTP 状态码映射中文（401 Key 无效或过期 / 403 无权限或余额不足 / 404 模型不存在 / 429 限流 / 5xx 服务端错误）
+- `config.js` 新增 `getAccessKey`/`getSecretKey`（providers.json 优先、env 兜底）；`.env.example` 补火山 AK/SK 占位
+
+### 踩坑
+- 火山 `GetAFPUsage` 走管理端点 `ark.cn-beijing.volcengineapi.com`（非推理域名），签名 V4 需 AK/SK 而非 `ark-xxx` apiKey；401=签名错、403=无权限，可据此区分
+- MiniMax/Qwen/GLM 无公开余额接口（仅 1008/Arrearage/1113 错误码），只能主动探测发现欠费
+
+### 验证
+- 火山签名真实调用 200（日 0/10000 · 月 8910/20000）；DeepSeek 余额 CNY 789.83；qwen 401 正确标红并中文化
+- typecheck + test（22+11+5）全绿
+
 ## v0.11.13 (2026-08-31) — 漫画场景连续性 + 直接替换页图
 
 ### 变更

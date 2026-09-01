@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 
+interface ProviderStatus {
+  available: boolean | null;
+  balanceText?: string;
+  note?: string;
+  error?: string;
+}
+
 interface ProviderConfigProps {
   id: string;
   label: string;
@@ -12,6 +19,7 @@ interface ProviderConfigProps {
     models: Record<string, string>;
   };
   onChange: (id: string, config: unknown) => void;
+  status?: ProviderStatus;
 }
 
 const MODEL_LABELS: Record<string, string> = {
@@ -41,7 +49,7 @@ function maskKey(key: string) {
   return key.slice(0, 3) + "****" + key.slice(-4);
 }
 
-export default function ProviderConfigCard({ id, label, config, onChange }: ProviderConfigProps) {
+export default function ProviderConfigCard({ id, label, config, onChange, status }: ProviderConfigProps) {
   const [showKey, setShowKey] = useState(false);
   const [open, setOpen] = useState(false);
   const [local, setLocal] = useState(config);
@@ -55,9 +63,15 @@ export default function ProviderConfigCard({ id, label, config, onChange }: Prov
   return (
     <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)}
       className="brutal bg-card p-3">
-      <summary className="flex items-center justify-between cursor-pointer list-none">
-        <h3 className="text-xs font-bold text-foreground inline">{label} {local.enabled ? "✓" : "✗"}</h3>
-        <span className="text-xs text-muted-foreground ml-2">{open ? "点击收起" : "点击展开"}</span>
+      <summary className="flex items-center justify-between gap-2 cursor-pointer list-none">
+        <h3 className="text-xs font-bold text-foreground inline shrink-0">{label} {local.enabled ? "✓" : "✗"}</h3>
+        {status && (
+          <span className="flex-1 min-w-0 text-[10px] font-mono truncate text-muted-foreground">
+            {status.available === true ? "🟢" : status.available === false ? "🔴" : "⚪"}{" "}
+            {status.balanceText || status.error || status.note || ""}
+          </span>
+        )}
+        <span className="text-xs text-muted-foreground shrink-0">{open ? "点击收起" : "点击展开"}</span>
       </summary>
 
       <div className="mt-3 space-y-2 text-xs font-mono">

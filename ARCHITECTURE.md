@@ -56,6 +56,7 @@ ai-engineer-journey/
     │   └── llm/                # LLM 共享封装
     │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
     │       ├── config.js       # providers.json / selection.json fresh-read（真源，env 兜底）
+    │       ├── balance.js      # 模型概况余额/可用性查询（差异抹平：deepseek 余额 / 火山 GetAFPUsage / minimax·glm·qwen 探测）
     │       ├── parse-json.js   # 容错 JSON 解析
     │       └── providers/      # deepseek.js / glm.js / minimax.js / qwen.js / volcengine.js(Seedream 图片)
     ├── ai-chat/                # 业务服务（Next.js，组合根）

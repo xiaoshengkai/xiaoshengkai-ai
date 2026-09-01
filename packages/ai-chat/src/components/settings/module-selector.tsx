@@ -39,6 +39,7 @@ const MODULE_OPTIONS: Record<string, { label: string; icon: string; providers: M
     icon: "👁️",
     providers: [
       { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3", availability: "both" },
+      { id: "deepseek", label: "DeepSeek Flash Vision", model: "deepseek-v4-flash-vision-exp", availability: "both" },
       { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max", availability: "both" },
       { id: "qwen", label: "Qwen3.8-Flash", model: "qwen3.8-flash", availability: "both" },
       { id: "qwen", label: "Qwen3-VL-Flash", model: "qwen3-vl-flash", availability: "api" },
@@ -83,9 +84,16 @@ interface ModuleSelectorProps {
   current: { provider: string; model: string };
   onChange: (module: string, provider: string, model: string) => void;
   disabled?: boolean;
+  statusByProvider?: Record<string, { available: boolean | null }> | null;
 }
 
-export default function ModuleSelector({ module, current, onChange, disabled }: ModuleSelectorProps) {
+function statusDot(available?: boolean | null) {
+  if (available === true) return "🟢";
+  if (available === false) return "🔴";
+  return "⚪";
+}
+
+export default function ModuleSelector({ module, current, onChange, disabled, statusByProvider }: ModuleSelectorProps) {
   const info = MODULE_OPTIONS[module];
   if (!info) return null;
 
@@ -110,7 +118,10 @@ export default function ModuleSelector({ module, current, onChange, disabled }: 
               style={selected ? { boxShadow: "var(--shadow-sm)" } : {}}
             >
               <div className="flex-1 min-w-0">
-                <div className="font-bold truncate">{opt.label}</div>
+                <div className="font-bold truncate">
+                  {statusByProvider && <span className="mr-1">{statusDot(statusByProvider[opt.id]?.available)}</span>}
+                  {opt.label}
+                </div>
                 {opt.model && <div className="text-[10px] opacity-70 truncate mt-0.5">{opt.model}</div>}
               </div>
               {opt.multimodal && (

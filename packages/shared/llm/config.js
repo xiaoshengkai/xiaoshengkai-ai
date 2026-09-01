@@ -33,6 +33,18 @@ export function getApiKey(provider, envKey) {
   return process.env[envKey] || "";
 }
 
+export function getAccessKey(provider, envKey) {
+  const cfg = readProviders()[provider];
+  if (cfg?.accessKey) return cfg.accessKey;
+  return process.env[envKey] || "";
+}
+
+export function getSecretKey(provider, envKey) {
+  const cfg = readProviders()[provider];
+  if (cfg?.secretKey) return cfg.secretKey;
+  return process.env[envKey] || "";
+}
+
 export function getBaseUrl(provider, envKey, fallback = "") {
   const cfg = readProviders()[provider];
   if (cfg?.baseURL) return cfg.baseURL;

@@ -56,7 +56,9 @@ function readDefinitions(): { services: ServiceDef[]; errors: string[] } {
     try {
       services.push(...normalizeManifest(entry.name, JSON.parse(readFileSync(manifestPath, "utf8"))));
     } catch (err) {
-      errors.push(`${entry.name}: ${err instanceof Error ? err.message : "invalid service.json"}`);
+      const message = `${entry.name}: ${err instanceof Error ? err.message : "invalid service.json"}`;
+      errors.push(message);
+      console.error(`[services] ${message}`);
     }
   }
 
@@ -127,15 +129,23 @@ export async function controlService(id: string, action: "start" | "restart" | "
   const service = readDefinitions().services.find((item) => item.id === id);
   if (!service) throw new Error(`unknown service: ${id}`);
 
-  if (action === "stop" || action === "restart") await run(service.stop, PROJECT_ROOT, false, true);
-  if (action === "start" || action === "restart") {
-    pending.set(service.id, Date.now());
-    await run(service.start, service.cwd, true);
-  } else if (action === "stop") {
-    pending.delete(service.id);
+  console.log(`[services] ${action}: ${id} (${service.name})`);
+
+  try {
+    if (action === "stop" || action === "restart") await run(service.stop, PROJECT_ROOT, false, true);
+    if (action === "start" || action === "restart") {
+      pending.set(service.id, Date.now());
+      await run(service.start, service.cwd, true);
+    } else if (action === "stop") {
+      pending.delete(service.id);
+    }
+  } catch (err) {
+    console.error(`[services] ${action} ${id} failed:`, err);
+    throw err;
   }
 
   const managed = await toManaged(service);
   if (managed.status === "running") pending.delete(service.id);
+  console.log(`[services] ${action}: ${id} -> ${managed.status}`);
   return managed;
 }

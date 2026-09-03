@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.11.18 (2026-09-03) — 独立服务监控面板
+
+### 变更
+- **设置页服务监控**：新增 `packages/services/*` 独立服务监控面板，基于各服务目录的 `service.json` 清单自动发现，展示运行状态、端口/健康检查地址，并支持启动、重启、关闭
+- **服务清单**：`packages/services/search/service.json` 声明 `search-service` 与 `searxng` 两个独立服务（`cwd`/`start`/`stop`/`health`）
+- **服务管理 API**：`GET /api/services` 返回服务列表与状态；`POST /api/services/:id/:action` 执行 `start`/`restart`/`stop`（重启 = 停止 + 启动组合，停止对 pkill 无匹配进程容忍）
+- **状态模型**：健康检查通过 → `running`，启动中 → `starting`（60s 超时回退 `stopped`），失败 → `stopped`
+
 ## v0.11.17 (2026-09-03) — 小红书金融内容增长改造 + 图片任务轮询修复
 
 ### 变更

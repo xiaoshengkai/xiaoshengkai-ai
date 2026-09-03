@@ -68,11 +68,12 @@ ai-engineer-journey/
     │   │   │   ├── multimodal/  # 附件处理：attachment / image / video(仅 stripVideos) / pipeline / preprocess(复用 vision 模块) / modality-detector / multimodal-config / mime
     │   │   │   ├── rag/         # retrieve.ts / vector-store.ts / chroma-server.ts
     │   │   │   ├── settings/    # store / init / dispatcher / types
+    │   │   │   ├── services/    # manager.ts：packages/services/* 清单扫描 + 启停/健康检查（服务监控）
     │   │   │   ├── mcp-client.ts
     │   │   │   └── utils/       # utils(cn+BASE) / types / cost / env
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）
-    │   │       ├── api/         # chat / memory / settings / conversations ... + workflows、tasks 仅 catch-all 挂载点
+    │   │       ├── api/         # chat / memory / settings / services / conversations ... + workflows、tasks 仅 catch-all 挂载点
     │   │       ├── note/[taskId]/page.tsx
     │   │       ├── preview/[taskId]/route.ts
     │   │       ├── settings/page.tsx

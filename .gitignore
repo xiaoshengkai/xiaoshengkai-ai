@@ -11,10 +11,6 @@ packages/*/node_modules/
 *.pem
 AGENTS.md
 
-# worktrees
-.worktrees/
-worktrees/
-
 # debug
 npm-debug.log*
 yarn-debug.log*

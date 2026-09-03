@@ -65,18 +65,20 @@ function readDefinitions(): { services: ServiceDef[]; errors: string[] } {
 
 const STARTING_TIMEOUT_MS = 60_000;
 
+function startingStatus(service: ServiceDef): ServiceStatus {
+  const startedAt = pending.get(service.id);
+  return startedAt !== undefined && Date.now() - startedAt < STARTING_TIMEOUT_MS ? "starting" : "stopped";
+}
+
 async function checkHealth(service: ServiceDef): Promise<ServiceStatus> {
   if (!service.healthUrl) return "unknown";
   try {
     const res = await fetch(service.healthUrl, { signal: AbortSignal.timeout(1500) });
-    return statusFromHealth(res.ok);
+    return res.ok ? "running" : startingStatus(service);
   } catch {
-    const startedAt = pending.get(service.id);
-    if (startedAt !== undefined && Date.now() - startedAt < STARTING_TIMEOUT_MS) {
-      return "starting";
-    }
-    pending.delete(service.id);
-    return "stopped";
+    const status = startingStatus(service);
+    if (status === "stopped") pending.delete(service.id);
+    return status;
   }
 }
 
@@ -101,10 +103,12 @@ function run(command: string[], cwd: string, detach = false, allowFail = false):
     });
     let stderr = "";
     child.stderr?.on("data", (chunk) => { stderr += chunk.toString(); });
-    child.on("error", reject);
+    child.once("error", reject);
     if (detach) {
-      child.unref();
-      resolve();
+      child.once("spawn", () => {
+        child.unref();
+        resolve();
+      });
       return;
     }
     child.on("exit", (code) => {
@@ -127,9 +131,11 @@ export async function controlService(id: string, action: "start" | "restart" | "
   if (action === "start" || action === "restart") {
     pending.set(service.id, Date.now());
     await run(service.start, service.cwd, true);
+  } else if (action === "stop") {
+    pending.delete(service.id);
   }
 
   const managed = await toManaged(service);
-  if (managed.status === "running" || action === "stop") pending.delete(service.id);
+  if (managed.status === "running") pending.delete(service.id);
   return managed;
 }

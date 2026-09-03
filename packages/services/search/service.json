@@ -1,0 +1,23 @@
+{
+  "group": "search",
+  "services": [
+    {
+      "id": "search-service",
+      "name": "搜索编排服务",
+      "description": "MCP search 模块调用的 Node 编排服务",
+      "cwd": "packages/services/search",
+      "start": ["node", "server.js"],
+      "stop": ["pkill", "-f", "packages/services/search/server.js"],
+      "health": { "type": "http", "url": "http://127.0.0.1:8090/health" }
+    },
+    {
+      "id": "searxng",
+      "name": "SearXNG",
+      "description": "本地搜索引擎",
+      "cwd": "packages/services/search/searxng",
+      "start": ["bash", "start.sh"],
+      "stop": ["pkill", "-f", "searx.webapp"],
+      "health": { "type": "http", "url": "http://127.0.0.1:8080/healthz" }
+    }
+  ]
+}

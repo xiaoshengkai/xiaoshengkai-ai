@@ -342,6 +342,7 @@ packages/mcp/
 
 ```
 packages/services/search/
+├── service.json          # 服务监控清单（search-service + searxng）
 ├── server.js             # Node HTTP 服务（/search /scrape /map /crawl /parse /health /ready）
 ├── lib/
 │   ├── searxng.js        # 调本地 SearXNG JSON API（类别→引擎映射）

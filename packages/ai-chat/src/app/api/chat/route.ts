@@ -53,7 +53,7 @@ const TOOLS_PROMPT = `
     context: 当前对话的关键讨论内容(必填，确保笔记包含对话上下文)
     style: knowledge(知识分享)/product_review(好物推荐)/experience(经验复盘)/opinion(观点讨论)，LLM自动推断
     subcategory: 二级类目(如finance)，LLM自动推断
-  checkXiaohongshuNoteProgress(taskId, interval=3): 轮询等ready，返回的iframe字段直接嵌入聊天展示预览
+   checkXiaohongshuNoteProgress(taskId, interval=3): 轮询直到ready、partial或failed；partial表示部分图片失败，是终态，不要继续轮询。ready/partial返回的iframe字段直接嵌入聊天展示预览
   修改: updateXiaohongshuNote({ taskId, field, value }), field: title/content/tags/image_N
   导出: exportXiaohongshuNote({ taskId })，仅在用户明确说"导出"时调用
   注意: 生成后不自动导出、不打开浏览器，直接输出iframe预览

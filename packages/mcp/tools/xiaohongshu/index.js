@@ -10,6 +10,7 @@ import { getApiKey } from "@app/shared/llm/config.js";
 import { sleep, shortId, downloadsDir } from "@app/shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
+import { contentToMarkdown, selectCandidate, summarizeImages, updateImageState } from "./note-utils.js";
 
 const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
 const TAG = "[xhs]";
@@ -177,7 +178,40 @@ ${cardsHtml}
 
 // writeTaskState / updateTask / parseJSON — 已迁到 shared/ 和 mcp/lib/task-state.js
 
-async function callLLM(prompt, style, subcategory) {
+async function callFinancePlan(prompt, template) {
+  const { text } = await callProviderLLM({
+    system: `${template.systemPrompt}
+
+你现在只做“传播方案策划”，不要写正文。面向普通人，不要固定使用年龄或职业标签。
+返回严格 JSON（不要 markdown 代码块）：
+{
+  "angle": "只解决一个具体问题的传播角度",
+  "audiencePain": "读者正在担心或忽略的具体问题",
+  "primaryGoal": "click|save|like|comment",
+  "candidates": [
+    {
+      "title": "强好奇、强冲突但正文可以兑现的标题",
+      "coverText": "4-10字封面大字",
+      "curiosityGap": "读者为什么必须点开",
+      "promise": "正文必须兑现的具体收益",
+      "titleFormula": "使用的标题机制",
+      "coverPrompt": "英文封面画面 prompt"
+    }
+  ],
+  "factChecklist": ["需要核实的事实或数字"],
+  "factSources": ["来源；没有来源的数字写 example 或 estimate"]
+}
+
+标题候选必须覆盖不同机制：数字冲击、损失风险、反常识、悬念揭露或评论争议。禁止空泛的“讲透/解析/科普/攻略/揭秘”和无法兑现的“震惊/所有人都被骗了”。数字不能凭空编造。`,
+    user: prompt,
+    maxTokens: 3000,
+  });
+  const plan = parseJSON(text);
+  plan.selectedCandidate = selectCandidate(plan.candidates);
+  return plan;
+}
+
+async function callLLM(prompt, style, subcategory, plan = null) {
   const category = TEMPLATES[style];
   if (!category) throw new Error(`未知模板: ${style}`);
 
@@ -201,27 +235,40 @@ async function callLLM(prompt, style, subcategory) {
 
 返回严格的 JSON 格式（不要包含 markdown 代码块标记）：
 {
-  "title": "笔记标题（10-20字，吸引人）",
+  "title": "笔记标题（强好奇、强冲突、正文可兑现）",
   "excerpt": "精彩摘要，≤30字，吸引读者点击阅读",
   "content": ["段落1", "[IMG-1]", "段落2", "[IMG-2]", "段落3"],
   "tags": ["#标签1", "#标签2", "#标签3"],
   "coverPrompt": "封面图英文 prompt",
-  "illustrationPrompts": ["插画1英文prompt", "插画2英文prompt"]
+  "illustrationPrompts": ["插画1英文prompt", "插画2英文prompt"],
+  "angle": "选题角度",
+  "audiencePain": "读者痛点",
+  "primaryGoal": "click|save|like|comment",
+  "coverText": "4-10字封面大字",
+  "cta": "一个具体问题，引导读者回答",
+  "factSources": ["事实来源或 example/estimate 标记"],
+  "titleFormula": "标题机制"
 }
 
 规则：
-- 正文6-10段，每段3-5句，内容丰富但不啰嗦
-- 每个概念配一个具体、有画面感的例子，让读者看完就能记住
+- 正文约800-1500字，4-6个核心段落，只解决一个问题
+- 第一屏直接回应标题的冲突或悬念，不写百科式背景
+- 先写普通人的场景或案例，再从案例引出概念，并说明对读者的影响
+- 至少一笔可复算的数字；假设数字必须标注“假设案例”，估算必须写条件
+- 结尾给出3条可以马上执行的防坑/检查清单
+- 使用一个具体 CTA，不要只写“你怎么看”
 - 同类数据对比用结构化列表（不要用表格，小红书不支持），每项一行，格式示例：
   - **信息差套利**：100元启动，1-2天回本，利润率50-100%，门槛低，复利2颗星
   - **技能变现**：0元启动，1-3天回本，利润率200%+，门槛中高，复利4颗星
 - 可用内容形式：### 小标题分段、**加粗**强调、- 列表拆解、> 金句引用
-- 每段根据内容选合适格式，不堆纯文字，段落间用空行隔开
+- 只在必要处使用 Markdown；不要为了格式给每段强行加标题、列表或引用
 - 插画3-5张，穿插在段落之间，长内容多配图降低阅读压力
 - content 数组用 "[IMG-N]" 标记插画位置
 - 封面 prompt 要求：${template.coverStyle}
 - 插画 prompt 要求：${template.illustrationStyle}
 - 所有 prompt 用英文，描述具体画面内容
+- 不要强行出现“30+”“程序员”等职业或年龄标签
+- 标题中的承诺必须在正文前两段兑现
 - 涉及具体数据或关键信息要准确，不要编造`;
 
   const tStart = Date.now();
@@ -246,8 +293,6 @@ async function callLLM(prompt, style, subcategory) {
 }
 
 async function generateAllImages(taskId, workDir, images) {
-  const state = JSON.parse(fs.readFileSync(path.join(workDir, "task.json"), "utf-8"));
-
   console.log(`${TAG} images: 开始生成 taskId=${taskId} 共${images.length}张`);
 
   let doneCount = 0;
@@ -260,20 +305,20 @@ async function generateAllImages(taskId, workDir, images) {
       const aspectRatio = img.type === "cover" ? "3:4" : "1:1";
       const [url] = await generateImage(img.prompt, { aspectRatio });
 
-      state.images[img.index].url = url;
-      state.images[img.index].status = "done";
+      const state = updateImageState(readTaskState(workDir), img.index, { url, status: "done", error: undefined });
       doneCount++;
       writeTaskState(workDir, state);
       console.log(`${TAG} image[${img.index}] ${img.type}: 成功 耗时=${((Date.now() - tStart) / 1000).toFixed(1)}s`);
     } catch (err) {
-      state.images[img.index].status = "failed";
-      state.images[img.index].error = err.message;
+      const error = err.name === "AbortError" ? "图片生成超时，请重试" : err.message;
+      const state = updateImageState(readTaskState(workDir), img.index, { status: "failed", error });
       failedCount++;
       writeTaskState(workDir, state);
       console.log(`${TAG} image[${img.index}] ${img.type}: 失败 ${err.message}`);
     }
   }
 
+  const state = JSON.parse(fs.readFileSync(path.join(workDir, "task.json"), "utf-8"));
   const allDone = state.images.every((img) => img.status === "done");
   const hasFailed = state.images.some((img) => img.status === "failed");
 
@@ -312,8 +357,14 @@ export function register(server) {
         const knowledge = await searchChroma(topic);
         console.log(`${TAG} searchChroma: 结果=${knowledge?.length || 0}字`);
 
-        const prompt = `主题：${topic}\n${context ? `对话内容：${context}\n` : ""}相关知识：${knowledge || "无"}`;
-        const noteData = await callLLM(prompt, style, subcategory);
+        const basePrompt = `主题：${topic}\n${context ? `对话内容：${context}\n` : ""}相关知识：${knowledge || "无"}`;
+        const template = style === "knowledge" && subcategory === "finance"
+          ? TEMPLATES.knowledge.finance
+          : null;
+        const plan = template ? await callFinancePlan(basePrompt, template) : null;
+        const selected = plan?.selectedCandidate;
+        const prompt = `${basePrompt}${plan ? `\n传播方案：${JSON.stringify(plan)}\n必须使用候选方案中的 selectedCandidate 作为最终标题和封面方向，并兑现其 promise。` : ""}`;
+        const noteData = await callLLM(prompt, style, subcategory, plan);
 
         const taskId = shortId();
         const workDir = path.join(TASK_DIR, taskId);
@@ -339,6 +390,14 @@ export function register(server) {
           excerpt: noteData.excerpt || "",
           content: noteData.content,
           tags: noteData.tags,
+          angle: noteData.angle || plan?.angle || "",
+          audiencePain: noteData.audiencePain || plan?.audiencePain || "",
+          primaryGoal: noteData.primaryGoal || plan?.primaryGoal || "click",
+          coverText: noteData.coverText || selected?.coverText || "",
+          cta: noteData.cta || "",
+          factSources: noteData.factSources || plan?.factSources || [],
+          titleFormula: noteData.titleFormula || selected?.titleFormula || "",
+          candidates: plan?.candidates || [],
           images,
         };
 
@@ -433,7 +492,7 @@ export function register(server) {
 
   server.tool(
     "checkXiaohongshuNoteProgress",
-    "查询小红书笔记生成任务进度。返回 status 字段。status=ready 时所有图片已生成完毕。",
+    "查询小红书笔记生成任务进度。返回 status 字段。status=ready、partial 或 failed 时任务结束；partial 表示部分图片失败，不要继续轮询。",
     {
       taskId: z.string().min(1).describe("笔记任务 ID"),
       interval: z.number().optional().default(3).describe("初始查询间隔（秒），后续每次递减 10%，最低为初始值的 60%"),
@@ -452,11 +511,11 @@ export function register(server) {
         console.log(`${TAG} checkProgress: taskId=${taskId} status=${state.status} count=${count} wait=${(wait / 1000).toFixed(1)}s`);
         await sleep(wait);
         const updated = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-        const doneCount = updated.images?.filter((img) => img.status === "done").length || 0;
-        return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, title: updated.title, readyCount: doneCount, totalCount: updated.images?.length || 0 }, null, 2) }] };
+        const progress = summarizeImages(updated.images);
+        return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: updated.taskId, status: updated.status, title: updated.title, ...progress }, null, 2) }] };
       }
 
-      return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: state.taskId, status: state.status, previewUrl: `/note/${state.taskId}`, iframe: `<iframe src="/note/${state.taskId}" width="100%" height="600" style="border:none"></iframe>`, note: { title: state.title, excerpt: state.excerpt, content: state.content, tags: state.tags, images: state.images } }, null, 2) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ ok: true, taskId: state.taskId, status: state.status, ...summarizeImages(state.images), previewUrl: `/note/${state.taskId}`, iframe: `<iframe src="/note/${state.taskId}" width="100%" height="600" style="border:none"></iframe>`, note: { title: state.title, excerpt: state.excerpt, content: state.content, tags: state.tags, images: state.images } }, null, 2) }] };
     },
   );
 
@@ -569,14 +628,7 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.jpg" alt="封�
           "",
           ...(state.tags || []).map((t) => `\`${t}\``),
           "",
-          ...state.content.map((seg) => {
-            const match = seg.match(/^\[插图-(\d+)\]$/);
-            if (match) {
-              const img = state.images[parseInt(match[1], 10)];
-              return img?.url ? `![插图](./images/${img.type === "cover" ? "cover" : `illustration-${img.index}`}.jpg)` : "_[插图生成失败]_";
-            }
-            return seg + "\n";
-          }),
+          contentToMarkdown(state.content, state.images),
           "",
           "",
         ].join("\n");

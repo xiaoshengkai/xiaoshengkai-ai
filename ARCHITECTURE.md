@@ -329,7 +329,7 @@ packages/mcp/
     ├── chroma/              # 5 tools：知识库增删查
     ├── media/               # 5 tools：generateImage / generateImageFromImage / checkImageProgress / generateMusic / checkMusicProgress
     ├── diagram/             # 2 tools：generateDiagram / checkDiagramProgress（Mermaid/D2）
-    ├── xiaohongshu/         # 4 tools：小红书笔记生成/修稿/导出/进度
+    ├── xiaohongshu/         # 4 tools：小红书笔记生成/修稿/导出/进度；finance 两阶段策划→正文，note-utils 负责候选评分/状态摘要/导出转换
     ├── document/            # 2 tools：convertDocument / convertDocumentBatch（Pandoc→PDF/Word）
     └── todo/                # 6 tools（暂未注册）
 ```

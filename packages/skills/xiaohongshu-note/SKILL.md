@@ -15,8 +15,12 @@ description: 小红书笔记自动生成技能，将当前对话内容+记忆库
    - context 从当前对话中提取关键讨论内容（必传，确保笔记内容包含对话信息）
    - style 自动推断：knowledge=知识分享, product_review=好物推荐, experience=经验复盘, opinion=观点讨论
    - subcategory 自动推断二级类目，如 finance=金融知识
-2. 用 checkXiaohongshuNoteProgress(taskId, interval=3) 轮询进度，等 status=ready
-3. status=ready 后，直接输出 iframe 在聊天中嵌入预览，告知标题和摘要，不要调用 export 或打开浏览器
+2. 用 checkXiaohongshuNoteProgress(taskId, interval=3) 轮询进度，直到 status=ready、partial 或 failed
+   - ready：全部图片成功，直接预览
+   - partial：部分图片失败，停止轮询，直接预览可用内容，并告知失败图片；需要时用 updateXiaohongshuNote 重试单张图片
+   - failed：任务级失败，停止轮询并说明错误
+   - 同一个 taskId 只保留一条轮询链，不要并发重复调用
+3. status=ready 或 partial 后，直接输出 iframe 在聊天中嵌入预览，告知标题和摘要，不要调用 export 或打开浏览器
 4. 只有用户明确说"导出"时，才调用 exportXiaohongshuNote({ taskId })
    - 在聊天中展示预览页链接 /note/[taskId]（不要用 file:// 路径）
    - 告知用户导出文件夹完整路径和文件列表（index.html、note.md、images/）

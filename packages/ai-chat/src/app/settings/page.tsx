@@ -27,6 +27,16 @@ interface ProviderStatus {
   error?: string;
 }
 
+interface ManagedService {
+  id: string;
+  group: string;
+  name: string;
+  description: string;
+  cwd: string;
+  healthUrl: string;
+  status: "running" | "starting" | "stopped" | "unknown";
+}
+
 const PROVIDER_LABELS: Record<string, string> = {
   deepseek: "DeepSeek",
   minimax: "MiniMax",
@@ -44,6 +54,10 @@ export default function SettingsPage() {
   const [dirtySel, setDirtySel] = useState(false);
   const [status, setStatus] = useState<Record<string, ProviderStatus> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [services, setServices] = useState<ManagedService[]>([]);
+  const [serviceErrors, setServiceErrors] = useState<string[]>([]);
+  const [serviceLoading, setServiceLoading] = useState(true);
+  const [serviceAction, setServiceAction] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -72,6 +86,42 @@ export default function SettingsPage() {
   useEffect(() => {
     loadBalance();
   }, [loadBalance]);
+
+  const loadServices = useCallback(async () => {
+    try {
+      const r = await fetch(`${BASE}/api/services`);
+      const data = await r.json();
+      setServices(data.services || []);
+      setServiceErrors(data.errors || []);
+    } catch {
+      setServices([]);
+      setServiceErrors(["服务状态读取失败"]);
+    } finally {
+      setServiceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadServices();
+    const timer = setInterval(loadServices, 5000);
+    return () => clearInterval(timer);
+  }, [loadServices]);
+
+  const handleServiceAction = useCallback(async (id: string, action: "start" | "restart" | "stop") => {
+    const key = `${id}:${action}`;
+    setServiceAction(key);
+    try {
+      const r = await fetch(`${BASE}/api/services/${id}/${action}`, { method: "POST" });
+      const data = await r.json();
+      if (!r.ok || !data.ok) throw new Error(data.error || "服务操作失败");
+      await loadServices();
+      toast("服务操作已提交");
+    } catch (err) {
+      toast(`服务操作失败: ${err instanceof Error ? err.message : "未知错误"}`);
+    } finally {
+      setServiceAction(null);
+    }
+  }, [loadServices]);
 
   const handleProviderChange = useCallback((id: string, config: unknown) => {
     setProviders((prev) => (prev ? { ...prev, [id]: config as Providers[string] } : prev));
@@ -121,6 +171,13 @@ export default function SettingsPage() {
 
   const hasChanges = dirtyProv || dirtySel;
 
+  const statusClass: Record<ManagedService["status"], string> = {
+    running: "bg-lime-soft text-foreground",
+    starting: "bg-yellow-soft text-foreground",
+    stopped: "bg-muted text-muted-foreground",
+    unknown: "bg-orange-soft text-foreground",
+  };
+
   return (
     <div data-theme="pink" className="flex flex-col h-full">
       {/* 头部：与其他页面统一 */}
@@ -155,6 +212,52 @@ export default function SettingsPage() {
         <p className="text-foreground/70">
           所有配置（聊天/图片/向量/MCP/工作流/定时任务）保存后立即生效，无需重启。
         </p>
+      </div>
+
+      {/* 独立服务监控 */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-foreground font-heading">独立服务</h2>
+          <button onClick={loadServices} className="brutal-btn px-2 py-1 text-xs font-bold bg-muted text-foreground">
+            刷新状态
+          </button>
+        </div>
+        {serviceErrors.length > 0 && (
+          <div className="brutal bg-orange-soft p-3 text-xs font-mono mb-3">
+            {serviceErrors.join("；")}
+          </div>
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {serviceLoading ? (
+            <div className="brutal bg-card p-4 text-xs font-mono text-muted-foreground">服务状态加载中...</div>
+          ) : services.map((service) => (
+            <div key={service.id} className="brutal bg-card p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold font-heading">{service.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">{service.description}</p>
+                </div>
+                <span className={`brutal-chip px-2 py-0.5 text-[10px] ${statusClass[service.status]}`}>{service.status}</span>
+              </div>
+              <div className="text-[11px] font-mono text-muted-foreground space-y-1">
+                <div>{service.cwd}</div>
+                <div>{service.healthUrl}</div>
+              </div>
+              <div className="flex gap-2">
+                {(["start", "restart", "stop"] as const).map((action) => (
+                  <button
+                    key={action}
+                    onClick={() => handleServiceAction(service.id, action)}
+                    disabled={serviceAction !== null}
+                    className="brutal-btn px-2 py-1 text-xs font-bold bg-card text-foreground disabled:opacity-50"
+                  >
+                    {serviceAction === `${service.id}:${action}` ? "执行中..." : action === "start" ? "启动" : action === "restart" ? "重启" : "关闭"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* 模型配置 */}

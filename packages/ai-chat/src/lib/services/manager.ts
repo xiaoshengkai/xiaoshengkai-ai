@@ -63,13 +63,20 @@ function readDefinitions(): { services: ServiceDef[]; errors: string[] } {
   return { services, errors };
 }
 
+const STARTING_TIMEOUT_MS = 60_000;
+
 async function checkHealth(service: ServiceDef): Promise<ServiceStatus> {
   if (!service.healthUrl) return "unknown";
   try {
     const res = await fetch(service.healthUrl, { signal: AbortSignal.timeout(1500) });
     return statusFromHealth(res.ok);
   } catch {
-    return pending.has(service.id) ? "starting" : "stopped";
+    const startedAt = pending.get(service.id);
+    if (startedAt !== undefined && Date.now() - startedAt < STARTING_TIMEOUT_MS) {
+      return "starting";
+    }
+    pending.delete(service.id);
+    return "stopped";
   }
 }
 
@@ -85,7 +92,7 @@ async function toManaged(service: ServiceDef): Promise<ManagedService> {
   };
 }
 
-function run(command: string[], cwd: string, detach = false): Promise<void> {
+function run(command: string[], cwd: string, detach = false, allowFail = false): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command[0], command.slice(1), {
       cwd: path.resolve(PROJECT_ROOT, cwd),
@@ -100,7 +107,10 @@ function run(command: string[], cwd: string, detach = false): Promise<void> {
       resolve();
       return;
     }
-    child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(stderr.trim() || `exit ${code}`)));
+    child.on("exit", (code) => {
+      if (code === 0 || allowFail) resolve();
+      else reject(new Error(stderr.trim() || `exit ${code}`));
+    });
   });
 }
 
@@ -113,7 +123,7 @@ export async function controlService(id: string, action: "start" | "restart" | "
   const service = readDefinitions().services.find((item) => item.id === id);
   if (!service) throw new Error(`unknown service: ${id}`);
 
-  if (action === "stop" || action === "restart") await run(service.stop, PROJECT_ROOT);
+  if (action === "stop" || action === "restart") await run(service.stop, PROJECT_ROOT, false, true);
   if (action === "start" || action === "restart") {
     pending.set(service.id, Date.now());
     await run(service.start, service.cwd, true);

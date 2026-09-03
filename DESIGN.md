@@ -217,6 +217,35 @@ search-service / searxng 是独立进程，不 import 共享 logger。统一用 
 - `createDateLogger` 只返回 logger 方法、**不自动包装 `console.log`**，需手动包（scheduler / run-task.js / log-wrap 都手动包）。
 - searxng 禁用默认引擎要用 **`inactive: true`** 而非 `disabled: true`——`load_engines()` 只跳过 `inactive`，`disabled` 引擎照样 import + init 产生报错噪音；`disabled` 仅在搜索阶段过滤引擎。
 
+## 服务监控
+
+### 清单驱动（不扫进程）
+
+- `packages/services/*/service.json` 是唯一真相源，一个目录可声明多个进程（`services` 数组）。
+- 明确**不**扫描进程/端口反推服务定义，也不做 PID 级别进程树管理——清单自带 `start`/`stop` 命令与健康检查 URL，新增独立服务只需补清单。
+- 仅管理 `packages/services/*`；AI 工作台、反向代理、Tailscale Funnel、定时任务、MCP 均不纳入。
+
+### 控制语义
+
+- **重启 = 停止 + 启动** 组合，清单只声明 `start`/`stop`，不额外维护 `restart` 字段。
+- 停止对 `pkill` 无匹配进程（exit 1）容忍（`allowFail`），保证对已停止服务执行 stop/restart 不报错。
+- 启动 detached + 监听 `spawn` 事件 resolve（而非同步 resolve），确保命令 ENOENT/EACCES 等启动失败能上抛、不被吞掉。
+
+### 状态模型
+
+- `running`（健康检查通过）/ `starting`（启动中，60s 超时回退）/ `stopped` / `unknown`（无健康检查）。
+- 不做 PID/进程树探测，故不区分「进程存在但不健康」与「进程已停止」。
+
+### 安全边界
+
+- `action` 白名单（start/restart/stop）；`id` 仅用于查仓库内清单；spawn 参数来自 `service.json`，不含请求输入，无命令注入路径。
+- 沿用设置页现状，无额外鉴权。
+
+### 日志策略
+
+- 动作触发/完成、命令失败、清单解析失败经 `console.log/error` 写 `logs/app/`（复用 instrumentation 的 `createLogger` 包装）。
+- 健康检查与 5s 轮询是正常状态，不打日志（避免刷屏）。
+
 ## 图片生成经验
 
 ### OSS 签名 URL 规则

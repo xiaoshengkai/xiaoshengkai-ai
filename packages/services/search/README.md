@@ -23,7 +23,7 @@ bash packages/services/search/searxng/start.sh
 node packages/services/search/server.js
 ```
 
-由 `scripts/dev.sh` / `scripts/prod.sh` 统一管理。
+由 `scripts/dev.sh` / `scripts/prod.sh` 统一管理；也可在设置页「独立服务」面板启动/重启/关闭（清单见本目录 `service.json`）。
 
 ## 接口
 

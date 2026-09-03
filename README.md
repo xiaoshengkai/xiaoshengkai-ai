@@ -7,6 +7,7 @@ Neo-Brutalism 糖果色 AI 对话助手，集成 RAG 知识库、MCP 工具调�
 - 📸 图片理解：粘贴/上传图片 → MiniMax-M3 描述 → DeepSeek 间接理解
 - 💬 流式 AI 对话（DeepSeek V4 Pro / MiniMax M3 / GLM / Qwen，策略模式路由）
 - ⚙️ 设置系统：7 个模块独立选择（chat / media / vector / workflow / preprocess / tts / bgm）+ Provider 在线配置（providers.json 为真源）
+- 🖥️ 服务监控面板：设置页可视化 `packages/services/*` 独立服务（`service.json` 清单发现），展示状态/端口/健康检查，支持启动/重启/关闭
 - 📚 RAG 知识库检索（Chroma + 智谱 embedding-3，动态多表检索）
 - 🧠 主题学习笔记（learn-* collection，按主题隔离）
 - 📝 小红书笔记自动生成：对话内容 → 带封面/插画/标签的完整笔记，4 种模板 + 二级类目，聊天内嵌预览 + 独立页面，导出 HTML/MD/图片

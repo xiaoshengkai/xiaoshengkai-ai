@@ -377,3 +377,25 @@ packages/services/search/
 - Firecrawl key：根 `.env` 的 `FIRECRAWL_API_KEY`
 - 搜索失败语义：类别内引擎全失败才报错；部分失败返回 `degraded=true` + 引擎状态
 - 正文抓取失败不丢弃搜索结果（`contentFetched=false` + `contentError`）
+
+## 服务监控系统
+
+设置页独立服务监控：以 `packages/services/*/service.json` 为唯一真相源，`ai-chat` 的 `lib/services/manager.ts` 扫描清单、执行启停命令、探测 HTTP 健康检查，设置页轮询展示并下发启动/重启/关闭。
+
+```
+packages/services/*/service.json      # 清单（services 数组，一目录可多进程）
+  ├── id / name / description / cwd
+  ├── start / stop                    # 命令数组，直接 spawn（不走 shell）
+  └── health: { type: "http", url }   # 健康检查 URL
+
+ai-chat/src/lib/services/manager.ts   # 清单扫描 + 启停 + 健康检查（状态机）
+ai-chat/src/app/api/services/route.ts             # GET /api/services
+ai-chat/src/app/api/services/[id]/[action]/route.ts  # POST start/restart/stop
+ai-chat/src/app/settings/page.tsx     # 服务监控面板（5s 轮询）
+```
+
+- **状态模型**：`running`（健康检查通过）/ `starting`（启动中，60s 超时回退 `stopped`）/ `stopped` / `unknown`（无健康检查）。不做 PID/进程树探测。
+- **重启语义**：重启 = 停止 + 启动组合（清单只声明 `start`/`stop`）；停止对 pkill 无匹配进程（exit 1）容忍。
+- **进程生命周期**：启动 detached + `spawn` 事件 resolve（避免吞掉 ENOENT）；停止同步等待 exit code。
+- **安全边界**：`action` 白名单（start/restart/stop），`id` 仅用于查找仓库内清单，命令参数来自 `service.json` 而非请求输入。
+- **日志**：动作触发/完成/失败/清单解析失败经 `console.log/error` 写 `logs/app/app-YYYY-MM-DD.log`（instrumentation 的 `createLogger` 包装）。健康检查与 5s 轮询不打日志。

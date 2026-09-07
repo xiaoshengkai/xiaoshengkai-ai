@@ -4,6 +4,7 @@ import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderPlan } from "./render.js";
 import { loadWallMask, snapPoint } from "./snap.js";
+import { areaM2, roomTypeByLabel } from "./metrics.js";
 
 const TIERS = [
   ["conservative", "保守（最小改动、造价低）"],
@@ -63,8 +64,45 @@ function validatePlan(p, structure, tol) {
   return { errors, warnings };
 }
 
+export function validatePlanWithRules(p, structure, rules = {}) {
+  const tol = (structure.imgW || 1000) * 0.02;
+  const v = validatePlan(p, structure, tol);
+  const minLen = (structure.imgW || 1000) * 0.02;
+
+  (p.build || []).forEach((b, j) => {
+    const len = Math.hypot(Number(b.x2) - Number(b.x1), Number(b.y2) - Number(b.y1));
+    if (len < minLen) v.errors.push(`build[${j}] 长度过短（${len.toFixed(0)}px），无法构成有效隔墙`);
+  });
+
+  const minArea = (rules.minAreaM2 || {});
+  (p.newRooms || []).forEach((nr, j) => {
+    const type = roomTypeByLabel(nr.label);
+    if (!type || !minArea[type]) return;
+    const a = areaM2(nr.bbox, structure.mmPerPx);
+    if (a == null) return;
+    if (a < minArea[type]) v.errors.push(`newRooms[${j}]（${nr.label}）面积 ${a}㎡ 低于 ${type} 下限 ${minArea[type]}㎡`);
+  });
+
+  // 新马桶间须邻湿区（含房间 bbox 扩展 tol）
+  const wet = structure.wetRooms || [];
+  (p.newRooms || []).forEach((nr, j) => {
+    if (roomTypeByLabel(nr.label) !== "toilet" || wet.length === 0) return;
+    const near = (structure.rooms || []).some(r => wet.includes(r.id) && r.bbox && nearBbox(nr.bbox, r.bbox, tol));
+    if (!near) v.warnings.push(`newRooms[${j}]（${nr.label}）不邻湿区，需墙排/提升泵`);
+  });
+
+  return v;
+}
+
+function nearBbox(a, b, tol) {
+  if (!a || a.length !== 4 || !b || b.length !== 4) return false;
+  return !(a[2] + tol < b[0] || b[2] + tol < a[0] || a[3] + tol < b[1] || b[3] + tol < a[1]);
+}
+
 export async function generatePlans(needs, needsText, planCount, executionDir) {
   const structure = JSON.parse(fs.readFileSync(path.join(executionDir, "structure.json"), "utf-8"));
+  if (!structure.confirmed) throw new Error("户型结构尚未确认，请先在上一步确认入户门/门窗/房间/承重墙");
+  const rules = JSON.parse(fs.readFileSync(new URL("../rules.json", import.meta.url), "utf-8"));
   const n = Math.max(1, Math.min(6, parseInt(planCount, 10) || 4));
   const plansPath = path.join(executionDir, "plans.json");
   const qualityPath = path.join(executionDir, "quality.json");
@@ -78,7 +116,10 @@ export async function generatePlans(needs, needsText, planCount, executionDir) {
     const bearingIds = (structure.walls || []).filter(w => w.bearing).map(w => w.id);
     const removableIds = (structure.walls || []).filter(w => !w.bearing && !w.unverified).map(w => w.id);
     const tierList = TIERS.slice(0, n).map(([id, desc], i) => `${i + 1}. tier=${id}：${desc}`).join("\n");
+    const principles = rules.designPrinciples || [];
     const system = `你是资深住宅改造设计师。基于结构化户型数据（像素坐标，图宽 ${structure.imgW || structure.width}），按指定梯度生成 ${n} 套改造方案。
+设计准则（逐条遵守）：
+${principles.map(r => `- ${r}`).join("\n")}
 硬约束（违反即方案作废）：
 - demolish 只能从可拆墙白名单中选择：${removableIds.join(", ") || "无（不可拆任何墙）"}；承重墙 ${bearingIds.join(", ") || "无"} 绝对不可拆
 - build 新墙坐标必须是数字，端点必须贴在已有墙上或落在被改造房间的 bbox 内，形成闭合空间
@@ -121,7 +162,7 @@ ${tierList}
       }
       snapBuilds(parsed, mask, Rb);
       const report = (Array.isArray(parsed.plans) ? parsed.plans : []).map((p, i) => {
-        const v = validatePlan(p, structure, tol);
+        const v = validatePlanWithRules(p, structure, rules);
         return { index: i + 1, title: p?.title || `方案${i + 1}`, errors: v.errors, warnings: v.warnings, plan: p };
       });
       const valid = report.filter(r => r.errors.length === 0).map(r => r.plan);

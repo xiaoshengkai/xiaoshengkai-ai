@@ -1,7 +1,7 @@
 "use client";
 
 import { BASE } from "@/lib/utils/utils";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp, Edit3, History } from "lucide-react";
 import { toast } from "sonner";
@@ -82,6 +82,9 @@ export default function ExecutionDetailPage() {
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; tweak?: boolean }[]>([]);
   const [tweakPages, setTweakPages] = useState<number[]>([]);
+  const [fpStructure, setFpStructure] = useState<any>(null);
+  const [fpConfirmed, setFpConfirmed] = useState(false);
+  const [fpConfirming, setFpConfirming] = useState(false);
 
   const fetchExecution = useCallback(async () => {
     try {
@@ -118,6 +121,7 @@ export default function ExecutionDetailPage() {
 
   const supportsTweak = templates.find(t => t.id === execution?.template)?.tweak === true;
   const isComic = execution?.template === "comic-generation";
+  const isFloorplan = execution?.template === "floorplan-remodel";
   const comicPages: { page: number }[] = (() => {
     try {
       const g = execution?.steps?.find(s => s.id === "generate-pages");
@@ -134,6 +138,19 @@ export default function ExecutionDetailPage() {
       return (script?.pages || []) as { page: number; sceneId?: string; scenePrompt?: string }[];
     } catch { return []; }
   })();
+
+  const parseStep = execution?.steps?.find(s => s.id === "parse");
+  const floorplanStructure = useMemo(() => {
+    try {
+      const out = parseStep?.output;
+      if (!out) return null;
+      const o = typeof out === "string" ? JSON.parse(out) : out;
+      const s = typeof o?.structureJson === "string" ? JSON.parse(o.structureJson) : null;
+      return s;
+    } catch { return null; }
+  }, [parseStep?.output]);
+  const floorplanConfirmed = fpConfirmed || floorplanStructure?.confirmed === true;
+  const floorplanBlocked = isFloorplan && parseStep?.status === "completed" && !floorplanConfirmed;
 
   useEffect(() => {
     clientLog(id, "INFO", `useEffect run: executionStatus=${execution?.status}`);
@@ -181,6 +198,13 @@ export default function ExecutionDetailPage() {
       fetchExecution();
     }
   }, [supportsTweak, execution?.tweakTask?.status, fetchExecution]);
+
+  useEffect(() => {
+    if (floorplanStructure) {
+      setFpStructure(floorplanStructure);
+      setFpConfirmed(floorplanStructure.confirmed === true);
+    }
+  }, [floorplanStructure]);
 
   const handleNext = useCallback(async () => {
     setNextLoading(true);
@@ -251,6 +275,20 @@ export default function ExecutionDetailPage() {
       else toast(`🔴 ${data.error}`);
     } catch { toast("🔴 请求失败"); }
   }, [id, fetchExecution]);
+
+  const handleFloorplanConfirm = useCallback(async () => {
+    setFpConfirming(true);
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${id}/confirm-structure`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ structure: fpStructure }),
+      });
+      const data = await res.json();
+      if (data.ok) { toast("🟢 底图已确认"); setFpConfirmed(true); fetchExecution(); }
+      else toast(`🔴 ${data.error}`);
+    } catch { toast("🔴 请求失败"); }
+    setFpConfirming(false);
+  }, [id, fpStructure, fetchExecution]);
 
   const handleDelete = useCallback(async () => {
     try {
@@ -468,6 +506,18 @@ export default function ExecutionDetailPage() {
 
         <div className="overflow-auto p-4">
           {(() => {
+            // 优先级0：floorplan parse → 底图确认面板
+            if (isFloorplan && activeStep.id === "parse" && parseStep?.status === "completed" && !floorplanConfirmed) {
+              return (
+                <FloorplanConfirmPanel
+                  structure={fpStructure}
+                  onChange={setFpStructure}
+                  onConfirm={handleFloorplanConfirm}
+                  confirming={fpConfirming}
+                />
+              );
+            }
+
             // 优先级1：script step → JSON tabs
             if (activeStep.id === "script" && activeStep.output) {
               if (activeStep.status === "running") {
@@ -548,14 +598,14 @@ export default function ExecutionDetailPage() {
 
       {!isDone && !isTweakRunning && (
         <div className="flex gap-2 px-4 py-3 border-t border-border shrink-0">
-          <button onClick={handleNext} disabled={nextLoading || isRunning}
+          <button onClick={handleNext} disabled={nextLoading || isRunning || floorplanBlocked}
             className="brutal-btn inline-flex items-center gap-1 px-4 py-1.5 text-xs font-bold cursor-pointer"
-            style={{ border: "2px solid var(--border)", background: nextLoading || isRunning ? "var(--muted)" : "var(--blue)", color: nextLoading || isRunning ? "var(--muted-foreground)" : "#fff", boxShadow: "2px 2px 0 var(--border)" }}>
-            <ChevronRight className="w-3 h-3" />{nextLoading || isRunning ? "执行中..." : "下一步"}
+            style={{ border: "2px solid var(--border)", background: nextLoading || isRunning || floorplanBlocked ? "var(--muted)" : "var(--blue)", color: nextLoading || isRunning || floorplanBlocked ? "var(--muted-foreground)" : "#fff", boxShadow: "2px 2px 0 var(--border)" }}>
+            <ChevronRight className="w-3 h-3" />{floorplanBlocked ? "请先确认底图" : nextLoading || isRunning ? "执行中..." : "下一步"}
           </button>
-          <button onClick={handleAuto} disabled={autoLoading || isRunning}
+          <button onClick={handleAuto} disabled={autoLoading || isRunning || floorplanBlocked}
             className="brutal-btn inline-flex items-center gap-1 px-4 py-1.5 text-xs font-bold cursor-pointer"
-            style={{ border: "2px solid var(--border)", background: autoLoading || isRunning ? "var(--muted)" : "var(--primary)", color: autoLoading || isRunning ? "var(--muted-foreground)" : "var(--primary-foreground)", boxShadow: "2px 2px 0 var(--border)" }}>
+            style={{ border: "2px solid var(--border)", background: autoLoading || isRunning || floorplanBlocked ? "var(--muted)" : "var(--primary)", color: autoLoading || isRunning || floorplanBlocked ? "var(--muted-foreground)" : "var(--primary-foreground)", boxShadow: "2px 2px 0 var(--border)" }}>
             <Play className="w-3 h-3" />{autoLoading || isRunning ? "执行中..." : "自动执行"}
           </button>
         </div>
@@ -813,6 +863,122 @@ export default function ExecutionDetailPage() {
       </div>
     );
   }
+}
+
+function FloorplanConfirmPanel({ structure, onChange, onConfirm, confirming }: {
+  structure: any;
+  onChange: (s: any) => void;
+  onConfirm: () => void;
+  confirming: boolean;
+}) {
+  const openings: any[] = structure?.openings || [];
+  const rooms: any[] = structure?.rooms || [];
+  const walls: any[] = structure?.walls || [];
+  const doors = openings.filter((o: any) => o.type === "door");
+
+  const setEntryDoor = (v: string) => onChange({ ...structure, entryDoorId: v || null });
+  const toggleOpeningType = (id: string) => onChange({
+    ...structure,
+    openings: openings.map(o => o.id === id ? { ...o, type: o.type === "door" ? "window" : "door" } : o),
+  });
+  const deleteOpening = (id: string) => onChange({ ...structure, openings: openings.filter(o => o.id !== id) });
+  const setRoomLabel = (id: string, label: string) => onChange({
+    ...structure,
+    rooms: rooms.map(r => r.id === id ? { ...r, label } : r),
+  });
+  const toggleBearing = (id: string) => onChange({
+    ...structure,
+    walls: walls.map(w => w.id === id ? { ...w, bearing: !w.bearing } : w),
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="brutal bg-yellow-soft p-3" style={{ border: "3px solid var(--border)", boxShadow: "4px 4px 0 var(--border)" }}>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-5 h-5 rounded-full bg-blue text-white flex items-center justify-center text-xs font-bold">✓</span>
+          <h3 className="text-xs font-bold text-foreground">户型结构识别</h3>
+          <span className="text-xs px-1.5 py-0.5 bg-lime text-foreground font-bold">✅ 识别完成</span>
+        </div>
+        <p className="text-xs text-muted-foreground">请核对并修正下方结构信息，确认无误后点击「确认底图」，再执行「下一步」生成改造方案。</p>
+      </div>
+
+      <div className="border-2 border-border bg-card p-3 text-xs">
+        <label className="font-bold text-foreground block mb-1.5">🚪 入户门（关键字段）</label>
+        <select
+          value={structure?.entryDoorId ?? ""}
+          onChange={(e) => setEntryDoor(e.target.value)}
+          className="w-full px-2 py-1.5 text-sm border-2 border-[var(--border)] rounded-none bg-card focus:outline-none"
+        >
+          <option value="">未识别</option>
+          {doors.map(d => <option key={d.id} value={d.id}>{d.id}</option>)}
+        </select>
+        {doors.length === 0 && <p className="text-muted-foreground mt-1">未识别到门，请选择「未识别」或重新识别。</p>}
+      </div>
+
+      <div className="border-2 border-border bg-card p-3 text-xs">
+        <label className="font-bold text-foreground block mb-1.5">🚪 门窗（{openings.length}）</label>
+        {openings.length === 0 ? (
+          <p className="text-muted-foreground">未识别到门窗。</p>
+        ) : (
+          <div className="space-y-1">
+            {openings.map(o => (
+              <div key={o.id} className="flex items-center gap-2">
+                <span className="font-bold w-10 shrink-0">{o.id}</span>
+                <button onClick={() => toggleOpeningType(o.id)} className="px-2 py-0.5 border-2 border-border font-bold bg-yellow-soft">{o.type === "door" ? "门" : "窗"}</button>
+                <span className="text-muted-foreground/70 flex-1">{o.wallId || ""}</span>
+                <button onClick={() => deleteOpening(o.id)} className="w-5 h-5 flex items-center justify-center border-2 border-border text-muted-foreground hover:text-destructive" title="删除">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="border-2 border-border bg-card p-3 text-xs">
+        <label className="font-bold text-foreground block mb-1.5">🏠 房间名（{rooms.length}）</label>
+        <div className="space-y-1">
+          {rooms.map(r => (
+            <div key={r.id} className="flex items-center gap-2">
+              <span className="font-bold w-10 shrink-0">{r.id}</span>
+              <input
+                value={r.label ?? ""}
+                onChange={(e) => setRoomLabel(r.id, e.target.value)}
+                className="flex-1 px-2 py-1 border-2 border-[var(--border)] rounded-none bg-card focus:outline-none"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-2 border-border bg-card p-3 text-xs">
+        <label className="font-bold text-foreground block mb-1.5">🧱 承重墙（{walls.length}）</label>
+        {walls.length === 0 ? (
+          <p className="text-muted-foreground">未识别到墙。</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {walls.map(w => (
+              <button
+                key={w.id}
+                onClick={() => toggleBearing(w.id)}
+                className={`px-2 py-1 border-2 border-border font-bold ${w.bearing ? "bg-gray-800 text-white" : "bg-muted text-muted-foreground"}`}
+                title={w.unverified ? "该墙识别存疑" : ""}
+              >
+                {w.id} {w.bearing ? "承重" : "非承重"}{w.unverified ? " ⚠" : ""}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={onConfirm}
+        disabled={confirming}
+        className="brutal-btn inline-flex items-center gap-1 px-4 py-1.5 text-xs font-bold cursor-pointer w-full justify-center"
+        style={{ border: "2px solid var(--border)", background: confirming ? "var(--muted)" : "var(--blue)", color: confirming ? "var(--muted-foreground)" : "#fff", boxShadow: "2px 2px 0 var(--border)" }}
+      >
+        {confirming ? "确认中..." : "✅ 确认底图"}
+      </button>
+    </div>
+  );
 }
 
 function RenderManifestPreview({ executionId, manifest, sceneList }: { executionId: string; manifest: { sceneId: string; templateId: string; actualDuration: number; alignmentDiff: number; warning: string | null }[]; sceneList: { id: string; narration: string }[] }) {

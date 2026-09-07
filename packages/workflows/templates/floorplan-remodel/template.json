@@ -3,6 +3,7 @@
   "label": "户型改造",
   "description": "上传户型图 → 识别并确认底图 → 生成 N 套二维矢量改造方案（红=砸墙、蓝=砌墙）",
   "params": [
+    { "name": "title", "label": "项目标题", "type": "text", "required": true, "placeholder": "如：滨江两居室加书房" },
     { "name": "floorplan", "label": "户型图", "type": "text", "required": true },
     { "name": "needs", "label": "改造诉求（可多选）", "type": "checkbox", "required": false,
       "options": ["2改3", "3改2", "加书房/多功能房", "加独立马桶间", "开放式厨房", "干湿分离", "加衣帽间"] },

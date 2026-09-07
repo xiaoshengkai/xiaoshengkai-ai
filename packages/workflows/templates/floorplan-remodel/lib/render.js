@@ -9,7 +9,6 @@ const C = {
   dim: "#bbbbbb",
   demolish: "#e02020",
   build: "#1677ff",
-  align: "#f5c542",
   text: "#333333",
   sub: "#666666",
   window: "#77aabb",
@@ -249,7 +248,8 @@ export function demo() {
   assert(pImg.includes(">功能房</text>"), "plan has newRoom label");
   assert(pImg.includes("→ 功能房"), "plan has rename badge");
   assert(pImg.includes("施工前需专业鉴定"), "disclaimer present");
-  assert(pImg.includes("马桶"), "plan has fixture icon for 马桶间");
+  assert(pImg.includes("<ellipse"), "plan has toilet fixture glyph");
+  assert(pImg.includes("0.49㎡"), "new-room area from areaM2");
   const outDir = "/tmp/opencode";
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "floorplan-demo-structure.svg"), sImg);

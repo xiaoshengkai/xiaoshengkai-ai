@@ -7,9 +7,10 @@
 - **底图人工确认**：新增 `lib/confirm.js`（`confirm-structure` action，写回结构 + confirmed 盖章）；`parse` 扩展识别入户门/门窗/房间/承重，识别后人工确认底图，generate 前 confirmed 硬门槛
 - **纯二维矢量渲染**：`render` 弃原图 base64 叠层，改为纯二维矢量重绘（门窗符号 + 洁具图元）
 - **前端确认面板**：执行详情页新增确认面板 + 下一步拦截（未确认不可进入 generate）
+- **创建标题必填**：模板新增必填 `title` 参数，执行列表显示用户自定义标题（空标题历史记录仍回退显示模板名）
 
 ### 修复/验证
-- `test:shared` 33 项 + `npm run typecheck` + `npm run build` 全绿
+- `test:shared` 35 项 + `npm run typecheck` + `npm run build` 全绿；端到端复跑验证 confirmed 门槛、硬校验拦截（拆承重墙/零长度墙）、纯矢量 SVG 无 `<image>`
 
 ## v0.11.18 (2026-09-03) — 独立服务监控面板
 

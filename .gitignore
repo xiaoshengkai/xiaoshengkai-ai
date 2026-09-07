@@ -39,3 +39,5 @@ packages/services/search/searxng/searxng-src/
 packages/services/search/searxng/venv/
 
 nohup.out
+
+.superpowers/

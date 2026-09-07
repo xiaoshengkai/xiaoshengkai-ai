@@ -203,7 +203,7 @@ export function renderPlan(structure, plan, img = null, extraLines = []) {
     const w = wallById(structure, id);
     return w ? `<line x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}" stroke="${C.demolish}" stroke-width="${strokeW * 1.4}" stroke-dasharray="10 6"/>` : "";
   }).filter(Boolean).join("\n");
-  const body = `${dimWallEls(structure, strokeW)}\n${openingEls(structure, strokeW)}\n${demolish}\n${newRoomEls(plan, W, structure)}\n${buildEls(plan, strokeW)}\n${badgeEls(structure, plan)}`;
+  const body = `${dimWallEls(structure, strokeW)}\n${roomEls(structure)}\n${openingEls(structure, strokeW)}\n${demolish}\n${newRoomEls(plan, W, structure)}\n${buildEls(plan, strokeW)}\n${badgeEls(structure, plan)}`;
   const chunk = Math.floor(W / 17);
   const checks = (plan.checks || []).map(c => `${c.pass ? "✓" : "✗"}${c.rule}${c.note && !c.pass ? `(${c.note})` : ""}`).join(" ");
   const lines = ["图例：色块=新增功能空间 蓝线=新砌墙 红虚线=砸墙 | 示意方案，施工前需专业鉴定",
@@ -247,6 +247,8 @@ export function demo() {
   assert(pImg.includes(PALETTE[0]), "plan has newRoom fill");
   assert(pImg.includes(">功能房</text>"), "plan has newRoom label");
   assert(pImg.includes("→ 功能房"), "plan has rename badge");
+  assert(pImg.includes(">客厅</text>"), "plan shows original room labels");
+  assert(pImg.includes(">30㎡</text>"), "plan shows original room area");
   assert(pImg.includes("施工前需专业鉴定"), "disclaimer present");
   assert(pImg.includes("<ellipse"), "plan has toilet fixture glyph");
   assert(pImg.includes("0.49㎡"), "new-room area from areaM2");

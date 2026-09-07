@@ -70,12 +70,14 @@ export function validatePlanWithRules(p, structure, rules = {}) {
   const minLen = (structure.imgW || 1000) * 0.02;
 
   (p.build || []).forEach((b, j) => {
+    if (!b) return;
     const len = Math.hypot(Number(b.x2) - Number(b.x1), Number(b.y2) - Number(b.y1));
     if (len < minLen) v.errors.push(`build[${j}] 长度过短（${len.toFixed(0)}px），无法构成有效隔墙`);
   });
 
   const minArea = (rules.minAreaM2 || {});
   (p.newRooms || []).forEach((nr, j) => {
+    if (!nr || !nr.label) return;
     const type = roomTypeByLabel(nr.label);
     if (!type || !minArea[type]) return;
     const a = areaM2(nr.bbox, structure.mmPerPx);
@@ -86,6 +88,7 @@ export function validatePlanWithRules(p, structure, rules = {}) {
   // 新马桶间须邻湿区（含房间 bbox 扩展 tol）
   const wet = structure.wetRooms || [];
   (p.newRooms || []).forEach((nr, j) => {
+    if (!nr || !nr.label) return;
     if (roomTypeByLabel(nr.label) !== "toilet" || wet.length === 0) return;
     const near = (structure.rooms || []).some(r => wet.includes(r.id) && r.bbox && nearBbox(nr.bbox, r.bbox, tol));
     if (!near) v.warnings.push(`newRooms[${j}]（${nr.label}）不邻湿区，需墙排/提升泵`);

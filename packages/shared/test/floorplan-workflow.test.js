@@ -32,3 +32,9 @@ test("马桶间不邻湿区告警", () => {
   const r = validatePlanWithRules({ title: "t", demolish: [], build: [], newRooms: [{ label: "独立马桶间", bbox: [400, 400, 500, 500] }] }, structure, rules);
   assert.ok(r.warnings.some(w => w.includes("湿区")), JSON.stringify(r));
 });
+
+test("null 条目不抛异常并返回 errors/warnings 数组", () => {
+  const r = validatePlanWithRules({ title: "t", demolish: [], build: [null], newRooms: [null] }, structure, rules);
+  assert.ok(Array.isArray(r.errors), JSON.stringify(r));
+  assert.ok(Array.isArray(r.warnings), JSON.stringify(r));
+});

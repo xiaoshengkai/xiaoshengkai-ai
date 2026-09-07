@@ -35,6 +35,9 @@ function buildSystem(imgW, imgH) {
 - 承重判断不确定时 confidence<0.7（下游会把低置信墙按承重处理，宁可保守）
 - rooms.bbox 取房间墙线内边界矩形；center 取几何中心
 - 门=带弧线开口，窗=墙上细线开口
+- 入户门：通常是最外侧一扇 door，识别到则其 id 写入 entryDoorId，不确定写 null
+- wetRooms：所有厨房、卫生间、淋浴间等湿区的 room id 数组（这些房间有排水立管）
+- adjacency：输出相邻房间的 room id 对 [{a,b}]，每对两个房间共享一堵墙或有门相通
 - dims：只录图上清晰可见的尺寸标注排（如顶部 2670/3415/1070），values 按标注原文数字，x1y1x2y2 取该排尺寸线两端对应的墙体像素位置；看不清就不录`;
 }
 
@@ -82,6 +85,13 @@ function normalize(structure, imgW, imgH) {
       x1: Number(d.x1) || 0, y1: Number(d.y1) || 0, x2: Number(d.x2) || 0, y2: Number(d.y2) || 0,
     })),
     notes: String(structure.notes || ""),
+    entryDoorId: (structure.entryDoorId && (structure.openings || []).some(o => o.id === structure.entryDoorId))
+      ? String(structure.entryDoorId) : null,
+    wetRooms: Array.isArray(structure.wetRooms) ? structure.wetRooms.map(String) : [],
+    adjacency: Array.isArray(structure.adjacency)
+      ? structure.adjacency.filter(p => p && p.a && p.b).map(p => ({ a: String(p.a), b: String(p.b) }))
+      : [],
+    confirmed: false,
   };
 }
 

@@ -37,6 +37,7 @@ export default function WorkflowTypePage() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [bgmUploading, setBgmUploading] = useState(false);
+  const [fpUploading, setFpUploading] = useState(false);
 
   const [showCharacters, setShowCharacters] = useState(false);
   const [showStyles, setShowStyles] = useState(false);
@@ -162,6 +163,19 @@ export default function WorkflowTypePage() {
       else toast(`🔴 ${data.error || "上传失败"}`);
     } catch { toast("🔴 上传失败"); }
     setBgmUploading(false);
+  }, [formValues]);
+
+  const handleFloorplanUpload = useCallback(async (file: File) => {
+    setFpUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${BASE}/api/workflows/floorplan-upload`, { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.ok) { setFormValues({ ...formValues, floorplan: data.tempPath }); toast("🟢 户型图已上传"); }
+      else toast(`🔴 ${data.error || "上传失败"}`);
+    } catch { toast("🔴 上传失败"); }
+    setFpUploading(false);
   }, [formValues]);
 
   const handleAiGenerate = useCallback(async () => {
@@ -464,6 +478,31 @@ export default function WorkflowTypePage() {
                       className="w-full px-2 py-1 text-xs border-2 border-border bg-card">
                       {p.options?.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
+                  ) : p.type === "checkbox" ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(p.options || []).map(o => {
+                        const cur = (formValues[p.name] || "").split(",").filter(Boolean);
+                        const on = cur.includes(o);
+                        return (
+                          <button key={o} type="button"
+                            onClick={() => setFormValues({ ...formValues, [p.name]: (on ? cur.filter(x => x !== o) : [...cur, o]).join(",") })}
+                            className={`px-2 py-0.5 text-xs font-bold cursor-pointer ${on ? "bg-blue text-white" : "bg-card text-foreground"}`}
+                            style={{ border: "2px solid var(--border)" }}>
+                            {o}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : p.name === "floorplan" ? (
+                    <div className="flex gap-2 items-center">
+                      <input type="text" value={formValues[p.name] || ""} readOnly placeholder="未选择图片"
+                        className="flex-1 px-2 py-1 text-xs border-2 border-border bg-muted" />
+                      <label className={`brutal-btn shrink-0 px-2 py-1 text-xs font-bold ${fpUploading ? "bg-muted text-muted-foreground" : "bg-orange text-white"}`}>
+                        <Upload className="w-3 h-3 inline mr-1" />{fpUploading ? "上传中..." : "上传"}
+                        <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                          onChange={e => { const file = e.target.files?.[0]; if (file) handleFloorplanUpload(file); }} />
+                      </label>
+                    </div>
                   ) : p.name === "bgm_file" ? (
                     <div className="flex gap-2 items-center">
                       <input type="text" value={formValues[p.name] || ""} readOnly placeholder="未选择文件"

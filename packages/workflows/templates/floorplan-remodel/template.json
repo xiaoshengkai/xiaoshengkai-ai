@@ -1,0 +1,32 @@
+{
+  "name": "floorplan-remodel",
+  "label": "户型改造",
+  "description": "上传户型图 + 改造诉求 → N 套改造方案（红=砸墙、蓝=砌墙示意图）",
+  "params": [
+    { "name": "floorplan", "label": "户型图", "type": "text", "required": true },
+    { "name": "needs", "label": "改造诉求（可多选）", "type": "checkbox", "required": false,
+      "options": ["2改3", "3改2", "加书房/多功能房", "加独立马桶间", "开放式厨房", "干湿分离", "加衣帽间"] },
+    { "name": "needsText", "label": "补充诉求（可选）", "type": "textarea", "required": false, "placeholder": "如：功能房用来办公和打游戏；厕所只要马桶+洗漱台" },
+    { "name": "planCount", "label": "方案数量（1-6，默认 4）", "type": "number", "required": false }
+  ],
+  "steps": [
+    {
+      "id": "parse",
+      "name": "户型结构识别",
+      "type": "tool",
+      "previewType": "images",
+      "module": "./lib/parse.js",
+      "function": "parseFloorPlan",
+      "args": ["{floorplan}", "{executionDir}"]
+    },
+    {
+      "id": "generate",
+      "name": "生成改造方案",
+      "type": "tool",
+      "previewType": "images",
+      "module": "./lib/generate.js",
+      "function": "generatePlans",
+      "args": ["{needs}", "{needsText}", "{planCount}", "{executionDir}"]
+    }
+  ]
+}

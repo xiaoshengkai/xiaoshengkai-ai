@@ -14,18 +14,20 @@ export async function handle({ params, request }) {
   const merged = { ...JSON.parse(fs.readFileSync(file, "utf-8")), ...structure, confirmed: true };
   fs.writeFileSync(file, JSON.stringify(merged, null, 2));
 
-  const stateFile = path.join(dir, "state.json");
-  if (fs.existsSync(stateFile)) {
-    const state = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
-    const parseStep = state.steps?.find(s => s.id === "parse");
-    if (parseStep?.output) {
-      const isString = typeof parseStep.output === "string";
-      const out = isString ? JSON.parse(parseStep.output) : parseStep.output;
-      out.structureJson = JSON.stringify(merged);
-      parseStep.output = isString ? JSON.stringify(out) : out;
-      fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+  try {
+    const stateFile = path.join(dir, "state.json");
+    if (fs.existsSync(stateFile)) {
+      const state = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
+      const parseStep = state.steps?.find(s => s.id === "parse");
+      if (parseStep?.output) {
+        const isString = typeof parseStep.output === "string";
+        const out = isString ? JSON.parse(parseStep.output) : parseStep.output;
+        out.structureJson = JSON.stringify(merged);
+        parseStep.output = isString ? JSON.stringify(out) : out;
+        fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+      }
     }
-  }
+  } catch { /* structure.json 仍是后端唯一事实源，state.json 回写仅为前端读取便利 */ }
 
   return { ok: true };
 }

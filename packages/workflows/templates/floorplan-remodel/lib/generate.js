@@ -67,12 +67,11 @@ function validatePlan(p, structure, tol) {
 export function validatePlanWithRules(p, structure, rules = {}) {
   const tol = (structure.imgW || 1000) * 0.02;
   const v = validatePlan(p, structure, tol);
-  const minLen = (structure.imgW || 1000) * 0.02;
 
   (p.build || []).forEach((b, j) => {
     if (!b) return;
     const len = Math.hypot(Number(b.x2) - Number(b.x1), Number(b.y2) - Number(b.y1));
-    if (len < minLen) v.errors.push(`build[${j}] 长度过短（${len.toFixed(0)}px），无法构成有效隔墙`);
+    if (len < tol) v.errors.push(`build[${j}] 长度过短（${len.toFixed(0)}px），无法构成有效隔墙`);
   });
 
   const minArea = (rules.minAreaM2 || {});
@@ -81,7 +80,10 @@ export function validatePlanWithRules(p, structure, rules = {}) {
     const type = roomTypeByLabel(nr.label);
     if (!type || !minArea[type]) return;
     const a = areaM2(nr.bbox, structure.mmPerPx);
-    if (a == null) return;
+    if (a == null) {
+      if (!structure.mmPerPx) v.warnings.push(`newRooms[${j}]（${nr.label}）无比例尺(mmPerPx)，面积下限未校验`);
+      return;
+    }
     if (a < minArea[type]) v.errors.push(`newRooms[${j}]（${nr.label}）面积 ${a}㎡ 低于 ${type} 下限 ${minArea[type]}㎡`);
   });
 
@@ -104,7 +106,7 @@ function nearBbox(a, b, tol) {
 
 export async function generatePlans(needs, needsText, planCount, executionDir) {
   const structure = JSON.parse(fs.readFileSync(path.join(executionDir, "structure.json"), "utf-8"));
-  if (!structure.confirmed) throw new Error("户型结构尚未确认，请先在上一步确认入户门/门窗/房间/承重墙");
+  if (!structure.confirmed) throw Object.assign(new Error("户型结构尚未确认，请先在上一步确认入户门/门窗/房间/承重墙"), { retryable: false });
   const rules = JSON.parse(fs.readFileSync(new URL("../rules.json", import.meta.url), "utf-8"));
   const n = Math.max(1, Math.min(6, parseInt(planCount, 10) || 4));
   const plansPath = path.join(executionDir, "plans.json");

@@ -140,16 +140,20 @@ export default function ExecutionDetailPage() {
   })();
 
   const parseStep = execution?.steps?.find(s => s.id === "parse");
-  const floorplanStructure = useMemo(() => {
+  const structureJsonStr = (() => {
     try {
       const out = parseStep?.output;
       if (!out) return null;
       const o = typeof out === "string" ? JSON.parse(out) : out;
-      const s = typeof o?.structureJson === "string" ? JSON.parse(o.structureJson) : null;
-      return s;
+      return typeof o?.structureJson === "string" ? o.structureJson : null;
     } catch { return null; }
-  }, [parseStep?.output]);
-  const floorplanConfirmed = fpConfirmed || floorplanStructure?.confirmed === true;
+  })();
+  const floorplanStructure = useMemo(() => {
+    try {
+      return structureJsonStr ? JSON.parse(structureJsonStr) : null;
+    } catch { return null; }
+  }, [structureJsonStr]);
+  const floorplanConfirmed = floorplanStructure?.confirmed === true || fpConfirmed;
   const floorplanBlocked = isFloorplan && parseStep?.status === "completed" && !floorplanConfirmed;
 
   useEffect(() => {

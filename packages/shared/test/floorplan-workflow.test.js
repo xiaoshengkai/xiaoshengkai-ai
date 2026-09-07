@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { validatePlanWithRules } from "../../workflows/templates/floorplan-remodel/lib/generate.js";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { validatePlanWithRules, generatePlans } from "../../workflows/templates/floorplan-remodel/lib/generate.js";
 
 const rules = { minAreaM2: { bedroom: 9, study: 5, toilet: 2 } };
 const structure = {
@@ -37,4 +40,22 @@ test("null 条目不抛异常并返回 errors/warnings 数组", () => {
   const r = validatePlanWithRules({ title: "t", demolish: [], build: [null], newRooms: [null] }, structure, rules);
   assert.ok(Array.isArray(r.errors), JSON.stringify(r));
   assert.ok(Array.isArray(r.warnings), JSON.stringify(r));
+});
+
+test("无比例尺时面积下限降级为告警", () => {
+  const s = { ...structure, mmPerPx: undefined };
+  const r = validatePlanWithRules({ title: "t", demolish: [], build: [], newRooms: [{ label: "独立马桶间", bbox: [0, 0, 10, 10] }] }, s, rules);
+  assert.ok(r.warnings.some(w => w.includes("无比例尺")), JSON.stringify(r));
+});
+
+test("结构未确认时硬失败（retryable=false）", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "floorplan-gate-"));
+  fs.writeFileSync(path.join(dir, "structure.json"), JSON.stringify({ confirmed: false }));
+  await assert.rejects(
+    () => generatePlans("", "", 1, dir),
+    (e) => {
+      assert.strictEqual(e.retryable, false, `retryable 应为 false，实际 ${JSON.stringify(e)}`);
+      return true;
+    },
+  );
 });

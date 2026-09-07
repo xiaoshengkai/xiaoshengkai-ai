@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createCapabilityHandler, loadActions } from "@app/shared/capability.js";
 import { handle as generateContent } from "./templates/video-generation/lib/generate-content.js";
+import { handle as floorplanConfirm } from "./templates/floorplan-remodel/lib/confirm.js";
 import { handle as comicExport } from "./templates/comic-generation/lib/export.js";
 import { handle as comicGenerateContent } from "./templates/comic-generation/lib/generate-content.js";
 import { handle as comicSceneGroup } from "./templates/comic-generation/lib/scene-groups.js";
@@ -38,6 +39,7 @@ const CUSTOM_HANDLERS = {
   "list-styles": listStyleHandler,
   "create-style": createStyleHandler,
   "delete-style": deleteStyleHandler,
+  "floorplan-confirm-structure": floorplanConfirm,
 };
 
 function collectActions() {

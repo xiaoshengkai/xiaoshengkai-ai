@@ -1,3 +1,4 @@
 [
-  { "type": "upload", "method": "POST", "path": "/floorplan-upload", "destDir": "data/static/floorplans", "allowExt": [".png", ".jpg", ".jpeg", ".webp"], "error": "不支持的图片格式，请上传 png/jpg/webp" }
+  { "type": "upload", "method": "POST", "path": "/floorplan-upload", "destDir": "data/static/floorplans", "allowExt": [".png", ".jpg", ".jpeg", ".webp"], "error": "不支持的图片格式，请上传 png/jpg/webp" },
+  { "type": "custom", "method": "POST", "path": "/execution/:id/confirm-structure", "handler": "floorplan-confirm-structure" }
 ]

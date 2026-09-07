@@ -3,9 +3,9 @@ import path from "node:path";
 
 const PROJECT_ROOT = path.resolve(process.cwd(), "..", "..");
 
-export async function handle(req) {
-  const { id } = req.params || {};
-  const { structure } = (await req.json()) || {};
+export async function handle({ params, request }) {
+  const { id } = params || {};
+  const { structure } = (await request.json().catch(() => ({}))) || {};
   if (!id) return { ok: false, error: "缺少执行 id" };
   if (!structure || typeof structure !== "object") return { ok: false, error: "缺少结构数据" };
   const dir = path.join(PROJECT_ROOT, "data", "workflows", "tasks", id);

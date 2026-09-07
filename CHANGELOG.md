@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.19 (2026-09-07) — 户型改造 v4：底图确认 + 纯二维矢量 + 户型规则
+
+### 变更
+- **户型规则**：新增 `templates/floorplan-remodel/rules.json`（尺寸下限 + 设计准则）与 `lib/metrics.js`（px→mm/面积/房间类型换算），generate 前用真实尺寸硬校验（面积/承重/零长度/邻湿区）
+- **底图人工确认**：新增 `lib/confirm.js`（`confirm-structure` action，写回结构 + confirmed 盖章）；`parse` 扩展识别入户门/门窗/房间/承重，识别后人工确认底图，generate 前 confirmed 硬门槛
+- **纯二维矢量渲染**：`render` 弃原图 base64 叠层，改为纯二维矢量重绘（门窗符号 + 洁具图元）
+- **前端确认面板**：执行详情页新增确认面板 + 下一步拦截（未确认不可进入 generate）
+
+### 修复/验证
+- `test:shared` 33 项 + `npm run typecheck` + `npm run build` 全绿
+
 ## v0.11.18 (2026-09-03) — 独立服务监控面板
 
 ### 变更

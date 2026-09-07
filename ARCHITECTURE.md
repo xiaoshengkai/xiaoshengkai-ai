@@ -106,9 +106,10 @@ ai-engineer-journey/
             ├── comic-generation/# 漫画生成（2 步：script/generate-pages）
                 ├── actions.json # 模板级动作（export / scene-group / generate-content）
                 └── lib/         # storyboard / generate-pages / tweak / scene-groups / export / generate-content
-            └── floorplan-remodel/# 户型改造（2 步：parse/generate；视觉识别结构→CV 像素吸附→LLM 梯度方案→原图 1:1 叠层 SVG 红=砸墙蓝=砌墙）
-                ├── actions.json # 模板级动作（floorplan-upload）
-                └── lib/         # parse（视觉+sharp 墙像素 mask 吸附+quality.json）/ generate（承重硬校验+可拆白名单+按方案判定不回退）/ render（原图 base64 叠层+编号+徽章）/ snap（墙像素 mask/吸附/外围 bbox）
+            └── floorplan-remodel/# 户型改造（2 步：parse/generate；视觉识别结构→人工确认底图→纯二维矢量方案 红=砸墙蓝=砌墙）
+                ├── actions.json # 模板级动作（floorplan-upload / confirm-structure）
+                ├── rules.json   # 户型规则（尺寸下限+设计准则）
+                └── lib/         # parse（视觉+sharp 墙像素 mask 吸附+quality.json）/ generate（承重硬校验+可拆白名单+按方案判定不回退）/ metrics（px→mm/面积/房间类型）/ confirm（confirm-structure：写回结构+confirmed 盖章）/ render（纯二维矢量+门窗符号+洁具图元）/ snap（墙像素 mask/吸附/外围 bbox）
 ```
 
 ## 能力注册机制（v0.11.0）
@@ -227,7 +228,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 - `templates/tech-video/`：科技风短视频（script.json 驱动 + 逐场景 TTS + BGM + SFX + 硬字幕 + SRT）
 - `templates/video-generation/`：视频生成（含微调/版本切换/内容生成等模板级动作）
 - `templates/comic-generation/`：漫画生成（故事→AI 分镜→每个 `sceneId` 生成无文字/无气泡锚点→逐页生成漫画图；`sceneId/scenePrompt` + 独立锚点锁连续场景且不继承成品页气泡；角色参考图锁人物一致性 + 风格库锁画风；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
-- `templates/floorplan-remodel/`：户型改造（户型图→`parse` 视觉识别 structure.json（像素坐标、墙/房间 bbox/门窗/承重+置信度，低置信按承重）+ sharp 墙像素 mask 吸附（端点 snap+外围 bbox+on-mask 校验，未过验墙标 unverified）+ 双采样共识→`generate` 按保守/均衡/激进/创意梯度出 N 套，承重硬校验+可拆白名单+build 端点吸附+newRooms 校验，按方案判定不回退（拆未验证墙=安全降级保留+图上注解，拆承重=丢弃），quality.json 记录全部原因→原图 base64 1:1 叠层渲染（newRooms 色块填充+标签、蓝线新墙、红=砸墙、改名徽章）；创建页 `type: "checkbox"` 多选 + `floorplan` 图片上传两通用控件）
+- `templates/floorplan-remodel/`：户型改造（户型图→`parse` 视觉识别 structure.json（像素坐标、墙/房间 bbox/门窗/承重+置信度，低置信按承重）+ sharp 墙像素 mask 吸附（端点 snap+外围 bbox+on-mask 校验，未过验墙标 unverified）+ 双采样共识→`generate` 按保守/均衡/激进/创意梯度出 N 套，承重硬校验+可拆白名单+build 端点吸附+newRooms 校验，按方案判定不回退（拆未验证墙=安全降级保留+图上注解，拆承重=丢弃），quality.json 记录全部原因→原图 base64 1:1 叠层渲染（newRooms 色块填充+标签、蓝线新墙、红=砸墙、改名徽章）；创建页 `type: "checkbox"` 多选 + `floorplan` 图片上传两通用控件；v4：识别后人工确认底图（入户门/门窗/房间/承重）→ generate 前 confirmed 硬门槛 → 真实尺寸硬校验（面积/承重/零长度/邻湿区）→ 纯二维矢量重绘（门窗符号+洁具图元））
 
 ### 资产库（工作流级通用）
 

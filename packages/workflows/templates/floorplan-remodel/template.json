@@ -1,7 +1,7 @@
 {
   "name": "floorplan-remodel",
   "label": "户型改造",
-  "description": "上传户型图 + 改造诉求 → N 套改造方案（红=砸墙、蓝=砌墙示意图）",
+  "description": "上传户型图 → 识别并确认底图 → 生成 N 套二维矢量改造方案（红=砸墙、蓝=砌墙）",
   "params": [
     { "name": "floorplan", "label": "户型图", "type": "text", "required": true },
     { "name": "needs", "label": "改造诉求（可多选）", "type": "checkbox", "required": false,

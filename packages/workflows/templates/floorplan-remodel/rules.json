@@ -1,0 +1,12 @@
+{
+  "minAreaM2": { "bedroom": 9, "study": 5, "toilet": 2 },
+  "minDoorWidthMm": 800,
+  "minCorridorWidthMm": 900,
+  "designPrinciples": [
+    "入户动线不穿卧室",
+    "动静分区：卧室远离入户与客厅噪声",
+    "卧室与客厅直接对外窗采光，暗房间仅作储藏/卫浴",
+    "厨房/卫生间为湿区，需相邻排水立管；新马桶间须贴既有湿区或注明提升泵",
+    "承重墙不可拆"
+  ]
+}

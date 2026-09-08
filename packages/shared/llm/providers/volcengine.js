@@ -1,4 +1,5 @@
 import { getApiKey, getBaseUrl, getProviderModel } from "../config.js";
+import { withTimeout } from "../../utils.js";
 
 // aspectRatio → 2K 档宽高像素（Seedream 5.0 lite，方式2 指定 WxH）
 const ASPECT_TO_SIZE = {
@@ -38,13 +39,13 @@ export async function generateImage(prompt, { aspectRatio = "1:1", model, image_
   const timeout = setTimeout(() => controller.abort(), 120000);
 
   try {
-    const res = await fetch(`${baseURL}/images/generations`, {
+    const res = await withTimeout(fetch(`${baseURL}/images/generations`, {
       method: "POST",
       signal: controller.signal,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(body),
-    });
-    const data = await res.json();
+    }), 120000, "Volcengine 图片生成");
+    const data = await withTimeout(res.json(), 30000, "Volcengine 响应解析");
     if (!res.ok) {
       throw new Error(data?.error?.message || data?.message || `Volcengine 图片生成失败 (${res.status})`);
     }

@@ -8,6 +8,7 @@ import { callLLM as callGLM } from "./providers/glm.js";
 import { callLLM as callQwen, generateImage as generateQwenImage, generateBGM as generateQwenBGM, generateMusic as generateQwenMusic } from "./providers/qwen.js";
 import { generateImage as generateVolcImage } from "./providers/volcengine.js";
 import { readSelection, assertProviderEnabled } from "./config.js";
+import { withTimeout } from "../utils.js";
 
 // 工作流文字生成 selection（每次 fresh-read，切 provider/model 无需重启）
 function readWorkflowSelection() {
@@ -34,7 +35,7 @@ export async function callLLM(params) {
   const caller = CALLERS[provider];
   if (!caller) throw new Error(`Unsupported workflow provider: ${provider}`);
   assertProviderEnabled(provider);
-  return caller({ ...params, model: params.model || model });
+  return withTimeout(caller({ ...params, model: params.model || model }), 300000, `${provider} 文本生成`);
 }
 
 // ─── 多模态模型（视觉评估：selection.vision）───────────────────────────

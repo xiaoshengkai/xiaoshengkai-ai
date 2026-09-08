@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateImage, callMultimodalLLM } from "@app/shared/llm/index.js";
+import { withTimeout } from "@app/shared/utils.js";
 import { createDateLogger } from "@app/shared/logger.js";
 import { DATA_DIR, LOG_DIR, readState, writeState } from "../../../lib/state.js";
 import { buildDialogueInstructions, buildVisualHierarchyInstructions } from "./generate-pages.js";
@@ -68,12 +69,12 @@ async function describeUploadedImages(imagePaths) {
     const local = resolveUploadPath(p);
     if (!local || !fs.existsSync(local)) continue;
     try {
-      const { text } = await callMultimodalLLM({
+      const { text } = await withTimeout(callMultimodalLLM({
         system: "你是漫画微调助手。用户上传了一张图片来描述想修改的问题（可能是圈出/标注了要改的地方）。请准确、具体地转述图中体现的修改意图。",
         user: "描述这张图里用户想表达的修改意见",
         images: [toDataUrl(local)],
         format: null,
-      });
+      }), 60000, "微调读图");
       if (text) parts.push(text);
     } catch (e) {
       // ponytail: vision 读图失败不阻断微调，仅忽略上传图
@@ -96,11 +97,11 @@ export async function tweak(executionId) {
 
     // 累积反馈（"过去提到过的内容"）
     state.tweakHistory = [...(state.tweakHistory || []), feedback];
-    const allFeedback = state.tweakHistory.filter(Boolean).join("\n");
+    const past = state.tweakHistory.filter(Boolean).slice(0, -1);
 
     const selected = state.tweakTask?.pages || [];
     logger.info(`[tweak] 本次 feedback(提交AI): ${feedback}`);
-    logger.info(`[tweak] 累积历史 allFeedback(仅记录不提交):\n${allFeedback}`);
+    logger.info(`[tweak] 历史 feedback(作为背景提交):\n${past.join("\n") || "无"}`);
     logger.info(`[tweak] selected 页: ${selected.length ? selected.join(",") : "全部"}`);
 
     // 分镜（每页 imagePrompt/dialogue）
@@ -158,6 +159,7 @@ export async function tweak(executionId) {
       const dialogueInstructions = buildDialogueInstructions(story.dialogue, story.cast);
       if (dialogueInstructions.length) parts.push(`如本次修改涉及文字：\n${dialogueInstructions.join("\n")}`);
       parts.push(...buildVisualHierarchyInstructions());
+      if (past.length) parts.push(`之前已做的修改（背景，帮助理解当前意图，不要重复修改）：\n${past.join("\n")}`);
       parts.push(`修改要求：\n${feedback}`);
       if (visionDesc) parts.push(`用户上传参考图描述：\n${visionDesc}`);
       parts.push("每个说话人仅一个气泡，气泡尾部指向该人物；左人左泡、右人右泡，不得合并/重复/颠倒。");
@@ -169,7 +171,7 @@ export async function tweak(executionId) {
       const urls = await generateImage(prompt, { aspectRatio: "2:3", image_url: refB64, seed: SEED });
       const url = urls[0];
       if (!url) throw new Error(`第 ${g.page} 页编辑未产生图片`);
-      const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
+      const res = await withTimeout(fetch(url, { signal: AbortSignal.timeout(120000) }), 120000, "图片下载");
       if (!res.ok) throw new Error(`第 ${g.page} 页图片下载失败 (${res.status})`);
       fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
       logger.info(`[tweak] 第 ${g.page} 页完成 (${((Date.now() - t0) / 1000).toFixed(1)}s) url=${url} file=${g.file}`);

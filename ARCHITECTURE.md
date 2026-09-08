@@ -51,7 +51,7 @@ ai-engineer-journey/
     │   ├── capability.js       # 通用能力 dispatcher（actions.json 4 原语）
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
-    │   ├── utils.js            # sleep / shortId / downloadsDir
+    │   ├── utils.js            # sleep / shortId / downloadsDir / withTimeout（网络调用硬超时兜底）
     │   ├── test/               # 共享测试（capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store）
     │   └── llm/                # LLM 共享封装
     │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
@@ -227,7 +227,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 - `templates/tech-video/`：科技风短视频（script.json 驱动 + 逐场景 TTS + BGM + SFX + 硬字幕 + SRT）
 - `templates/video-generation/`：视频生成（含微调/版本切换/内容生成等模板级动作）
-- `templates/comic-generation/`：漫画生成（故事→AI 分镜→每个 `sceneId` 生成无文字/无气泡锚点→逐页生成漫画图；`sceneId/scenePrompt` + 独立锚点锁连续场景且不继承成品页气泡；角色参考图锁人物一致性 + 风格库锁画风；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
+- `templates/comic-generation/`：漫画生成（故事→AI 分镜→每个 `sceneId` 生成无文字/无气泡锚点→逐页生成漫画图；`sceneId/scenePrompt` + 独立锚点锁连续场景且不继承成品页气泡；角色参考图锁人物一致性 + 风格库锁画风；分镜支持可选旁白 `narration`（灰底方框置顶）；每页生成后 `verifyPage` vision 质检气泡文字/尾巴指向、不通过带反馈重试一次；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
 - `templates/floorplan-remodel/`：户型改造（户型图→`parse` 视觉识别 structure.json（像素坐标、墙/房间 bbox/门窗/承重+置信度）+ sharp 墙像素 mask 吸附（端点 snap+外围 bbox+on-mask 校验[门窗断口豁免]，校验失败墙垂直滑搜重拟合 snap.js `slideRefit`，仍未过验标 unverified）+ 共线墙合并 `mergeCollinearWalls` + CV 门窗检测 `detectOpenings`（mask 断口+中灰双线=窗/纯白=门，取代 vision openings；整墙窗断口删墙）+ 入户门=外围已验证墙的门 `pickEntryDoor` + 墙厚启发式定承重（`wallThickness`：贴外围或厚于中位数 1.35×，unverified 一律承重）+ 双采样共识→`generate` 按保守/均衡/激进/创意梯度出 N 套，承重硬校验+可拆白名单+build 端点吸附+newRooms 校验（面积/零长度/邻湿区/中心在户型内），按方案判定不回退（拆未验证墙=安全降级保留+图上注解，拆承重=丢弃），quality.json 记录全部原因→纯二维矢量渲染（newRooms 色块填充+标签、蓝线新墙、红=砸墙、改名徽章、门窗符号+洁具图元）；创建页 `type: "checkbox"` 多选 + `floorplan` 图片上传两通用控件 + 必填 `title` 标题输入框（execution 列表显示用户标题）；v4：识别后人工确认底图（入户门/门窗/房间/承重）→ generate 前 confirmed 硬门槛 → 真实尺寸硬校验；v5：确认预览 structure.svg 叠半透明原图+w/d/r ID 芯片（确认面板左 6 右 4 布局、左图 sticky 可点击放大、parse 质检提示横幅），确认后 confirm.js 重渲染 structure.svg 并作废 plans.json/plan-*.svg 强制重生成）
 
 ### 资产库（工作流级通用）

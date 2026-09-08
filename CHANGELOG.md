@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.21 (2026-09-08) — 漫画生成：旁白 + 自动质检 + 网络超时防护
+
+### 变更
+- **网络超时防护**（`shared/utils.js` 新增 `withTimeout`，Promise.race 硬超时）：所有外部网络调用统一加超时兜底——volcengine 图片生成 120s、minimax 文本 180s（原本完全无超时）、图片/锚点下载 120s、质检/微调读图 60s、`callLLM` 分发层 300s（顺带覆盖 deepseek/glm 两个无超时 provider）。根因：第 13 页图片生成请求挂起，AbortController abort 后 fetch 未 settle，整批 for 循环永久停住（19 页任务卡死 22 分钟）。单页超时后走既有 catch 标记 error 继续下一页，不再阻塞整个批。
+- **漫画自动质检**（`generate-pages.js` `verifyPage`）：有对白页生成后调 vision 读图校验「气泡文字与台词一致 + 尾巴指向正确说话人」，不通过则带问题反馈重试一次（不重检防循环）；质检失败降级通过不阻断；无对白页跳过。
+- **漫画旁白**（`narration` 字段）：分镜 schema 加可选 narration（≤30 字只陈述），生图 prompt 画成顶部灰底方框；锚点图明确禁止旁白框。
+- **分镜硬校验增强**（`storyboard.js`）：dialogue 每个说话人必须在 cast 中（否则气泡尾巴错指）；narration 类型/长度校验；文案「四要素」→「五要素」。
+- **生成内容**（`generate-content.js`）：去掉硬编码「3-6 页」，改由分镜按剧情/对话密度定页数。
+- **逐页 seed**（`generate-pages.js`）：`42 + pageNo`（每页确定但互不相同），避免相邻页过度相似。
+- **微调累积上下文**（`tweak.js`）：tweakHistory 由「仅记录不提交」改为作为背景提交进 prompt。
+- **joke-comic skill 反说教**：红线新增禁止说教式收尾/鸡汤总结；「升维荒诞」禁止升华成人生道理；五步流程加「说教自检」；角色设定「笑中带泪」→「笑里藏真实，不煽情不催泪」。
+
+### 验证
+- typecheck + `test:shared` 50 项（comic 测试 13 项，新增 cast 校验/旁白超长/旁白灰框 3 项）全绿
+- 卡死任务 d993af435c12 恢复：`force=false` 重试幂等复用前 12 页补后 7 页，19 页 0 失败
+
 ## v0.11.20 (2026-09-07) — 户型改造 v5：确认可视化 + 底图精度自动修
 
 ### 变更（v5.2 追加：方案生成质检分级）

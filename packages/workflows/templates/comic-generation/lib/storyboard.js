@@ -45,6 +45,8 @@ export function validateStoryboard(script, minPages) {
     if (!p.sceneId || typeof p.sceneId !== "string") errors.push(`第 ${i + 1} 页缺少 sceneId`);
     if (!p.scenePrompt || typeof p.scenePrompt !== "string") errors.push(`第 ${i + 1} 页缺少 scenePrompt`);
     if (p.dialogue === undefined) errors.push(`第 ${i + 1} 页缺少 dialogue`);
+    if (p.narration !== undefined && typeof p.narration !== "string") errors.push(`第 ${i + 1} 页 narration 必须是字符串`);
+    if (typeof p.narration === "string" && p.narration.replace(/\s/g, "").length > 30) errors.push(`第 ${i + 1} 页旁白过长（>30字）：${p.narration}`);
     const lines = dialogueLines(p.dialogue);
     const n = lines.length;
     if (n > MAX_DIALOGUE_LINES) errors.push(`第 ${i + 1} 页对白 ${n} 句过密（≤${MAX_DIALOGUE_LINES}），请拆成多页`);
@@ -52,6 +54,14 @@ export function validateStoryboard(script, minPages) {
       if (dialogueContentLength(line) > MAX_DIALOGUE_CHARS) errors.push(`第 ${i + 1} 页对白过长（>${MAX_DIALOGUE_CHARS}字）：${line}`);
     });
     if (n > 0 && (!Array.isArray(p.cast) || p.cast.length === 0)) errors.push(`第 ${i + 1} 页有对白但缺少 cast（说话人位置），请补充`);
+    const castNames = (p.cast || []).map(c => c && c.name);
+    lines.forEach(line => {
+      const m = line.match(/^\s*([^：:]+)[：:]\s*/);
+      const speaker = m ? m[1].trim() : null;
+      if (speaker && castNames.length > 0 && !castNames.includes(speaker)) {
+        errors.push(`第 ${i + 1} 页说话人「${speaker}」不在 cast 中，请补充或修正`);
+      }
+    });
     if (MULTI_PANEL_RE.test(p.imagePrompt || "")) errors.push(`第 ${i + 1} 页 imagePrompt 含多格/上下分屏，每页只画一个镜头，请拆分`);
   });
   return errors;
@@ -129,7 +139,7 @@ export function buildStoryboardPrompt(styleDesc = "") {
 - sceneId：同一地点、同一道具布局、同一连续对话使用同一个英文短横线 id，如 "bank-counter"；换时间/地点/剧情阶段才换新 id。
 - scenePrompt：该 sceneId 的固定场景描述，同一 sceneId 必须逐字一致，写清地点、环境道具、人物基础站位、镜头轴线。
 
-每页 imagePrompt 必须包含四要素（缺一不可）：
+每页 imagePrompt 必须包含五要素（缺一不可）：
 1.【背景】只写本页新增变化，不重复完整固定场景；固定场景放 scenePrompt。
 2.【人物】本页出场的每个角色：名字+位置（左/右/前景/背景）+动作+表情。角色外貌由参考图锁定，用名字指代即可，不要重复描述外貌。动作必须符合当前画风中的角色造型能力；无肢体角色禁止描述抓手、摊手、挥手、指向、迈步等手脚动作，改用身体倾斜、人物距离、视线、眼睛、嘴型、动作线和情绪符号表达。表情必须写成可绘制的眼睛、嘴型、身体姿态和情绪符号，不得只写抽象情绪词。
 3.【构图】单一景别（特写/中景/全景）+机位。每页只画一个镜头、单一构图，禁止"分格/上下两部分/双分格/多格堆叠"。
@@ -142,6 +152,11 @@ export function buildStoryboardPrompt(styleDesc = "") {
 - 谁说谁必须与故事原文严格对应，不得张冠李戴、不得合并/省略说话人。
 - 无对白页 dialogue 为空数组 []。
 
+旁白规则：
+- narration 为可选字符串：转场/无对白页的旁白或独白文字。
+- 只在需要旁白的页填（如时间跳转、环境交代），普通对话页省略或写空字符串 ""。
+- 旁白正文≤30个汉字，只陈述事实，不抒情、不讲道理。
+
 只输出 JSON，格式：
-{ "title": "标题", "pages": [ { "page": 1, "sceneId": "office-desk", "scenePrompt": "固定场景：白天·开放式办公区，小张在左，PM在右，桌上有显示器、咖啡杯和绿植，镜头轴线保持左右对话。", "imagePrompt": "【背景】PM身体前倾【人物】左:小张(皱眉) 右:PM(前倾)【构图】中景【说话人】PM在说话", "cast": [{"name":"小张","side":"left"},{"name":"PM","side":"right"}], "dialogue": ["PM: …", "小张: …"] } ] }`;
+{ "title": "标题", "pages": [ { "page": 1, "sceneId": "office-desk", "scenePrompt": "固定场景：白天·开放式办公区，小张在左，PM在右，桌上有显示器、咖啡杯和绿植，镜头轴线保持左右对话。", "imagePrompt": "【背景】PM身体前倾【人物】左:小张(皱眉) 右:PM(前倾)【构图】中景【说话人】PM在说话", "cast": [{"name":"小张","side":"left"},{"name":"PM","side":"right"}], "dialogue": ["PM: …", "小张: …"], "narration": "" } ] }`;
 }

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { getApiKey, getBaseUrl, getProviderModel } from "../config.js";
-import { sleep } from "../../utils.js";
+import { sleep, withTimeout } from "../../utils.js";
 
 export async function callLLM({ system, user, model, temperature = 0.7, maxTokens = 8000, format = 'json_object', images = [] }) {
   const apiKey = getApiKey("minimax", "MINIMAX_API_KEY");
@@ -26,16 +26,16 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   };
   if (format) body.response_format = { type: format };
 
-  const res = await fetch(`${baseURL}/chat/completions`, {
+  const res = await withTimeout(fetch(`${baseURL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
-  });
+  }), 180000, "MiniMax 请求");
 
-  const data = await res.json();
+  const data = await withTimeout(res.json(), 30000, "MiniMax 响应解析");
   if (!res.ok) {
     console.log(`[minimax] callLLM: HTTP ${res.status} ${JSON.stringify(data).slice(0, 200)}`);
     throw new Error(`MiniMax API 错误 (${res.status}): ${data.error?.message || "未知错误"}`);

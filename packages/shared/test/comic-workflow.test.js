@@ -26,6 +26,51 @@ test("comic storyboard rejects overlong dialogue and missing scene fields", () =
   assert(errors.some(e => e.includes("对白过长")));
 });
 
+test("comic storyboard rejects dialogue speaker missing from cast", () => {
+  const errors = validateStoryboard({
+    pages: [{
+      page: 1,
+      sceneId: "bank-counter",
+      scenePrompt: "固定场景：银行柜台",
+      imagePrompt: "【背景】柜台【人物】左:小李【构图】中景【说话人】小李",
+      cast: [{ name: "小李", side: "left" }],
+      dialogue: ["老周: 40年？"],
+    }],
+  });
+
+  assert(errors.some(e => e.includes("说话人") && e.includes("老周")));
+});
+
+test("comic storyboard rejects overlong narration", () => {
+  const errors = validateStoryboard({
+    pages: [{
+      page: 1,
+      sceneId: "bank-counter",
+      scenePrompt: "固定场景：银行柜台",
+      imagePrompt: "【背景】柜台【人物】左:老周【构图】中景【说话人】老周",
+      cast: [{ name: "老周", side: "left" }],
+      dialogue: [],
+      narration: "这是一段明显超过三十个汉字的旁白文字用来测试旁白长度校验逻辑是否正确触发报错路径",
+    }],
+  });
+
+  assert(errors.some(e => e.includes("旁白过长")));
+});
+
+test("comic prompt renders narration as top gray box", () => {
+  const prompt = buildPrompt({
+    imagePrompt: "【人物】左:老周【构图】中景",
+    sceneId: "bank-counter",
+    scenePrompt: "固定场景：银行柜台",
+    cast: [{ name: "老周", side: "left" }],
+    dialogue: [],
+    narration: "三个月后",
+  }, "黑白简笔漫画");
+
+  assert(prompt.includes("旁白：三个月后"));
+  assert(prompt.includes("灰底方框"));
+});
+
 test("comic image prompt carries reusable scene prompt", () => {
   const prompt = buildPrompt({
     imagePrompt: "【人物】左:老周(皱眉) 右:小李(微笑)【构图】中景【说话人】老周",
@@ -51,7 +96,7 @@ test("comic scene anchor prompt excludes dialogue and bubbles", () => {
   }, "黑白简笔漫画");
 
   assert(prompt.includes("固定场景：银行柜台"));
-  assert(prompt.includes("禁止出现任何文字、对白框、气泡和气泡尾巴"));
+  assert(prompt.includes("禁止出现任何文字、对白框、旁白框、气泡和气泡尾巴"));
   assert(prompt.includes("无明显情绪的基础脸"));
   assert(prompt.includes("背景和道具必须全部位于人物轮廓后方"));
   assert(prompt.includes("不得穿过或遮挡人物轮廓、脸部"));

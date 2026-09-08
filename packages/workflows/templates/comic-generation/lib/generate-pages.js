@@ -2,14 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { generateImage } from "@app/shared/llm/index.js";
+import { generateImage, callMultimodalLLM } from "@app/shared/llm/index.js";
+import { parseJSON } from "@app/shared/llm/parse-json.js";
+import { withTimeout } from "@app/shared/utils.js";
 import { readState, writeState } from "../../../lib/state.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..", "..", "..");
 const ASSETS_DIR = path.join(PROJECT_ROOT, "data", "workflows", "assets");
 
-// ponytail: 固定 seed 提升逐页风格一致性（角色一致性靠参考图 subject_reference）
+// ponytail: 基础 seed 提升风格一致性，逐页加 pageNo 偏移避免相邻页过度相似（角色一致性靠参考图 subject_reference）
 const SEED = 42;
 
 function readJson(p) {
@@ -74,6 +76,9 @@ export function buildPrompt(p, styleDesc) {
     const sideZh = { left: "左", right: "右", center: "中间" };
     parts.push("人物位置：" + p.cast.map(c => `${c.name}在${sideZh[c.side] || "中间"}`).join("、") + "；每个对白气泡靠近对应说话人。");
   }
+  if (typeof p.narration === "string" && p.narration.trim()) {
+    parts.push(`旁白：${p.narration.trim()}。旁白用灰底方框显示在画面顶部，方框内只写这段文字，不得画进对话气泡，也不得与气泡重叠。`);
+  }
   parts.push(...buildDialogueInstructions(p.dialogue, p.cast));
   parts.push(...buildCharacterFidelityInstructions());
   parts.push(...buildVisualHierarchyInstructions());
@@ -93,8 +98,37 @@ export function buildAnchorPrompt(p, styleDesc) {
     parts.push("人物基础站位：" + p.cast.map(c => `${c.name}在${sideZh[c.side] || "中间"}`).join("、"));
   }
   parts.push(...buildCharacterFidelityInstructions());
-  parts.push("生成该场景的干净基础画面，保持固定人物站位、镜头轴线、背景和道具布局；人物统一使用无明显情绪的基础脸和静止基础姿态，供正式页覆盖重绘。背景和道具必须全部位于人物轮廓后方，不得穿过或遮挡人物轮廓、脸部。禁止出现任何文字、对白框、气泡和气泡尾巴。");
+  parts.push("生成该场景的干净基础画面，保持固定人物站位、镜头轴线、背景和道具布局；人物统一使用无明显情绪的基础脸和静止基础姿态，供正式页覆盖重绘。背景和道具必须全部位于人物轮廓后方，不得穿过或遮挡人物轮廓、脸部。禁止出现任何文字、对白框、旁白框、气泡和气泡尾巴。");
   return parts.join("\n\n");
+}
+
+function dialogueText(dialogue) {
+  return (Array.isArray(dialogue) ? dialogue : [])
+    .map(d => String(d).replace(/^\s*[^：:]+[：:]\s*/, "").trim())
+    .filter(Boolean)
+    .join("；");
+}
+
+// 生成后质检：读图校验气泡文字与尾巴指向；质检失败不阻断（降级通过），仅用于触发重试
+async function verifyPage(imagePath, dialogue) {
+  const text = dialogueText(dialogue);
+  if (!text) return { ok: true };
+  const b64 = `data:image/png;base64,${fs.readFileSync(imagePath).toString("base64")}`;
+  const system = "你是漫画质检员。检查漫画页里对白气泡中的文字是否与给定台词一致（无错字/漏字/串字/多余字），以及气泡尾巴是否指向正确的说话人。只返回 JSON：{\"ok\": true} 或 {\"ok\": false, \"issue\": \"具体问题一句话\"}";
+  const user = `期望台词（冒号前是说话人，气泡内只画冒号后的文字）：${text}`;
+  try {
+    const { text: reply } = await withTimeout(
+      callMultimodalLLM({ system, user, images: [b64] }),
+      60000,
+      "漫画质检"
+    );
+    const parsed = parseJSON(reply);
+    if (parsed && typeof parsed.ok === "boolean") return { ok: parsed.ok, issue: parsed.issue || "" };
+    return { ok: true };
+  } catch (e) {
+    console.warn(`[generate-pages] 质检失败，跳过: ${e.message}`);
+    return { ok: true };
+  }
 }
 
 export async function generatePages(pagesJson, characterRef, styleId, executionDir) {
@@ -134,7 +168,7 @@ export async function generatePages(pagesJson, characterRef, styleId, executionD
         seed: SEED,
       });
       if (!urls[0]) throw new Error("未生成图片");
-      const res = await fetch(urls[0], { signal: AbortSignal.timeout(120000) });
+      const res = await withTimeout(fetch(urls[0], { signal: AbortSignal.timeout(120000) }), 120000, "锚点下载");
       if (!res.ok) throw new Error(`图片下载失败 (${res.status})`);
       fs.writeFileSync(anchorPath, Buffer.from(await res.arrayBuffer()));
       sceneAnchors.set(page.sceneId, anchorPath);
@@ -173,24 +207,31 @@ export async function generatePages(pagesJson, characterRef, styleId, executionD
       : null;
     const refInput = anchorB64 ? [anchorB64, charRefB64] : charRefB64;
     console.log(`[generate-pages] 第 ${pageNo} 页 提交AI图片prompt (aspectRatio=2:3, seed=${SEED}, 参考=${anchorB64 ? "场景锚点+角色参考图" : "角色参考图"}):\n${prompt}`);
-    try {
-      const genStart = Date.now();
-      const urls = await generateImage(prompt, {
+
+    const render = async (overridePrompt) => {
+      const urls = await generateImage(overridePrompt || prompt, {
         aspectRatio: "2:3",
         image_url: refInput,
-        seed: SEED,
+        seed: SEED + pageNo,
       });
-      const genElapsed = ((Date.now() - genStart) / 1000).toFixed(1);
       const url = urls[0];
       if (!url) throw new Error(`第 ${pageNo} 页未生成图片`);
-
-      const dlStart = Date.now();
-      const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
+      const res = await withTimeout(fetch(url, { signal: AbortSignal.timeout(120000) }), 120000, "图片下载");
       if (!res.ok) throw new Error(`第 ${pageNo} 页图片下载失败 (${res.status})`);
-      fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
-      const dlElapsed = ((Date.now() - dlStart) / 1000).toFixed(1);
-      console.log(`[generate-pages] 第 ${pageNo} 页完成 (生成 ${genElapsed}s, 下载 ${dlElapsed}s, 合计 ${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+      fs.writeFileSync(filePath, Buffer.from(await withTimeout(res.arrayBuffer(), 30000, "图片读取")));
+    };
 
+    try {
+      await render();
+
+      // 质检：有对白的页读图校验，不通过则带反馈重试一次（不重检，避免循环）
+      const check = await verifyPage(filePath, p.dialogue);
+      if (!check.ok && check.issue) {
+        console.warn(`[generate-pages] 第 ${pageNo} 页质检未通过，重试一次: ${check.issue}`);
+        await render(`${prompt}\n\n【修正要求】上一版问题：${check.issue}。修正该问题后重新绘制，保持构图、人物、背景、其余对白完全不变。`);
+      }
+
+      console.log(`[generate-pages] 第 ${pageNo} 页完成 (合计 ${((Date.now() - t0) / 1000).toFixed(1)}s)`);
       result.push({ page: pageNo, file, dialogue: p.dialogue || [], sceneId: p.sceneId || null });
     } catch (err) {
       // 单页失败（如敏感内容）不中断整批，标记 error 后继续，前端展示占位图

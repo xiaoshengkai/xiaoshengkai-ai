@@ -289,6 +289,17 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 - 取舍：成品页作锚点会传播错误并锁住已有气泡方向，逐页串联还会持续累积坏页；故使用独立干净锚点，不让任何正式页回写为锚点。锚点假设 provider 跟参考图（Seedream 验证可用，minimax image-01 不跟参考图且偶发空白，不适用）。
 - 重试语义：用户主动点已完成步骤的「重新生成」会传 `force=true`，漫画正式页会重新生成并在单页成功后覆盖旧图；失败/警告步骤的「继续/重试」不传 force，继续复用已有成功页、只补缺失页，避免网络超时造成画廊空洞。
 
+### 网络超时防护决策（withTimeout 硬超时）
+
+- 问题：volcengine 同步生图请求偶发挂起，`AbortController` abort 后底层 fetch 未 settle，`await` 永久 pending，整个逐页 for 循环停住（实测 19 页任务卡在第 13 页 22 分钟）。
+- 决策：新增 `shared/utils.js` 的 `withTimeout(promise, ms, label)`（`Promise.race` + `setTimeout`，finally 清 timer），**不依赖底层 fetch 是否响应 abort**，上层一定在超时后继续。所有外部网络调用统一加：volcengine 图片生成 120s、minimax 文本 180s（原本完全无超时）、图片/锚点下载 120s、质检/微调读图 60s、`callLLM` 分发层 300s（兜底 deepseek/glm 无超时 provider）。
+- 取舍：Promise.race 只让上层放弃，底层挂起的 fetch 仍占 socket（由 undici 自身超时或 GC 回收），偶发可接受；超时后单页走既有 catch 标记 error 继续下一页，不再阻塞整批。
+
+### 漫画自动质检 + 旁白决策
+
+- **自动质检**：有对白页生成后调 vision（MiniMax-M3）读图校验「气泡文字与台词一致 + 尾巴指向正确说话人」，不通过则把问题反馈拼进 prompt 重试一次（不重检防循环）；质检自身失败降级通过、无对白页跳过，保证不阻断生图主流程。仅做最关键的文字正确性校验，不做全量构图质检。
+- **旁白 narration**：分镜 schema 加可选 `narration`（≤30 字、只陈述不抒情不讲道理），生图 prompt 画成顶部灰底方框，锚点图明确禁止旁白框；无对白转场页用它代替空对话。
+
 ## 已知问题
 
 | # | 问题 | 影响 | 解决方案 |

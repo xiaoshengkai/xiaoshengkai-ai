@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { callMultimodalLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderStructure } from "./render.js";
-import { loadWallMask, snapPoint, nearMask, snapPerimeter } from "./snap.js";
+import { loadWallMask, snapPoint, nearMask, snapPerimeter, buildMaskGrid, slideRefit, wallThickness, loadColorRaw, detectOpenings, mergeCollinearWalls, pickEntryDoor } from "./snap.js";
 
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 
@@ -26,6 +26,9 @@ function buildSystem(imgW, imgH) {
   "rooms": [{ "id": "r1", "label": "<图上房间名>", "center": [x, y], "area": "<图上标注面积，如 12㎡；无则 null>", "bbox": [x1, y1, x2, y2] }],
   "openings": [{ "id": "d1", "type": "door|window", "wallId": "<所属墙id>", "pos": <0-1 沿墙起点到终点比例> }],
   "dims": [{ "edge": "top|bottom|left|right", "values": [<该排尺寸标注的毫米数，按从左到右/从上到下顺序>], "x1": <该排标注覆盖的起点x>, "y1": <起点y>, "x2": <终点x>, "y2": <终点y> }],
+  "entryDoorId": "<入户门 opening 的 id（最外侧一扇门），不确定写 null",
+  "wetRooms": ["<厨房/卫生间等湿区 room id>"],
+  "adjacency": [{ "a": "<room id>", "b": "<相邻 room id>" }],
   "notes": "<朝向等说明，一句话>"
 }
 识别规则：
@@ -52,6 +55,18 @@ function validate(structure) {
   return errors;
 }
 
+function dedupeWalls(walls, minLen) {
+  const seen = new Set();
+  return walls.filter(w => {
+    if (Math.hypot(w.x2 - w.x1, w.y2 - w.y1) < minLen) return false;
+    const k = [w.x1, w.y1, w.x2, w.y2].map(Math.round).join(",");
+    const kr = [w.x2, w.y2, w.x1, w.y1].map(Math.round).join(",");
+    if (seen.has(k) || seen.has(kr)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 function normalize(structure, imgW, imgH) {
   const clampC = v => Math.max(0, Math.min(1, Number(v) || 0));
   const clampX = v => imgW ? Math.max(0, Math.min(imgW, Number(v) || 0)) : Number(v) || 0;
@@ -60,12 +75,12 @@ function normalize(structure, imgW, imgH) {
     imgW, imgH,
     width: imgW || 1000,
     height: imgH || 700,
-    walls: (structure.walls || []).map((w, i) => ({
+    walls: dedupeWalls((structure.walls || []).map((w, i) => ({
       id: String(w.id || `w${i + 1}`),
       x1: clampX(w.x1), y1: clampY(w.y1), x2: clampX(w.x2), y2: clampY(w.y2),
       bearing: Boolean(w.bearing) || clampC(w.confidence) < 0.7,
       confidence: clampC(w.confidence),
-    })),
+    })), Math.max(8, (imgW || 1000) * 0.01)),
     rooms: (structure.rooms || []).map((r, i) => ({
       id: String(r.id || `r${i + 1}`),
       label: String(r.label || `房间${i + 1}`),
@@ -111,8 +126,9 @@ function computeMmPerPx(normalized) {
 }
 
 async function snapWalls(normalized, imagePath) {
-  if (!normalized.imgW) return { snapped: 0, missed: 0 };
+  if (!normalized.imgW) return { snapped: 0, missed: 0, extent: null, det: null };
   const pts = await loadWallMask(imagePath);
+  const grid = buildMaskGrid(pts);
   const R = Math.max(80, normalized.imgW * 0.12);
   snapPerimeter(normalized.walls, pts, normalized.imgW);
   let snapped = 0, missed = 0;
@@ -129,17 +145,55 @@ async function snapWalls(normalized, imagePath) {
       if (vertical) { const x = Math.round((w.x1 + w.x2) / 2); w.x1 = x; w.x2 = x; }
       else { const y = Math.round((w.y1 + w.y2) / 2); w.y1 = y; w.y2 = y; }
     }
+  }
+  normalized.walls = mergeCollinearWalls(normalized.walls, 6, normalized.imgW * 0.08);
+  const img = await loadColorRaw(imagePath);
+  const det = detectOpenings(normalized.walls, pts, img);
+  normalized.walls = normalized.walls.filter(w => !det.drops.includes(w.id));
+  det.openings = det.openings.filter(o => !det.drops.includes(o.wallId));
+  for (const w of normalized.walls) {
     const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1) || 1;
+    const gaps = det.openings.filter(o => o.wallId === w.id);
     const samples = 8;
     let onWall = 0;
     for (let i = 0; i <= samples; i++) {
+      const s = len * i / samples;
       const x = w.x1 + (w.x2 - w.x1) * i / samples;
       const y = w.y1 + (w.y2 - w.y1) * i / samples;
-      if (nearMask(x, y, pts, 8)) onWall++;
+      if (nearMask(x, y, pts, 8) || gaps.some(g => s >= g.s0 - 4 && s <= g.s1 + 4)) onWall++;
     }
-    if (onWall / (samples + 1) < 0.75) { Object.assign(w, orig); w.unverified = true; missed += 2; }
+    if (onWall / (samples + 1) < 0.75) {
+      const pre = { ...w };
+      if (slideRefit(w, pts, grid, Math.max(40, normalized.imgW * 0.08))) {
+        const re = detectOpenings([w], pts, img);
+        det.openings = det.openings.filter(o => o.wallId !== w.id).concat(re.openings);
+      } else {
+        Object.assign(w, pre); w.unverified = true; missed += 2;
+      }
+    }
   }
-  return { snapped, missed };
+  for (const w of normalized.walls) if (!w.unverified) w.thickness = wallThickness(w, pts);
+  const xs = pts.map(p => p[0]).sort((a, b) => a - b);
+  const ys = pts.map(p => p[1]).sort((a, b) => a - b);
+  const q = (arr, t) => arr[Math.min(arr.length - 1, Math.floor(arr.length * t))];
+  const extent = pts.length ? { left: q(xs, 0.01), right: q(xs, 0.99), top: q(ys, 0.01), bottom: q(ys, 0.99) } : null;
+  return { snapped, missed, extent, det };
+}
+
+// 承重判定：贴外围轮廓或墙厚显著大于中位数 → 承重；未验证墙一律按承重（不可拆兜底）
+function reclassifyBearing(normalized, extent) {
+  const band = Math.max(8, (normalized.imgW || 1000) * 0.03);
+  const ts = normalized.walls.filter(w => !w.unverified && w.thickness > 0).map(w => w.thickness).sort((a, b) => a - b);
+  const median = ts.length ? ts[Math.floor(ts.length / 2)] : 0;
+  for (const w of normalized.walls) {
+    if (w.unverified || !extent) { w.bearing = true; continue; }
+    const vertical = Math.abs(w.y2 - w.y1) >= Math.abs(w.x2 - w.x1);
+    const mx = (w.x1 + w.x2) / 2, my = (w.y1 + w.y2) / 2;
+    const onPerimeter = vertical
+      ? Math.abs(mx - extent.left) < band || Math.abs(mx - extent.right) < band
+      : Math.abs(my - extent.top) < band || Math.abs(my - extent.bottom) < band;
+    w.bearing = onPerimeter || (median > 0 && w.thickness >= median * 1.35);
+  }
 }
 
 function qualityChecks(normalized) {
@@ -204,7 +258,19 @@ export async function parseFloorPlan(imagePath, executionDir) {
     const stats = await snapWalls(c, imagePath);
     if (!normalized || stats.missed < snapStats.missed) { normalized = c; snapStats = stats; }
   }
+  reclassifyBearing(normalized, snapStats.extent);
+  if (snapStats.det && snapStats.det.openings.length > 0) {
+    normalized.openings = snapStats.det.openings
+      .sort((a, b) => a.wallId.localeCompare(b.wallId, undefined, { numeric: true }) || a.pos - b.pos)
+      .map((o, i) => ({ id: `d${i + 1}`, type: o.type, wallId: o.wallId, pos: Number(o.pos.toFixed(3)), len: Math.round(o.len) }));
+    const entry = pickEntryDoor(normalized.openings, normalized.walls, snapStats.extent, Math.max(8, normalized.imgW * 0.03));
+    if (entry) normalized.entryDoorId = entry;
+  }
   const checks = qualityChecks(normalized);
+  if (snapStats.det) {
+    const doors = normalized.openings.filter(o => o.type === "door").length;
+    checks.push({ rule: "门窗像素检测", pass: normalized.openings.length > 0, note: `门 ${doors} · 窗 ${normalized.openings.length - doors} · 入户 ${normalized.entryDoorId || "未识别"}` });
+  }
   checks.push({
     rule: "墙体像素吸附",
     pass: snapStats.missed <= Math.ceil(normalized.walls.length * 0.4),

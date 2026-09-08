@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { renderStructure, readImg } from "./render.js";
 
 const PROJECT_ROOT = path.resolve(process.cwd(), "..", "..");
 
@@ -13,6 +14,13 @@ export async function handle({ params, request }) {
   if (!fs.existsSync(file)) return { ok: false, error: "结构文件不存在，请先执行识别步骤" };
   const merged = { ...JSON.parse(fs.readFileSync(file, "utf-8")), ...structure, confirmed: true };
   fs.writeFileSync(file, JSON.stringify(merged, null, 2));
+
+  try {
+    fs.writeFileSync(path.join(dir, "structure.svg"), renderStructure(merged, readImg(dir, merged)));
+    for (const f of fs.readdirSync(dir)) {
+      if (f === "plans.json" || /^plan-p\d+\.svg$/.test(f)) fs.rmSync(path.join(dir, f));
+    }
+  } catch { /* 预览产物与缓存清理，structure.json 仍是后端唯一事实源 */ }
 
   try {
     const stateFile = path.join(dir, "state.json");

@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.11.20 (2026-09-07) — 户型改造 v5：确认可视化 + 底图精度自动修
+
+### 变更（v5.2 追加：方案生成质检分级）
+- **门窗判型列连续度**（snap.js classifyGap）：中灰线须横跨断口 ≥50% 列=窗，门弧只在一端=门，修「卧室A门被判窗」
+- **build 端点 mask 豁免**：端点贴原图墙像素（tol 内）不算悬空——vision 漏识别的墙（notch）不再误杀 4 套方案
+- **面积质检分级**：<60% 下限=硬错误丢弃；60-100%=warning+图上「仅示意」注解（近 miss 不再整套丢）；重试反馈只喂 errors 不喂 warnings
+- **标签归类**（metrics roomTypeByLabel）：衣帽间/阳台/休闲无面积下限、study 关键词先于 bedroom，修「主卧衣帽间按 bedroom 9㎡ 判死」
+- **方案图防重叠**：改名徽章移房间 bbox 顶边、newRooms 芯片改顶边 tab、面积文字移至芯片下
+- 实测 84e926a7476c：6 套要求通过 5 套（此前 1 套）
+
+### 变更（v5.1 追加：门窗像素检测）
+- **CV 门窗检测取代 vision openings**（snap.js `detectOpenings`）：沿墙扫 mask 断口，断口带中灰双线=窗、纯白=门（原图灰度、颜色签名不可靠）；窗梃分裂断口自动合并；整墙即窗断口的"墙"删除；>0.15W 断口视为错位不采信
+- **入户门规则**（`pickEntryDoor`）：外围轮廓上已验证墙的门=入户门（唯一/最宽），修「入户门挂内墙」
+- **共线墙合并**（`mergeCollinearWalls`）：同向垂直距<6px、间隔≤0.08W 并一面（跨门洞外墙合一、重复段消除）
+- on-mask 校验对门窗断口豁免（带窗外墙不再误标 unverified）；render 门窗缺口按 CV 实测长度画；r 芯片改房间中心
+- parse 质检新增「门窗像素检测：门 X·窗 Y·入户 Z」进确认面板横幅
+
+### 变更（v5）
+- **确认对比图**：`renderStructure` 叠半透明原图（opacity 0.35）+ w/d/r ID 白描边芯片，确认面板左侧 sticky 展示（6:4 左右布局、点击复用 image-viewer 放大），右侧四区块竖排编辑；parse 质检提示做横幅展示
+- **底图精度自动修**：on-mask 校验失败的墙垂直滑搜重拟合（`snap.js slideRefit`：grid 粗扫+mask 居中+精确复核）；承重改墙厚启发式（`wallThickness`：贴外围轮廓或厚于中位数 1.35×，unverified 墙一律承重），替代 conf<0.7 一刀切（修「承重 100% 导致可拆白名单为空」）
+- **确认闭环**：confirm 后重渲染 structure.svg（修 stale 预览）并删除 plans.json/plan-*.svg 强制按新底图重生成；parse prompt JSON 模板补 entryDoorId/wetRooms/adjacency 三字段
+- **generate 修正**：丢弃方案后 tier 按原梯度序号赋值（不再错位）；全失败抛 retryable:false（明确 failed 而非 warning）；newRooms bbox 中心不在任何既有房间内告警
+
+### 验证
+- `test:shared` 40 项（新增滑搜/墙厚/叠图+ID/户型外告警 5 项）+ typecheck + build 全绿；同图 e2e 复跑：承重 100%→79%、可拆白名单非空、structure.svg 含叠图与 ID 芯片；confirm handler 临时目录实测重渲染+盖章
+
 ## v0.11.19 (2026-09-07) — 户型改造 v4：底图确认 + 纯二维矢量 + 户型规则
 
 ### 变更

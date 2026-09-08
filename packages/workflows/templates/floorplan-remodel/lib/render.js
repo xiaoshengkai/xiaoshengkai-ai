@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { areaM2, roomTypeByLabel } from "./metrics.js";
 
 const C = {
@@ -79,7 +78,7 @@ function openingEls(structure, gapW) {
     const ux = dx / len, uy = dy / len;
     const nx = -uy, ny = ux;
     const cx = w.x1 + dx * t, cy = w.y1 + dy * t;
-    const half = o.type === "door" ? gapW * 3 : gapW * 3.6;
+    const half = o.len ? Math.max(gapW * 1.5, Math.min(o.len / 2, gapW * 4)) : (o.type === "door" ? gapW * 3 : gapW * 3.6);
     const gx1 = cx - ux * half, gy1 = cy - uy * half;
     const gx2 = cx + ux * half, gy2 = cy + uy * half;
     const isEntry = structure.entryDoorId && structure.entryDoorId === o.id;
@@ -152,16 +151,17 @@ function newRoomEls(plan, W, structure) {
     if (!Array.isArray(nr.bbox) || nr.bbox.length !== 4) return "";
     const [x1, y1, x2, y2] = nr.bbox.map(Number);
     const color = PALETTE[i % PALETTE.length];
-    const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+    const cx = (x1 + x2) / 2;
     const label = String(nr.label || "");
     const chipW = label.length * fs2 + fs2;
+    const chipY = y1 + fs2 * 1.15;
     const area = areaM2(nr.bbox, structure?.mmPerPx);
     const areaLine = area != null
-      ? `<text x="${cx}" y="${cy + fs2 * 1.5}" text-anchor="middle" font-size="${fs2 * 0.9}" fill="${C.text}" font-weight="bold">${area}㎡</text>`
+      ? `<text x="${cx}" y="${chipY + fs2 * 1.5}" text-anchor="middle" font-size="${fs2 * 0.9}" fill="${C.text}" font-weight="bold">${area}㎡</text>`
       : "";
     return `<rect x="${x1}" y="${y1}" width="${Math.max(0, x2 - x1)}" height="${Math.max(0, y2 - y1)}" fill="${color}" fill-opacity="0.22" stroke="${color}" stroke-width="2" stroke-dasharray="6 4"/>
-<rect x="${cx - chipW / 2}" y="${cy - fs2}" width="${chipW}" height="${fs2 * 1.9}" rx="${fs2 * 0.5}" fill="${color}" fill-opacity="0.92"/>
-<text x="${cx}" y="${cy + fs2 * 0.35}" text-anchor="middle" font-size="${fs2}" fill="#ffffff" font-weight="bold">${esc(label)}</text>
+<rect x="${cx - chipW / 2}" y="${chipY - fs2}" width="${chipW}" height="${fs2 * 1.9}" rx="${fs2 * 0.5}" fill="${color}" fill-opacity="0.92"/>
+<text x="${cx}" y="${chipY + fs2 * 0.35}" text-anchor="middle" font-size="${fs2}" fill="#ffffff" font-weight="bold">${esc(label)}</text>
 ${areaLine}
 ${fixtureEls(nr)}`;
   }).join("\n");
@@ -177,7 +177,7 @@ function badgeEls(structure, plan) {
     const room = (structure.rooms || []).find(r => r.id === rc.roomId);
     if (!room || !rc.newLabel) return "";
     const cx = room.center?.[0] ?? 500;
-    const cy = room.bbox ? room.bbox[3] - fs2 * 0.8 : (room.center?.[1] ?? 500);
+    const cy = room.bbox ? room.bbox[1] + fs2 * 1.6 : (room.center?.[1] ?? 500);
     const text = `→ ${rc.newLabel}`;
     const w = text.length * fs2 + fs2;
     return `<g><rect x="${cx - w / 2}" y="${cy - fs2 * 1.4}" width="${w}" height="${fs2 * 1.9}" rx="${fs2 * 0.5}" fill="${C.build}" fill-opacity="0.9"/>
@@ -185,13 +185,41 @@ function badgeEls(structure, plan) {
   }).join("\n");
 }
 
+// 确认预览用 ID 芯片：墙中点/门窗开口/房间 bbox 角标，白描边保证叠图上可读
+function idEls(structure, W) {
+  const fs2 = Math.max(12, W * 0.013);
+  const chip = (x, y, t) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="${fs2}" font-weight="bold" fill="#595959" paint-order="stroke" stroke="#ffffff" stroke-width="3">${esc(t)}</text>`;
+  const els = [];
+  for (const w of structure.walls || []) {
+    const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+    const len = Math.hypot(dx, dy) || 1;
+    els.push(chip((w.x1 + w.x2) / 2 - (dy / len) * fs2, (w.y1 + w.y2) / 2 + (dx / len) * fs2, w.id));
+  }
+  for (const o of structure.openings || []) {
+    const w = wallById(structure, o.wallId);
+    if (!w) continue;
+    const t = Math.max(0, Math.min(1, Number(o.pos) || 0.5));
+    const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const off = fs2 * 2.2;
+    els.push(chip(w.x1 + dx * t - (dy / len) * off, w.y1 + dy * t + (dx / len) * off, o.id));
+  }
+  for (const r of structure.rooms || []) {
+    const cx = r.center?.[0] ?? (((r.bbox?.[0] ?? 0) + (r.bbox?.[2] ?? 0)) / 2 || 500);
+    const cy = r.center?.[1] ?? (((r.bbox?.[1] ?? 0) + (r.bbox?.[3] ?? 0)) / 2 || 500);
+    els.push(chip(cx, cy - fs2 * 1.2, r.id));
+  }
+  return els.join("\n");
+}
+
 export function renderStructure(structure, img = null) {
   const W = structure.imgW || structure.width || 1000;
   const H = structure.imgH || structure.height || 700;
   const strokeW = Math.max(4, W * 0.006);
-  const body = `${wallEls(structure, strokeW)}\n${openingEls(structure, strokeW)}\n${roomEls(structure)}`;
+  const base = img?.base64 ? `<image href="data:${img.mime};base64,${img.base64}" x="0" y="0" width="${W}" height="${H}" opacity="0.35"/>` : "";
+  const body = `${base}\n${wallEls(structure, strokeW)}\n${openingEls(structure, strokeW)}\n${img ? "" : roomEls(structure)}\n${idEls(structure, W)}`;
   const chunk = Math.floor(W / 17);
-  const lines = wrapLines("图例：灰虚线=未验证墙 红=承重墙不可拆 黑=非承重墙；请核对线与原图墙体是否贴合，有误请重试", chunk);
+  const lines = wrapLines("图例：灰虚线=未验证墙 红=承重墙不可拆 黑=非承重墙；w/d/r 编号对应确认面板；请核对线与原图墙体是否贴合，有误请重试", chunk);
   return svgWrap(W, H, "结构识别预览", lines, body);
 }
 
@@ -210,6 +238,16 @@ export function renderPlan(structure, plan, img = null, extraLines = []) {
     ...wrapLines(`规范自检：${checks}`, chunk),
     ...extraLines.flatMap(l => wrapLines(l, chunk))];
   return svgWrap(W, H, plan.title || plan.id, lines, body);
+}
+
+export function readImg(executionDir, structure) {
+  if (!structure.imgW) return null;
+  const dir = fs.readdirSync(executionDir);
+  const file = dir.find(f => /^floorplan\.(png|jpe?g|webp)$/.test(f));
+  if (!file) return null;
+  const ext = path.extname(file).toLowerCase();
+  const mime = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" }[ext];
+  return { base64: fs.readFileSync(path.join(executionDir, file)).toString("base64"), mime };
 }
 
 export function demo() {
@@ -252,6 +290,9 @@ export function demo() {
   assert(pImg.includes("施工前需专业鉴定"), "disclaimer present");
   assert(pImg.includes("<ellipse"), "plan has toilet fixture glyph");
   assert(pImg.includes("0.49㎡"), "new-room area from areaM2");
+  const sImg2 = renderStructure(structure, { base64: "iVBORw0KGgo=", mime: "image/png" });
+  assert(sImg2.includes("<image href=") && sImg2.includes('opacity="0.35"'), "confirm preview overlays base image");
+  assert(sImg2.includes(">w1<") && sImg2.includes(">d1<") && sImg2.includes(">r1<"), "id chips for walls/openings/rooms");
   const outDir = "/tmp/opencode";
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "floorplan-demo-structure.svg"), sImg);
@@ -259,4 +300,4 @@ export function demo() {
   console.log("render self-check OK → /tmp/opencode/floorplan-demo-*.svg");
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) demo();
+if (process.argv[1]?.endsWith("render.js")) demo();

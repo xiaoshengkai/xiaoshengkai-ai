@@ -515,6 +515,13 @@ export default function ExecutionDetailPage() {
               return (
                 <FloorplanConfirmPanel
                   structure={fpStructure}
+                  executionId={id}
+                  notice={(() => {
+                    try {
+                      const o = typeof parseStep?.output === "string" ? JSON.parse(parseStep.output) : parseStep?.output;
+                      return typeof o?.output === "string" ? o.output : null;
+                    } catch { return null; }
+                  })()}
                   onChange={setFpStructure}
                   onConfirm={handleFloorplanConfirm}
                   confirming={fpConfirming}
@@ -869,12 +876,16 @@ export default function ExecutionDetailPage() {
   }
 }
 
-function FloorplanConfirmPanel({ structure, onChange, onConfirm, confirming }: {
+function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onConfirm, confirming }: {
   structure: any;
+  executionId: string;
+  notice: string | null;
   onChange: (s: any) => void;
   onConfirm: () => void;
   confirming: boolean;
 }) {
+  const { register, open } = useImageViewer();
+  const svgSrc = `${BASE}/api/workflows/execution/${executionId}/file/structure.svg`;
   const openings: any[] = structure?.openings || [];
   const rooms: any[] = structure?.rooms || [];
   const walls: any[] = structure?.walls || [];
@@ -906,7 +917,22 @@ function FloorplanConfirmPanel({ structure, onChange, onConfirm, confirming }: {
         <p className="text-xs text-muted-foreground">请核对并修正下方结构信息，确认无误后点击「确认底图」，再执行「下一步」生成改造方案。</p>
       </div>
 
-      <div className="border-2 border-border bg-card p-3 text-xs">
+      {notice && <div className="border-2 border-border bg-yellow-soft p-2 text-xs text-foreground">{notice}</div>}
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="self-start lg:sticky lg:top-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={svgSrc}
+            alt="户型识别对比图"
+            className="w-full h-auto max-h-[calc(100vh-120px)] object-contain border-2 border-border bg-card cursor-zoom-in"
+            onClick={() => open(register(svgSrc))}
+          />
+          <p className="text-xs text-muted-foreground mt-1">对比图：淡化原图+识别线；w=墙 d=门窗 r=房间，编号对应右侧编辑区；点击可放大。</p>
+        </div>
+
+        <div className="space-y-3">
+          <div className="border-2 border-border bg-card p-3 text-xs">
         <label className="font-bold text-foreground block mb-1.5">🚪 入户门（关键字段）</label>
         <select
           value={structure?.entryDoorId ?? ""}
@@ -954,7 +980,7 @@ function FloorplanConfirmPanel({ structure, onChange, onConfirm, confirming }: {
       </div>
 
       <div className="border-2 border-border bg-card p-3 text-xs">
-        <label className="font-bold text-foreground block mb-1.5">🧱 承重墙（{walls.length}）</label>
+        <label className="font-bold text-foreground block mb-1.5">🧱 承重墙（{walls.length}）<span className="font-normal text-muted-foreground"> ⚠=未验证墙，不可拆</span></label>
         {walls.length === 0 ? (
           <p className="text-muted-foreground">未识别到墙。</p>
         ) : (
@@ -981,6 +1007,8 @@ function FloorplanConfirmPanel({ structure, onChange, onConfirm, confirming }: {
       >
         {confirming ? "确认中..." : "✅ 确认底图"}
       </button>
+        </div>
+      </div>
     </div>
   );
 }

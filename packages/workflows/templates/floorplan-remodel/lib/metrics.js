@@ -1,5 +1,3 @@
-import { fileURLToPath } from "node:url";
-
 export function pxToMm(px, mmPerPx) {
   return Number(px) * (Number(mmPerPx) || 0);
 }
@@ -12,12 +10,13 @@ export function areaM2(bbox, mmPerPx) {
   return Number((wMm * hMm / 1e6).toFixed(2));
 }
 
-// label → 房间类型（面积下限用）；未知返回 null
+// label → 房间类型（面积下限用）；衣帽间/阳台等无下限；未知返回 null
 export function roomTypeByLabel(label) {
   const s = String(label || "");
-  if (/马桶|卫生间|卫|淋浴|浴室/.test(s)) return "toilet";
+  if (/马桶|卫生间|卫|淋浴|浴室|洗手/.test(s)) return "toilet";
+  if (/衣帽间|阳台|休闲|地台|储藏|玄关/.test(s)) return null;
+  if (/书房|办公|电竞|多功能|学习|舱/.test(s)) return "study";
   if (/卧室|主卧|次卧|儿童房|睡/.test(s)) return "bedroom";
-  if (/书房|办公|电竞|多功能|学习|衣帽间/.test(s)) return "study";
   return null;
 }
 
@@ -31,4 +30,4 @@ export function demo() {
   console.log("metrics self-check OK");
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) demo();
+if (process.argv[1]?.endsWith("metrics.js")) demo();

@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
-import { renderPlan } from "./render.js";
-import { loadWallMask, snapPoint } from "./snap.js";
+import { renderPlan, readImg } from "./render.js";
+import { loadWallMask, snapPoint, nearMask } from "./snap.js";
 import { areaM2, roomTypeByLabel } from "./metrics.js";
 
 const TIERS = [
@@ -31,7 +31,7 @@ function distToSeg(px, py, w) {
   return Math.hypot(px - (w.x1 + dx * t), py - (w.y1 + dy * t));
 }
 
-function validatePlan(p, structure, tol) {
+function validatePlan(p, structure, tol, maskPts) {
   const errors = [];
   const warnings = [];
   if (!p || typeof p !== "object") return { errors: ["方案不是对象"], warnings };
@@ -52,7 +52,8 @@ function validatePlan(p, structure, tol) {
       const onWall = (structure.walls || []).some(w => distToSeg(Number(x), Number(y), w) < tol);
       const inBbox = (structure.rooms || []).some(r => r.bbox &&
         x >= r.bbox[0] - tol && x <= r.bbox[2] + tol && y >= r.bbox[1] - tol && y <= r.bbox[3] + tol);
-      if (!onWall && !inBbox) errors.push(`build[${j}] 端点(${x},${y})悬空：不贴墙也不在任何房间 bbox 内`);
+      const onMask = maskPts ? nearMask(Number(x), Number(y), maskPts, tol) : false;
+      if (!onWall && !inBbox && !onMask) errors.push(`build[${j}] 端点(${x},${y})悬空：不贴墙也不在任何房间 bbox 内`);
     }
   });
   (p.newRooms || []).forEach((nr, j) => {
@@ -64,9 +65,9 @@ function validatePlan(p, structure, tol) {
   return { errors, warnings };
 }
 
-export function validatePlanWithRules(p, structure, rules = {}) {
+export function validatePlanWithRules(p, structure, rules = {}, maskPts = null) {
   const tol = (structure.imgW || 1000) * 0.02;
-  const v = validatePlan(p, structure, tol);
+  const v = validatePlan(p, structure, tol, maskPts);
 
   (p.build || []).forEach((b, j) => {
     if (!b) return;
@@ -84,7 +85,18 @@ export function validatePlanWithRules(p, structure, rules = {}) {
       if (!structure.mmPerPx) v.warnings.push(`newRooms[${j}]（${nr.label}）无比例尺(mmPerPx)，面积下限未校验`);
       return;
     }
-    if (a < minArea[type]) v.errors.push(`newRooms[${j}]（${nr.label}）面积 ${a}㎡ 低于 ${type} 下限 ${minArea[type]}㎡`);
+    if (a < minArea[type] * 0.6) v.errors.push(`newRooms[${j}]（${nr.label}）面积 ${a}㎡ 远低于 ${type} 下限 ${minArea[type]}㎡`);
+    else if (a < minArea[type]) v.warnings.push(`newRooms[${j}]（${nr.label}）面积 ${a}㎡ 低于 ${type} 下限 ${minArea[type]}㎡，仅示意`);
+  });
+
+  // 新房间 bbox 中心须落在既有房间内（防画到户型外）
+  (p.newRooms || []).forEach((nr, j) => {
+    if (!nr || !Array.isArray(nr.bbox) || nr.bbox.length !== 4 || !nr.bbox.every(v => Number.isFinite(Number(v)))) return;
+    const cx = (Number(nr.bbox[0]) + Number(nr.bbox[2])) / 2;
+    const cy = (Number(nr.bbox[1]) + Number(nr.bbox[3])) / 2;
+    const inside = (structure.rooms || []).some(r => r.bbox &&
+      cx >= r.bbox[0] - tol && cx <= r.bbox[2] + tol && cy >= r.bbox[1] - tol && cy <= r.bbox[3] + tol);
+    if (!inside) v.warnings.push(`newRooms[${j}]（${nr.label || "?"}）中心不在任何既有房间内，可能画到户型外`);
   });
 
   // 新马桶间须邻湿区（含房间 bbox 扩展 tol）
@@ -167,25 +179,25 @@ ${tierList}
       }
       snapBuilds(parsed, mask, Rb);
       const report = (Array.isArray(parsed.plans) ? parsed.plans : []).map((p, i) => {
-        const v = validatePlanWithRules(p, structure, rules);
+        const v = validatePlanWithRules(p, structure, rules, mask);
         return { index: i + 1, title: p?.title || `方案${i + 1}`, errors: v.errors, warnings: v.warnings, plan: p };
       });
       const valid = report.filter(r => r.errors.length === 0).map(r => r.plan);
       if (valid.length === n) { best = { valid: report.filter(r => r.errors.length === 0), report }; break; }
       if (valid.length > best.valid.length) best = { valid: report.filter(r => r.errors.length === 0), report };
-      lastErrors = report.flatMap(r => [...r.errors.map(e => `${r.title}: ${e}`), ...r.warnings.map(w => `${r.title}: ${w}`)]);
+      lastErrors = report.flatMap(r => r.errors.map(e => `${r.title}: ${e}`));
     }
     if (best.valid.length === 0) {
       const reasons = best.report.flatMap(r => r.errors.map(e => `${r.title}: ${e}`));
       writeQuality(qualityPath, { generate: best.report.map(({ plan, ...r }) => r) });
-      throw new Error(`方案生成失败：${reasons.slice(0, 5).join("；") || "无有效方案"}`);
+      throw Object.assign(new Error(`方案生成失败：${reasons.slice(0, 5).join("；") || "无有效方案"}`), { retryable: false });
     }
     const wallMap = new Map((structure.walls || []).map(w => [w.id, w]));
     discarded = best.report.filter(r => r.errors.length > 0);
     plans = best.valid.map((r, i) => ({
       ...r.plan,
       demolish: (r.plan.demolish || []).filter(id => !wallMap.get(id)?.unverified),
-      id: `p${i + 1}`, tier: TIERS[i]?.[0] || "balanced",
+      id: `p${i + 1}`, tier: TIERS[r.index - 1]?.[0] || "balanced",
       safetyNotes: r.warnings,
     }));
     fs.writeFileSync(plansPath, JSON.stringify(plans, null, 2));
@@ -228,14 +240,4 @@ function writeQuality(qualityPath, section) {
   let existing = {};
   try { existing = JSON.parse(fs.readFileSync(qualityPath, "utf-8")); } catch { /* fresh */ }
   fs.writeFileSync(qualityPath, JSON.stringify({ ...existing, ...section }, null, 2));
-}
-
-function readImg(executionDir, structure) {
-  if (!structure.imgW) return null;
-  const dir = fs.readdirSync(executionDir);
-  const file = dir.find(f => /^floorplan\.(png|jpe?g|webp)$/.test(f));
-  if (!file) return null;
-  const ext = path.extname(file).toLowerCase();
-  const mime = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" }[ext];
-  return { base64: fs.readFileSync(path.join(executionDir, file)).toString("base64"), mime };
 }

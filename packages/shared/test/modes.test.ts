@@ -14,8 +14,8 @@ const ALL = {
   restoreKnowledgeById: {},
 };
 
-test("edit 模式保留全部工具（原对象引用）", () => {
-  const out = filterToolsByMode(ALL, "edit");
+test("build 模式保留全部工具（原对象引用）", () => {
+  const out = filterToolsByMode(ALL, "build");
   assert.equal(out, ALL);
 });
 

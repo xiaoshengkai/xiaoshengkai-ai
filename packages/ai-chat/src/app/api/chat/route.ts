@@ -150,7 +150,7 @@ function toModelMessages(messages: Message[]): AISDKModelMessage[] {
 export async function POST(req: Request) {
   try {
     const { messages, mode = "chat" } = await req.json();
-    const currentMode: ChatMode = mode === "edit" || mode === "plan" ? mode : "chat";
+    const currentMode: ChatMode = mode === "build" || mode === "plan" ? mode : "chat";
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: '请输入内容' }), {

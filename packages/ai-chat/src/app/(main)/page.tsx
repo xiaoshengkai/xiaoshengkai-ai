@@ -46,8 +46,14 @@ function generateId() {
   return `conv-${Date.now().toString(36)}`;
 }
 
-const MODES = ["chat", "plan", "edit"] as const;
+const MODES = ["chat", "plan", "build"] as const;
 type Mode = (typeof MODES)[number];
+
+const MODE_STYLE: Record<Mode, string> = {
+  chat: "bg-lime text-white",
+  plan: "bg-orange text-white",
+  build: "bg-blue text-white",
+};
 
 export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -127,7 +133,7 @@ export default function ChatPage() {
           if (res.ok) {
             const data = await res.json();
             setMessages(data.messages || []);
-            setMode(data.mode === "edit" || data.mode === "plan" ? data.mode : "chat");
+            setMode(data.mode === "plan" || data.mode === "build" ? data.mode : data.mode === "edit" ? "build" : "chat");
             convIdRef.current = activeConversationId;
             setTimeout(() => {
               virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" });
@@ -390,19 +396,6 @@ export default function ChatPage() {
                   ))}
                 </div>
               )}
-              {hasMessages && (
-                <div className="flex items-center justify-between px-3 pt-2 pb-1">
-                  <div className="flex items-center gap-1">
-                    <button
-                      className="brutal-btn bg-card px-2 py-0.5 text-xs font-mono font-bold"
-                      onClick={handleCompress}
-                      disabled={compressState === "loading"}
-                    >
-                      {compressState === "loading" ? "压缩中..." : "压缩对话"}
-                    </button>
-                  </div>
-                </div>
-              )}
               <textarea
                 ref={inputRef}
                 rows={1}
@@ -425,8 +418,8 @@ export default function ChatPage() {
                   <button
                     type="button"
                     onClick={cycleMode}
-                    className="brutal-btn bg-card px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"
-                    title={`当前模式：${mode}（点击切换 chat→plan→edit）`}
+                    className={`brutal-btn px-2 py-0.5 text-xs font-mono font-bold cursor-pointer ${MODE_STYLE[mode]}`}
+                    title={`当前模式：${mode}（点击切换 chat→plan→build）`}
                   >
                     {mode}
                   </button>
@@ -437,6 +430,15 @@ export default function ChatPage() {
                   >
                     <ImageIcon className="size-3.5" />
                   </button>
+                  {hasMessages && (
+                    <button
+                      onClick={handleCompress}
+                      disabled={compressState === "loading"}
+                      className="brutal-btn bg-card px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"
+                    >
+                      {compressState === "loading" ? "压缩中..." : "压缩对话"}
+                    </button>
+                  )}
                 </div>
                 {isLoading ? (
                   <button

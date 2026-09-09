@@ -125,7 +125,7 @@ flowchart TD
 
 **响应** — SSE 流式返回，由 `@ai-sdk/react` 的 `useChat` 自动解析。
 
-**模式（mode）**：`chat`（纯聊）/ `plan`（只读，只出方案）/ `edit`（全权，默认缺省为 chat，每对话独立记忆）。非 edit 模式剥离写工具（`lib/modes.ts` 的 `WRITE_TOOLS`：exec + 文件写 6 + 知识库写 4），plan 额外注入「只读分析、只输出方案」system prompt 引导。
+**模式（mode）**：`chat`（纯聊，绿）/ `plan`（只读，只出方案，橙）/ `build`（全权，蓝；默认缺省为 chat，每对话独立记忆）。非 build 模式剥离写工具（`lib/modes.ts` 的 `WRITE_TOOLS`：exec + 文件写 6 + 知识库写 4），plan 额外注入「只读分析、只输出方案」system prompt 引导。
 
 **处理流程**
 1. 提取最后一条用户消息 + mode

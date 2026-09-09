@@ -1,12 +1,12 @@
 import { writeConversation } from "../_lib/store";
 
 export async function POST(req: Request) {
-  const { id, title, messages, model } = await req.json();
+  const { id, title, messages, model, mode } = await req.json();
   if (!id || !messages) {
     return Response.json({ error: "id 和 messages 必填" }, { status: 400 });
   }
 
-  console.log(`[conv:save] id=${id} title="${title || ""}" messages=${messages.length} model=${model || "deepseek"}`);
-  writeConversation(id, title, messages, model);
+  console.log(`[conv:save] id=${id} title="${title || ""}" messages=${messages.length} model=${model || "deepseek"} mode=${mode || "chat"}`);
+  writeConversation(id, title, messages, model, mode);
   return Response.json({ ok: true, id });
 }

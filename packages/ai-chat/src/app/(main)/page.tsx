@@ -46,6 +46,9 @@ function generateId() {
   return `conv-${Date.now().toString(36)}`;
 }
 
+const MODES = ["chat", "plan", "edit"] as const;
+type Mode = (typeof MODES)[number];
+
 export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -59,15 +62,22 @@ export default function ChatPage() {
   const { activeConversationId, setActiveConversationId, clearMessagesRef, triggerRefresh, newIdsRef } = useConversation();
   const convIdRef = useRef<string | null>(null);
   const savingRef = useRef(false);
+  const [mode, setMode] = useState<Mode>("chat");
+  const modeRef = useRef<Mode>("chat");
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   clearMessagesRef.current = () => {
     setMessages([]);
     convIdRef.current = null;
+    setMode("chat");
   };
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: `${BASE}/api/chat`,
-    body: () => ({}),
+    body: () => ({ mode: modeRef.current }),
   }), []);
 
   const { messages, setMessages, sendMessage, status, stop } = useChat({
@@ -95,6 +105,7 @@ export default function ChatPage() {
           title,
           messages,
           model: "default",
+          mode: modeRef.current,
         }),
       });
       triggerRefresh();
@@ -116,6 +127,7 @@ export default function ChatPage() {
           if (res.ok) {
             const data = await res.json();
             setMessages(data.messages || []);
+            setMode(data.mode === "edit" || data.mode === "plan" ? data.mode : "chat");
             convIdRef.current = activeConversationId;
             setTimeout(() => {
               virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" });
@@ -126,6 +138,7 @@ export default function ChatPage() {
       }
       // 新对话
       setMessages([]);
+      setMode("chat");
       convIdRef.current = null;
     };
 
@@ -272,6 +285,10 @@ export default function ChatPage() {
     setImages((prev) => prev.filter((_, idx) => idx !== i));
   }, []);
 
+  const cycleMode = useCallback(() => {
+    setMode((m) => MODES[(MODES.indexOf(m) + 1) % MODES.length]);
+  }, []);
+
   useEffect(() => {
     console.log("[scroll-debug] msgs.length变化:", messages.length, "| atBottomRef:", atBottomRef.current, "| isAtBottom:", isAtBottom);
     virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" });
@@ -405,6 +422,14 @@ export default function ChatPage() {
               />
               <div className="flex items-center justify-between px-3 pt-1 pb-2">
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={cycleMode}
+                    className="brutal-btn bg-card px-2 py-0.5 text-xs font-mono font-bold cursor-pointer"
+                    title={`当前模式：${mode}（点击切换 chat→plan→edit）`}
+                  >
+                    {mode}
+                  </button>
                   <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                   <button
                     onClick={() => fileInputRef.current?.click()}

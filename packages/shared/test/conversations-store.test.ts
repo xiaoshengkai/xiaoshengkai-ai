@@ -28,3 +28,14 @@ test("重命名后再次 save 不覆盖用户改的标题", () => {
 test("重命名不存在的对话返回 null", () => {
   assert.equal(renameConversation("conv-nope", "x"), null);
 });
+
+test("mode 字段持久化，缺省默认 chat", () => {
+  writeConversation("conv-m1", "标题", [{ role: "user" }], "deepseek", "plan");
+  assert.equal(readConversation("conv-m1")?.mode, "plan");
+
+  writeConversation("conv-m1", "标题2", [{ role: "user" }]);
+  assert.equal(readConversation("conv-m1")?.mode, "plan");
+
+  writeConversation("conv-m2", "标题", [{ role: "user" }]);
+  assert.equal(readConversation("conv-m2")?.mode, "chat");
+});

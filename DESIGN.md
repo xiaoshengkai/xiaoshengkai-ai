@@ -112,6 +112,7 @@ flowchart TD
 **请求体**
 ```json
 {
+  "mode": "chat",
   "messages": [
     {
       "id": "msg_1",
@@ -124,12 +125,14 @@ flowchart TD
 
 **响应** — SSE 流式返回，由 `@ai-sdk/react` 的 `useChat` 自动解析。
 
+**模式（mode）**：`chat`（纯聊）/ `plan`（只读，只出方案）/ `edit`（全权，默认缺省为 chat，每对话独立记忆）。非 edit 模式剥离写工具（`lib/modes.ts` 的 `WRITE_TOOLS`：exec + 文件写 6 + 知识库写 4），plan 额外注入「只读分析、只输出方案」system prompt 引导。
+
 **处理流程**
-1. 提取最后一条用户消息
+1. 提取最后一条用户消息 + mode
 2. 智谱 `embedding-3` 生成查询向量
 3. Chroma cosine 检索 Top-5 知识片段（动态多表：shared + chat 全部 collection）
 4. 注入 `knowledgeContext` + `SKILL_LIST` 到 system prompt
-5. 启动/复用 1 个 MCP client（stdio spawn `node ../mcp/index.js`，33 tools）
+5. 启动/复用 1 个 MCP client（stdio spawn `node ../mcp/index.js`，33 tools），按 mode 过滤写工具
 6. `streamText` 按策略模式路由（deepseek / minimax / glm / qwen，DeepSeek 经 classifyTask 分 pro/flash）
 7. SSE 流式返回，图表/视频通过 iframe 预览
 

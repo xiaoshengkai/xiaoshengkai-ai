@@ -20,6 +20,7 @@ export interface ConversationRecord {
   pinned: boolean;
   titleLocked?: boolean;
   model?: string;
+  mode?: string;
   messages: unknown[];
 }
 
@@ -35,7 +36,7 @@ export function readConversation(id: string): ConversationRecord | null {
   return JSON.parse(readFileSync(p, "utf-8"));
 }
 
-export function writeConversation(id: string, title: string, messages: unknown[], model?: string): ConversationRecord {
+export function writeConversation(id: string, title: string, messages: unknown[], model?: string, mode?: string): ConversationRecord {
   ensureDir();
   const p = filePath(id);
   const existing = existsSync(p) ? JSON.parse(readFileSync(p, "utf-8")) : null;
@@ -47,6 +48,7 @@ export function writeConversation(id: string, title: string, messages: unknown[]
     pinned: existing?.pinned ?? false,
     titleLocked: existing?.titleLocked ?? false,
     model: model || "deepseek",
+    mode: mode || existing?.mode || "chat",
     messages,
   };
   writeFileSync(p, JSON.stringify(record, null, 2));

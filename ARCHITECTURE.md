@@ -70,6 +70,7 @@ ai-engineer-journey/
     │   │   │   ├── settings/    # store / init / dispatcher / types
     │   │   │   ├── services/    # manager.ts：packages/services/* 清单扫描 + 启停/健康检查（服务监控）
     │   │   │   ├── mcp-client.ts
+    │   │   │   ├── modes.ts           # chat/plan/edit 模式权限（WRITE_TOOLS + filterToolsByMode）
     │   │   │   └── utils/       # utils(cn+BASE) / types / cost / env
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）

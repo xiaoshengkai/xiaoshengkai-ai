@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.22 (2026-09-09) — 聊天增加 chat/plan/edit 三档模式
+
+### 变更
+- **三档模式切换**：聊天新增 `chat`（纯聊）/ `plan`（只读，只出方案）/ `edit`（全权）三种模式，输入框左侧循环按钮切换，每对话独立记忆（存 `data/conversations/*.json` 的 `mode` 字段，缺省回 chat 向后兼容）。
+- **写工具权限**（`lib/modes.ts` 新增，`WRITE_TOOLS` 11 个：exec + 文件写 6 + 知识库写 4）：非 edit 模式剥离这些写工具，只保留只读/搜索/知识库检索/生图/图表；plan 模式额外注入「只读分析、只输出方案」system prompt 引导。
+- **API**（`POST /api/chat`）：请求体新增 `mode` 字段，`filterToolsByMode` 按模式过滤 MCP 工具。
+- **对话存储**：`store.ts` `ConversationRecord` 加 `mode`，`writeConversation` 加 mode 参数（已存在记录保留原 mode）。
+
+### 验证
+- typecheck + `test:mm` 18 项全绿（新增 `modes.test.ts` 5 项：edit 保留原对象 / chat、plan 剥离写工具 / WRITE_TOOLS 完整性；`conversations-store.test.ts` 加 mode 持久化 + 缺省默认 chat 2 项）
+
 ## v0.11.21 (2026-09-08) — 漫画生成：旁白 + 自动质检 + 网络超时防护
 
 ### 变更

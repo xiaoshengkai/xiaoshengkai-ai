@@ -24,6 +24,7 @@ import { getChatStrategy } from '@/lib/strategies/chat-strategy';
 import { getProviderConfig } from '@/lib/settings/dispatcher';
 import { getMCPClient } from '@/lib/mcp-client';
 import { processAttachments } from '@/lib/multimodal/pipeline';
+import { filterToolsByMode, type ChatMode } from '@/lib/modes';
 import type { Message, MessagePart } from '@/lib/utils/types';
 
 // ─── 提示词常量 ────────────────────────────────────────────────────────
@@ -148,7 +149,8 @@ function toModelMessages(messages: Message[]): AISDKModelMessage[] {
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const { messages, mode = "chat" } = await req.json();
+    const currentMode: ChatMode = mode === "edit" || mode === "plan" ? mode : "chat";
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: '请输入内容' }), {
@@ -175,11 +177,12 @@ export async function POST(req: Request) {
         retrieved.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n')
       : '';
 
-    const tools = await loadMcpTools();
+    const tools = filterToolsByMode(await loadMcpTools(), currentMode);
 
     const systemPrompt = buildSystemPrompt({
       multimodalInjection,
       knowledgeContext,
+      mode: currentMode,
     });
 
     const chatConfig = getProviderConfig('chat');
@@ -233,13 +236,18 @@ export async function POST(req: Request) {
 function buildSystemPrompt({
   multimodalInjection,
   knowledgeContext,
+  mode,
 }: {
   multimodalInjection?: string;
   knowledgeContext: string;
+  mode: ChatMode;
 }): string {
+  const modeInstruction = mode === "plan"
+    ? "\n当前处于 plan 模式：只读分析，只输出方案，禁止修改文件、执行命令或写入知识库。"
+    : "";
   return `你是小盛开AI，一个实用的编程助手，擅长代码编写、知识管理、图表生成和多媒体创作。用中文思考，所有思考过程必须用中文描述，不要使用英文。用通俗语言回答。参考知识库时自然融入答案，不标注来源。
 
-工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。
+ 工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。${modeInstruction}
 
 技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
         ${SKILL_LIST}

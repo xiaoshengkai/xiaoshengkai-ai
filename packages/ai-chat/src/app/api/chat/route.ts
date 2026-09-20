@@ -22,7 +22,7 @@ import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
 
 import { getChatStrategy } from '@/lib/strategies/chat-strategy';
 import { getProviderConfig } from '@/lib/settings/dispatcher';
-import { getMCPClient } from '@/lib/mcp-client';
+import { getMCPClient, resetMCPClient } from '@/lib/mcp-client';
 import { processAttachments } from '@/lib/multimodal/pipeline';
 import { filterToolsByMode, type ChatMode } from '@/lib/modes';
 import type { Message, MessagePart } from '@/lib/utils/types';
@@ -183,6 +183,7 @@ export async function POST(req: Request) {
       multimodalInjection,
       knowledgeContext,
       mode: currentMode,
+      hasTools: Object.keys(tools).length > 0,
     });
 
     const chatConfig = getProviderConfig('chat');
@@ -237,21 +238,26 @@ function buildSystemPrompt({
   multimodalInjection,
   knowledgeContext,
   mode,
+  hasTools,
 }: {
   multimodalInjection?: string;
   knowledgeContext: string;
   mode: ChatMode;
+  hasTools: boolean;
 }): string {
   const modeInstruction = mode === "plan"
     ? "\n当前处于 plan 模式：只读分析，只输出方案，禁止修改文件、执行命令或写入知识库。"
     : "";
+  const toolsSection = hasTools
+    ? TOOLS_PROMPT
+    : "当前无可用工具（工具服务暂不可用）。直接回答用户问题；若用户要求执行操作，如实说明暂时无法执行，绝对不要伪造工具调用。";
   return `你是小盛开AI，一个实用的编程助手，擅长代码编写、知识管理、图表生成和多媒体创作。用中文思考，所有思考过程必须用中文描述，不要使用英文。用通俗语言回答。参考知识库时自然融入答案，不标注来源。
 
  工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。${modeInstruction}
 
 技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
         ${SKILL_LIST}
-        ${TOOLS_PROMPT}
+        ${toolsSection}
         ${multimodalInjection ? `\n用户消息中的 [图片]/[视频] 占位符对应的实际内容如下（由视觉模型生成，等同附件本身）。请据此理解并回答用户问题，不要声称看不到附件：\n${multimodalInjection}\n` : ''}
         ${knowledgeContext}`;
 }
@@ -260,13 +266,16 @@ function buildSystemPrompt({
  * 加载 MCP 工具（带缓存）
  */
 async function loadMcpTools(): Promise<Record<string, unknown>> {
-  try {
-    const client = await getMCPClient();
-    const t = await client.tools();
-    console.log(`[mcp] loaded (${Object.keys(t).length} tools)`);
-    return t;
-  } catch (err) {
-    console.error(`[mcp] FAILED - ${(err as Error).message}`);
-    return {};
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const client = await getMCPClient();
+      const t = await client.tools();
+      console.log(`[mcp] loaded (${Object.keys(t).length} tools)`);
+      return t;
+    } catch (err) {
+      console.error(`[mcp] FAILED (attempt ${attempt}) - ${(err as Error).message}`);
+      resetMCPClient(); // 清掉死客户端，下次循环重新 spawn
+    }
   }
+  return {};
 }

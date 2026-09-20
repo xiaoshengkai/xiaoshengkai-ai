@@ -129,8 +129,8 @@
   --purple-soft: #ECDDFF;
 
   --shadow-1: 2px 2px 0 #000;
-  --shadow-2: 5px 5px 0 #000;
-  --shadow-3: 9px 9px 0 #000;
+  --shadow-2: 4px 4px 0 #000;
+  --shadow-3: 6px 6px 0 #000;
 
   --font-body: 'Inter', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
   --font-code: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
@@ -163,7 +163,7 @@
     letter-spacing: -0.02em;
   }
   :focus-visible {
-    outline: 3px solid var(--ring);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 }
@@ -174,11 +174,11 @@
 }
 ::-webkit-scrollbar-track {
   background: var(--muted);
-  border-left: 3px solid var(--border);
+  border-left: 2px solid var(--border);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--primary);
-  border: 3px solid var(--border);
+  border: 2px solid var(--border);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--blue);
@@ -186,34 +186,30 @@
 
 /* ============ Neo-Brutalism 交互类 ============ */
 @layer components {
-  /* 静态：纯黑边框 + 硬阴影（消息气泡 / 静态卡片） */
+  /* 静态：纯黑边框 + 硬阴影（静态卡片；聊天气泡用内联 3px 保持签名重量） */
   .brutal {
-    border: 3px solid var(--border);
-    box-shadow: var(--shadow-md);
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow-sm);
   }
   .brutal-sm {
     border: 2px solid var(--border);
     box-shadow: var(--shadow-sm);
   }
-  .brutal-lg {
-    border: 3px solid var(--border);
-    box-shadow: var(--shadow-lg);
-  }
 
   /* 交互：hover 位移 + 阴影扩大，active 物理按压（按钮 / 可点卡片） */
   .brutal-btn {
-    border: 3px solid var(--border);
-    box-shadow: var(--shadow-md);
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow-sm);
     transition: transform 0.12s ease, box-shadow 0.12s ease;
     cursor: pointer;
   }
   .brutal-btn:hover {
     transform: translate(-2px, -2px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-md);
   }
   .brutal-btn:active {
     transform: translate(2px, 2px);
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;
   }
   .brutal-btn:disabled {
     opacity: 0.4;
@@ -231,18 +227,6 @@
     background: var(--card);
     font-family: var(--font-code);
     font-weight: 700;
-  }
-
-  /* 输入框 */
-  .brutal-input {
-    border: 3px solid var(--border);
-    background: var(--card);
-    transition: border-color 0.12s ease, box-shadow 0.12s ease;
-  }
-  .brutal-input:focus {
-    outline: none;
-    border-color: var(--ring);
-    box-shadow: 3px 3px 0 var(--ring);
   }
 }
 

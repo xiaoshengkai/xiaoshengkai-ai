@@ -26,7 +26,9 @@ function cleanOldLogs(logDir, prefix) {
   } catch { /* ignore */ }
 }
 
-export function createLogger(source, logDir) {
+export function createLogger(source, logDir, opts = {}) {
+  // stdout=false：不回显到 stdout。MCP 的 stdout 是 JSON-RPC 通道，禁止被日志污染
+  const { stdout = true } = opts;
   fs.mkdirSync(logDir, { recursive: true });
   const safeSource = String(source || "app");
   let lastCleanDate = localDateString();
@@ -37,10 +39,6 @@ export function createLogger(source, logDir) {
   const origWarn = console.warn;
   const origInfo = console.info;
 
-  // 倒序缓存：最新在前，跨天切文件时才读一次磁盘
-  let buffer = "";
-  let bufferFile = "";
-
   function writeLog(level, args) {
     // 每次写日志动态算「今天」的文件名：跨天自动切文件（不再用启动时固化的常量）
     const today = localDateString();
@@ -49,19 +47,16 @@ export function createLogger(source, logDir) {
       cleanOldLogs(logDir, "app-");
     }
     const file = path.join(logDir, `app-${today}.log`);
-    if (bufferFile !== file) {
-      bufferFile = file;
-      buffer = fs.existsSync(file) ? fs.readFileSync(file, "utf-8") : "";
-    }
     const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${safeSource}] [${level}] ${args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ")}\n`;
-    buffer = line + buffer;
-    fs.writeFileSync(file, buffer);
+    // 追加写（时间正序）：多进程共享同一文件时唯一安全的方式，读改写会互相覆盖
+    fs.appendFileSync(file, line);
   }
 
-  console.log = (...args) => { origLog(...args); writeLog("LOG", args); };
+  console.log = (...args) => { if (stdout) origLog(...args); writeLog("LOG", args); };
+  console.info = (...args) => { if (stdout) origInfo(...args); writeLog("INFO", args); };
+  // console.error/warn 本就走 stderr，不受 stdout 开关影响
   console.error = (...args) => { origErr(...args); writeLog("ERR", args); };
   console.warn = (...args) => { origWarn(...args); writeLog("WARN", args); };
-  console.info = (...args) => { origInfo(...args); writeLog("INFO", args); };
 }
 
 export function createDateLogger(source, logDir, itemName) {

@@ -2,6 +2,7 @@
   "name": "tech-video",
   "label": "科技风 短视频生成",
   "description": "script.json 驱动 + 逐场景渲染 + TTS + BGM + SFX + 硬字幕 + SRT",
+  "available": false,
   "params": [
     { "name": "title", "label": "视频标题", "type": "text", "required": true },
     { "name": "content", "label": "视频内容描述", "type": "textarea", "required": false, "placeholder": "详细描述视频内容（可选，不填则用标题生成）" },

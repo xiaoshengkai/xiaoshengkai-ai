@@ -1,5 +1,50 @@
 # Changelog
 
+## v0.11.26 (2026-09-18) — 统一界面框规范：2px 轻框 + 阴影分级
+
+### 变更
+- **框规范中心化**（`globals.css`）：`.brutal` / `.brutal-btn` 由 3px 边 + `--shadow-md`(5px) 改为 **2px 边 + `--shadow-sm`(2px)**；`.brutal-btn` hover 位移 + `--shadow-md`、active `box-shadow:none`。删除死类 `.brutal-lg` / `.brutal-input`（全仓 0 使用）。
+- **阴影 token 减重**：`--shadow-2` 5px→4px、`--shadow-3` 9px→6px（hover / 浮层同步变轻）。
+- **内联 3px → 2px**（约 24 处）：各页页头分隔线、左右侧栏边框、右栏分区条、alert-dialog 底部分隔、memory/execution 代码块、看图层、workflow 页头。
+- **聊天屏保留 3px 签名**：气泡（含内嵌图/视频）、笔记预览卡、markdown 插图、输入框外壳维持 3px + 4px 硬阴影。
+- **清理内联硬编码阴影**：execution 页对话框 4px→2px；结构面板去掉覆盖 `.brutal` 的内联 `border/boxShadow`。
+- 滚动条 track/thumb 边框 3px→2px；`:focus-visible` outline 3px→2px。
+
+### 验证
+- `npm run typecheck` + `npm run build`；目视：聊天保持重框签名，工作流/定时任务/设置/memory 统一轻框
+
+## v0.11.25 (2026-09-18) — 工作流列表：可用状态标识 + 卡片重设计
+
+### 变更
+- **可用状态标识**（`workflow/page.tsx`）：模板卡片加「可用 / 不可用」圆点徽章。状态来自 `template.json` 新增的 `available` 字段（缺省视为可用），`cli.js templates` 整体展开 template.json，引擎零改动。当前：漫画生成可用，户型改造 / 科技风短视频 / 短视频生成不可用。
+- **卡片重设计**：改为白底 `border-2` + 小阴影 + hover 抬起，色彩只做点缀——40px 糖果色图标块（lucide：漫画 BookImage / 户型 Ruler / 科技风 Cpu / 短视频 Film），标题 `font-black`，副行「N 步 · N 条记录」，描述 + 浅分隔线下的流程行；去掉四角白框 chip；页头加「N/M 可用」汇总 chip。不可用卡片用虚线边 + 灰图标块 + 灰徽章标识，**仍可点击**。
+
+### 验证
+- `npm run typecheck` + `npm run build`；列表页目视：白卡 + 彩色图标块，漫画「可用」绿徽章，其余虚线边 + 灰徽章，全部可点
+
+## v0.11.24 (2026-09-18) — MCP 客户端自愈 + 工具缺失不伪造调用
+
+### 变更
+- **MCP 客户端自愈**（`lib/mcp-client.ts`）：单例改缓存 Promise（顺带修掉并发首次请求 spawn 多个子进程的竞态），新增 `resetMCPClient()`；`route.ts` `loadMcpTools` 失败后清空单例并**重试一次**。根因：子进程死亡后模块级单例永久缓存已关闭客户端，后续所有请求报 `Attempted to send a request from a closed client`，工具能力失效直到人工重启。
+- **工具为空时的降级**（`route.ts` `buildSystemPrompt` 加 `hasTools`）：工具列表为空时不注入 `TOOLS_PROMPT`，改注入「无可用工具，禁止伪造工具调用」提示。根因：工具加载失败仍列出 35 个工具，模型把工具调用当文本输出（`<｜｜DSML｜｜ invoke>`），表现为聊天"突然断掉"。
+
+### 验证
+- `npm run typecheck` 通过；`test:shared` 51 项全绿
+- 现场：kill MCP 子进程后发一条需要工具的消息，应自动重连，日志出现 `[mcp] FAILED (attempt 1)` → `[mcp] loaded`
+
+## v0.11.23 (2026-09-18) — 日志追加写 + MCP 死因兜底
+
+### 变更
+- **日志改追加写（跨进程安全）**（`shared/logger.js` `createLogger`）：去掉内存 buffer + 整文件重写，改 `fs.appendFileSync`（时间正序）。根因：`logs/app/app-*.log` 由 ai-chat、MCP、`/api/client-log` 三方共享，读整文件前插重写导致互相覆盖——MCP 的 `[MCP]` 行全部丢失，子进程崩溃现场无证据可查。
+- **MCP 不再污染 stdout**：`createLogger` 新增 `opts.stdout`（默认 true），MCP 传 `false`，并以 `mcp/lib/logger-setup.js` 作为 index.js 的首个 import 提前拦截（工具模块在顶层就 `console.log`，晚于 createLogger 就会漏进 stdout）——stdout 是 JSON-RPC 通道，日志只写文件。
+- **MCP 死因兜底**（`mcp/index.js`）：新增 `uncaughtException` / `unhandledRejection`（打印堆栈 → exit(1)）、`SIGTERM`/`SIGINT`、`process.on("exit")` 记录退出码，子进程死亡时留证据。
+- **读取方适配正序**：`/api/logs` 取尾部 200 行再反转（面板观感不变）；`scripts/log.sh` 改 `tail -n 40 -f`；`/api/client-log` 改追加写 + 本地时区（原 UTC 与 logger 本地日期在凌晨错位）。
+- **客户端侧错误落日志**（`lib/mcp-client.ts`）：`createMCPClient` 传 `onUncaughtError`。
+
+### 验证
+- `npm run typecheck` + `npm run test`（`test:shared` 新增 `logger.test.js`：正序追加、行不覆盖）
+- 当天 `app-2026-09-18.log` 已按 entry 规整为时间正序
+
 ## v0.11.22 (2026-09-09) — 聊天增加 chat/plan/build 三档模式
 
 ### 变更

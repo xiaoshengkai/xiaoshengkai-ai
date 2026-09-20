@@ -109,7 +109,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
           <img
             src={currentSrc}
             alt=""
-            className="max-w-[90vw] max-h-[90vh] object-contain border-[3px] shadow-md"
+            className="max-w-[90vw] max-h-[90vh] object-contain border-2 shadow-sm"
             onClick={e => e.stopPropagation()}
             onLoad={() => setImgState("loaded")}
             onError={() => setImgState("error")}

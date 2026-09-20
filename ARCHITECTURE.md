@@ -226,6 +226,8 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 ### 模板
 
+> 每个 `template.json` 可选 `available`（boolean，缺省视为可用）：工作流列表页据此显示「可用 / 不可用」徽章，不可用卡片加虚线边 + 灰图标标识，但仍可点击。
+
 - `templates/tech-video/`：科技风短视频（script.json 驱动 + 逐场景 TTS + BGM + SFX + 硬字幕 + SRT）
 - `templates/video-generation/`：视频生成（含微调/版本切换/内容生成等模板级动作）
 - `templates/comic-generation/`：漫画生成（故事→AI 分镜→每个 `sceneId` 生成无文字/无气泡锚点→逐页生成漫画图；`sceneId/scenePrompt` + 独立锚点锁连续场景且不继承成品页气泡；角色参考图锁人物一致性 + 风格库锁画风；分镜支持可选旁白 `narration`（灰底方框置顶）；每页生成后 `verifyPage` vision 质检气泡文字/尾巴指向、不通过带反馈重试一次；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
@@ -306,7 +308,7 @@ packages/tasks/
 
 ```
 logs/
-├── app/                           # 应用日志（ai-chat + MCP）
+├── app/                           # 应用日志（ai-chat + MCP + client-log，追加写/时间正序）
 │   └── app-YYYY-MM-DD.log
 ├── workflows/                     # 工作流日志（按日，含执行 id 前缀）
 │   └── workflows-YYYY-MM-DD.log
@@ -317,15 +319,18 @@ logs/
     └── <task-name>.log            # HTTP「立即执行」（每任务一个）
 ```
 
+> `logs/app/app-*.log` 由 ai-chat（NEXT logger）、MCP 子进程、`/api/client-log` 三方共享，统一**追加写（时间正序）**；读取方（`/api/logs`、`scripts/log.sh`）取尾部再反转展示。禁止「读整文件 → 前插 → 重写」（多进程会互相覆盖）。`createDateLogger`（workflows/tasks/services）仍是每 item 独立文件 + 倒序。
+
 ## MCP 系统
 
-统一 MCP 服务器（`packages/mcp/`，stdio 协议），由 ai-chat 的 `lib/mcp-client.ts` spawn `node ../mcp/index.js` 拉起，进程内 `shared/llm` 每次调用 fresh-read 配置（改配置无需重建客户端）。
+统一 MCP 服务器（`packages/mcp/`，stdio 协议），由 ai-chat 的 `lib/mcp-client.ts` spawn `node ../mcp/index.js` 拉起，进程内 `shared/llm` 每次调用 fresh-read 配置（改配置无需重建客户端）。客户端单例缓存 Promise，子进程死亡后由 `loadMcpTools` 调 `resetMCPClient()` 重连。
 
 ```
 packages/mcp/
 ├── index.js                 # 统一入口（注册全部工具模块）
 ├── lib/
 │   ├── env.js               # 环境变量
+│   ├── logger-setup.js      # MCP 日志初始化（首个 import，提前拦截 console，禁止污染 stdout）
 │   ├── chroma.js            # Chroma 客户端（network.json + providers.json 配置）
 │   └── task-state.js        # 异步任务状态（图片/图表等长任务）
 └── tools/

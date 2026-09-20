@@ -45,7 +45,7 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
 
   if (error) {
     return (
-      <div className="brutal bg-card p-4 my-2 text-sm text-destructive">
+      <div className="border-[3px] shadow-md bg-card p-4 my-2 text-sm text-destructive">
         {error}
       </div>
     );
@@ -53,7 +53,7 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
 
   if (!note) {
     return (
-      <div className="brutal bg-card p-4 my-2">
+      <div className="border-[3px] shadow-md bg-card p-4 my-2">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span className="flex gap-1">
             <span className="w-2 h-2 bg-primary animate-bounce" />
@@ -70,7 +70,7 @@ export default function NotePreviewCard({ taskId }: { taskId: string }) {
   const illustrations = note.images?.filter((img) => img.type === "illustration") || [];
 
   return (
-    <div className="brutal bg-card my-2 overflow-hidden">
+    <div className="border-[3px] shadow-md bg-card my-2 overflow-hidden">
       {/* 封面 */}
       {cover?.url ? (
         <img src={cover.url} alt={note.title} className="w-full aspect-[3/4] object-cover" />

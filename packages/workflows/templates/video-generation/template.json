@@ -2,6 +2,7 @@
   "name": "video-generation",
   "label": "短视频生成",
   "description": "script.json 驱动 + TTS + BGM + 渲染",
+  "available": false,
   "params": [
     { "name": "title", "label": "视频标题", "type": "text", "required": true },
     { "name": "contentRequirement", "label": "内容要求（可选）", "type": "textarea", "required": false, "placeholder": "如：场景要反转、用emoji做SVG、每场景英文标题" },

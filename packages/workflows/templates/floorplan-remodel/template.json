@@ -2,6 +2,7 @@
   "name": "floorplan-remodel",
   "label": "户型改造",
   "description": "上传户型图 → 识别并确认底图 → 生成 N 套二维矢量改造方案（红=砸墙、蓝=砌墙）",
+  "available": false,
   "params": [
     { "name": "title", "label": "项目标题", "type": "text", "required": true, "placeholder": "如：滨江两居室加书房" },
     { "name": "floorplan", "label": "户型图", "type": "text", "required": true },

@@ -452,7 +452,7 @@ export default function ExecutionDetailPage() {
   return (
     <ImageViewerProvider>
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-4 py-3 border-b-[3px] border-border shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 border-b-2 border-border shrink-0">
         <a href={`/workflow/type/${execution.template}`} className="text-muted-foreground/70 hover:text-muted-foreground"><ArrowLeft className="w-4 h-4" /></a>
         <div className="flex items-center gap-2 flex-1">
           <h2 className="text-sm font-bold text-foreground">{execution.template}</h2>
@@ -572,7 +572,7 @@ export default function ExecutionDetailPage() {
                       ))}
                     </div>
                   )}
-                  <pre className="text-xs bg-yellow-soft p-4 border-[3px] border-border shadow-md overflow-auto max-h-[70vh] whitespace-pre-wrap">
+                  <pre className="text-xs bg-yellow-soft p-4 border-2 border-border shadow-sm overflow-auto max-h-[70vh] whitespace-pre-wrap">
                     {scriptJsonTab === "script"
                       ? (() => {
                           try {
@@ -632,7 +632,7 @@ export default function ExecutionDetailPage() {
 
       <AlertDialog open={showTweak} onOpenChange={setShowTweak}>
         <AlertDialogContent className="max-w-lg rounded-none border-2 border-[var(--border)]"
-          style={{ boxShadow: "4px 4px 0 var(--border)", background: "#fff" }}
+          style={{ boxShadow: "2px 2px 0 var(--border)", background: "#fff" }}
           onPaste={handlePaste}
         >
           <AlertDialogHeader>
@@ -908,7 +908,7 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
 
   return (
     <div className="space-y-3">
-      <div className="brutal bg-yellow-soft p-3" style={{ border: "3px solid var(--border)", boxShadow: "4px 4px 0 var(--border)" }}>
+      <div className="brutal bg-yellow-soft p-3">
         <div className="flex items-center gap-2 mb-1">
           <span className="w-5 h-5 rounded-full bg-blue text-white flex items-center justify-center text-xs font-bold">✓</span>
           <h3 className="text-xs font-bold text-foreground">户型结构识别</h3>

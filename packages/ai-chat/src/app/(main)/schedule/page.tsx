@@ -126,7 +126,7 @@ export default function SchedulePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border">
+      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border">
         <h2 className="text-lg font-bold text-foreground font-heading">定时任务</h2>
         <button
           onClick={() => router.push("/")}

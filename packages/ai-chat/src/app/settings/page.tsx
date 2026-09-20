@@ -181,7 +181,7 @@ export default function SettingsPage() {
   return (
     <div data-theme="pink" className="flex flex-col h-full">
       {/* 头部：与其他页面统一 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border shrink-0">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-foreground font-heading">系统设置</h2>
           <span className="text-xs text-muted-foreground font-mono hidden md:inline">

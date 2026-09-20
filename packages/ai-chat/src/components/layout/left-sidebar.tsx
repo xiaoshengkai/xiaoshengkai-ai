@@ -133,9 +133,9 @@ export default function LeftSidebar({
   };
 
   return (
-    <aside className="w-[240px] shrink-0 h-dvh flex flex-col bg-card border-r-[3px] border-border">
+    <aside className="w-[240px] shrink-0 h-dvh flex flex-col bg-card border-r-2 border-border">
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-3 px-4 py-4 border-b-[3px] border-border">
+      <Link href="/" className="flex items-center gap-3 px-4 py-4 border-b-2 border-border">
         <Logo size={10} />
         <span className="text-sm font-bold font-heading tracking-wider">
           小盛开AI
@@ -143,7 +143,7 @@ export default function LeftSidebar({
       </Link>
 
       {/* 新对话 */}
-      <div className="px-3 py-2 border-b-[3px] border-border">
+      <div className="px-3 py-2 border-b-2 border-border">
         <button
           onClick={handleNewClick}
           className="brutal-btn flex items-center gap-2 px-3 py-1.5 text-sm font-mono font-bold cursor-pointer w-full bg-primary text-primary-foreground"

@@ -11,6 +11,7 @@ export async function GET() {
   }
 
   const content = fs.readFileSync(LOG_FILE, "utf-8");
-  const lines = content.split("\n").filter(Boolean).slice(0, 200);
+  // 文件为追加写（时间正序），取最新 200 行并倒序返回给面板
+  const lines = content.split("\n").filter(Boolean).slice(-200).reverse();
   return Response.json({ lines: lines.map(l => l.length > 500 ? l.slice(0, 500) + "..." : l) });
 }

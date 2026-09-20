@@ -237,7 +237,7 @@ export default function MemoryLibraryPage() {
   return (
     <div className="flex flex-col h-full">
       {/* 头部：与其他页面统一 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border shrink-0">
         <h2 className="text-lg font-bold text-foreground font-heading">记忆库</h2>
         <button
           onClick={() => router.push("/")}
@@ -342,7 +342,7 @@ export default function MemoryLibraryPage() {
 
         {/* 列表 */}
         <div className="brutal bg-card">
-          <div className="flex items-center justify-between px-4 py-3 border-b-[3px] border-border">
+          <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground font-mono">
                 {listLoading && chunks.length === 0 ? "加载中…" : searchResult ? `共 ${searchResult.results.length} 条结果` : `共 ${chunks.length} 条`}
@@ -540,8 +540,8 @@ function DetailDrawer({
         className="fixed inset-0 bg-black/30 z-40"
         aria-hidden="true"
       />
-      <div className="fixed top-0 right-0 h-full w-full md:w-2/3 lg:w-1/2 bg-card border-l-[3px] border-border shadow-lg z-50 overflow-y-auto">
-        <div className="sticky top-0 bg-card border-b-[3px] border-border px-6 py-4 flex items-center justify-between">
+      <div className="fixed top-0 right-0 h-full w-full md:w-2/3 lg:w-1/2 bg-card border-l-2 border-border shadow-lg z-50 overflow-y-auto">
+        <div className="sticky top-0 bg-card border-b-2 border-border px-6 py-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold font-mono">
             Chunk 详情
           </h2>
@@ -581,7 +581,7 @@ function DetailDrawer({
 
               <div>
                 <Label>Content ({detail.content.length} 字)</Label>
-                <pre className="mt-1 p-4 bg-yellow-soft border-[3px] border-border shadow-md text-sm whitespace-pre-wrap break-words font-mono">
+                <pre className="mt-1 p-4 bg-yellow-soft border-2 border-border shadow-sm text-sm whitespace-pre-wrap break-words font-mono">
                   {detail.content}
                 </pre>
               </div>

@@ -9,14 +9,15 @@ export async function POST(request: Request) {
     const { level, executionId, message } = await request.json();
     if (!message) return NextResponse.json({ ok: true });
 
-    const date = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const logFile = path.join(LOG_DIR, `app-${date}.log`);
 
     if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
 
-    const line = `[${new Date().toLocaleString("zh-CN", { hour12: false })}] [${executionId || "-"}] [${level || "LOG"}] ${message}\n`;
-    const old = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf-8") : "";
-    fs.writeFileSync(logFile, line + old);
+    const line = `[${now.toLocaleString("zh-CN", { hour12: false })}] [${executionId || "-"}] [${level || "LOG"}] ${message}\n`;
+    // 追加写，与 createLogger 的正序格式保持一致
+    fs.appendFileSync(logFile, line);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

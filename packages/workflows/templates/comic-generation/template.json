@@ -2,6 +2,7 @@
   "name": "comic-generation",
   "label": "漫画生成",
   "description": "故事文本 → AI 分镜 → 逐页生成漫画图（对白直接画进画面，参考图锁人物一致性）",
+  "available": true,
   "params": [
     { "name": "title", "label": "故事标题", "type": "text", "required": false },
     { "name": "content", "label": "故事内容（含角色与关系）", "type": "textarea", "required": true, "placeholder": "剧情 + 角色名字/外貌 + 角色关系，如：小明（20岁男生，红T恤）是小红的哥哥…" },

@@ -1,10 +1,25 @@
 import "./lib/env.js";
-import fs from "node:fs";
-import path from "node:path";
-import { createLogger } from "@app/shared/logger.js";
+// 日志必须最先初始化：工具模块在顶层 console.log，需在它们被 import 前拦截 stdout
+import "./lib/logger-setup.js";
 
-// ─── 日志系统 ───
-createLogger("MCP", path.join(path.dirname(new URL(import.meta.url).pathname), "..", "..", "logs", "app"));
+// ─── 进程级死因兜底：子进程异常/被杀时留下证据 ───
+process.on("uncaughtException", (err) => {
+  console.error(`[mcp] uncaughtException: ${err?.stack || err}`);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error(`[mcp] unhandledRejection: ${reason?.stack || reason}`);
+  process.exit(1);
+});
+for (const sig of ["SIGTERM", "SIGINT"]) {
+  process.on(sig, () => {
+    console.error(`[mcp] 收到 ${sig}，退出`);
+    process.exit(0);
+  });
+}
+process.on("exit", (code) => {
+  console.error(`[mcp] 进程退出 code=${code}`);
+});
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

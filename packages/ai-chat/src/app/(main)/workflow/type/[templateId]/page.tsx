@@ -335,7 +335,7 @@ export default function WorkflowTypePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 py-3 border-b-[3px] border-border">
+      <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-border">
         <button onClick={() => router.push("/workflow")}
           className="text-muted-foreground/70 hover:text-muted-foreground">
           <ArrowLeft className="w-4 h-4" />

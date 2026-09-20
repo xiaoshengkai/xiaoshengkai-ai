@@ -374,7 +374,7 @@ export default function ChatPage() {
                 </button>
               )}
             </div>
-            <div className="brutal bg-card max-w-3xl mx-auto">
+            <div className="border-[3px] shadow-md bg-card max-w-3xl mx-auto">
               {images.length > 0 && (
                 <div className="flex items-center gap-2 px-3 pt-2 pb-1 overflow-x-auto">
                   {images.map((img, i) => (

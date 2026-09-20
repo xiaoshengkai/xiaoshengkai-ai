@@ -115,15 +115,15 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
   }, [messages]);
 
   return (
-    <aside className="w-[280px] shrink-0 h-full flex flex-col overflow-hidden border-l-[3px] border-border bg-card">
-      <div className="px-3 py-2 text-sm font-bold font-mono text-white bg-ink border-b-[3px] border-border">
+    <aside className="w-[280px] shrink-0 h-full flex flex-col overflow-hidden border-l-2 border-border bg-card">
+      <div className="px-3 py-2 text-sm font-bold font-mono text-white bg-ink border-b-2 border-border">
         状态面板
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {/* 模型 */}
         <div className="brutal bg-card overflow-hidden">
-          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-foreground bg-blue border-b-[3px] border-border">
+          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-foreground bg-blue border-b-2 border-border">
             模型
           </div>
           <div className="p-2.5">
@@ -151,7 +151,7 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
 
         {/* Token 统计 */}
         <div className="brutal bg-card overflow-hidden">
-          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-white bg-lime border-b-[3px] border-border">
+          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-white bg-lime border-b-2 border-border">
             Token 统计
           </div>
           <div className="p-2.5">
@@ -173,7 +173,7 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
         {/* 检索记忆 */}
         {stats.retrievedChunks && stats.retrievedChunks.length > 0 && (
           <div className="brutal bg-card overflow-hidden">
-            <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-white bg-purple border-b-[3px] border-border">
+            <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-white bg-purple border-b-2 border-border">
               检索记忆 ({stats.retrievedChunks.length})
             </div>
             <div className="p-2.5 max-h-[220px] overflow-y-auto">
@@ -198,7 +198,7 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
 
         {/* 运行日志 */}
         <div className="brutal bg-card overflow-hidden">
-          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-foreground bg-yellow border-b-[3px] border-border">
+          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-foreground bg-yellow border-b-2 border-border">
             运行日志 ({logLines.length})
           </div>
           <div className="p-2.5 max-h-[370px] overflow-y-auto">

@@ -35,7 +35,7 @@ async function callSearchService(path, params, { timeout = 45000 } = {}) {
 export function register(server) {
   server.tool(
     "searchWeb",
-    "联网搜索工具。根据关键词搜索网页（本地 SearXNG），支持分类：general(综合网页)/images(图片)/videos(视频)/news(新闻)/wechat(微信公众号)。general/news 默认抓前 3 条结果正文（Firecrawl Cloud），images/videos/wechat 只返回标题/URL/摘要/缩略图不抓正文。返回结构化结果（含标题/URL/摘要/来源引擎），回答时必须引用结果 URL。",
+    "联网搜索工具。根据关键词搜索网页，支持分类：general(综合网页)/images(图片)/videos(视频)/news(新闻)/wechat(微信公众号)。general/news/images 主搜走 Firecrawl Cloud（失败自动兜底本地 SearXNG），videos/wechat 走本地 SearXNG。general/news 默认抓前 3 条结果正文（Firecrawl Cloud），images/videos/wechat 只返回标题/URL/摘要/缩略图不抓正文。返回结构化结果（含标题/URL/摘要/来源引擎），回答时必须引用结果 URL。",
     {
       query: z.string().min(1).describe("搜索关键词"),
       category: z.enum(CATEGORY_OPTIONS).optional().describe("搜索分类，默认 general"),

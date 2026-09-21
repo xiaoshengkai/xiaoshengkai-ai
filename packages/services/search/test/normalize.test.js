@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { normalizeResults, CATEGORY_ENGINES, categoryFetchesContent } from "../lib/searxng.js";
+import { normalizeFirecrawlSearch } from "../lib/firecrawl.js";
 
 const GENERAL_ENGINES = CATEGORY_ENGINES.general;
 
@@ -63,4 +64,26 @@ test("categoryFetchesContent: general/news 抓正文，其余不抓", () => {
   assert.equal(categoryFetchesContent("images"), false);
   assert.equal(categoryFetchesContent("videos"), false);
   assert.equal(categoryFetchesContent("wechat"), false);
+});
+
+test("normalizeFirecrawlSearch: 拍平 web/news/images + 字段映射", () => {
+  const data = {
+    web: [
+      { url: "https://a.com", title: "A", description: "web 摘要", position: 1 },
+      { url: "", title: "缺 url 应过滤" },
+    ],
+    news: [
+      { url: "https://n.com", title: "N", snippet: "news 摘要", date: "2 hours ago", imageUrl: "https://img/1.jpg" },
+    ],
+    images: [{ url: "https://i.com", title: "I", imageUrl: "https://img/2.jpg", imageWidth: 100 }],
+  };
+  const results = normalizeFirecrawlSearch(data);
+  assert.equal(results.length, 3);
+  assert.equal(results[0].snippet, "web 摘要");
+  assert.deepEqual(results[0].engines, ["firecrawl"]);
+  assert.equal(results[1].snippet, "news 摘要");
+  assert.equal(results[1].publishedDate, "2 hours ago");
+  assert.equal(results[1].thumbnail, "https://img/1.jpg");
+  assert.equal(results[2].thumbnail, "https://img/2.jpg");
+  assert.deepEqual(normalizeFirecrawlSearch(null), []);
 });

@@ -350,7 +350,7 @@ packages/mcp/
 
 ## 搜索服务系统
 
-`packages/services/search/` 是独立常驻 Node 服务（非 npm workspace 包），提供联网搜索与网页抓取能力，MCP 的 search 模块薄适配调用。
+`packages/services/search/` 是独立常驻 Node 服务（非 npm workspace 包），提供联网搜索与网页抓取能力（Firecrawl Cloud 主搜/抓取 + 本地 SearXNG 兜底），MCP 的 search 模块薄适配调用。
 
 ```
 packages/services/search/
@@ -358,8 +358,8 @@ packages/services/search/
 ├── server.js             # Node HTTP 服务（/search /scrape /map /crawl /parse /health /ready）
 ├── lib/
 │   ├── searxng.js        # 调本地 SearXNG JSON API（类别→引擎映射）
-│   ├── firecrawl.js      # 调 Firecrawl Cloud（scrape/map/crawl/parse，crawl 内部轮询）
-│   └── search.js         # 编排：去重、限额（≤10 结果、≤3 正文、≤20 页）、引擎状态
+│   ├── firecrawl.js      # 调 Firecrawl Cloud（search/scrape/map/crawl/parse，crawl 内部轮询）
+│   └── search.js         # 编排：Firecrawl 主搜→SearXNG 兜底、去重、限额（≤10 结果、≤3 正文、≤20 页）、引擎状态
 ├── searxng/              # 本地 SearXNG Python 子服务（start.sh: clone→venv→install→run）
 │   ├── settings.yml      # 启用 baidu/sogou/bing 系列引擎 + json 输出；无用默认引擎 inactive 掉
 │   ├── limiter.toml      # 空 limiter 配置（消除 missing config 警告，用内置 schema 默认值）
@@ -369,16 +369,19 @@ packages/services/search/
 
 ### searchWeb 类别映射
 
-| category | 引擎 | 抓正文 |
-|---|---|---|
-| general | baidu / sogou / bing | ✅ 前 3 条 |
-| images | baidu images / sogou images / bing images | ❌ |
-| videos | sogou videos / bing videos | ❌ |
-| news | bing news | ✅ 前 3 条 |
-| wechat | sogou wechat | ❌ |
+| category | 主搜 | 兜底(SearXNG) | 抓正文 |
+|---|---|---|---|
+| general | Firecrawl web | baidu / sogou / bing | ✅ 前 3 条 |
+| images | Firecrawl images | baidu images / sogou images / bing images | ❌ |
+| videos | — | sogou videos / bing videos | ❌ |
+| news | Firecrawl news | bing news | ✅ 前 3 条 |
+| wechat | — | sogou wechat | ❌ |
+
+Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(qdr:d/m/y)，language 忽略。背景：本机 SearXNG 抓取式引擎高频 CAPTCHA 且被挂起 1h、bing 恒 0 结果，故降为兜底。
 
 ### Firecrawl 工具
 
+- `searchWeb`（主搜）：POST /v2/search → data.{web,news,images} 拍平
 - `scrapeWebPage`：POST /v2/scrape → Markdown
 - `mapWebsite`：POST /v2/map → 站点 URL 列表
 - `crawlWebsite`：POST /v2/crawl + GET status（内部轮询，≤20 页）
@@ -386,7 +389,7 @@ packages/services/search/
 
 - 端口：`config/network.json` 的 `hosts.local`(127.0.0.1) + `ports.searxng`(8080) / `ports.searchService`(8090)
 - Firecrawl key：根 `.env` 的 `FIRECRAWL_API_KEY`
-- 搜索失败语义：类别内引擎全失败才报错；部分失败返回 `degraded=true` + 引擎状态
+- 搜索失败语义：主搜+兜底均失败才报错（`search_failed: firecrawl(…) | searxng(…)`）；主搜失败已兜底或部分引擎失败返回 `degraded=true`；响应含 `provider`(firecrawl/searxng)
 - 正文抓取失败不丢弃搜索结果（`contentFetched=false` + `contentError`）
 
 ## 服务监控系统

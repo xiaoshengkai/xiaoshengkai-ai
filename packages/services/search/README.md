@@ -1,12 +1,13 @@
 # Search Service
 
-联网搜索 + 网页抓取服务：本地 SearXNG 检索 + Firecrawl Cloud 正文抓取。MCP 的 search 模块（5 个工具）薄适配调用本服务。
+联网搜索 + 网页抓取服务：Firecrawl Cloud 主搜/抓取 + 本地 SearXNG 兜底。MCP 的 search 模块（5 个工具）薄适配调用本服务。
 
 ## 架构
 
 ```
 MCP (search 模块)
-  ├── searchWeb       → /search   → SearXNG(baidu/sogou/bing 系列) + Firecrawl(前 3 条正文)
+  ├── searchWeb       → /search   → Firecrawl /v2/search(general/news/images) + Firecrawl(前 3 条正文)
+  │                                  └ 失败/0 结果/videos/wechat/page>1 → SearXNG(baidu/sogou/bing 系列)
   ├── scrapeWebPage   → /scrape   → Firecrawl /v2/scrape
   ├── mapWebsite      → /map      → Firecrawl /v2/map
   ├── crawlWebsite    → /crawl    → Firecrawl /v2/crawl（内部轮询，≤20 页）
@@ -37,13 +38,16 @@ node packages/services/search/server.js
 
 ## searchWeb 分类
 
-| category | 引擎 | 抓正文 |
-|---|---|---|
-| general | baidu / sogou / bing | ✅ 前 3 条 |
-| images | baidu/sogou/bing images | ❌ |
-| videos | sogou/bing videos | ❌ |
-| news | bing news | ✅ 前 3 条 |
-| wechat | sogou wechat | ❌ |
+| category | 主搜 | 兜底(SearXNG) | 抓正文 |
+|---|---|---|---|
+| general | Firecrawl web | baidu / sogou / bing | ✅ 前 3 条 |
+| images | Firecrawl images | baidu/sogou/bing images | ❌ |
+| videos | —（无 Firecrawl 对应） | sogou/bing videos | ❌ |
+| news | Firecrawl news | bing news | ✅ 前 3 条 |
+| wechat | —（无 Firecrawl 对应） | sogou wechat | ❌ |
+
+- Firecrawl 主搜 2 credits/次；`timeRange` 映射为 tbs（qdr:d/m/y），`language` 忽略，`page>1` 直接走 SearXNG
+- 响应含 `provider`（firecrawl/searxng）与 `degraded`（主搜失败已兜底）
 
 ## 配置
 

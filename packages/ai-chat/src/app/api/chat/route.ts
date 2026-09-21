@@ -251,7 +251,14 @@ function buildSystemPrompt({
   const toolsSection = hasTools
     ? TOOLS_PROMPT
     : "当前无可用工具（工具服务暂不可用）。直接回答用户问题；若用户要求执行操作，如实说明暂时无法执行，绝对不要伪造工具调用。";
+  // 每请求生成，模型据此推算周末/节假日/当季，不再反问用户日期
+  const now = new Date().toLocaleString("zh-CN", {
+    weekday: "long", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
   return `你是小盛开AI，一个实用的编程助手，擅长代码编写、知识管理、图表生成和多媒体创作。用中文思考，所有思考过程必须用中文描述，不要使用英文。用通俗语言回答。参考知识库时自然融入答案，不标注来源。
+
+当前时间: ${now}
 
  工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。${modeInstruction}
 

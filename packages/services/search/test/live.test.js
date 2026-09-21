@@ -3,7 +3,7 @@ import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { scrapeUrl, mapWebsite, crawlWebsite, parseDocument } from "../lib/firecrawl.js";
+import { scrapeUrl, mapWebsite, crawlWebsite, parseDocument, searchWeb } from "../lib/firecrawl.js";
 import { search } from "../lib/search.js";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -54,12 +54,24 @@ test("live: Firecrawl crawl 小规模抓取", async () => {
   assert.ok(result.pages.length > 0, "crawl 应返回页面");
 });
 
+test("live: Firecrawl search 主搜（general）", async () => {
+  assert.ok(API_KEY, "缺少 FIRECRAWL_API_KEY");
+  const results = await searchWeb("人工智能", API_KEY, { category: "general", limit: 3 });
+  assert.ok(Array.isArray(results) && results.length > 0, "web 搜索应有结果");
+  assert.ok(results[0].url && results[0].title, "结果应含 url/title");
+});
+
+test("live: Firecrawl search 不支持类别返回 null", async () => {
+  assert.ok(API_KEY, "缺少 FIRECRAWL_API_KEY");
+  assert.equal(await searchWeb("测试", API_KEY, { category: "wechat" }), null);
+});
+
 test("live: search 编排（SearXNG 不可用时返回明确错误，不抛异常）", async () => {
   const network = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "config", "network.json"), "utf-8"));
   const searxngBase = `http://${network.hosts.local}:${network.ports.searxng}`;
   const result = await search({ query: "测试", maxResults: 5, fetchContent: true, searxngBase, firecrawlApiKey: API_KEY });
   assert.ok(typeof result.ok === "boolean");
   if (!result.ok) {
-    assert.ok(result.error.startsWith("searxng_search_failed"), `错误信息应明确: ${result.error}`);
+    assert.ok(result.error.startsWith("search_failed"), `错误信息应明确: ${result.error}`);
   }
 });

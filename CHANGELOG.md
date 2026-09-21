@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.11.28 (2026-09-20) — 聊天 system prompt 注入当前时间
+
+### 变更
+- **`route.ts` `buildSystemPrompt`**：模板头部加「当前时间: 2026/09/20星期日 17:45」（本地时区，每请求生成）。根因：system prompt 从未含日期，模型不知道「今天」，遇到周末/当季相关问题只能反问用户几月几号。
+- 不加 getCurrentTime MCP 工具：prompt 注入零依赖、无工具往返，MCP 挂掉时也生效；跨时区/农历属另一需求（YAGNI）。
+
+### 验证
+- `npm run typecheck` + `npm run build`；实测问「这周末是几号」应直接推算作答
+
+## v0.11.27 (2026-09-20) — searchWeb 主搜切换 Firecrawl /v2/search，SearXNG 降为兜底
+
+### 变更
+- **根因**：本地 SearXNG 抓取式引擎结构性不可靠——baidu/sogou 高频 CAPTCHA 且触发后引擎被挂起 1 小时（`suspended_time=3600`）、bing 恒 0 结果、google 实测 1-2 次后即 CAPTCHA，导致 general/news 搜索频繁全军覆没。
+- **`lib/firecrawl.js`**：新增 `searchWeb()`（POST /v2/search，2 credits/次）+ `normalizeFirecrawlSearch()`（拍平 `data.{web,news,images}` 为统一结果结构）；类别映射 general→web、news→news、images→images；`timeRange`→`tbs`(qdr:d/m/y，已实测生效)；`language` 不支持静默忽略；不支持的类别（videos/wechat）返回 null。
+- **`lib/search.js`**：编排改为 **Firecrawl 主搜 → SearXNG 兜底**（仅 page=1，Firecrawl 无分页）；videos/wechat 仍走 SearXNG；失败信息带双通道详情（`search_failed: firecrawl(…) | searxng(…)`，原 `searxng_search_failed` 废弃）；响应新增 `provider`(firecrawl/searxng)，主搜失败已兜底时 `degraded=true`；fetchContent 前 3 条抓正文逻辑不变。
+- **MCP `searchWeb` 工具描述**同步新链路；`packages/services/search/README.md` / `ARCHITECTURE.md` 类别映射表更新。
+
+### 验证
+- `test/normalize.test.js` 新增 Firecrawl normalizer 用例（6/6 过）；`test/live.test.js` 新增 /v2/search 真实用例
+- 重启 search-service 后 curl 实测 general/news/images 三类均走 firecrawl 返回结果
+
 ## v0.11.26 (2026-09-18) — 统一界面框规范：2px 轻框 + 阴影分级
 
 ### 变更

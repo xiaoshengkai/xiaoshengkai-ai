@@ -1,4 +1,5 @@
 // Firecrawl Cloud 适配
+// - searchWeb:    POST /v2/search（general/news/images 主搜）
 // - scrapeUrl:    POST /v2/scrape（含 parsers 解析 PDF/DOCX）
 // - mapWebsite:   POST /v2/map
 // - crawlWebsite: POST /v2/crawl + GET /v2/crawl/{id}（内部轮询）
@@ -37,6 +38,44 @@ export async function scrapeUrl(url, apiKey, { timeout = 30000 } = {}) {
     markdown: json.data?.markdown ?? "",
     metadata: json.data?.metadata ?? {},
   };
+}
+
+// 类别 → Firecrawl search sources（videos/wechat 无对应，返回 null 走 SearXNG）
+const SEARCH_SOURCES = { general: ["web"], news: ["news"], images: ["images"] };
+// timeRange → Google tbs 过滤（已实测 qdr:d 生效）
+const SEARCH_TBS = { day: "qdr:d", month: "qdr:m", year: "qdr:y" };
+
+// 拍平 data.{web,news,images} 为统一结果结构（与 normalizeResults 输出一致）
+export function normalizeFirecrawlSearch(data) {
+  const out = [];
+  for (const items of Object.values(data ?? {})) {
+    if (!Array.isArray(items)) continue;
+    for (const it of items) {
+      if (!it?.url || !it?.title) continue;
+      out.push({
+        title: it.title,
+        url: it.url,
+        snippet: (it.description ?? it.snippet ?? "").slice(0, 500),
+        engines: ["firecrawl"],
+        thumbnail: it.imageUrl ?? it.thumbnail ?? null,
+        publishedDate: it.date ?? null,
+      });
+    }
+  }
+  return out;
+}
+
+// Firecrawl /v2/search。返回 null 表示类别不支持（调用方走 SearXNG）
+export async function searchWeb(query, apiKey, { category = "general", timeRange, limit = 5, timeout = 30000 } = {}) {
+  const sources = SEARCH_SOURCES[category];
+  if (!sources) return null;
+  const body = { query, limit, sources };
+  if (SEARCH_TBS[timeRange]) body.tbs = SEARCH_TBS[timeRange];
+  const json = await firecrawl("/v2/search", apiKey, body, { timeout });
+  if (!json.success) {
+    throw new Error(`Firecrawl 搜索失败: ${JSON.stringify(json).slice(0, 300)}`);
+  }
+  return normalizeFirecrawlSearch(json.data);
 }
 
 // 解析在线 PDF 为 Markdown，复用 scrape 的 parsers（当前仅支持 pdf）

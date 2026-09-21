@@ -27,6 +27,8 @@
 - 基础组件用 shadcn/ui（Button、Input 等），不手写
 - 主题样式通过 CSS 变量 + `data-theme` 作用域，经 `@theme inline` 映射成 Tailwind 类
 - 所有 token 定义在 `globals.css` 的 `[data-theme="*"]` 块，无额外依赖
+- **品牌锁排**：「开」字旋转贴纸（`components/ui/logo.tsx`）+ 「小盛开AI」wordmark；竖排 mark+wordmark 用于 splash 场景（聊天空态、登录页），横排用于侧栏——贴纸字与 wordmark 的字面重复是品牌签名，不改
+- **登录页背景三层景深**：点阵网格底纹（radial-gradient 24px、前景色 14%、走 token）→ 出屏 soft 大色块（无边框无阴影，远景）→ 黑边旋转小贴纸（近景）；装饰元素 md 以下隐藏，登录页不透出会话时长等内部信息
 
 ## 架构流程
 
@@ -161,6 +163,13 @@ QWEN_CHAT_MODEL=qwen3.8-max
 CHROMA_SHARED_DB=shared
 CHROMA_CHAT_DB=chat
 CHROMA_CODE_DB=code
+
+# 登录鉴权（公网部署必需，见「登录鉴权决策」）
+AUTH_PASSWORD=xxx            # 登录密码；未配置时生产全拒、dev 放行
+AUTH_SECRET=xxx              # Cookie 签名密钥，openssl rand -hex 32
+AUTH_SESSION_DAYS=30         # 会话有效期（天）
+AUTH_MAX_FAILS=5             # 同 IP 连错锁定阈值（次）
+AUTH_LOCK_SECS=600           # 锁定时长（秒）
 ```
 
 `CHROMA_URL` 从 `config/network.json` 读（hosts.local + ports.chroma），`CHROMA_AUTO_START` 默认开启、无需配置。
@@ -314,7 +323,19 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 | 4 | `next/font/google` 构建时下载字体被墙 | 国内构建超时 | 改用本地 `@fontsource` 字体，移除 `Geist` 导入 |
 | 5 | `getOrCreateCollection` 误创建大量空 collection | 管理面板有大量垃圾表 | 已清理，后续 `getCollectionSafe` 不自动创建 |
 
+## 登录鉴权决策
+
+- **单密码，无用户名/用户表**：单人应用，账户体系是负资产。登录页只有密码框。
+- **无默认密码**：公网部署下默认密码等于没锁。`AUTH_PASSWORD` 未配置时生产 fail-closed（全拒 + 明确报错），dev 放行不打扰本地开发。
+- **不用 next-auth / session store**：HMAC 签名过期 token（`过期时间.密码指纹.签名`），无服务端状态；密码指纹掺入 token → 改密即踢掉所有旧会话（含丢失设备），这是无状态方案里最便宜的吊销手段。
+- **改密写 `data/auth.json`（hash），`.env` 只作初始兜底**：改密不碰 .env、不重启服务；auth.json 被 gitignore 的 `data/` 覆盖。
+- **不加 getCurrentTime 类鉴权旁路工具**；防爆破用进程内存计数（重启清零）——单机个人应用，多进程共享锁定属过度设计。
+- **CSP 不加**：与 Next 内联脚本冲突，维护成本高收益低；nosniff/DENY/Referrer-Policy/HSTS 已加。
+- **2FA/多用户/WAF**：YAGNI，需求出现再议。
+
 ## 生产部署
+
+**上线前置**：根 `.env` 必须配置 `AUTH_PASSWORD`（强密码——chat 背后是 exec 工具，密码即服务器）与 `AUTH_SECRET`（`openssl rand -hex 32`），否则生产环境全拒（fail-closed）。
 
 ```bash
 npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 博客 :4321 + Tailscale Funnel）
@@ -326,12 +347,13 @@ npm run log    # 查看实时日志
 
 | 服务 | 本地端口 | 公网地址 |
 |------|---------|---------|
-| AI 工作台 | 4567 | `https://node.tailddce43.ts.net:8443` |
-| 博客 | 4321 | `https://node.tailddce43.ts.net` |
+| AI 工作台 | 4567（仅回环） | `https://node.tailddce43.ts.net:8443`（经 funnel→proxy，需登录） |
+| 博客 | 4321（仅回环） | `https://node.tailddce43.ts.net`（公开） |
 | ChromaDB | 8000 | 仅本地 |
 
-端口 / host 集中在 `config/network.json`，改这里全局同步。
+端口 / host 集中在 `config/network.json`，改这里全局同步。next-server 与 proxy.cjs 只绑 127.0.0.1：公网流量一律经 tailscaled 本机转发，局域网不可直连。
 
 - 日志文件：见「日志规范」小节（`logs/{app,tasks,services,workflows}/` 按日轮转、倒序）
-- 博客静态文件：`site/`，由 `proxy.cjs` 直接 serve
+- 博客静态文件：`site/`，由 `proxy.cjs` 直接 serve（带路径穿越防护）
 - Tailscale Funnel 提供内网穿透，无需公网 IP
+- 定时任务推送里的 dashboard 链接：手机首次打开需登录（30 天 Cookie，之后无感）

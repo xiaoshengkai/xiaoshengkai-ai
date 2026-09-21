@@ -20,8 +20,8 @@ npm run typecheck
 # 重新构建
 npm run build
 
-# AI 工作台 (prodDirect)
-nohup env BUILD_DIR=.next-prod npm run start -w packages/ai-chat -- -p $PROD_DIRECT > /tmp/xiaosheng-ai.log 2>&1 &
+# AI 工作台 (prodDirect)——只绑回环，公网经 funnel→proxy.cjs 本机转发，局域网不可直连
+nohup env BUILD_DIR=.next-prod npm run start -w packages/ai-chat -- -p $PROD_DIRECT -H $LOCAL > /tmp/xiaosheng-ai.log 2>&1 &
 echo "AI 工作台已启动 → http://${LOCAL}:${PROD_DIRECT}"
 
 # 反向代理 (proxyPort)

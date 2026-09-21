@@ -14,4 +14,5 @@ node packages/tasks/scheduler.js &
 SCHEDULER_PID=$!
 
 trap "kill $SCHEDULER_PID $SEARXNG_PID $SEARCH_PID 2>/dev/null" EXIT
-npm run dev -w packages/ai-chat -- -p $DEV_PORT
+# 只绑回环：dev 未配置 AUTH_PASSWORD 时鉴权放行，不能暴露给局域网
+npm run dev -w packages/ai-chat -- -p $DEV_PORT -H 127.0.0.1

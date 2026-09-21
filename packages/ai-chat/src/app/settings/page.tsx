@@ -58,6 +58,8 @@ export default function SettingsPage() {
   const [serviceErrors, setServiceErrors] = useState<string[]>([]);
   const [serviceLoading, setServiceLoading] = useState(true);
   const [serviceAction, setServiceAction] = useState<string | null>(null);
+  const [pwdForm, setPwdForm] = useState({ oldPassword: "", newPassword: "", confirm: "" });
+  const [pwdBusy, setPwdBusy] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -122,6 +124,42 @@ export default function SettingsPage() {
       setServiceAction(null);
     }
   }, [loadServices]);
+
+  const handleChangePassword = useCallback(async () => {
+    if (pwdForm.newPassword !== pwdForm.confirm) {
+      toast("🔴 两次输入的新密码不一致");
+      return;
+    }
+    if (pwdForm.newPassword.length < 8) {
+      toast("🔴 新密码至少 8 位");
+      return;
+    }
+    setPwdBusy(true);
+    try {
+      const r = await fetch(`${BASE}/api/auth/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldPassword: pwdForm.oldPassword, newPassword: pwdForm.newPassword }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data.ok) {
+        toast("🟢 密码已修改，所有设备需重新登录");
+        router.replace("/login");
+        router.refresh();
+      } else {
+        toast(`🔴 ${data.error || `修改失败 (${r.status})`}`);
+      }
+    } catch (e) {
+      toast(`🔴 网络错误: ${e instanceof Error ? e.message : "未知错误"}`);
+    }
+    setPwdBusy(false);
+  }, [pwdForm, router]);
+
+  const handleLogout = useCallback(async () => {
+    await fetch(`${BASE}/api/auth/logout`, { method: "POST" }).catch(() => {});
+    router.replace("/login");
+    router.refresh();
+  }, [router]);
 
   const handleProviderChange = useCallback((id: string, config: unknown) => {
     setProviders((prev) => (prev ? { ...prev, [id]: config as Providers[string] } : prev));
@@ -297,6 +335,46 @@ export default function SettingsPage() {
           <ModuleSelector module="workflow" current={selection.workflow} onChange={handleSelectionChange} statusByProvider={status} />
           <ModuleSelector module="tts" current={selection.tts || { provider: "minimax", model: "speech-2.8-hd" }} onChange={handleSelectionChange} statusByProvider={status} />
           <ModuleSelector module="music" current={selection.music || { provider: "qwen", model: "fun-music-v1" }} onChange={handleSelectionChange} statusByProvider={status} />
+        </div>
+      </div>
+
+      {/* 密码管理 */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-foreground font-heading">🔐 密码管理</h2>
+          <button
+            onClick={handleLogout}
+            className="brutal-btn px-2 py-1 text-xs font-bold bg-pink-soft text-foreground"
+          >
+            退出登录
+          </button>
+        </div>
+        <div className="brutal bg-card p-4 max-w-md space-y-2 text-xs font-mono">
+          <div className="text-muted-foreground text-[10px] mb-2">修改密码后所有设备（含本机）需重新登录</div>
+          {([
+            ["oldPassword", "当前密码"],
+            ["newPassword", "新密码（≥8 位）"],
+            ["confirm", "确认新密码"],
+          ] as const).map(([field, label]) => (
+            <div key={field}>
+              <label className="text-muted-foreground block mb-0.5">{label}</label>
+              <input
+                type="password"
+                value={pwdForm[field]}
+                onChange={(e) => setPwdForm((p) => ({ ...p, [field]: e.target.value }))}
+                autoComplete={field === "oldPassword" ? "current-password" : "new-password"}
+                className="w-full px-2 py-1 border-2 border-border bg-card text-xs focus:outline-none focus:border-ring"
+                style={{ boxShadow: "var(--shadow-sm)" }}
+              />
+            </div>
+          ))}
+          <button
+            onClick={handleChangePassword}
+            disabled={pwdBusy || !pwdForm.oldPassword || !pwdForm.newPassword || !pwdForm.confirm}
+            className="brutal-btn px-3 py-1.5 text-xs font-bold bg-primary text-foreground disabled:opacity-40"
+          >
+            {pwdBusy ? "提交中..." : "修改密码"}
+          </button>
         </div>
       </div>
       </div>

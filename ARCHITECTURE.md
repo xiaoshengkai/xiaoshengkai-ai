@@ -40,7 +40,7 @@ ai-engineer-journey/
 ├── scripts/                    # 部署 / 运维脚本
 │   ├── prod.sh / dev.sh / stop.sh / log.sh
 │   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
-│   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai）
+│   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；只绑 127.0.0.1，静态服务带路径穿越防护）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs
 ├── data/                       # 运行时数据（chroma / tasks / settings / static / workflows）
 ├── logs/                       # 日志（app/ + tasks/ + services/ + workflows/）
@@ -49,10 +49,11 @@ ai-engineer-journey/
     ├── shared/                 # 跨包共享模块（@app/shared workspace 包，裸导入）
     │   ├── package.json        # name: @app/shared（private, type: module）
     │   ├── capability.js       # 通用能力 dispatcher（actions.json 4 原语）
+    │   ├── auth.js             # 登录鉴权：密码校验（data/auth.json 优先，.env 兜底）/ HMAC token 签发校验（含密码指纹）/ 防爆破计数
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir / withTimeout（网络调用硬超时兜底）
-    │   ├── test/               # 共享测试（capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store）
+    │   ├── test/               # 共享测试（auth / capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store）
     │   └── llm/                # LLM 共享封装
     │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
     │       ├── config.js       # providers.json / selection.json fresh-read（真源，env 兜底）
@@ -62,6 +63,7 @@ ai-engineer-journey/
     ├── ai-chat/                # 业务服务（Next.js，组合根）
     │   ├── src/
     │   │   ├── instrumentation.ts      # 启动时 initSettings + spawn chroma
+    │   │   ├── proxy.ts                # 全局鉴权卡口（Next 16 proxy，见「登录鉴权」）
     │   │   ├── lib/
     │   │   │   ├── core/        # LLM 基础设施：embedding / workflow-model / fetch-interceptors
     │   │   │   ├── strategies/  # chat 路由：chat-strategy + 4 provider strategy（deepseek/glm/minimax/qwen，classifyTask 在 deepseek.ts）
@@ -74,7 +76,8 @@ ai-engineer-journey/
     │   │   │   └── utils/       # utils(cn+BASE) / types / cost / env
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）
-    │   │       ├── api/         # chat / memory / settings / services / conversations ... + workflows、tasks 仅 catch-all 挂载点
+    │   │       ├── login/       # 登录页（(main) 组外，Neo-Brutalism 居中卡片）
+    │   │       ├── api/         # chat / memory / settings / services / conversations / auth(login·logout·change-password) ... + workflows、tasks 仅 catch-all 挂载点
     │   │       ├── note/[taskId]/page.tsx
     │   │       ├── preview/[taskId]/route.ts
     │   │       ├── settings/page.tsx
@@ -391,6 +394,26 @@ Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(q
 - Firecrawl key：根 `.env` 的 `FIRECRAWL_API_KEY`
 - 搜索失败语义：主搜+兜底均失败才报错（`search_failed: firecrawl(…) | searxng(…)`）；主搜失败已兜底或部分引擎失败返回 `degraded=true`；响应含 `provider`(firecrawl/searxng)
 - 正文抓取失败不丢弃搜索结果（`contentFetched=false` + `contentError`）
+
+## 登录鉴权
+
+公网部署（tailscale funnel）下的单密码鉴权，全部收口在 ai-chat 的 `src/proxy.ts`（Next 16 proxy，middleware 继任者，Node runtime）：
+
+```
+浏览器 → funnel(:443) → proxy.cjs(:4321, 仅回环) → next-server(:4567, 仅回环)
+                                                      └── proxy.ts 鉴权卡口（页面+API 全量）
+```
+
+- **模型**：单人应用，无用户名；生效密码 = `data/auth.json` 的 passwordHash（settings 页改密写入，gitignored）优先，根 `.env` `AUTH_PASSWORD` 兜底。
+- **token**：`过期时间.密码指纹8位.HMAC-SHA256(AUTH_SECRET)`，Cookie `ai_session`（httpOnly / SameSite=Lax / prod Secure / 30 天）。指纹掺入 → 改密后所有旧会话立即失效。
+- **卡口规则**（proxy.ts）：放行 `/login`、`/api/auth/*`（自带密码验证）、字体豁免路径（MCP document 工具经 Chrome 取 `/api/uploads/NotoSansCJKsc-Regular.otf`，字体加载带不了 Cookie，开源字体无泄漏风险）、`_next/*` 静态资源；未登录页面 307→login、API 401。
+- **fail-closed**：`AUTH_PASSWORD` 未配置时生产全拒（login 接口报 `auth_not_configured`）、dev 放行。
+- **防爆破**：login 与 change-password 共用内存计数，同 IP 连错 `AUTH_MAX_FAILS`(5) 次锁 `AUTH_LOCK_SECS`(600) 秒；重启进程清零。
+- **matcher 坑**：basePath 根路径 `/ai`（裸路径，无尾斜杠）只有 isRoot matcher `'/'` 能覆盖，普通 `'/((?!_next...).*)'` 前缀化后要求子路径，`/ai` 会被静态缓存直出绕过鉴权（Next 16 实测）。故 matcher = `['/', '/((?!_next/static|_next/image|favicon.ico).*)']`。
+- **绑定收紧**：next-server（prod/dev）与 proxy.cjs 均只绑 127.0.0.1——dev 未配密码时鉴权放行，不能暴露局域网；公网流量一律经 funnel→tailscaled 本机转发。
+- **安全响应头**（next.config.ts headers()）：nosniff / X-Frame-Options DENY / Referrer-Policy / HSTS；CSP 跳过（与 Next 内联脚本冲突）。
+
+涉及文件：`packages/shared/auth.js`（+ test/auth.test.js）、`ai-chat src/proxy.ts`、`api/auth/{login,logout,change-password}/route.ts`、`app/login/page.tsx`、settings 页「密码管理」区块、`scripts/proxy.cjs`、`scripts/{prod,dev}.sh`、根 `.env`（AUTH_*）。
 
 ## 服务监控系统
 

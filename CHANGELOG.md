@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.29 (2026-09-21) — 登录鉴权 + 上线安全加固
+
+### 变更
+- **登录鉴权（单密码，无用户名）**：`src/proxy.ts`（Next 16 proxy）全局卡口——未登录页面 307→`/ai/login`、API 401；放行 `/login`、`/api/auth/*`、字体豁免路径（MCP document 经 Chrome 取 CJK 字体，带不了 Cookie）、`_next/*`。Cookie `ai_session` = `过期时间.密码指纹.HMAC-SHA256`（httpOnly/SameSite=Lax/prod Secure/30 天），**改密后旧会话全部失效**。生产缺 `AUTH_PASSWORD` fail-closed，dev 放行。
+- **`packages/shared/auth.js`**：密码校验（`data/auth.json` hash 优先，`.env` 兜底）/ token 签发校验（timingSafeEqual）/ 防爆破（同 IP 连错 5 次锁 10 分钟，login 与 change-password 共用计数）。
+- **登录页** `/ai/login`：品牌化 Neo-Brutalism——「开」字 Logo 旋转贴纸 + text-3xl font-black tracking-widest 标题 + mono 微文案 ▸ + 糖果点行 + PASSWORD chip + 输入框 3px 外壳签名 + animate-in 入场；disabled 按钮灰底不洗白。背景三层景深：点阵网格底纹（radial-gradient 24px，前景色 14%）+ 出屏 soft 大色块（黄右上/蓝左下，无边框）+ 黑边旋转小贴纸×6 + 描边空贴纸×2（md 以下隐藏）。不透出会话时长等内部信息（无页脚）。settings「🔐 密码管理」区块：改密（验旧密码，新密码 ≥8 位，写 auth.json）+ 退出登录。
+- **🔴 proxy.cjs 路径穿越修复**：实测 `/../config/network.json` 可 200 读出任意文件（上线即泄漏 .env 全部密钥）；`path.resolve` 后强制校验在 `site/` 内。
+- **🟠 全绑 127.0.0.1**：next-server（prod.sh/dev.sh 加 `-H`）+ proxy.cjs（`listen(PORT, LOCAL)`）——此前全网卡监听，局域网可直连 dev（鉴权放行 + root 进程 + exec 工具 = 免费 shell）；公网流量一律经 funnel→tailscaled 本机转发。
+- **安全响应头**（next.config headers()）：nosniff / X-Frame-Options DENY / Referrer-Policy / HSTS；CSP 跳过（与 Next 内联脚本冲突）。
+- **matcher 坑（Next 16 实测）**：basePath 裸根 `/ai` 不被 `'/((?!_next...).*)'` 前缀化 regex 覆盖，静态缓存直出绕过鉴权；补 isRoot 条目 `'/'` 修复。
+- `.env`/`.env.example` 加 `AUTH_*` 5 项（密钥只进 gitignored 的 `.env`；`.env.production` 被 git 追踪，不放密钥）。
+
+### 验证
+- `test:shared` 新增 auth.test.js 5 用例（56 全绿）；typecheck + build 通过
+- E2E 实测：未登录 页面307/API401 ✓；错密码401、连错5次429锁定 ✓；登录种Cookie后 页面/API 200 ✓；改密→旧Cookie 401、新密码可登 ✓；登出 ✓；字体匿名200+CORS ✓；穿越404 ✓；4567/4321 仅回环 ✓；博客/转发正常 ✓
+
 ## v0.11.28 (2026-09-20) — 聊天 system prompt 注入当前时间
 
 ### 变更

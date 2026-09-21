@@ -35,7 +35,12 @@ function serveStatic(req, res) {
   let urlPath = req.url.replace(/^\//, '');
   try { urlPath = decodeURIComponent(urlPath); } catch {}
   if (!urlPath) urlPath = 'index.html';
-  let filePath = path.join(SITE_DIR, urlPath);
+  let filePath = path.resolve(SITE_DIR, urlPath);
+  // 防路径穿越：resolve 后必须仍在 site/ 内（否则 /../.env 可读出全部密钥）
+  if (filePath !== SITE_DIR && !filePath.startsWith(SITE_DIR + path.sep)) {
+    res.writeHead(404, { 'Content-Type': 'text/html' });
+    return res.end('<h1>404 Not Found</h1>');
+  }
   if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
     filePath = path.join(filePath, 'index.html');
   }
@@ -66,7 +71,8 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(PROXY_PORT, () => {
+// 只绑本机回环：公网流量一律经 tailscale funnel（tailscaled 本机转发），局域网不可直连
+server.listen(PROXY_PORT, LOCAL, () => {
   console.log(`代理已启动 → http://${LOCAL}:${PROXY_PORT}`);
   console.log('  /             → 博客 (site/)');
   console.log(`  /ai/ /note/ /preview/ /api/ → AI 工作台 (${LOCAL}:${PROD_DIRECT})`);

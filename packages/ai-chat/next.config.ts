@@ -18,6 +18,19 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   distDir: process.env.BUILD_DIR || '.next',
   basePath: process.env.NODE_ENV === 'production' ? '/ai' : '',
+
+  // 安全响应头（CSP 跳过：与 Next 内联脚本冲突，单人应用收益/成本差）
+  async headers() {
+    return [{
+      source: '/:path*',
+      headers: [
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'X-Frame-Options', value: 'DENY' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+      ],
+    }];
+  },
   /**
    * 服务端外部化依赖:不参与 webpack 打包,运行时由 Node 直接 require。
    *

@@ -2,7 +2,11 @@ import cron from "node-cron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { config as dotenvConfig } from "dotenv";
 import { createDateLogger } from "@app/shared/logger.js";
+
+// 任务子进程继承本进程 env；DEPLOY_TARGET 等 .env 变量需在此加载（publicBase 依赖）
+dotenvConfig({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", ".env") });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TASKS_DIR = path.join(__dirname, "tasks");

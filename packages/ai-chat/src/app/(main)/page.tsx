@@ -60,6 +60,7 @@ export default function ChatPage() {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const atBottomRef = useRef(true);
   const [compressState, setCompressState] = useState<"idle" | "loading">("idle");
+  const [loadingConv, setLoadingConv] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -128,6 +129,7 @@ export default function ChatPage() {
       console.log("[scroll-debug] 切换对话:", activeConversationId, "| isAtBottom:", isAtBottom, "| atBottomRef:", atBottomRef.current);
       stop(); // 中断AI回答
       if (activeConversationId && !newIdsRef.current.has(activeConversationId)) {
+        setLoadingConv(true);
         try {
           const res = await fetch(`${BASE}/api/conversations/getDetail?id=${activeConversationId}`);
           if (res.ok) {
@@ -141,6 +143,9 @@ export default function ChatPage() {
             return;
           }
         } catch { /* ignore */ }
+        finally {
+          setLoadingConv(false);
+        }
       }
       // 新对话
       setMessages([]);
@@ -345,7 +350,15 @@ export default function ChatPage() {
               </div>
             )}
             components={{
-              EmptyPlaceholder: () => <EmptyState />,
+              EmptyPlaceholder: () =>
+                loadingConv ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <LoadingDots />
+                    <p className="text-xs text-muted-foreground font-mono">加载对话中...</p>
+                  </div>
+                ) : (
+                  <EmptyState />
+                ),
               Footer: () => (
                 <>
                   {showFooter && (

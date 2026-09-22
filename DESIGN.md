@@ -338,13 +338,17 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 
 **上线前置**：根 `.env` 必须配置 `AUTH_PASSWORD`（强密码——chat 背后是 exec 工具，密码即服务器）与 `AUTH_SECRET`（`openssl rand -hex 32`），否则生产环境全拒（fail-closed）。
 
+**发版 = `scripts/deploy.sh`（Mac 侧，永远 master）**：push（非致命）→ 服务器脏检查/分支=master 校验 → `timeout 90 git pull --ff-only origin master`，失败自动切 git bundle 兜底（CN 网络 github 抽风免疫）→ 分离启动 prod.sh → 轮询 `/tmp/prod-last-status`（prod.sh EXIT trap 写退出码+ts）≤25min → Mac 公网冒烟五连（超时也冒烟兜底判断）。并发锁防双开。**回滚 = Mac `git revert <sha>` 后重跑 deploy.sh**（服务器永远 ff 前进，无强 reset）。无新提交时直接重跑 prod.sh。
+
+**机器相关配置全在 `.env`（gitignored）**：`DEPLOY_TARGET=root@<ip>`（换服务器改这一行）、`DEPLOY_PATH`、可选 `PUBLIC_PORT/PUBLIC_BASE`；`network.json` 只留架构性端口/hosts.local，per-server 差异零 git diff。
+
 ```bash
 npm run prod   # 体检 → 门禁(test/typecheck/build) → stop → start → 暴露自适应 → 启动后自检
 npm run stop   # 停止全部服务 + 关闭内网穿透（无 lsof 环境自动退化 pkill）
 npm run log    # 查看实时日志
 ```
 
-**prod.sh 前置体检**（新机/更新通用）：node≥20、.env 存在且 AUTH_* 齐（硬失败给可执行提示）、占位密码警告、node_modules 缺失自动 `npm install`、ffmpeg/pandoc/xz/chrome 缺失软警告。**门禁先于 stop**：更新失败时旧版本继续服务，不人为停站。
+**prod.sh 前置体检**（新机/更新通用）：node≥22（puppeteer engines）、.env 存在且 AUTH_* 齐（硬失败给可执行提示）、占位密码警告、node_modules 缺失自动 `npm install`、ffmpeg/pandoc/xz/chrome 缺失软警告。**门禁先于 stop**：更新失败时旧版本继续服务，不人为停站。
 
 **依赖自动安装分级**：只自动装免 sudo、自包含的——Chrome 走 `npx puppeteer browsers install chrome`；ffmpeg/pandoc 仅 linux-x64 自动下载静态二进制进 `data/bin/`（gitignored，prod.sh 注入 PATH，子服务自动可见，钉死下载 URL 防漂移）；需系统包管理器的一律警告+给命令（mac 走 brew）。下载失败不拦部署，功能用时才报错。
 

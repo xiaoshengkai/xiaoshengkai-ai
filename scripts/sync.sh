@@ -12,13 +12,9 @@
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+source "$ROOT/scripts/deploy-common.sh"
+resolve_deploy_env
 
-read_config() { node -e "console.log(require('./config/network.json').$1)"; }
-DEPLOY_HOST=${DEPLOY_TARGET:-$(read_config deploy.host)}
-DEPLOY_PATH=${DEPLOY_PATH:-$(read_config deploy.path)}
-DEPLOY_PORT=$(read_config deploy.port)
-SSH="ssh -o BatchMode=yes -p $DEPLOY_PORT $DEPLOY_HOST"
-RSYNC_E="ssh -o BatchMode=yes -p $DEPLOY_PORT"
 BACKUP_DIR="$ROOT/data-backup"
 STATUS_FILE="$BACKUP_DIR/.backup-status.json"
 LOCK_DIR="$BACKUP_DIR/.lock"

@@ -36,10 +36,79 @@ export function readConversation(id: string): ConversationRecord | null {
   return JSON.parse(readFileSync(p, "utf-8"));
 }
 
+// ── tool output 裁剪（getDetail 响应瘦身）与还原（save 时无损合并） ──
+// UI 对 tool parts 只渲染 [toolName] 标签，output 从不显示（小红书预览卡例外，保留完整）；
+// 裁剪仅作用于响应传输，存储保持完整；带 __trimmed 标记的 part 在 writeConversation 时
+// 按 toolCallId 从存储换回完整 output，杜绝「加载后再保存丢失原始数据」。
+const TRIM_LIMIT = 200;
+
+interface ToolPart {
+  type?: string;
+  toolCallId?: string;
+  toolName?: string;
+  state?: string;
+  output?: string;
+  __trimmed?: boolean;
+  [k: string]: unknown;
+}
+
+function isXhsCardPart(p: ToolPart): boolean {
+  if (p.toolName !== "generateXiaohongshuNote" || p.state !== "result" || typeof p.output !== "string") return false;
+  try {
+    const o = JSON.parse(p.output);
+    return !!(o && o.ok && o.taskId);
+  } catch {
+    return false;
+  }
+}
+
+export function trimToolOutputs(record: ConversationRecord): ConversationRecord {
+  const messages = (record.messages as { parts?: ToolPart[] }[] | undefined)?.map((m) => {
+    if (!m?.parts) return m;
+    const parts = m.parts.map((p) => {
+      if (
+        p?.type === "dynamic-tool" &&
+        p.state === "output-available" &&
+        typeof p.output === "string" &&
+        p.output.length > TRIM_LIMIT &&
+        !isXhsCardPart(p)
+      ) {
+        return { ...p, output: p.output.slice(0, TRIM_LIMIT) + "…(已截断,完整内容见存储)", __trimmed: true };
+      }
+      return p;
+    });
+    return { ...m, parts };
+  });
+  return { ...record, messages: messages ?? record.messages };
+}
+
+function restoreTrimmedOutputs(incoming: unknown[], stored: unknown[]): unknown[] {
+  const byCall = new Map<string, string>();
+  for (const m of (stored as { parts?: ToolPart[] }[]) || []) {
+    for (const p of m?.parts || []) {
+      if (p?.type === "dynamic-tool" && p.toolCallId && typeof p.output === "string") byCall.set(p.toolCallId, p.output);
+    }
+  }
+  if (byCall.size === 0) return incoming;
+  return (incoming as { parts?: ToolPart[] }[]).map((m) => {
+    if (!m?.parts) return m;
+    const parts = m.parts.map((p) => {
+      if (p?.__trimmed && p.toolCallId && byCall.has(p.toolCallId)) {
+        const { __trimmed: _drop, ...rest } = p;
+        return { ...rest, output: byCall.get(p.toolCallId) };
+      }
+      return p;
+    });
+    return { ...m, parts };
+  });
+}
+
 export function writeConversation(id: string, title: string, messages: unknown[], model?: string, mode?: string): ConversationRecord {
   ensureDir();
   const p = filePath(id);
   const existing = existsSync(p) ? JSON.parse(readFileSync(p, "utf-8")) : null;
+  // 无损合并：客户端带 __trimmed 标记的 tool part 换回存储里的完整 output
+  const merged = existing ? restoreTrimmedOutputs(messages, existing.messages) : messages;
   const record: ConversationRecord = {
     id,
     title: existing?.titleLocked ? existing.title : (title || "未命名对话"),
@@ -49,7 +118,7 @@ export function writeConversation(id: string, title: string, messages: unknown[]
     titleLocked: existing?.titleLocked ?? false,
     model: model || "deepseek",
     mode: mode || existing?.mode || "chat",
-    messages,
+    messages: merged,
   };
   writeFileSync(p, JSON.stringify(record, null, 2));
   return record;

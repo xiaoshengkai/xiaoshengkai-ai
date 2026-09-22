@@ -1,13 +1,16 @@
 #!/bin/bash
 set -e
 
+# deploy.sh 轮询用：退出码+UTC 时间戳
+trap 'echo "$? $(date -u +%FT%TZ)" > /tmp/prod-last-status' EXIT
+
 export BUILD_DIR=.next-prod
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # 读取网络配置（统一真相源 config/network.json）
 read_config() { node -e "console.log(require('./config/network.json').$1)"; }
+source "$(cd "$(dirname "$0")" && pwd)/deploy-common.sh"
 LOCAL=$(read_config "hosts.local")
-PUBLIC=$(read_config "hosts.public")
 PROD_DIRECT=$(read_config "ports.aiChat.prodDirect")
 PROXY_PORT=$(read_config "ports.aiChat.prodProxy")
 SEARCH_PORT=$(read_config "ports.searchService")
@@ -15,7 +18,7 @@ SEARCH_PORT=$(read_config "ports.searchService")
 # ── 0. 前置体检（新机/更新通用；硬失败给可执行提示，软缺失仅警告） ──
 command -v node >/dev/null 2>&1 || { echo "❌ 缺 node：先装 Node.js >= 20"; exit 1; }
 NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")
-[ "$NODE_MAJOR" -ge 20 ] || { echo "❌ 需 Node >= 20（Next 16），当前 $(node -v)"; exit 1; }
+[ "$NODE_MAJOR" -ge 22 ] || { echo "❌ 需 Node >= 22（puppeteer 要求 >=22.12），当前 $(node -v)"; exit 1; }
 
 [ -f .env ] || { echo "❌ 缺 .env：cp .env.example .env 并填齐密钥（公网部署 AUTH_PASSWORD/AUTH_SECRET 必需）"; exit 1; }
 grep -q "^AUTH_PASSWORD=.\{8,\}" .env || { echo "❌ .env 缺 AUTH_PASSWORD（≥8 位）"; exit 1; }
@@ -95,7 +98,7 @@ echo '搜索编排服务已启动'
 
 # ── 5. 公网暴露：tailscale 在跑走 funnel，否则直连部署 ──
 # 公网基址推导（与 @app/shared/public-base.js 同规则）：IP→http://IP:PROXY_PORT，域名→https://
-if [[ "$PUBLIC" =~ ^[0-9]+\.[0-9]+ ]]; then PUBLIC_URL="http://${PUBLIC}:${PROXY_PORT}"; else PUBLIC_URL="https://${PUBLIC}"; fi
+PUBLIC_URL=$(public_url)
 if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
   tailscale funnel --bg --https=443 $PROXY_PORT
   echo '内网穿透已启动'

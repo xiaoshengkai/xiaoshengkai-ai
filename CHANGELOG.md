@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.34 (2026-09-22) — getDetail 8.77s 优化 + Loading 态 + 部署 env 化 + deploy.sh
+
+### 变更
+- **getDetail 优化**（实测：服务端 0.15s，瓶颈=3.3MB 明文传输，App Router 不自动 gzip）：① tool output 响应裁剪（`dynamic-tool` 且 output>200 字截断+`__trimmed` 标记；小红书预览卡 taskId 例外保留；UI 对 tool parts 只渲染 `[toolName]` 标签，可见内容零变化）；② 手动 gzip 响应（accept-encoding 检测）。3.3MB→~550KB raw→~150KB 传输。
+- **存储无损保证**：`writeConversation` 按 toolCallId 把 `__trimmed` part 换回存储完整 output——「加载后再保存丢原始数据」路径堵死（save 路由零改动，合并内置 store）。
+- **Loading 态**：切换对话 fetch 期间 Virtuoso EmptyPlaceholder 渲染 LoadingDots+「加载对话中...」，修掉加载期闪「PRESS ENTER TO CHAT」。
+- **部署 env 化**：`.env` 新增 `DEPLOY_TARGET/DEPLOY_PATH`（换服务器改一行）；`network.json` 删除 `deploy` 块与 `hosts.public`（per-server 差异零 git diff）；`publicBase()` 改 DEPLOY_TARGET 推导链；sync.sh/prod.sh 经 `deploy-common.sh` 单源解析；scheduler.js 补 dotenv（任务子进程 publicBase 依赖）。
+- **`scripts/deploy.sh`（新）**：永远 master；push（非致命）→ 服务器脏检查/分支校验 → `timeout 90 pull origin` 失败自动 bundle 兜底 → 分离启动 prod.sh → 轮询 `/tmp/prod-last-status`（prod.sh EXIT trap）≤25min → 公网冒烟五连（超时也冒烟兜底）；并发锁；回滚=git revert+重跑（无强 reset）。
+- **node 门槛 20→22**（puppeteer engines >=22.12；服务器升级 node 22 静态包）。
+
+### 验证
+- loopback getDetail size/时间 + gzip header；公网复测 8.77s→<2s；UI 截图 Loading+加载后渲染
+- deploy.sh 真跑全流程（含 bundle 兜底演练）+ 冒烟五连绿
+
 ## v0.11.33 (2026-09-22) — 公网地址去硬编码 + site 主从翻转 + 备份 30min + headless 任务修复
 
 ### 变更

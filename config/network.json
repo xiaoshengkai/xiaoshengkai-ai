@@ -1,7 +1,6 @@
 {
   "hosts": {
-    "local": "127.0.0.1",
-    "public": "118.89.25.12"
+    "local": "127.0.0.1"
   },
   "ports": {
     "aiChat": {
@@ -12,10 +11,5 @@
     "chroma": 8000,
     "searxng": 8080,
     "searchService": 8090
-  },
-  "deploy": {
-    "host": "root@118.89.25.12",
-    "path": "/root/xiaoshengkai-ai",
-    "port": 22
   }
 }

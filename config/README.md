@@ -18,7 +18,7 @@
 {
   "hosts": {
     "local": "127.0.0.1",                 // 本机地址，dev/prod 都用它
-    "public": "118.89.25.12"            // 公网地址：IP→http://IP:prodProxy / 域名→https://域名（publicBase() 推导，PUBLIC_BASE 可覆盖）
+    // 公网地址不再存这里：见 .env 的 DEPLOY_TARGET/PUBLIC_BASE（publicBase() 推导）
   },
   "ports": {
     "aiChat": {
@@ -30,10 +30,5 @@
     "searxng": 8080           // 本地 SearXNG 搜索服务端口
     "searchService": 8090     // 搜索编排服务（Node）端口
   },
-  "deploy": {
-    "host": "root@118.89.25.12",   // 云服务器 ssh 目标（scripts/sync.sh 消费者）
-    "path": "/root/xiaoshengkai-ai", // 远程仓库路径
-    "port": 22
-  }
 }
 ```

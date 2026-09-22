@@ -53,13 +53,17 @@ interface ToolPart {
 }
 
 function isXhsCardPart(p: ToolPart): boolean {
-  if (p.toolName !== "generateXiaohongshuNote" || p.state !== "result" || typeof p.output !== "string") return false;
+  if (p.toolName !== "generateXiaohongshuNote" || p.state !== "result" || p.output == null) return false;
   try {
-    const o = JSON.parse(p.output);
+    const o = typeof p.output === "string" ? JSON.parse(p.output) : p.output;
     return !!(o && o.ok && o.taskId);
   } catch {
     return false;
   }
+}
+
+function serializedOutput(p: ToolPart): string {
+  return typeof p.output === "string" ? p.output : JSON.stringify(p.output);
 }
 
 export function trimToolOutputs(record: ConversationRecord): ConversationRecord {
@@ -69,11 +73,14 @@ export function trimToolOutputs(record: ConversationRecord): ConversationRecord 
       if (
         p?.type === "dynamic-tool" &&
         p.state === "output-available" &&
-        typeof p.output === "string" &&
-        p.output.length > TRIM_LIMIT &&
+        p.output != null &&
+        serializedOutput(p).length > TRIM_LIMIT &&
         !isXhsCardPart(p)
       ) {
-        return { ...p, output: p.output.slice(0, TRIM_LIMIT) + "…(已截断,完整内容见存储)", __trimmed: true };
+        const trimmedPart: ToolPart = { ...p, __trimmed: true };
+        if (p.output != null) trimmedPart.output = serializedOutput(p).slice(0, TRIM_LIMIT) + "…(已截断,完整内容见存储)";
+        if (p.input != null) trimmedPart.input = JSON.stringify(p.input).slice(0, TRIM_LIMIT);
+        return trimmedPart;
       }
       return p;
     });
@@ -83,19 +90,20 @@ export function trimToolOutputs(record: ConversationRecord): ConversationRecord 
 }
 
 function restoreTrimmedOutputs(incoming: unknown[], stored: unknown[]): unknown[] {
-  const byCall = new Map<string, string>();
+  const byCall = new Map<string, ToolPart>();
   for (const m of (stored as { parts?: ToolPart[] }[]) || []) {
     for (const p of m?.parts || []) {
-      if (p?.type === "dynamic-tool" && p.toolCallId && typeof p.output === "string") byCall.set(p.toolCallId, p.output);
+      if (p?.type === "dynamic-tool" && p.toolCallId) byCall.set(p.toolCallId, p);
     }
   }
   if (byCall.size === 0) return incoming;
   return (incoming as { parts?: ToolPart[] }[]).map((m) => {
     if (!m?.parts) return m;
     const parts = m.parts.map((p) => {
-      if (p?.__trimmed && p.toolCallId && byCall.has(p.toolCallId)) {
+      const storedPart = p?.__trimmed && p.toolCallId ? byCall.get(p.toolCallId) : undefined;
+      if (storedPart) {
         const { __trimmed: _drop, ...rest } = p;
-        return { ...rest, output: byCall.get(p.toolCallId) };
+        return { ...rest, output: storedPart.output, input: storedPart.input };
       }
       return p;
     });

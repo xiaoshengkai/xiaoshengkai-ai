@@ -41,19 +41,19 @@ mkdir -p "$ROOT/data/bin"
 export PATH="$ROOT/data/bin:$PATH"
 if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
   if ! command -v ffmpeg >/dev/null 2>&1; then
-    echo "── 自动下载 ffmpeg 静态版 ──"
-    curl -fsSL -o /tmp/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz \
-      && tar -xf /tmp/ffmpeg.tar.xz -C /tmp \
-      && cp /tmp/ffmpeg-*-amd64-static/ffmpeg "$ROOT/data/bin/" && chmod +x "$ROOT/data/bin/ffmpeg" \
-      || echo "⚠️  ffmpeg 自动下载失败：手动 apt install ffmpeg"
-    rm -f /tmp/ffmpeg.tar.xz
+    echo "── 自动下载 ffmpeg 静态版（npmmirror 优先，BtbN 兜底）──"
+    { curl -fsSL --connect-timeout 10 --max-time 300 -o /tmp/ff.gz https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.1.1/ffmpeg-linux-x64.gz \
+      || curl -fsSL --connect-timeout 10 --max-time 600 -o /tmp/ff.gz https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-linux-x64.gz; } \
+      && gunzip -f /tmp/ff.gz && mv /tmp/ff "$ROOT/data/bin/ffmpeg" && chmod +x "$ROOT/data/bin/ffmpeg" \
+      || echo "⚠️  ffmpeg 自动下载失败：手动装（或本机代下 scp 后放 data/bin/）"
+    rm -f /tmp/ff.gz
   fi
-  if ! command -v pandoc >/dev/null 2>&1; then
+  if ! command -v pandoc >/dev/null 2>&1 && [ ! -f "$ROOT/data/bin/.pandoc-failed" ]; then
     echo "── 自动下载 pandoc 静态版 ──"
-    curl -fsSL -o /tmp/pandoc.tar.gz https://github.com/jgm/pandoc/releases/download/3.6.4/pandoc-3.6.4-linux-amd64.tar.gz \
+    curl -fsSL --connect-timeout 10 --max-time 300 -o /tmp/pandoc.tar.gz https://github.com/jgm/pandoc/releases/download/3.6.4/pandoc-3.6.4-linux-amd64.tar.gz \
       && tar -xzf /tmp/pandoc.tar.gz -C /tmp \
       && cp /tmp/pandoc-3.6.4/bin/pandoc "$ROOT/data/bin/" && chmod +x "$ROOT/data/bin/pandoc" \
-      || echo "⚠️  pandoc 自动下载失败：手动 apt install pandoc"
+      || { echo "⚠️  pandoc 自动下载失败：文档转换功能降级（删 data/bin/.pandoc-failed 可重试）"; touch "$ROOT/data/bin/.pandoc-failed"; }
     rm -f /tmp/pandoc.tar.gz
   fi
 else
@@ -71,6 +71,8 @@ npm run build
 npm run stop
 
 # ── 4. 启动 ──
+# 系统 chroma CLI 显式导出：遮蔽 node_modules/.bin 里的 node 版（老 glibc 服务器 dlopen 失败）
+export CHROMA_CLI=$(command -v chroma || echo chroma)
 # AI 工作台 (prodDirect，仅回环；公网流量经 proxy 进入)
 nohup env BUILD_DIR=.next-prod npm run start -w packages/ai-chat -- -p $PROD_DIRECT -H $LOCAL > /tmp/xiaosheng-ai.log 2>&1 &
 echo "AI 工作台已启动 → http://${LOCAL}:${PROD_DIRECT}"

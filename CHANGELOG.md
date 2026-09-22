@@ -10,7 +10,8 @@
   - `install-cron`/`uninstall-cron`：mac 装 LaunchDaemon（6h 间隔+RunAtLoad 首跑+wake 补跑，日志 logs/backup.log；root=system 域/非 root=gui 域自适应），linux 打印 cron 行
   - `harden`：sshd 关密码门（`PasswordAuthentication no`+`PermitRootLogin prohibit-password`，**90s 自动回滚保险**：复验失败自动还原配置）+ fail2ban（源缺失自动降级警告）+ `ss -tlnp` 监听审计
 - **ssh 吞 stdin 坑修复**：脚本内非 heredoc 的 ssh 调用全加 `</dev/null`（否则管道输入被 ssh 当远程 stdin 吃掉，`read` 提示符后静默退出）
-- **服务器一次性 setup**（手工经 ssh）：2G swapfile（1.6G 内存防 build OOM）、停禁用腾讯云自带 `myapp.service`（0.0.0.0:80 公网暴露面）；fail2ban 在 OpenCloudOS 9 源缺失接受降级（密码门已关，暴破无效）
+- **服务器一次性 setup**（手工经 ssh）：2G swapfile（1.6G 内存防 build OOM）、停禁用腾讯云自带 `myapp.service`（0.0.0.0:80 公网暴露面）；fail2ban 在 OpenCloudOS 9 源缺失接受降级（密码门已关，暴破无效）；chroma 用 pip 1.3.5（glibc 2.38 < 1.4.4 绑定要求的 2.39），知识库经 base64 float32 JSON 跨版本迁移（22 集合/2978 向量/向量查询 top1 验证）；onnxruntime 空 cuda 标记跳 GPU 包下载；puppeteer chrome 手放缓存；ffmpeg 走 npmmirror 镜像（prod.sh 固化）；pandoc 标记降级
+- **`chroma-server.ts` 支持 `CHROMA_CLI` 环境变量**：npm run start 的 `node_modules/.bin/chroma`（node 版）遮蔽系统 python CLI 导致老 glibc 服务器 dlopen 失败；prod.sh 导出系统 CLI 路径
 - `config/network.json` 新增 `deploy { host, path, port }` 块 + config/README 同步；`.gitignore` 加 `data-backup/`
 
 ### 验证

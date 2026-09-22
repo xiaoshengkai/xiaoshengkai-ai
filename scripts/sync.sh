@@ -101,6 +101,10 @@ install_plist() { # $1 = plist 路径
     <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
   </array>
   <key>RunAtLoad</key><true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>$PATH</string>
+  </dict>
   <key>StandardOutPath</key><string>$ROOT/logs/backup.log</string>
   <key>StandardErrorPath</key><string>$ROOT/logs/backup.log</string>
 </dict>

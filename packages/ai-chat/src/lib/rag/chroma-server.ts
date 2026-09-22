@@ -51,7 +51,10 @@ const CHROMA_DATA_DIR = "chroma";
 const AUTO_START_ENV = "CHROMA_AUTO_START";
 
 /** Chroma CLI 命令名(由 `uv tool install chromadb` 安装到 PATH)。 */
-const CHROMA_CLI = "chroma";
+// CHROMA_CLI 可显式指定：npm run start/dev 会把 node_modules/.bin 注入 PATH，
+// 其中 chromadb 包自带的 node 版 chroma 会遮蔽系统 python CLI（其 linux 绑定要求 glibc≥2.39，
+// 老 glibc 服务器 dlopen 失败）。prod.sh 导出 CHROMA_CLI=$(command -v chroma) 指向系统 CLI。
+const CHROMA_CLI = process.env.CHROMA_CLI || "chroma";
 
 /**
  * Chroma healthcheck 端点(Chroma 1.x 升级为 v2 API)。

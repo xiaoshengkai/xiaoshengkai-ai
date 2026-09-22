@@ -382,3 +382,13 @@ scripts/sync.sh harden         # 服务器加固（见下）
 - **备份缺口语义**：Mac 睡眠/关机期间不备份；要服务器侧快照再说（YAGNI）。
 - **服务器加固**（`sync.sh harden`，已跑）：sshd `PasswordAuthentication no` + `PermitRootLogin prohibit-password`（带 90s 自动回滚保险）；fail2ban 在 OpenCloudOS 9 源缺失→降级接受（密码门已关，暴破无效）；停禁用腾讯云自带 myapp.service（原 0.0.0.0:80 暴露）；2G swapfile 防 1.6G 内存 build OOM。上线后建议改一次密码（曾明文出现于对话）。
 - **腾讯云安全组（手工）**：放行 22/4321，其余关闭；控制台 VNC 是 sshd 配置失误时的应急通道。
+
+### 服务器首跑实测坑（OpenCloudOS 9.2 / 1.6G / glibc 2.38，v0.11.32）
+
+- **glibc 2.38 < 2.39**：chromadb pip 1.4.4 与 chromadb npm 的 node 绑定 dlopen 失败 → 服务器 chroma 用 **pip 1.3.5**（纯 python CLI）；知识库经「Mac 1.4.4 导出 base64 float32 JSON → 服务器 1.3.5 导入」迁移（多 database：shared/chat/code；一次性脚本用完即删）。
+- **npm .bin 遮蔽**：`npm run start` 的 PATH 含 `node_modules/.bin/chroma`（node 版，glibc 炸）遮蔽系统 python CLI → `chroma-server.ts` 支持 `CHROMA_CLI` 环境变量覆盖，prod.sh 导出 `CHROMA_CLI=$(command -v chroma)`。
+- **1.6G 内存**：2G swapfile 防 build OOM；onnxruntime-node postinstall 无 CUDA 时误下 GPU tgz（数 GB）→ 安装期 `npm_config_onnxruntime_node_install_cuda=skip` + 空 `libonnxruntime_providers_cuda.so` 标记跳过（CPU EP 不加载该文件）；包自带 linux .so 与 .node 绑定，无需手放。
+- **puppeteer**：install.mjs 下载器在服务器 stall（32M 死锁，直连 curl 12MB/s 正常）→ 直连 curl 下载 zip 手放 `/root/.cache/puppeteer/chrome/linux-<ver>/`。
+- **ffmpeg**：johnvansickle 与 GitHub 大文件国内外均慢 → prod.sh 改 npmmirror `ffmpeg-static` 镜像优先（服务器 12MB/s）；pandoc 无可用源 → `data/bin/.pandoc-failed` 标记降级（文档转换功能服务器不可用）。
+- **腾讯云自带 `myapp.service`** 占 0.0.0.0:80 公网暴露 → 已 disable --now。
+- **ssh 脚本坑**：远程后台任务用 `setsid nohup ... &` 仍可能吊住 ssh 会话（本工具环境）；kill 远程进程的 pgrep pattern 不得与同条命令后续字串自匹配（`prod[.]sh` 括号法 + kill/launch 拆两次调用）。

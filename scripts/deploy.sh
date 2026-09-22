@@ -33,7 +33,7 @@ git push origin master 2>/dev/null && echo "── push origin ✓" || echo "⚠
 
 # 3 服务器状态检查
 SERVER_SHA=$($SSH 'cd '"$DEPLOY_PATH"' && git rev-parse HEAD' </dev/null)
-DIRTY=$($SSH 'cd '"$DEPLOY_PATH"' && git status --porcelain | head -5' </dev/null)
+DIRTY=$($SSH 'cd '"$DEPLOY_PATH"' && git status --porcelain --untracked-files=no | head -5' </dev/null)
 if [ -n "$DIRTY" ]; then
   echo "❌ 服务器工作区脏，中止（人工处理）："; echo "$DIRTY"; exit 1
 fi

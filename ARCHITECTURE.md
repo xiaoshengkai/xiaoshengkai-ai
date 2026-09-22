@@ -39,7 +39,9 @@ ai-engineer-journey/
 │   └── README.md               # 字段 + 消费者清单
 ├── scripts/                    # 部署 / 运维脚本
 │   ├── prod.sh / dev.sh / stop.sh / log.sh   # prod.sh：体检→门禁→stop→start→暴露自适应→自检（见「生产部署」）
-│   ├── sync.sh               # 部署同步：env / migrate-data / backup / install-cron / uninstall-cron / harden（目标读 network.json deploy 块）
+│   ├── deploy.sh             # Mac 侧发版编排（npm run deploy）：永远 master，pull origin 90s 超时→bundle 兜底→prod.sh→状态轮询→公网冒烟五连
+│   ├── deploy-common.sh      # deploy/sync/prod 共享解析：DEPLOY_TARGET/DEPLOY_PATH（env>.env）+ public_url 单源
+│   ├── sync.sh               # 部署同步：env / site(server→Mac 镜像) / site-push / migrate-data / backup(30min) / install-cron / uninstall-cron / harden
 │   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
 │   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；默认回环、PROXY_BIND 可放开；静态服务带路径穿越防护）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs
@@ -398,10 +400,11 @@ Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(q
 
 ## 登录鉴权
 
-公网部署（tailscale funnel）下的单密码鉴权，全部收口在 ai-chat 的 `src/proxy.ts`（Next 16 proxy，middleware 继任者，Node runtime）：
+公网部署（云服务器直连为主，tailscale funnel 为可选备选）下的单密码鉴权，全部收口在 ai-chat 的 `src/proxy.ts`（Next 16 proxy，middleware 继任者，Node runtime）：
 
 ```
-浏览器 → funnel(:443) → proxy.cjs(:4321, 仅回环) → next-server(:4567, 仅回环)
+浏览器 → 公网IP:4321 → proxy.cjs(0.0.0.0:4321) → next-server(:4567, 仅回环)
+（其余服务 chroma/searxng/search 恒回环；funnel 备选路径：funnel(:443) → tailscaled 本机转发 → proxy.cjs）
                                                       └── proxy.ts 鉴权卡口（页面+API 全量）
 ```
 
@@ -411,7 +414,7 @@ Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(q
 - **fail-closed**：`AUTH_PASSWORD` 未配置时生产全拒（login 接口报 `auth_not_configured`）、dev 放行。
 - **防爆破**：login 与 change-password 共用内存计数，同 IP 连错 `AUTH_MAX_FAILS`(5) 次锁 `AUTH_LOCK_SECS`(600) 秒；重启进程清零。
 - **matcher 坑**：basePath 根路径 `/ai`（裸路径，无尾斜杠）只有 isRoot matcher `'/'` 能覆盖，普通 `'/((?!_next...).*)'` 前缀化后要求子路径，`/ai` 会被静态缓存直出绕过鉴权（Next 16 实测）。故 matcher = `['/', '/((?!_next/static|_next/image|favicon.ico).*)']`。
-- **绑定收紧**：next-server（prod/dev）与 proxy.cjs 默认只绑 127.0.0.1——dev 未配密码时鉴权放行，不能暴露局域网；funnel 流量经 tailscaled 本机转发。**直连公网部署**：`PROXY_BIND=0.0.0.0 npm run prod` 放开 proxy 单口（其余端口仍回环）。
+- **绑定收紧**：next-server 与内部服务恒绑 127.0.0.1；proxy.cjs 生产经 `PROXY_BIND=0.0.0.0` 放开单口对外（deploy/prod 自动带），dev 默认回环（未配密码时鉴权放行，不暴露局域网）。
 - **Cookie Secure 自动探测**：`x-forwarded-proto || nextUrl.protocol === https`——裸 IP HTTP 部署自动降级（否则浏览器拒发 Cookie），funnel/nginx TLS 下自动恢复 Secure。
 - **安全响应头**（next.config.ts headers()）：nosniff / X-Frame-Options DENY / Referrer-Policy / HSTS；CSP 跳过（与 Next 内联脚本冲突）。
 

@@ -338,7 +338,7 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 
 **上线前置**：根 `.env` 必须配置 `AUTH_PASSWORD`（强密码——chat 背后是 exec 工具，密码即服务器）与 `AUTH_SECRET`（`openssl rand -hex 32`），否则生产环境全拒（fail-closed）。
 
-**发版 = `scripts/deploy.sh`（Mac 侧，永远 master）**：push（非致命）→ 服务器脏检查/分支=master 校验 → `timeout 90 git pull --ff-only origin master`，失败自动切 git bundle 兜底（CN 网络 github 抽风免疫）→ 分离启动 prod.sh → 轮询 `/tmp/prod-last-status`（prod.sh EXIT trap 写退出码+ts）≤25min → Mac 公网冒烟五连（超时也冒烟兜底判断）。并发锁防双开。**回滚 = Mac `git revert <sha>` 后重跑 deploy.sh**（服务器永远 ff 前进，无强 reset）。无新提交时直接重跑 prod.sh。
+**发版 = `npm run deploy`（= `scripts/deploy.sh`，Mac 侧，永远 master；`npm run deploy:smoke` 单跑冒烟）**：push（非致命）→ 服务器脏检查/分支=master 校验 → `timeout 90 git pull --ff-only origin master`，失败自动切 git bundle 兜底（CN 网络 github 抽风免疫）→ 分离启动 prod.sh → 轮询 `/tmp/prod-last-status`（prod.sh EXIT trap 写退出码+ts）≤25min → Mac 公网冒烟五连（超时也冒烟兜底判断）。并发锁防双开。**回滚 = Mac `git revert <sha>` 后重跑 deploy.sh**（服务器永远 ff 前进，无强 reset）。无新提交时直接重跑 prod.sh。
 
 **机器相关配置全在 `.env`（gitignored）**：`DEPLOY_TARGET=root@<ip>`（换服务器改这一行）、`DEPLOY_PATH`、可选 `PUBLIC_PORT/PUBLIC_BASE`；`network.json` 只留架构性端口/hosts.local，per-server 差异零 git diff。
 
@@ -358,8 +358,8 @@ npm run log    # 查看实时日志
 
 | 服务 | 本地端口 | 公网地址 |
 |------|---------|---------|
-| AI 工作台 | 4567（仅回环） | funnel: `https://<ts.net>/ai/`；直连: `http://<IP>:4321/ai/`（需登录） |
-| 博客 | 4321（默认回环） | funnel: `https://<ts.net>`；直连: `http://<IP>:4321`（公开） |
+| AI 工作台 | 4567（仅回环） | `http://118.89.25.12:4321/ai/`（需登录；funnel 备选 `https://<ts.net>/ai/`） |
+| 博客 | 4321（生产 PROXY_BIND 对外） | `http://118.89.25.12:4321`（公开） |
 | ChromaDB | 8000 | 仅本地 |
 
 端口 / host 集中在 `config/network.json`，改这里全局同步。
@@ -367,7 +367,7 @@ npm run log    # 查看实时日志
 - 日志文件：见「日志规范」小节（`logs/{app,tasks,services,workflows}/` 按日轮转、倒序）
 - 博客静态文件：`site/`，由 `proxy.cjs` 直接 serve（带路径穿越防护）
 - Tailscale Funnel 提供内网穿透，无需公网 IP
-- 定时任务推送里的 dashboard 链接：手机首次打开需登录（30 天 Cookie）；`DASHBOARD_URL` 硬编码 ts.net 地址，换部署目标需手改两个 task 文件 + `hosts.public`
+- 定时任务推送里的 dashboard 链接：手机首次打开需登录（30 天 Cookie）；链接经 `publicBase()` 推导（DEPLOY_TARGET 源），换部署目标零代码改动
 - 新服务器首装清单：git pull → npm install（或体检自动）→ .env → 系统依赖（体检自动/警告）→ `PROXY_BIND=0.0.0.0 npm run prod` → 防火墙只放行 4321
 
 ### 备份与恢复（v0.11.32）

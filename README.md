@@ -43,36 +43,28 @@ uv tool install chromadb
 npm run dev
 ```
 
-### 部署
+### 部署（云服务器）
+
+生产拓扑：**云服务器 = 生产 + 博客唯一写入端；Mac = 开发 + 备份副本**。反向代理（`scripts/proxy.cjs`）统一处理 `/`（博客）和 `/ai/`（AI 工作台），仅 proxy 口对外（`PROXY_BIND=0.0.0.0`），其余服务恒回环。
 
 ```bash
-npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 反向代理 :4321 + Tailscale Funnel）
-npm run stop   # 停止全部服务 + 关闭内网穿透
-npm run log    # 查看实时日志
-
-# 定时任务
-npm run tasks:start   # 启动定时任务调度器
-npm run tasks:stop    # 停止调度器
-npm run tasks:run     # 手动执行某个任务（TASK=name）
+npm run deploy          # Mac 侧发版：push → 服务器拉 master（github 不通自动 bundle 兜底）→ 门禁构建 → 重启 → 公网冒烟五连
+npm run deploy:smoke    # 仅公网冒烟
+npm run prod            # 服务器侧本机：体检 → 门禁 → stop → start → 自检（deploy.sh 内部调用）
+npm run stop / log
 ```
 
-| 服务 | 本地端口 | 公网地址 |
+换云服务器 = 改 `.env` 一行 `DEPLOY_TARGET=root@<新IP>`（`DEPLOY_PATH` 同理）；首次服务器准备见 DESIGN.md「生产部署」（node≥22、.env、防火墙放行 4321）。Mac 侧 `sync.sh`：`env`（.env 同步）/ `site`（博客 server→Mac 镜像）/ `backup`（data 备份，30min 定时）/ `harden` 等，详见 `scripts/sync.sh` 头注释。
+
+| 服务 | 端口 | 公网地址 |
 |------|---------|---------|
-| AI 工作台 | 4567（通过 4321 代理） | `http://118.89.25.12:4321/ai/` |
+| AI 工作台 | 4567（通过 4321 代理） | `http://118.89.25.12:4321/ai/`（需登录） |
 | 博客 | 4321（代理静态文件） | `http://118.89.25.12:4321` |
-| ChromaDB | 8000 | 仅本地 |
+| ChromaDB / SearXNG / 搜索编排 | 8000 / 8080 / 8090 | 仅回环 |
 
-> 端口 / host 集中在 [`config/network.json`](config/README.md)，改这里全局同步。
+> 架构性端口集中在 [`config/network.json`](config/README.md)；机器相关（服务器地址/密钥）全在 `.env`（gitignored）。
 
-本机部署，通过 [Tailscale](https://tailscale.com/) Funnel 将本地服务暴露到公网，无需公网 IP 或云服务器。反向代理（`scripts/proxy.cjs`）统一处理 `/`（AI 工作台）和 `/blog/`（博客）。
-
-```bash
-# 启动时自动执行，也可手动控制
-tailscale funnel --bg --https=443 4321
-tailscale funnel reset                   # 关闭穿透
-```
-
-日志：`logs/`（app 应用日志 + tasks 任务日志 + workflows 工作流日志，按日轮转）
+日志：`logs/`（app 应用日志 + tasks 任务日志 + workflows 工作流日志 + services 子服务日志，按日轮转）
 
 ## 技术栈
 

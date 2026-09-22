@@ -10,6 +10,8 @@
     "build": "npm run build -w packages/ai-chat",
     "lint": "npm run lint -w packages/ai-chat",
     "prod": "bash scripts/prod.sh",
+    "deploy": "bash scripts/deploy.sh",
+    "deploy:smoke": "bash scripts/deploy.sh smoke",
     "stop": "bash scripts/stop.sh",
     "log": "bash scripts/log.sh",
     "tasks:start": "node packages/tasks/scheduler.js",

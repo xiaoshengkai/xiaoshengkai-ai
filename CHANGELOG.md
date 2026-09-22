@@ -9,6 +9,7 @@
 - **部署 env 化**：`.env` 新增 `DEPLOY_TARGET/DEPLOY_PATH`（换服务器改一行）；`network.json` 删除 `deploy` 块与 `hosts.public`（per-server 差异零 git diff）；`publicBase()` 改 DEPLOY_TARGET 推导链；sync.sh/prod.sh 经 `deploy-common.sh` 单源解析；scheduler.js 补 dotenv（任务子进程 publicBase 依赖）。
 - **`scripts/deploy.sh`（新）**：永远 master；push（非致命）→ 服务器脏检查/分支校验 → `timeout 90 pull origin` 失败自动 bundle 兜底 → 分离启动 prod.sh → 轮询 `/tmp/prod-last-status`（prod.sh EXIT trap）≤25min → 公网冒烟五连（超时也冒烟兜底）；并发锁；回滚=git revert+重跑（无强 reset）。
 - **node 门槛 20→22**（puppeteer engines >=22.12；服务器升级 node 22 静态包）。
+- **`npm run deploy` / `deploy:smoke`** 入口入 package.json；README 部署节重写为云服务器拓扑（deploy.sh 流程/sync.sh 子命令/端口表/机器配置在 .env）；ARCHITECTURE scripts 树补 deploy.sh/deploy-common.sh、鉴权节拓扑改直连为主；DESIGN 清过时项（funnel 主路径表述、DASHBOARD_URL 手改表述）并补 npm 入口。
 
 ### 验证
 - loopback getDetail size/时间 + gzip header；公网复测 8.77s→<2s；UI 截图 Loading+加载后渲染

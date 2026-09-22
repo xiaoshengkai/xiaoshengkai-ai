@@ -10,9 +10,10 @@ import { fetchAllHotNews } from "./fetcher/index.js";
 import { classifyAndMerge } from "./classifier.js";
 import { generateDashboard } from "./generate-dashboard.js";
 import { config } from "./config.js";
+import { publicBase } from "@app/shared/public-base.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DASHBOARD_URL = "https://node.tailddce43.ts.net/ai/api/tasks/hot-news/dashboard";
+const DASHBOARD_URL = `${publicBase()}/ai/api/tasks/hot-news/dashboard`;
 
 export async function run() {
   console.log("=== 每日热点新闻聚合开始 ===");
@@ -33,15 +34,21 @@ export async function run() {
     // 3. 生成 HTML
     await generateDashboard(grouped, { sourceStatus, totalRaw: items.length });
 
-    // 4. 浏览器打开
-    console.log(`正在浏览器中打开: ${DASHBOARD_URL}`);
-    await new Promise((resolve, reject) => {
-      exec(`open "${DASHBOARD_URL}"`, (err) => {
-        if (err) reject(new Error(`打开浏览器失败: ${err.message}`));
-        else resolve();
+    // 4. 浏览器打开（仅本机桌面环境；headless 服务器跳过）
+    const opener =
+      process.platform === "darwin" ? "open" : process.env.DISPLAY ? "xdg-open" : null;
+    if (opener) {
+      console.log(`正在浏览器中打开: ${DASHBOARD_URL}`);
+      await new Promise((resolve, reject) => {
+        exec(`${opener} "${DASHBOARD_URL}"`, (err) => {
+          if (err) reject(new Error(`打开浏览器失败: ${err.message}`));
+          else resolve();
+        });
       });
-    });
-    console.log("浏览器已打开 ✅");
+      console.log("浏览器已打开 ✅");
+    } else {
+      console.log(`[headless] 跳过浏览器打开: ${DASHBOARD_URL}`);
+    }
 
     console.log("=== 执行完毕，HTML 已更新 ===");
     return { ok: true };

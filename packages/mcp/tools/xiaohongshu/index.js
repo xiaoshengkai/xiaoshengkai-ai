@@ -6,6 +6,7 @@ import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { callLLM as callProviderLLM, generateImage, getWorkflowProvider } from "@app/shared/llm/index.js";
+import { publicBase } from "@app/shared/public-base.js";
 import { getApiKey } from "@app/shared/llm/config.js";
 import { sleep, shortId, downloadsDir } from "@app/shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
@@ -641,7 +642,7 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.jpg" alt="封�
         // 同步到博客
         const category = state.subcategory || "finance";
         const safeTitle = state.title.replace(/[\/\\:*?"<>|]/g, "_");
-        const blogUrl = `https://node.tailddce43.ts.net/${category}/${safeTitle}/`;
+        const blogUrl = `${publicBase()}/${category}/${safeTitle}/`;
         let blogSynced = false;
         try {
           syncToBlog(exportDir, state, category);

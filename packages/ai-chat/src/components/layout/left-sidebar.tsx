@@ -40,7 +40,7 @@ const menuItems = [
   { href: "/tools", label: "工具库", icon: Wrench, disabled: true },
   { href: "/workflow", label: "工作流", icon: GitBranch },
   { href: "/schedule", label: "定时任务", icon: Clock },
-  { href: "https://node.tailddce43.ts.net", label: "博客", icon: FileText },
+  { href: "#", label: "博客", icon: FileText, blog: true },
   { href: "/settings", label: "设置", icon: Settings },
 ];
 
@@ -64,6 +64,11 @@ export default function LeftSidebar({
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  // 博客与 app 同 origin（proxy 同端口 serve / 博客 + /ai 应用）；挂载后取，SSR 用 "#" 占位防 hydration 失配
+  const [blogOrigin, setBlogOrigin] = useState("");
+  useEffect(() => {
+    setBlogOrigin(window.location.origin);
+  }, []);
   const { clearMessagesRef, refreshKey } = useConversation();
 
   const fetchConversations = useCallback(async () => {
@@ -229,11 +234,12 @@ export default function LeftSidebar({
       <nav className="px-3 py-3 space-y-1 border-t-2 border-border">
         {menuItems.map((item) => {
           const isDisabled = item.disabled;
-          const isExternal = typeof item.href === "string" && (item.href.startsWith("http") || item.href.startsWith("//"));
+          const href = item.blog ? blogOrigin || "#" : item.href;
+          const isExternal = typeof href === "string" && (href.startsWith("http") || href.startsWith("//"));
           return (
             <Link
-              key={item.href}
-              href={isDisabled ? "#" : item.href}
+              key={item.label}
+              href={isDisabled ? "#" : href}
               target={isExternal ? "_blank" : undefined}
               className={`flex items-center gap-3 px-3 py-2 text-sm font-mono transition-colors
                 ${isDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-muted"}`}

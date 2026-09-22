@@ -94,16 +94,18 @@ nohup node scripts/log-wrap.js search-service -- node packages/services/search/s
 echo '搜索编排服务已启动'
 
 # ── 5. 公网暴露：tailscale 在跑走 funnel，否则直连部署 ──
+# 公网基址推导（与 @app/shared/public-base.js 同规则）：IP→http://IP:PROXY_PORT，域名→https://
+if [[ "$PUBLIC" =~ ^[0-9]+\.[0-9]+ ]]; then PUBLIC_URL="http://${PUBLIC}:${PROXY_PORT}"; else PUBLIC_URL="https://${PUBLIC}"; fi
 if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
   tailscale funnel --bg --https=443 $PROXY_PORT
   echo '内网穿透已启动'
-  echo "  - 博客:      https://${PUBLIC}"
-  echo "  - AI 工作台: https://${PUBLIC}/ai/"
+  echo "  - 博客:      ${PUBLIC_URL}"
+  echo "  - AI 工作台: ${PUBLIC_URL}/ai/"
 else
   echo 'tailscale 未运行或未安装，跳过 funnel（直连部署）'
   echo "  - 请自行在防火墙/安全组放行 ${PROXY_PORT}"
-  echo "  - 博客:      http://<公网IP>:${PROXY_PORT}"
-  echo "  - AI 工作台: http://<公网IP>:${PROXY_PORT}/ai/（需登录）"
+  echo "  - 博客:      ${PUBLIC_URL}"
+  echo "  - AI 工作台: ${PUBLIC_URL}/ai/（需登录）"
 fi
 
 # ── 6. 启动后自检 ──

@@ -1,7 +1,7 @@
 {
   "hosts": {
     "local": "127.0.0.1",
-    "public": "node.tailddce43.ts.net"
+    "public": "118.89.25.12"
   },
   "ports": {
     "aiChat": {

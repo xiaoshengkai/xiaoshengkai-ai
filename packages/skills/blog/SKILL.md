@@ -23,4 +23,6 @@ description: 博客管理技能，将内容发布到开盛的博客（GitHub Pag
 
 ## 博客地址
 
-https://node.tailddce43.ts.net
+当前部署的公网基址（proxy 根路径）：由 `config/network.json` 的 `hosts.public` 推导
+（IP → `http://<IP>:<prodProxy>`，域名 → `https://<public>`；`PUBLIC_BASE` 环境变量可覆盖），
+服务端代码经 `@app/shared/public-base.js` 的 `publicBase()` 获取，勿在技能/代码里写死地址。

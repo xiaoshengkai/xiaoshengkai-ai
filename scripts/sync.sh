@@ -1,10 +1,11 @@
 #!/bin/bash
 # 部署同步工具（Mac ↔ 云服务器）
 #   env            Mac→server 同步 .env（远端自动备份旧版 + chmod 600）
-#   site           Mac→server 同步 site/ 博客静态文件（--delete）
+#   site           server→Mac 镜像 site/ 博客（服务器=唯一写入端，--delete）
+#   site-push      应急 Mac→server 镜像推送 site/（会删服务器独有文件，跑前确认）
 #   migrate-data   Mac→server 一次性全量迁移 data/（含 chroma；跑前两端停服）
 #   backup         server→Mac 拉备份到 data-backup/（排除 chroma/bin；无 --delete）
-#   install-cron   装定时备份（mac: LaunchDaemon 6h+wake 补跑+装即首跑；linux: 打印 cron 行）
+#   install-cron   装定时备份（mac: LaunchDaemon 30min+wake 补跑+装即首跑；linux: 打印 cron 行）
 #   uninstall-cron 卸定时备份
 #   harden         服务器加固：sshd 关密码门（带回滚保险）+ fail2ban + 监听审计
 # 目标解析：config/network.json deploy 块；DEPLOY_TARGET/DEPLOY_PATH 环境变量可覆盖
@@ -26,7 +27,7 @@ CRON_LABEL=com.xiaoshengkai.backup
 DRY=${DRY_RUN:+--dry-run}
 
 usage() {
-  echo "用法: scripts/sync.sh <env|site|migrate-data|backup|install-cron|uninstall-cron|harden>"
+  echo "用法: scripts/sync.sh <env|site|site-push|migrate-data|backup|install-cron|uninstall-cron|harden>"
   exit 1
 }
 
@@ -36,9 +37,20 @@ preflight_local() {
 }
 
 cmd_site() {
+  # 服务器=博客唯一写入端，Mac=镜像：--delete 保证完全一致（Mac 侧误改会被覆盖）
   preflight_local
+  rsync -az --delete -e "$RSYNC_E" "$DEPLOY_HOST:$DEPLOY_PATH/site/" "$ROOT/site/"
+  echo "✅ site/ 已从服务器镜像到本地（--delete）"
+}
+
+cmd_site_push() {
+  # 应急/恢复：Mac→server 镜像推送。服务器上有而 Mac 没有的文件会被删！
+  preflight_local
+  echo "⚠️  site-push：服务器 site/ 将被 Mac 状态覆盖（服务器独有文件会删除）"
+  read -p "继续? [y/N] " ans
+  [ "$ans" = "y" ] || { echo "已取消"; exit 0; }
   rsync -az --delete -e "$RSYNC_E" "$ROOT/site/" "$DEPLOY_HOST:$DEPLOY_PATH/site/"
-  echo "✅ site/ 博客已同步（--delete：服务器与本地一致）"
+  echo "✅ site/ 已推送到服务器（--delete）"
 }
 
 cmd_env() {
@@ -102,10 +114,8 @@ install_plist() { # $1 = plist 路径
   </array>
   <key>StartCalendarInterval</key>
   <array>
-    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Minute</key><integer>30</integer></dict>
   </array>
   <key>RunAtLoad</key><true/>
   <key>EnvironmentVariables</key>
@@ -133,10 +143,10 @@ cmd_install_cron() {
     install_plist "$PLIST"
     launchctl bootout "$DOMAIN/$CRON_LABEL" 2>/dev/null || true
     launchctl bootstrap "$DOMAIN" "$PLIST"
-    echo "✅ 定时备份已装（每 6h + 装即首跑 + 睡眠错过 wake 补跑）→ $PLIST"
+    echo "✅ 定时备份已装（每 30min + 装即首跑 + 睡眠错过 wake 补跑）→ $PLIST"
   else
     echo "Linux 请自行挂 cron："
-    echo "  0 */6 * * * cd $ROOT && scripts/sync.sh backup >> logs/backup.log 2>&1"
+    echo "  */30 * * * * cd $ROOT && scripts/sync.sh backup >> logs/backup.log 2>&1"
   fi
 }
 
@@ -200,6 +210,7 @@ REMOTE
 case "${1:-}" in
   env) cmd_env ;;
   site) cmd_site ;;
+  site-push) cmd_site_push ;;
   migrate-data) cmd_migrate_data ;;
   backup) cmd_backup ;;
   install-cron) cmd_install_cron ;;

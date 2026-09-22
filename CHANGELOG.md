@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.33 (2026-09-22) — 公网地址去硬编码 + site 主从翻转 + 备份 30min + headless 任务修复
+
+### 变更
+- **`shared/public-base.js`（新）**：`publicBase()` = `PUBLIC_BASE` env > network.json 推导（IP→`http://<IP>:<prodProxy>`，域名→`https://<public>`）；`hosts.public` 改 `118.89.25.12`（服务器直连为当前拓扑真值）。消灭 5 处 `node.tailddce43.ts.net` 硬编码：tasks DASHBOARD_URL ×2、xiaohongshu blogUrl、left-sidebar 博客链接（改 `window.location.origin`，挂载后取值防 hydration 失配）、prod.sh 回显（同款 IP/域名推导）。
+- **headless 任务修复**：hot-news/precious-metals 收尾 `open`（macOS 专属）在 Linux 服务器必炸且曾使整任务失败 → 平台门控：darwin=`open` / 有 DISPLAY=`xdg-open` / 否则跳过并打印 URL（服务器首跑 hot-news 的致命错误根因）。
+- **site 主从翻转**：服务器=博客唯一写入端；`sync.sh site` = server→Mac `--delete` 镜像；新增 `site-push` 应急 Mac→server（跑前确认提示）。
+- **备份间隔 6h → 30min**（LaunchDaemon `Minute 0/30`；linux cron 行 `*/30`）。
+- **知乎/抖音源服务器侧 401/结构异常** = 数据中心 IP 被源站拒（Mac 住宅 IP 正常）——非代码 bug，接受降级（dashboard sourceStatus 标注），不修。
+
+### 验证
+- `publicBase()` 三情形（IP/域名/PUBLIC_BASE）node -e 实测；代码/配置/文档零 `tailddce43` 残留
+- typecheck + test + build；服务器 bundle 同步 + 重启后 hot-news 实跑（headless 跳过 open）+ dashboard/推送链接指向新基址
+
 ## v0.11.32 (2026-09-22) — 部署同步工具 sync.sh + 服务器加固 + Mac 定时备份
 
 ### 变更
@@ -7,7 +20,7 @@
   - `env`：Mac→server 同步 `.env`（远端旧版自动 `.env.bak-<ts>` + chmod 600）
   - `migrate-data`：一次性全量 data/（含 chroma；跑前确认提示+两端停服前提）
   - `backup`：server→Mac `data-backup/`（gitignored），rsync -az **无 --delete**（服务器误删不传染备份），排除 `chroma/`（活 sqlite 热拷会坏+可 generate-embeddings 重建）/`bin/`；mkdir 原子锁防并发；写 `.backup-status.json`
-  - `install-cron`/`uninstall-cron`：mac 装 LaunchDaemon（6h 间隔+RunAtLoad 首跑+wake 补跑，日志 logs/backup.log；root=system 域/非 root=gui 域自适应），linux 打印 cron 行
+  - `install-cron`/`uninstall-cron`：mac 装 LaunchDaemon（30min 间隔+RunAtLoad 首跑+wake 补跑，日志 logs/backup.log；root=system 域/非 root=gui 域自适应），linux 打印 cron 行
   - `harden`：sshd 关密码门（`PasswordAuthentication no`+`PermitRootLogin prohibit-password`，**90s 自动回滚保险**：复验失败自动还原配置）+ fail2ban（源缺失自动降级警告）+ `ss -tlnp` 监听审计
 - **ssh 吞 stdin 坑修复**：脚本内非 heredoc 的 ssh 调用全加 `</dev/null`（否则管道输入被 ssh 当远程 stdin 吃掉，`read` 提示符后静默退出）
 - **服务器一次性 setup**（手工经 ssh）：2G swapfile（1.6G 内存防 build OOM）、停禁用腾讯云自带 `myapp.service`（0.0.0.0:80 公网暴露面）；fail2ban 在 OpenCloudOS 9 源缺失接受降级（密码门已关，暴破无效）；chroma 用 pip 1.3.5（glibc 2.38 < 1.4.4 绑定要求的 2.39），知识库经 base64 float32 JSON 跨版本迁移（22 集合/2978 向量/向量查询 top1 验证）；onnxruntime 空 cuda 标记跳 GPU 包下载；puppeteer chrome 手放缓存；ffmpeg 走 npmmirror 镜像（prod.sh 固化）；pandoc 标记降级

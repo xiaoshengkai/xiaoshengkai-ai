@@ -58,8 +58,8 @@ npm run tasks:run     # 手动执行某个任务（TASK=name）
 
 | 服务 | 本地端口 | 公网地址 |
 |------|---------|---------|
-| AI 工作台 | 4567（通过 4321 代理） | `https://node.tailddce43.ts.net/ai/` |
-| 博客 | 4321（代理静态文件） | `https://node.tailddce43.ts.net` |
+| AI 工作台 | 4567（通过 4321 代理） | `http://118.89.25.12:4321/ai/` |
+| 博客 | 4321（代理静态文件） | `http://118.89.25.12:4321` |
 | ChromaDB | 8000 | 仅本地 |
 
 > 端口 / host 集中在 [`config/network.json`](config/README.md)，改这里全局同步。
@@ -86,4 +86,4 @@ Next.js 16 / React 19 / AI SDK v6 / DeepSeek V4 Pro / MiniMax / Chroma / Tailwin
 - [mcp](packages/mcp/README.md)
 - [skills](packages/skills/README.md)
 - [网络配置](config/README.md)
-- [博客](https://node.tailddce43.ts.net)
+- [博客](http://118.89.25.12:4321)

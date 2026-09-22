@@ -18,7 +18,7 @@
 {
   "hosts": {
     "local": "127.0.0.1",                 // 本机地址，dev/prod 都用它
-    "public": "node.tailddce43.ts.net"   // 公网域名（tailscale funnel 暴露）
+    "public": "118.89.25.12"            // 公网地址：IP→http://IP:prodProxy / 域名→https://域名（publicBase() 推导，PUBLIC_BASE 可覆盖）
   },
   "ports": {
     "aiChat": {

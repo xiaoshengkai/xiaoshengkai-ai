@@ -6,8 +6,9 @@ import { saveHistory, saveMacroHistory } from "./history.js";
 import { generateDashboard } from "./generate-dashboard.js";
 import { exec } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { publicBase } from "@app/shared/public-base.js";
 
-const DASHBOARD_URL = "https://node.tailddce43.ts.net/ai/api/tasks/precious-metals/dashboard";
+const DASHBOARD_URL = `${publicBase()}/ai/api/tasks/precious-metals/dashboard`;
 
 export async function run() {
   validate();
@@ -24,15 +25,21 @@ export async function run() {
     saveMacroHistory(data.macroIndicators, data.usdCny);
     await generateDashboard(data);
 
-    // 仪表盘生成完毕，在浏览器中打开
-    console.log(`正在浏览器中打开仪表盘: ${DASHBOARD_URL}`);
-    await new Promise((resolve, reject) => {
-      exec(`open "${DASHBOARD_URL}"`, (err) => {
-        if (err) reject(new Error(`打开浏览器失败: ${err.message}`));
-        else resolve();
+    // 仪表盘生成完毕，在浏览器中打开（仅本机桌面环境；headless 服务器跳过）
+    const opener =
+      process.platform === "darwin" ? "open" : process.env.DISPLAY ? "xdg-open" : null;
+    if (opener) {
+      console.log(`正在浏览器中打开仪表盘: ${DASHBOARD_URL}`);
+      await new Promise((resolve, reject) => {
+        exec(`${opener} "${DASHBOARD_URL}"`, (err) => {
+          if (err) reject(new Error(`打开浏览器失败: ${err.message}`));
+          else resolve();
+        });
       });
-    });
-    console.log("浏览器已打开 ✅");
+      console.log("浏览器已打开 ✅");
+    } else {
+      console.log(`[headless] 跳过浏览器打开: ${DASHBOARD_URL}`);
+    }
 
     if (success) {
       console.log("执行完毕，推送成功，仪表盘已更新");

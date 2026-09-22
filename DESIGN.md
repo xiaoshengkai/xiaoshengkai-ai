@@ -183,7 +183,7 @@ AUTH_LOCK_SECS=600           # 锁定时长（秒）
 {
   "hosts": {
     "local": "localhost",                 // 本机地址
-    "public": "node.tailddce43.ts.net"   // 公网域名（tailscale funnel）
+    "public": "118.89.25.12"            // 公网地址（publicBase() 推导：IP→http://IP:prodProxy / 域名→https://；PUBLIC_BASE 覆盖）
   },
   "ports": {
     "aiChat": { "dev": 3000, "prodDirect": 4567, "prodProxy": 4321 },
@@ -368,17 +368,17 @@ npm run log    # 查看实时日志
 
 ### 备份与恢复（v0.11.32）
 
-拓扑：**云服务器=生产，Mac=开发+备份副本**。不做双向同步（双活=冲突机器）；chroma 不进备份（活 sqlite 热拷会坏，且可 `scripts/generate-embeddings` 重建）。
+拓扑：**云服务器=生产+博客唯一写入端，Mac=开发+备份副本**。不做双向同步（双活=冲突机器）；chroma 不进备份（活 sqlite 热拷会坏，且可 `scripts/generate-embeddings` 重建）。博客本地留底 = `sync.sh site`（server→Mac 镜像，30min 备份之外的手动/按需拉取）。
 
 ```bash
 scripts/sync.sh env            # Mac→server 同步 .env（远端自动备份旧版）
 scripts/sync.sh migrate-data   # 一次性接班迁移 data/（两端停服）
 scripts/sync.sh backup         # server→Mac data-backup/（无 --delete；排除 chroma/bin）
-scripts/sync.sh install-cron   # Mac LaunchDaemon 每 6h + 装即首跑 + wake 补跑
+scripts/sync.sh install-cron   # Mac LaunchDaemon 每 30min + 装即首跑 + wake 补跑
 scripts/sync.sh harden         # 服务器加固（见下）
 ```
 
-- **丢服务器恢复路径**：新机器 git clone → `sync.sh env`（或从 data-backup 旁路取回 .env）→ rsync `data-backup/` 回 `data/` → `PROXY_BIND=0.0.0.0 npm run prod` → `scripts/generate-embeddings` 重建向量。**数据损失上限=一个备份间隔（6h）**。
+- **丢服务器恢复路径**：新机器 git clone → `sync.sh env`（或从 data-backup 旁路取回 .env）→ rsync `data-backup/` 回 `data/` → `PROXY_BIND=0.0.0.0 npm run prod` → `scripts/generate-embeddings` 重建向量。**数据损失上限=一个备份间隔（30min）**。
 - **备份缺口语义**：Mac 睡眠/关机期间不备份；要服务器侧快照再说（YAGNI）。
 - **服务器加固**（`sync.sh harden`，已跑）：sshd `PasswordAuthentication no` + `PermitRootLogin prohibit-password`（带 90s 自动回滚保险）；fail2ban 在 OpenCloudOS 9 源缺失→降级接受（密码门已关，暴破无效）；停禁用腾讯云自带 myapp.service（原 0.0.0.0:80 暴露）；2G swapfile 防 1.6G 内存 build OOM。上线后建议改一次密码（曾明文出现于对话）。
 - **腾讯云安全组（手工）**：放行 22/4321，其余关闭；控制台 VNC 是 sshd 配置失误时的应急通道。

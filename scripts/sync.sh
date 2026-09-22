@@ -1,6 +1,7 @@
 #!/bin/bash
 # 部署同步工具（Mac ↔ 云服务器）
 #   env            Mac→server 同步 .env（远端自动备份旧版 + chmod 600）
+#   site           Mac→server 同步 site/ 博客静态文件（--delete）
 #   migrate-data   Mac→server 一次性全量迁移 data/（含 chroma；跑前两端停服）
 #   backup         server→Mac 拉备份到 data-backup/（排除 chroma/bin；无 --delete）
 #   install-cron   装定时备份（mac: LaunchDaemon 6h+wake 补跑+装即首跑；linux: 打印 cron 行）
@@ -25,13 +26,19 @@ CRON_LABEL=com.xiaoshengkai.backup
 DRY=${DRY_RUN:+--dry-run}
 
 usage() {
-  echo "用法: scripts/sync.sh <env|migrate-data|backup|install-cron|uninstall-cron|harden>"
+  echo "用法: scripts/sync.sh <env|site|migrate-data|backup|install-cron|uninstall-cron|harden>"
   exit 1
 }
 
 preflight_local() {
   command -v rsync >/dev/null 2>&1 || { echo "❌ 缺 rsync"; exit 1; }
   $SSH true </dev/null 2>/dev/null || { echo "❌ ssh 免密不通: $DEPLOY_HOST（先 ssh-copy-id）"; exit 1; }
+}
+
+cmd_site() {
+  preflight_local
+  rsync -az --delete -e "$RSYNC_E" "$ROOT/site/" "$DEPLOY_HOST:$DEPLOY_PATH/site/"
+  echo "✅ site/ 博客已同步（--delete：服务器与本地一致）"
 }
 
 cmd_env() {
@@ -192,6 +199,7 @@ REMOTE
 
 case "${1:-}" in
   env) cmd_env ;;
+  site) cmd_site ;;
   migrate-data) cmd_migrate_data ;;
   backup) cmd_backup ;;
   install-cron) cmd_install_cron ;;

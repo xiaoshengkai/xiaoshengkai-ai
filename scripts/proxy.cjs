@@ -13,6 +13,17 @@ const proxy = httpProxy.createProxyServer({
   xfwd: true,
 });
 
+// 上游（next）重启窗口期连接被拒时不得崩进程：返回 502 保公网入口存活
+proxy.on('error', (err, req, res) => {
+  console.error(`[proxy] upstream error: ${err.message}`);
+  if (res && typeof res.writeHead === 'function') {
+    try {
+      res.writeHead(502, { 'Content-Type': 'text/plain' });
+      res.end('upstream unavailable');
+    } catch {}
+  }
+});
+
 const SITE_DIR = path.join(__dirname, '..', 'site');
 
 const MIME = {

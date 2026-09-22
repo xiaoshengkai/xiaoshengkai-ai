@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.11.32 (2026-09-22) — 部署同步工具 sync.sh + 服务器加固 + Mac 定时备份
+
+### 变更
+- **`scripts/sync.sh` 六子命令**（目标读 `config/network.json` deploy 块，`DEPLOY_TARGET/DEPLOY_PATH` 可覆盖；`DRY_RUN=1` 只演不传）：
+  - `env`：Mac→server 同步 `.env`（远端旧版自动 `.env.bak-<ts>` + chmod 600）
+  - `migrate-data`：一次性全量 data/（含 chroma；跑前确认提示+两端停服前提）
+  - `backup`：server→Mac `data-backup/`（gitignored），rsync -az **无 --delete**（服务器误删不传染备份），排除 `chroma/`（活 sqlite 热拷会坏+可 generate-embeddings 重建）/`bin/`；mkdir 原子锁防并发；写 `.backup-status.json`
+  - `install-cron`/`uninstall-cron`：mac 装 LaunchDaemon（6h 间隔+RunAtLoad 首跑+wake 补跑，日志 logs/backup.log；root=system 域/非 root=gui 域自适应），linux 打印 cron 行
+  - `harden`：sshd 关密码门（`PasswordAuthentication no`+`PermitRootLogin prohibit-password`，**90s 自动回滚保险**：复验失败自动还原配置）+ fail2ban（源缺失自动降级警告）+ `ss -tlnp` 监听审计
+- **ssh 吞 stdin 坑修复**：脚本内非 heredoc 的 ssh 调用全加 `</dev/null`（否则管道输入被 ssh 当远程 stdin 吃掉，`read` 提示符后静默退出）
+- **服务器一次性 setup**（手工经 ssh）：2G swapfile（1.6G 内存防 build OOM）、停禁用腾讯云自带 `myapp.service`（0.0.0.0:80 公网暴露面）；fail2ban 在 OpenCloudOS 9 源缺失接受降级（密码门已关，暴破无效）
+- `config/network.json` 新增 `deploy { host, path, port }` 块 + config/README 同步；`.gitignore` 加 `data-backup/`
+
+### 验证
+- 免密登记（本机原无密钥，ssh-keygen 后 copy-id；HOME/uid 错位用 ssh config IdentityFile 根治）
+- 三子命令 DRY_RUN 实测（629MB 清单零传输）；harden 真跑：密码门关闭+密钥复验+回滚保险取消；监听审计 80 口清除
+- 备份真链路待服务器起服后 RunAtLoad 首跑验证
+
+## v0.11.31 (2026-09-22) — 设置页左菜单三分组
+
+### 变更
+- **设置页重构**（`settings/page.tsx` 单文件）：四段堆叠长页改为**左菜单列 + 右内容区**——模型（模型配置+模块选择+黄条）/ 服务（独立服务监控）/ 安全（密码管理+退出登录），菜单纯文字无图标；窄屏（<md）菜单自动变横向 chips 行（`items-start md:items-stretch` 防 row 模式按钮拉伸）。页头副标题计数移入模型栏微文案，「实时生效」删（与黄条重复）。
+- **菜单状态点**：模型项在 dirty 时显红点、服务项在任一服务非 running 时显红点——跨栏被动可见；「保存更改」按钮移入模型栏动作行（刷新余量左侧，作用域归位），跨栏未保存由模型菜单红点提示，切栏不丢修改（state 页级）。退出登录按钮改错误红（`bg-destructive text-white`，memory 页既有约定）。
+- 菜单项 brutal-btn + active `bg-primary`（pink 主题粉底），沿用侧栏 active 填色语言；无路由/无新依赖。
+
+### 验证
+- typecheck + build 通过；browser-harness 实测：三栏切换截图、窄屏 480px 横排形态、dirty 跨栏回归（服务栏下保存钮亮+模型栏红点）
+
 ## v0.11.30 (2026-09-22) — prod.sh 部署升级：新机一键 + 更新不宕机 + 直连公网支持
 
 ### 变更

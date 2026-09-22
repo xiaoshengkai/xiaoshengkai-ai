@@ -29,6 +29,11 @@
     "chroma": 8000            // chroma-server 端口
     "searxng": 8080           // 本地 SearXNG 搜索服务端口
     "searchService": 8090     // 搜索编排服务（Node）端口
+  },
+  "deploy": {
+    "host": "root@118.89.25.12",   // 云服务器 ssh 目标（scripts/sync.sh 消费者）
+    "path": "/root/xiaoshengkai-ai", // 远程仓库路径
+    "port": 22
   }
 }
 ```

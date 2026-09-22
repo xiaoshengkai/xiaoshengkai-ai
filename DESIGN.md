@@ -29,6 +29,7 @@
 - 所有 token 定义在 `globals.css` 的 `[data-theme="*"]` 块，无额外依赖
 - **品牌锁排**：「开」字旋转贴纸（`components/ui/logo.tsx`）+ 「小盛开AI」wordmark；竖排 mark+wordmark 用于 splash 场景（聊天空态、登录页），横排用于侧栏——贴纸字与 wordmark 的字面重复是品牌签名，不改
 - **登录页背景三层景深**：点阵网格底纹（radial-gradient 24px、前景色 14%、走 token）→ 出屏 soft 大色块（无边框无阴影，远景）→ 黑边旋转小贴纸（近景）；装饰元素 md 以下隐藏，登录页不透出会话时长等内部信息
+- **设置页左菜单三分组**：模型（配置+模块选择）/ 服务 / 安全（密码+登出），菜单纯文字无图标；窄屏菜单变横向 chips 行；菜单状态点（模型=dirty、服务=有非 running）+ 保存按钮全局可见，跨栏不丢未保存态；新配置域=新菜单项或栏内新 section，不再整页堆叠
 
 ## 架构流程
 
@@ -364,3 +365,20 @@ npm run log    # 查看实时日志
 - Tailscale Funnel 提供内网穿透，无需公网 IP
 - 定时任务推送里的 dashboard 链接：手机首次打开需登录（30 天 Cookie）；`DASHBOARD_URL` 硬编码 ts.net 地址，换部署目标需手改两个 task 文件 + `hosts.public`
 - 新服务器首装清单：git pull → npm install（或体检自动）→ .env → 系统依赖（体检自动/警告）→ `PROXY_BIND=0.0.0.0 npm run prod` → 防火墙只放行 4321
+
+### 备份与恢复（v0.11.32）
+
+拓扑：**云服务器=生产，Mac=开发+备份副本**。不做双向同步（双活=冲突机器）；chroma 不进备份（活 sqlite 热拷会坏，且可 `scripts/generate-embeddings` 重建）。
+
+```bash
+scripts/sync.sh env            # Mac→server 同步 .env（远端自动备份旧版）
+scripts/sync.sh migrate-data   # 一次性接班迁移 data/（两端停服）
+scripts/sync.sh backup         # server→Mac data-backup/（无 --delete；排除 chroma/bin）
+scripts/sync.sh install-cron   # Mac LaunchDaemon 每 6h + 装即首跑 + wake 补跑
+scripts/sync.sh harden         # 服务器加固（见下）
+```
+
+- **丢服务器恢复路径**：新机器 git clone → `sync.sh env`（或从 data-backup 旁路取回 .env）→ rsync `data-backup/` 回 `data/` → `PROXY_BIND=0.0.0.0 npm run prod` → `scripts/generate-embeddings` 重建向量。**数据损失上限=一个备份间隔（6h）**。
+- **备份缺口语义**：Mac 睡眠/关机期间不备份；要服务器侧快照再说（YAGNI）。
+- **服务器加固**（`sync.sh harden`，已跑）：sshd `PasswordAuthentication no` + `PermitRootLogin prohibit-password`（带 90s 自动回滚保险）；fail2ban 在 OpenCloudOS 9 源缺失→降级接受（密码门已关，暴破无效）；停禁用腾讯云自带 myapp.service（原 0.0.0.0:80 暴露）；2G swapfile 防 1.6G 内存 build OOM。上线后建议改一次密码（曾明文出现于对话）。
+- **腾讯云安全组（手工）**：放行 22/4321，其余关闭；控制台 VNC 是 sshd 配置失误时的应急通道。

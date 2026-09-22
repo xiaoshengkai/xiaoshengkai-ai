@@ -41,3 +41,4 @@ packages/services/search/searxng/venv/
 nohup.out
 
 .superpowers/
+data-backup/

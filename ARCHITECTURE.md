@@ -39,6 +39,7 @@ ai-engineer-journey/
 │   └── README.md               # 字段 + 消费者清单
 ├── scripts/                    # 部署 / 运维脚本
 │   ├── prod.sh / dev.sh / stop.sh / log.sh   # prod.sh：体检→门禁→stop→start→暴露自适应→自检（见「生产部署」）
+│   ├── sync.sh               # 部署同步：env / migrate-data / backup / install-cron / uninstall-cron / harden（目标读 network.json deploy 块）
 │   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
 │   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；默认回环、PROXY_BIND 可放开；静态服务带路径穿越防护）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs

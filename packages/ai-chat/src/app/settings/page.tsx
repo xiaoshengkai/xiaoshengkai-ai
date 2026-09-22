@@ -60,6 +60,7 @@ export default function SettingsPage() {
   const [serviceAction, setServiceAction] = useState<string | null>(null);
   const [pwdForm, setPwdForm] = useState({ oldPassword: "", newPassword: "", confirm: "" });
   const [pwdBusy, setPwdBusy] = useState(false);
+  const [tab, setTab] = useState<"models" | "services" | "security">("models");
 
   useEffect(() => {
     Promise.all([
@@ -222,8 +223,6 @@ export default function SettingsPage() {
       <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border shrink-0">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-foreground font-heading">系统设置</h2>
-          <span className="text-xs text-muted-foreground font-mono hidden md:inline">
-            7 模块 · 4 Provider · 实时生效</span>
         </div>
         <div className="flex gap-2">
           <button
@@ -232,19 +231,33 @@ export default function SettingsPage() {
           >
             返回聊天
           </button>
-          <button
-            onClick={handleSave}
-            disabled={!hasChanges || saving}
-            className={`brutal-btn px-3 py-1.5 text-xs font-bold ${hasChanges && !saving ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
-          >
-            {saving ? "保存中..." : hasChanges ? "保存更改" : "已保存"}
-          </button>
         </div>
       </div>
 
-      {/* 主体（可滚动） */}
+      {/* 主体：左菜单 + 右内容（窄屏菜单变横向 chips 行） */}
+      <div className="flex flex-1 overflow-hidden">
+      <nav className="shrink-0 flex flex-row flex-wrap md:flex-col items-start md:items-stretch gap-2 p-3 border-b-2 md:border-b-0 md:border-r-2 border-border md:w-44 bg-card overflow-auto">
+        {([
+          { id: "models", label: "模型", dot: hasChanges },
+          { id: "services", label: "服务", dot: !serviceLoading && services.some((s) => s.status !== "running") },
+          { id: "security", label: "安全", dot: false },
+        ] as const).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`brutal-btn px-3 py-2 text-sm font-bold text-left flex items-center justify-between gap-2 ${
+              tab === t.id ? "bg-primary text-foreground" : "bg-card text-muted-foreground"
+            }`}
+          >
+            <span>{t.label}</span>
+            {t.dot && <span aria-label="提醒" className="w-2 h-2 bg-destructive shrink-0" />}
+          </button>
+        ))}
+      </nav>
+
       <div className="flex-1 overflow-auto p-6 space-y-6">
 
+      {tab === "models" && (<>
       {/* 生效提示：所有配置均 fresh-read，保存即生效（2026-08-20 移除重启机制） */}
       <div className="brutal bg-yellow-soft p-3 text-xs font-mono">
         <p className="text-foreground/70">
@@ -252,7 +265,61 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* 独立服务监控 */}
+      {/* 模型配置 */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-foreground font-heading">🔑 模型配置</h2>
+            <span className="text-xs text-muted-foreground font-mono hidden md:inline">7 模块 · 4 Provider</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={!hasChanges || saving}
+              className={`brutal-btn px-2 py-1 text-xs font-bold ${hasChanges && !saving ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
+            >
+              {saving ? "保存中..." : hasChanges ? "保存更改" : "已保存"}
+            </button>
+            <button
+              onClick={loadBalance}
+              disabled={refreshing}
+              className="brutal-btn px-2 py-1 text-xs font-bold bg-muted text-foreground disabled:opacity-50"
+            >
+              {refreshing ? "查询中..." : "刷新余量"}
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+          {Object.entries(providers).map(([id, config]) => (
+            <ProviderConfigCard
+              key={id}
+              id={id}
+              label={PROVIDER_LABELS[id] || id}
+              config={config}
+              onChange={handleProviderChange}
+              status={status?.[id]}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* 模型选择 */}
+      <div>
+        <h2 className="text-sm font-bold text-foreground mb-3 font-heading">📌 模块模型选择</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <ModuleSelector module="chat" current={selection.chat} onChange={handleSelectionChange} statusByProvider={status} />
+          <ModuleSelector module="media" current={selection.media} onChange={handleSelectionChange} statusByProvider={status} />
+          <ModuleSelector module="vision" current={selection.vision || { provider: "minimax", model: "MiniMax-M3" }} onChange={handleSelectionChange} statusByProvider={status} />
+          <ModuleSelector module="vector" current={selection.vector} onChange={handleSelectionChange} statusByProvider={status} />
+          <ModuleSelector module="workflow" current={selection.workflow} onChange={handleSelectionChange} statusByProvider={status} />
+          <ModuleSelector module="tts" current={selection.tts || { provider: "minimax", model: "speech-2.8-hd" }} onChange={handleSelectionChange} statusByProvider={status} />
+          <ModuleSelector module="music" current={selection.music || { provider: "qwen", model: "fun-music-v1" }} onChange={handleSelectionChange} statusByProvider={status} />
+        </div>
+      </div>
+      </>)}
+
+      {tab === "services" && (
+      /* 独立服务监控 */
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-foreground font-heading">独立服务</h2>
@@ -297,54 +364,16 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+      )}
 
-      {/* 模型配置 */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-foreground font-heading">🔑 模型配置</h2>
-          <button
-            onClick={loadBalance}
-            disabled={refreshing}
-            className="brutal-btn px-2 py-1 text-xs font-bold bg-muted text-foreground disabled:opacity-50"
-          >
-            {refreshing ? "查询中..." : "刷新余量"}
-          </button>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-          {Object.entries(providers).map(([id, config]) => (
-            <ProviderConfigCard
-              key={id}
-              id={id}
-              label={PROVIDER_LABELS[id] || id}
-              config={config}
-              onChange={handleProviderChange}
-              status={status?.[id]}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* 模型选择 */}
-      <div>
-        <h2 className="text-sm font-bold text-foreground mb-3 font-heading">📌 模块模型选择</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <ModuleSelector module="chat" current={selection.chat} onChange={handleSelectionChange} statusByProvider={status} />
-          <ModuleSelector module="media" current={selection.media} onChange={handleSelectionChange} statusByProvider={status} />
-          <ModuleSelector module="vision" current={selection.vision || { provider: "minimax", model: "MiniMax-M3" }} onChange={handleSelectionChange} statusByProvider={status} />
-          <ModuleSelector module="vector" current={selection.vector} onChange={handleSelectionChange} statusByProvider={status} />
-          <ModuleSelector module="workflow" current={selection.workflow} onChange={handleSelectionChange} statusByProvider={status} />
-          <ModuleSelector module="tts" current={selection.tts || { provider: "minimax", model: "speech-2.8-hd" }} onChange={handleSelectionChange} statusByProvider={status} />
-          <ModuleSelector module="music" current={selection.music || { provider: "qwen", model: "fun-music-v1" }} onChange={handleSelectionChange} statusByProvider={status} />
-        </div>
-      </div>
-
-      {/* 密码管理 */}
+      {tab === "security" && (
+      /* 密码管理 */
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-foreground font-heading">🔐 密码管理</h2>
           <button
             onClick={handleLogout}
-            className="brutal-btn px-2 py-1 text-xs font-bold bg-pink-soft text-foreground"
+            className="brutal-btn px-2 py-1 text-xs font-bold bg-destructive text-white"
           >
             退出登录
           </button>
@@ -376,6 +405,8 @@ export default function SettingsPage() {
             {pwdBusy ? "提交中..." : "修改密码"}
           </button>
         </div>
+      </div>
+      )}
       </div>
       </div>
     </div>

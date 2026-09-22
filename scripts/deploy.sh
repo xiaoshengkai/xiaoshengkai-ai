@@ -80,7 +80,7 @@ smoke() {
   [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$PUB/ai/api/conversations/getList")" = "401" ] || { echo "  ❌ 未登录API应401"; ok=0; }
   [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$PUB/")" = "200" ] || { echo "  ❌ 博客"; ok=0; }
   local PW
-  PW=$(awk -F= '$1=="AUTH_PASSWORD"{print $2}' "$ROOT/.env")
+  PW=$(awk '/^AUTH_PASSWORD=/{sub(/^AUTH_PASSWORD=/,""); print; exit}' "$ROOT/.env")
   local CJ=/tmp/deploy-smoke-cookies.txt
   rm -f "$CJ"
   [ "$(curl -s -m 20 -X POST "$PUB/ai/api/auth/login" -H 'Content-Type: application/json' -d "{\"password\":\"$PW\"}" -c "$CJ" -o /dev/null -w '%{http_code}')" = "200" ] || { echo "  ❌ 登录"; ok=0; }
@@ -101,4 +101,10 @@ if smoke; then
 else
   echo "❌ 冒烟失败（prod exit=${RESULT:-timeout}）——ssh 上去看 /tmp/prod-server.log"
   exit 1
+fi
+
+# 单跑冒烟子命令（函数定义之后）
+if [ "${1:-}" = "smoke" ]; then
+  echo "── 公网冒烟（仅） $PUB ──"
+  if smoke; then echo "✅ 冒烟全绿"; else echo "❌ 冒烟失败"; exit 1; fi
 fi

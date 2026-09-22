@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.30 (2026-09-22) — prod.sh 部署升级：新机一键 + 更新不宕机 + 直连公网支持
+
+### 变更
+- **prod.sh 重写**：前置体检（node≥20 / .env+AUTH_* 硬校验 / 占位密码警告 / LLM key 警告 / node_modules 缺失自动 install / 软依赖警告）→ **门禁先于 stop**（更新失败旧站继续服务）→ start → 暴露自适应 → 启动后自检（登录页/博客/搜索服务三 curl）。
+- **直连公网部署**（裸 IP 无 tailscale）：`PROXY_BIND=0.0.0.0` 放开 proxy 单口（实测 `*:4321` ↔ 默认回环双向）；funnel 改 daemon 态检测（`tailscale status`，二进制在但服务停不再 `set -e` 死掉）；Cookie `Secure` 按 `x-forwarded-proto/protocol` 自动探测（HTTP 部署实测 Set-Cookie 无 Secure，登录可用；TLS 下自动恢复）。
+- **依赖自动安装分级**：Chrome 走 puppeteer 自动装；ffmpeg/pandoc 仅 linux-x64 自动下载静态二进制进 `data/bin/`（钉死 URL、注入 PATH、失败不拦部署）；需 sudo/包管理器的一律警告+给命令。
+- **stop.sh**：无 lsof 环境（Linux 常见）退化 pkill 进程名匹配，防重启端口占用。
+- **prod.sh 管道坑修复**：两个 log-wrap nohup 行补 stdout 重定向——此前子进程吊住调用方管道，`prod.sh | tail` 表现为假死。
+
+### 验证
+- 本机全流程 `bash scripts/prod.sh` exit=0：门禁过、直连分支命中（Tailscale stopped）、自检三绿
+- HTTP 登录 Set-Cookie 无 Secure ✓；PROXY_BIND 双向绑定实测 ✓；占位密码警告命中 ✓
+
 ## v0.11.29 (2026-09-21) — 登录鉴权 + 上线安全加固
 
 ### 变更

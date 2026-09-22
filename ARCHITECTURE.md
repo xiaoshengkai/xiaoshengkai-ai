@@ -38,9 +38,9 @@ ai-engineer-journey/
 │   ├── network.json            # 端口 / host 单一真相源
 │   └── README.md               # 字段 + 消费者清单
 ├── scripts/                    # 部署 / 运维脚本
-│   ├── prod.sh / dev.sh / stop.sh / log.sh
+│   ├── prod.sh / dev.sh / stop.sh / log.sh   # prod.sh：体检→门禁→stop→start→暴露自适应→自检（见「生产部署」）
 │   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
-│   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；只绑 127.0.0.1，静态服务带路径穿越防护）
+│   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；默认回环、PROXY_BIND 可放开；静态服务带路径穿越防护）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs
 ├── data/                       # 运行时数据（chroma / tasks / settings / static / workflows）
 ├── logs/                       # 日志（app/ + tasks/ + services/ + workflows/）
@@ -410,7 +410,8 @@ Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(q
 - **fail-closed**：`AUTH_PASSWORD` 未配置时生产全拒（login 接口报 `auth_not_configured`）、dev 放行。
 - **防爆破**：login 与 change-password 共用内存计数，同 IP 连错 `AUTH_MAX_FAILS`(5) 次锁 `AUTH_LOCK_SECS`(600) 秒；重启进程清零。
 - **matcher 坑**：basePath 根路径 `/ai`（裸路径，无尾斜杠）只有 isRoot matcher `'/'` 能覆盖，普通 `'/((?!_next...).*)'` 前缀化后要求子路径，`/ai` 会被静态缓存直出绕过鉴权（Next 16 实测）。故 matcher = `['/', '/((?!_next/static|_next/image|favicon.ico).*)']`。
-- **绑定收紧**：next-server（prod/dev）与 proxy.cjs 均只绑 127.0.0.1——dev 未配密码时鉴权放行，不能暴露局域网；公网流量一律经 funnel→tailscaled 本机转发。
+- **绑定收紧**：next-server（prod/dev）与 proxy.cjs 默认只绑 127.0.0.1——dev 未配密码时鉴权放行，不能暴露局域网；funnel 流量经 tailscaled 本机转发。**直连公网部署**：`PROXY_BIND=0.0.0.0 npm run prod` 放开 proxy 单口（其余端口仍回环）。
+- **Cookie Secure 自动探测**：`x-forwarded-proto || nextUrl.protocol === https`——裸 IP HTTP 部署自动降级（否则浏览器拒发 Cookie），funnel/nginx TLS 下自动恢复 Secure。
 - **安全响应头**（next.config.ts headers()）：nosniff / X-Frame-Options DENY / Referrer-Policy / HSTS；CSP 跳过（与 Next 内联脚本冲突）。
 
 涉及文件：`packages/shared/auth.js`（+ test/auth.test.js）、`ai-chat src/proxy.ts`、`api/auth/{login,logout,change-password}/route.ts`、`app/login/page.tsx`、settings 页「密码管理」区块、`scripts/proxy.cjs`、`scripts/{prod,dev}.sh`、根 `.env`（AUTH_*）。

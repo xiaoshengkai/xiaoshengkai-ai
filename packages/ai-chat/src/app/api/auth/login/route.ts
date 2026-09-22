@@ -43,10 +43,12 @@ export async function POST(req: NextRequest) {
   resetThrottle(ip);
   const token = signToken(process.env.AUTH_SECRET || "");
   const res = NextResponse.json({ ok: true });
+  // Secure 自动探测：裸 IP HTTP 部署降级（否则浏览器拒发 Cookie），funnel/nginx TLS 下经 x-forwarded-proto 恢复
+  const secure = (req.headers.get("x-forwarded-proto") || req.nextUrl.protocol) === "https";
   res.cookies.set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure,
     path: "/",
     maxAge: SESSION_DAYS * 24 * 3600,
   });

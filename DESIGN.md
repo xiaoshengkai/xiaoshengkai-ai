@@ -338,22 +338,29 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 **上线前置**：根 `.env` 必须配置 `AUTH_PASSWORD`（强密码——chat 背后是 exec 工具，密码即服务器）与 `AUTH_SECRET`（`openssl rand -hex 32`），否则生产环境全拒（fail-closed）。
 
 ```bash
-npm run prod   # 构建 + 启动全部服务（AI 工作台 :4567 + 博客 :4321 + Tailscale Funnel）
-npm run stop   # 停止全部服务 + 关闭内网穿透
+npm run prod   # 体检 → 门禁(test/typecheck/build) → stop → start → 暴露自适应 → 启动后自检
+npm run stop   # 停止全部服务 + 关闭内网穿透（无 lsof 环境自动退化 pkill）
 npm run log    # 查看实时日志
 ```
+
+**prod.sh 前置体检**（新机/更新通用）：node≥20、.env 存在且 AUTH_* 齐（硬失败给可执行提示）、占位密码警告、node_modules 缺失自动 `npm install`、ffmpeg/pandoc/xz/chrome 缺失软警告。**门禁先于 stop**：更新失败时旧版本继续服务，不人为停站。
+
+**依赖自动安装分级**：只自动装免 sudo、自包含的——Chrome 走 `npx puppeteer browsers install chrome`；ffmpeg/pandoc 仅 linux-x64 自动下载静态二进制进 `data/bin/`（gitignored，prod.sh 注入 PATH，子服务自动可见，钉死下载 URL 防漂移）；需系统包管理器的一律警告+给命令（mac 走 brew）。下载失败不拦部署，功能用时才报错。
+
+**暴露方式自适应**：tailscale 在跑 → funnel（HTTPS）；否则打印直连部署提示。直连公网：`PROXY_BIND=0.0.0.0 npm run prod` 放开 proxy 单口（4567/8080/8090/8000 恒回环），裸 IP 仅 HTTP——Cookie Secure 按 `x-forwarded-proto/protocol` 自动降级；明文风险与 XFF 伪造锁定绕过为已知接受项，补 TLS 用 Caddy(域名)/Cloudflare Tunnel，代码零改动。
 
 服务端口：
 
 | 服务 | 本地端口 | 公网地址 |
 |------|---------|---------|
-| AI 工作台 | 4567（仅回环） | `https://node.tailddce43.ts.net:8443`（经 funnel→proxy，需登录） |
-| 博客 | 4321（仅回环） | `https://node.tailddce43.ts.net`（公开） |
+| AI 工作台 | 4567（仅回环） | funnel: `https://<ts.net>/ai/`；直连: `http://<IP>:4321/ai/`（需登录） |
+| 博客 | 4321（默认回环） | funnel: `https://<ts.net>`；直连: `http://<IP>:4321`（公开） |
 | ChromaDB | 8000 | 仅本地 |
 
-端口 / host 集中在 `config/network.json`，改这里全局同步。next-server 与 proxy.cjs 只绑 127.0.0.1：公网流量一律经 tailscaled 本机转发，局域网不可直连。
+端口 / host 集中在 `config/network.json`，改这里全局同步。
 
 - 日志文件：见「日志规范」小节（`logs/{app,tasks,services,workflows}/` 按日轮转、倒序）
 - 博客静态文件：`site/`，由 `proxy.cjs` 直接 serve（带路径穿越防护）
 - Tailscale Funnel 提供内网穿透，无需公网 IP
-- 定时任务推送里的 dashboard 链接：手机首次打开需登录（30 天 Cookie，之后无感）
+- 定时任务推送里的 dashboard 链接：手机首次打开需登录（30 天 Cookie）；`DASHBOARD_URL` 硬编码 ts.net 地址，换部署目标需手改两个 task 文件 + `hosts.public`
+- 新服务器首装清单：git pull → npm install（或体检自动）→ .env → 系统依赖（体检自动/警告）→ `PROXY_BIND=0.0.0.0 npm run prod` → 防火墙只放行 4321

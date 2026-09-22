@@ -71,8 +71,11 @@ const server = http.createServer((req, res) => {
   }
 });
 
-// 只绑本机回环：公网流量一律经 tailscale funnel（tailscaled 本机转发），局域网不可直连
-server.listen(PROXY_PORT, LOCAL, () => {
+// 默认只绑回环（funnel 经 tailscaled 本机转发）；直连公网部署用 PROXY_BIND=0.0.0.0 启动
+const BIND = process.env.PROXY_BIND || LOCAL;
+
+server.listen(PROXY_PORT, BIND, () => {
+  console.log(`代理已启动 → http://${BIND}:${PROXY_PORT}`);
   console.log(`代理已启动 → http://${LOCAL}:${PROXY_PORT}`);
   console.log('  /             → 博客 (site/)');
   console.log(`  /ai/ /note/ /preview/ /api/ → AI 工作台 (${LOCAL}:${PROD_DIRECT})`);

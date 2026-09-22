@@ -6,11 +6,22 @@ CHROMA_PORT=$(node -e "console.log(require('./config/network.json').ports.chroma
 SEARXNG_PORT=$(node -e "console.log(require('./config/network.json').ports.searxng)")
 SEARCH_SERVICE_PORT=$(node -e "console.log(require('./config/network.json').ports.searchService)")
 
-kill -9 $(lsof -t -i:$PROD_DIRECT) 2>/dev/null
-kill -9 $(lsof -t -i:$CHROMA_PORT) 2>/dev/null
-kill -9 $(lsof -t -i:$PROXY_PORT) 2>/dev/null
-kill -9 $(lsof -t -i:$SEARXNG_PORT) 2>/dev/null
-kill -9 $(lsof -t -i:$SEARCH_SERVICE_PORT) 2>/dev/null
+# 按端口杀进程；无 lsof（部分 Linux 默认不装）时退化为进程名匹配
+if command -v lsof >/dev/null 2>&1; then
+  kill -9 $(lsof -t -i:$PROD_DIRECT) 2>/dev/null
+  kill -9 $(lsof -t -i:$CHROMA_PORT) 2>/dev/null
+  kill -9 $(lsof -t -i:$PROXY_PORT) 2>/dev/null
+  kill -9 $(lsof -t -i:$SEARXNG_PORT) 2>/dev/null
+  kill -9 $(lsof -t -i:$SEARCH_SERVICE_PORT) 2>/dev/null
+else
+  pkill -f "next-server" 2>/dev/null
+  pkill -f "next start" 2>/dev/null
+  pkill -f "chroma run" 2>/dev/null
+  pkill -f "scripts/proxy.cjs" 2>/dev/null
+  pkill -f "searx.webapp" 2>/dev/null
+  pkill -f "packages/services/search/server.js" 2>/dev/null
+fi
+
 pkill -f "packages/tasks/scheduler.js" 2>/dev/null
 pkill -f "packages/services/search" 2>/dev/null
 pkill -f "searx.webapp" 2>/dev/null

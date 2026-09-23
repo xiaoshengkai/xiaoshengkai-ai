@@ -75,7 +75,7 @@ ai-engineer-journey/
     │   │   │   ├── settings/    # store / init / dispatcher / types
     │   │   │   ├── services/    # manager.ts：packages/services/* 清单扫描 + 启停/健康检查（服务监控）
     │   │   │   ├── mcp-client.ts
-    │   │   │   ├── modes.ts           # chat/plan/build 模式权限（WRITE_TOOLS + filterToolsByMode）
+    │   │   │   ├── modes.ts           # chat/plan/build 模式：MODE_INFO（状态+行为指令）+ WRITE_TOOLS/filterToolsByMode（工具权限）+ buildToolsSection（按模式拼工具清单）
     │   │   │   └── utils/       # utils(cn+BASE) / types / cost / env
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）
@@ -400,11 +400,11 @@ Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(q
 
 ## 登录鉴权
 
-公网部署（云服务器直连为主，tailscale funnel 为可选备选）下的单密码鉴权，全部收口在 ai-chat 的 `src/proxy.ts`（Next 16 proxy，middleware 继任者，Node runtime）：
+公网部署（云服务器直连；已移除本机自动 tailscale funnel）下的单密码鉴权，全部收口在 ai-chat 的 `src/proxy.ts`（Next 16 proxy，middleware 继任者，Node runtime）：
 
 ```
 浏览器 → 公网IP:4321 → proxy.cjs(0.0.0.0:4321) → next-server(:4567, 仅回环)
-（其余服务 chroma/searxng/search 恒回环；funnel 备选路径：funnel(:443) → tailscaled 本机转发 → proxy.cjs）
+（其余服务 chroma/searxng/search 恒回环）
                                                       └── proxy.ts 鉴权卡口（页面+API 全量）
 ```
 
@@ -415,7 +415,7 @@ Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(q
 - **防爆破**：login 与 change-password 共用内存计数，同 IP 连错 `AUTH_MAX_FAILS`(5) 次锁 `AUTH_LOCK_SECS`(600) 秒；重启进程清零。
 - **matcher 坑**：basePath 根路径 `/ai`（裸路径，无尾斜杠）只有 isRoot matcher `'/'` 能覆盖，普通 `'/((?!_next...).*)'` 前缀化后要求子路径，`/ai` 会被静态缓存直出绕过鉴权（Next 16 实测）。故 matcher = `['/', '/((?!_next/static|_next/image|favicon.ico).*)']`。
 - **绑定收紧**：next-server 与内部服务恒绑 127.0.0.1；proxy.cjs 生产经 `PROXY_BIND=0.0.0.0` 放开单口对外（deploy/prod 自动带），dev 默认回环（未配密码时鉴权放行，不暴露局域网）。
-- **Cookie Secure 自动探测**：`x-forwarded-proto || nextUrl.protocol === https`——裸 IP HTTP 部署自动降级（否则浏览器拒发 Cookie），funnel/nginx TLS 下自动恢复 Secure。
+- **Cookie Secure 自动探测**：`x-forwarded-proto || nextUrl.protocol === https`——裸 IP HTTP 部署自动降级（否则浏览器拒发 Cookie），反向代理 TLS 下自动恢复 Secure。
 - **安全响应头**（next.config.ts headers()）：nosniff / X-Frame-Options DENY / Referrer-Policy / HSTS；CSP 跳过（与 Next 内联脚本冲突）。
 
 涉及文件：`packages/shared/auth.js`（+ test/auth.test.js）、`ai-chat src/proxy.ts`、`api/auth/{login,logout,change-password}/route.ts`、`app/login/page.tsx`、settings 页「密码管理」区块、`scripts/proxy.cjs`、`scripts/{prod,dev}.sh`、根 `.env`（AUTH_*）。

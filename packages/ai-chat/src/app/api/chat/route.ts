@@ -24,67 +24,8 @@ import { getChatStrategy } from '@/lib/strategies/chat-strategy';
 import { getProviderConfig } from '@/lib/settings/dispatcher';
 import { getMCPClient, resetMCPClient } from '@/lib/mcp-client';
 import { processAttachments } from '@/lib/multimodal/pipeline';
-import { filterToolsByMode, type ChatMode } from '@/lib/modes';
+import { filterToolsByMode, buildToolsSection, MODE_INFO, type ChatMode } from '@/lib/modes';
 import type { Message, MessagePart } from '@/lib/utils/types';
-
-// ─── 提示词常量 ────────────────────────────────────────────────────────
-
-const TOOLS_PROMPT = `
-可用工具:
-
-- loadSkill(加载技能) | exec(执行Shell)
-
-- Chroma知识库: addKnowledge/searchKnowledge/updateKnowledge/deleteKnowledge/restoreKnowledgeById
-  库表: shared(规则/偏好) chat(日常/主题笔记)  database和collection必须同时传
-
-- 图片: generateImage → checkImageProgress | generateImageFromImage → checkImageProgress
-
-- 视频: generateHTMLPreview → checkTaskProgress → renderVideo
-
-- 图表: generateDiagram → checkDiagramProgress
-  类型映射: 流程图=mermaid+flowchart 时序图=mermaid+sequence 类图=mermaid+class
-           状态图=mermaid+state ER图=mermaid+er 甘特图=mermaid+gantt
-           饼图=mermaid+pie 象限图=mermaid+quadrant 架构图=d2+architecture
-  不确定类型时必须询问用户
-
-- 小红书笔记: generateXiaohongshuNote → checkXiaohongshuNoteProgress | updateXiaohongshuNote | exportXiaohongshuNote
-  触发: 用户说"生成笔记"、"整理成小红书"、"写篇笔记"、"做成笔记"、"总结成笔记"、"导出笔记"等
-  generateXiaohongshuNote({ topic, context, style, subcategory }) 返回 taskId
-    topic: 从对话中提取主题(必填)
-    context: 当前对话的关键讨论内容(必填，确保笔记包含对话上下文)
-    style: knowledge(知识分享)/product_review(好物推荐)/experience(经验复盘)/opinion(观点讨论)，LLM自动推断
-    subcategory: 二级类目(如finance)，LLM自动推断
-   checkXiaohongshuNoteProgress(taskId, interval=3): 轮询直到ready、partial或failed；partial表示部分图片失败，是终态，不要继续轮询。ready/partial返回的iframe字段直接嵌入聊天展示预览
-  修改: updateXiaohongshuNote({ taskId, field, value }), field: title/content/tags/image_N
-  导出: exportXiaohongshuNote({ taskId })，仅在用户明确说"导出"时调用
-  注意: 生成后不自动导出、不打开浏览器，直接输出iframe预览
-  
-- 联网搜索: searchWeb({ query, category, maxResults=5, fetchContent=true })
-  触发: 涉及时效性信息/新闻/开源项目/当前价格/未知事实等需要联网的内容
-  category: general(综合网页)/images(图片)/videos(视频)/news(新闻)/wechat(微信公众号)
-  searchWeb 返回结构化结果(标题/URL/摘要/来源引擎)，回答必须引用结果 URL
-  contentFetched=false 时只能使用标题/摘要，或明确说明无法读取正文
-  禁止自行猜测 API 地址或用 exec 替代搜索；对同一问题最多补充搜索一次
-
-- 网页抓取(Firecrawl):
-  scrapeWebPage({ url })    抓指定 URL 正文为 Markdown（知道具体 URL 时用）
-  mapWebsite({ url })       发现网站内所有 URL（定位页面时用）
-  crawlWebsite({ url, limit }) 抓网站多页正文（整站/栏目提取，最多 20 页）
-  parseDocument({ url })    解析在线 PDF 为 Markdown
-  选型: 不知道 URL→searchWeb；知道单个 URL→scrapeWebPage；找站内 URL→mapWebsite；抓整站→crawlWebsite；在线 PDF→parseDocument
-
-- 其他: 时间/待办/文件
-
-使用规则:
-- 用户说"画图"/"流程图"等 → 调用 generateDiagram，不确定类型时询问用户
-- generateDiagram 返回 taskId → checkDiagramProgress(taskId, interval=20) 轮询等 done
-- 修改图表用 readFile → replaceInFile → 重新调用 generateDiagram
-- 生成图片后用 ![描述](URL) 展示，URL 原样输出不得修改
-- generateImage/generateImageFromImage 返回 taskId → checkImageProgress(taskId, interval=5) 轮询等 done
-- 用户说"生成视频" → 先问风格，确认后 generateHTMLPreview → checkTaskProgress(interval=18) → 输出 iframe
-- 渲染视频用 renderVideo → checkTaskProgress(interval=30) 等 done
-- 用户说"记住"/"下载"时主动调用对应工具
-`.trim();
 
 // ─── Skill 列表（启动时扫描，注入 system prompt）───────────────────────
 
@@ -245,12 +186,8 @@ function buildSystemPrompt({
   mode: ChatMode;
   hasTools: boolean;
 }): string {
-  const modeInstruction = mode === "plan"
-    ? "\n当前处于 plan 模式：只读分析，只输出方案，禁止修改文件、执行命令或写入知识库。"
-    : "";
-  const toolsSection = hasTools
-    ? TOOLS_PROMPT
-    : "当前无可用工具（工具服务暂不可用）。直接回答用户问题；若用户要求执行操作，如实说明暂时无法执行，绝对不要伪造工具调用。";
+  const { label: modeLabel, instruction: modeInstruction } = MODE_INFO[mode];
+  const toolsSection = buildToolsSection(mode, hasTools);
   // 每请求生成，模型据此推算周末/节假日/当季，不再反问用户日期
   const now = new Date().toLocaleString("zh-CN", {
     weekday: "long", year: "numeric", month: "2-digit", day: "2-digit",
@@ -260,9 +197,12 @@ function buildSystemPrompt({
 
 当前时间: ${now}
 
- 工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。${modeInstruction}
+当前模式: ${modeLabel}
+${modeInstruction}
 
-技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
+ 工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。
+
+ 技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
         ${SKILL_LIST}
         ${toolsSection}
         ${multimodalInjection ? `\n用户消息中的 [图片]/[视频] 占位符对应的实际内容如下（由视觉模型生成，等同附件本身）。请据此理解并回答用户问题，不要声称看不到附件：\n${multimodalInjection}\n` : ''}

@@ -129,7 +129,7 @@ flowchart TD
 
 **响应** — SSE 流式返回，由 `@ai-sdk/react` 的 `useChat` 自动解析。
 
-**模式（mode）**：`chat`（纯聊，绿）/ `plan`（只读，只出方案，橙）/ `build`（全权，蓝；默认缺省为 chat，每对话独立记忆）。非 build 模式剥离写工具（`lib/modes.ts` 的 `WRITE_TOOLS`：exec + 文件写 6 + 知识库写 4），plan 额外注入「只读分析、只输出方案」system prompt 引导。
+**模式（mode）**：`chat`（自由对话，绿）/ `plan`（只读规划，橙）/ `build`（全权执行，蓝；默认缺省为 chat，每对话独立记忆）。单一真相源在 `lib/modes.ts`：`MODE_INFO`（每模式的 label/canWrite/行为指令）注入 system prompt 头部（`当前模式: <label>` + 行为约束），让模型明确所处状态与能干什么；`WRITE_TOOLS` + `filterToolsByMode` 剥离非 build 的写工具（exec + 文件写 6 + 知识库写 4）；`buildToolsSection(mode, hasTools)` 按模式拼工具清单——写入段仅 build 广告，非 build 追加「本模式无写/执行工具，勿调用，需执行请切 build」。三者（实际工具集 / 广告清单 / 行为指令）严格对齐，杜绝模型调用本模式不存在的工具。plan 为真规划模式：只读调研 → 输出结构化计划（目标/步骤/涉及文件/风险/待确认项）交用户确认，不执行。
 
 **处理流程**
 1. 提取最后一条用户消息 + mode
@@ -343,8 +343,8 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 **机器相关配置全在 `.env`（gitignored）**：`DEPLOY_TARGET=root@<ip>`（换服务器改这一行）、`DEPLOY_PATH`、可选 `PUBLIC_PORT/PUBLIC_BASE`；`network.json` 只留架构性端口/hosts.local，per-server 差异零 git diff。
 
 ```bash
-npm run prod   # 体检 → 门禁(test/typecheck/build) → stop → start → 暴露自适应 → 启动后自检
-npm run stop   # 停止全部服务 + 关闭内网穿透（无 lsof 环境自动退化 pkill）
+npm run prod   # 体检 → 门禁(test/typecheck/build) → stop → start → 打印公网地址 → 启动后自检
+npm run stop   # 停止全部服务（无 lsof 环境自动退化 pkill）
 npm run log    # 查看实时日志
 ```
 
@@ -352,13 +352,13 @@ npm run log    # 查看实时日志
 
 **依赖自动安装分级**：只自动装免 sudo、自包含的——Chrome 走 `npx puppeteer browsers install chrome`；ffmpeg/pandoc 仅 linux-x64 自动下载静态二进制进 `data/bin/`（gitignored，prod.sh 注入 PATH，子服务自动可见，钉死下载 URL 防漂移）；需系统包管理器的一律警告+给命令（mac 走 brew）。下载失败不拦部署，功能用时才报错。
 
-**暴露方式自适应**：tailscale 在跑 → funnel（HTTPS）；否则打印直连部署提示。直连公网：`PROXY_BIND=0.0.0.0 npm run prod` 放开 proxy 单口（4567/8080/8090/8000 恒回环），裸 IP 仅 HTTP——Cookie Secure 按 `x-forwarded-proto/protocol` 自动降级；明文风险与 XFF 伪造锁定绕过为已知接受项，补 TLS 用 Caddy(域名)/Cloudflare Tunnel，代码零改动。
+**公网访问**：云服务器直连（`PROXY_BIND=0.0.0.0 npm run prod` 放开 proxy 单口，4567/8080/8090/8000 恒回环），裸 IP 仅 HTTP——Cookie Secure 按 `x-forwarded-proto/protocol` 自动降级；明文风险与 XFF 伪造锁定绕过为已知接受项，补 TLS 用 Caddy(域名)/Cloudflare Tunnel，代码零改动。**本机不再自动开 tailscale funnel**：`tailscale funnel` 在公司网会触发 tailscaled 重配路由/DNS，导致整机断网。
 
 服务端口：
 
 | 服务 | 本地端口 | 公网地址 |
 |------|---------|---------|
-| AI 工作台 | 4567（仅回环） | `http://118.89.25.12:4321/ai/`（需登录；funnel 备选 `https://<ts.net>/ai/`） |
+| AI 工作台 | 4567（仅回环） | `http://118.89.25.12:4321/ai/`（需登录） |
 | 博客 | 4321（生产 PROXY_BIND 对外） | `http://118.89.25.12:4321`（公开） |
 | ChromaDB | 8000 | 仅本地 |
 
@@ -366,7 +366,7 @@ npm run log    # 查看实时日志
 
 - 日志文件：见「日志规范」小节（`logs/{app,tasks,services,workflows}/` 按日轮转、倒序）
 - 博客静态文件：`site/`，由 `proxy.cjs` 直接 serve（带路径穿越防护）
-- Tailscale Funnel 提供内网穿透，无需公网 IP
+- 公网访问走云服务器直连，无需内网穿透（已移除自动 tailscale funnel）
 - 定时任务推送里的 dashboard 链接：手机首次打开需登录（30 天 Cookie）；链接经 `publicBase()` 推导（DEPLOY_TARGET 源），换部署目标零代码改动
 - 新服务器首装清单：git pull → npm install（或体检自动）→ .env → 系统依赖（体检自动/警告）→ `PROXY_BIND=0.0.0.0 npm run prod` → 防火墙只放行 4321
 

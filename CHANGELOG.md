@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.35 (2026-09-23) — 模式感知（AI 知道 chat/plan/build）+ 移除本机自动 funnel
+
+### 变更
+- **模式感知**：`lib/modes.ts` 新增 `MODE_INFO`（每模式 label/canWrite/行为指令），system prompt 头部注入 `当前模式: <label>` + 该模式行为约束。此前只有 plan 有一句提示词、chat/build 无任何标识，模型不知自身状态。`plan` 做成真规划模式：只读调研 → 输出结构化计划（目标/步骤/涉及文件/风险/待确认项）交用户确认后再切 build 执行，不再与 chat 等价（原二者工具集相同、仅一句提示词之差）。
+- **工具清单按模式对齐**：`TOOLS_PROMPT` 拆 `TOOLS_PROMPT_READ`（恒注入）/ `TOOLS_PROMPT_WRITE`（仅 build），新增 `buildToolsSection(mode, hasTools)`。根因：原 `TOOLS_PROMPT` 是静态全量清单，chat/plan 下仍宣传 `exec`/`writeFile`/`addKnowledge`/`replaceInFile` 等已被 `filterToolsByMode` 剥离的写工具 → 模型调用本模式不存在的工具。非 build 追加「本模式无写/执行工具，勿调用，需执行请切 build」。
+- **移除本机自动 tailscale funnel**：`scripts/prod.sh` 删 tailscale 分支、`scripts/stop.sh` 删 `funnel reset`。本机 `npm run prod` 在公司网会触发 tailscaled 重配路由/DNS，导致整机断网（IP 层不通/网卡掉线）——服务本身全绑回环，断网唯一整机级动作即 funnel。公网一律走云服务器直连（`PROXY_BIND=0.0.0.0`）。文档同步（DESIGN/ARCHITECTURE/README 去 funnel 表述）。
+
+### 验证
+- `modes.test.ts` 补测（MODE_INFO 三模式 / plan 只读出计划 / 写入工具仅 build 广告 / 无工具降级）；`npm run typecheck` 干净，`npm run test` 56+22+6 全绿
+- 本机 `npm run prod` 不再触碰 tailscale，网络保持连通
+
 ## v0.11.34 (2026-09-22) — getDetail 8.77s 优化 + Loading 态 + 部署 env 化 + deploy.sh
 
 ### 变更

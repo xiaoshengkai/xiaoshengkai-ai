@@ -25,5 +25,4 @@ pkill -f "packages/tasks/scheduler.js" 2>/dev/null
 pkill -f "packages/services/search" 2>/dev/null
 pkill -f "searx.webapp" 2>/dev/null
 pkill -f "scripts/log-wrap.js" 2>/dev/null
-tailscale funnel reset 2>/dev/null
 echo '已停止全部服务'

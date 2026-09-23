@@ -131,6 +131,8 @@ flowchart TD
 
 **模式（mode）**：`chat`（自由对话，绿）/ `plan`（只读规划，橙）/ `build`（全权执行，蓝；默认缺省为 chat，每对话独立记忆）。单一真相源在 `lib/modes.ts`：`MODE_INFO`（每模式的 label/canWrite/行为指令）注入 system prompt 头部（`当前模式: <label>` + 行为约束），让模型明确所处状态与能干什么；`WRITE_TOOLS` + `filterToolsByMode` 剥离非 build 的写工具（exec + 文件写 6 + 知识库写 4）；`buildToolsSection(mode, hasTools)` 按模式拼工具清单——写入段仅 build 广告，非 build 追加「本模式无写/执行工具，勿调用，需执行请切 build」。三者（实际工具集 / 广告清单 / 行为指令）严格对齐，杜绝模型调用本模式不存在的工具。plan 为真规划模式：只读调研 → 输出结构化计划（目标/步骤/涉及文件/风险/待确认项）交用户确认，不执行。
 
+**小红书笔记（预览/持久化/下载）**：任务状态存 `data/xhs-tasks/<id>`（原 `os.tmpdir()`，重启即丢 → 改持久化；读侧保留 /tmp 回退）。聊天里的笔记预览：`markdown-components` 捕获 `/note/<id>`（含带 basePath/绝对地址/错端口）的 iframe → 改渲染 `NotePreviewCard`（同源 fetch，规避 iframe 的 basePath/端口问题，且修历史消息）；prompt 禁止模型手写 iframe。导出写 `data/exports/<id>`（每次重建、7 天清理），`exportXiaohongshuNote` 返回 `downloadUrl`（优先 `publicBase()` 绝对地址，便于复制到手机/浏览器）；`/api/exports/<id>` 用 `lib/zip.ts`（node:zlib 手写最小 zip，零依赖）打包流式下载。
+
 **处理流程**
 1. 提取最后一条用户消息 + mode
 2. 智谱 `embedding-3` 生成查询向量
@@ -221,6 +223,10 @@ AUTH_LOCK_SECS=600           # 锁定时长（秒）
 | `logs/tasks/` | `<task-name>.log` | HTTP「立即执行」（handlers） |
 | `logs/services/` | `services-YYYY-MM-DD.log` | search-service + searxng（经 log-wrap） |
 | `logs/workflows/` | `workflows-YYYY-MM-DD.log` | 工作流引擎 |
+
+### 在线日志页
+
+侧栏「日志」→ `(main)/logs`：左侧按分组（app/tasks/services/workflows/backup）列文件，右侧 tail 展示（`getLogColor` 按 `[ERR]/[INFO]/[WARN]` 着色，5s 自动刷新可关），顶部「下载」走附件流。后端 `/api/logs`：`?list=1` 列文件、`?group&file&tail=N`（≤2000）取行、`?group&file&download=1` 流式下载；分组+文件名白名单防路径穿越。原 right-panel 的临时「运行日志」块已移除。
 
 ### 子服务日志（log-wrap）
 
@@ -372,12 +378,13 @@ npm run log    # 查看实时日志
 
 ### 备份与恢复（v0.11.32）
 
-拓扑：**云服务器=生产+博客唯一写入端，Mac=开发+备份副本**。不做双向同步（双活=冲突机器）；chroma 不进备份（活 sqlite 热拷会坏，且可 `scripts/generate-embeddings` 重建）。博客本地留底 = `sync.sh site`（server→Mac 镜像，30min 备份之外的手动/按需拉取）。
+拓扑：**云服务器=生产+博客唯一写入端，Mac=开发+备份副本**。不做双向同步（双活=冲突机器）；chroma 不进备份（活 sqlite 热拷会坏，且可 `scripts/generate-embeddings` 重建）。博客本地留底 = `sync.sh site`（server→Mac 镜像，30min 备份之外的手动/按需拉取）。对话按机器存 `data/conversations/`（本地/服务器两套库，天然分歧，非 bug）；要把服务器独有对话补到本地用 `sync.sh conv-pull`（本地优先，只补服务器独有，不覆盖/不删除）。
 
 ```bash
 scripts/sync.sh env            # Mac→server 同步 .env（远端自动备份旧版）
 scripts/sync.sh migrate-data   # 一次性接班迁移 data/（两端停服）
 scripts/sync.sh backup         # server→Mac data-backup/（无 --delete；排除 chroma/bin）
+scripts/sync.sh conv-pull      # server→Mac 对话（本地优先 --ignore-existing，只补服务器独有；--with-uploads 连图片）
 scripts/sync.sh install-cron   # Mac LaunchDaemon 每 30min + 装即首跑 + wake 补跑
 scripts/sync.sh harden         # 服务器加固（见下）
 ```

@@ -9,16 +9,17 @@ import { useConversation } from "@/components/layout/conversation-context";
 import Logo from "@/components/ui/logo";
 import {
   Database,
-  Wrench,
   GitBranch,
   Clock,
   FileText,
   Settings,
+  ScrollText,
   Plus,
   MoreHorizontal,
   Pin,
   Trash2,
   Pencil,
+  type LucideIcon,
 } from "lucide-react";
 
 interface Conversation {
@@ -35,13 +36,13 @@ interface LeftSidebarProps {
   onSelectConversation: (id: string) => void;
 }
 
-const menuItems = [
+const menuItems: { href: string; label: string; icon: LucideIcon; disabled?: boolean; blog?: boolean }[] = [
   { href: "/memory", label: "记忆库", icon: Database },
-  { href: "/tools", label: "工具库", icon: Wrench, disabled: true },
   { href: "/workflow", label: "工作流", icon: GitBranch },
   { href: "/schedule", label: "定时任务", icon: Clock },
   { href: "#", label: "博客", icon: FileText, blog: true },
   { href: "/settings", label: "设置", icon: Settings },
+  { href: "/logs", label: "日志", icon: ScrollText },
 ];
 
 function sortConversations(list: Conversation[]) {

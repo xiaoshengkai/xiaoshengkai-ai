@@ -4,6 +4,7 @@
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -23,3 +24,11 @@ export const shortId = () => crypto.randomUUID().slice(0, 8);
 
 /** 系统 Downloads 目录（跨工具复用） */
 export const downloadsDir = path.join(os.homedir(), "Downloads");
+
+/** 仓库根（packages/shared → 上两级） */
+export const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+export const dataDir = path.join(projectRoot, "data");
+/** 小红书笔记任务目录（持久化，跨重启不丢；原 os.tmpdir() 重启即清空） */
+export const xhsTasksDir = path.join(dataDir, "xhs-tasks");
+/** 小红书笔记导出目录（浏览器可下载的产物） */
+export const exportsDir = path.join(dataDir, "exports");

@@ -1,5 +1,7 @@
 #!/bin/bash
 # 云服务器发布编排（Mac 侧执行）——永远部署 master
+#   `deploy`        完整发版（下列 1-7）
+#   `deploy:smoke`  仅公网冒烟，不碰服务器（= bash scripts/deploy.sh smoke）
 #   1 前置：ssh 免密 / 并发锁
 #   2 push origin master（失败仅警告，CN 网络不拦部署）
 #   3 服务器：脏检查中止 / 分支=master 校验
@@ -14,15 +16,39 @@ cd "$ROOT"
 source "$ROOT/scripts/deploy-common.sh"
 resolve_deploy_env
 
+PUB=$(public_url)
+STATUS=/tmp/prod-last-status
+DEPLOY_START_TS=$(date -u +%FT%TZ)
+
+# 公网冒烟五连（login200 / 未登录API401 / 博客200 / 登录200 / 带Cookie API200）
+smoke() {
+  local ok=1
+  [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$PUB/ai/login")" = "200" ] || { echo "  ❌ login页"; ok=0; }
+  [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$PUB/ai/api/conversations/getList")" = "401" ] || { echo "  ❌ 未登录API应401"; ok=0; }
+  [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$PUB/")" = "200" ] || { echo "  ❌ 博客"; ok=0; }
+  local PW
+  PW=$(awk '/^AUTH_PASSWORD=/{sub(/^AUTH_PASSWORD=/,""); print; exit}' "$ROOT/.env")
+  local CJ=/tmp/deploy-smoke-cookies.txt
+  rm -f "$CJ"
+  [ "$(curl -s -m 20 -X POST "$PUB/ai/api/auth/login" -H 'Content-Type: application/json' -d "{\"password\":\"$PW\"}" -c "$CJ" -o /dev/null -w '%{http_code}')" = "200" ] || { echo "  ❌ 登录"; ok=0; }
+  [ "$(curl -s -o /dev/null -m 15 -b "$CJ" -w '%{http_code}' "$PUB/ai/api/conversations/getList")" = "200" ] || { echo "  ❌ 带Cookie API"; ok=0; }
+  rm -f "$CJ"
+  return $((1 - ok))
+}
+
+# 仅冒烟：不碰服务器（deploy:smoke）
+if [ "${1:-}" = "smoke" ]; then
+  echo "── 公网冒烟（仅） $PUB ──"
+  if smoke; then echo "✅ 冒烟全绿"; else echo "❌ 冒烟失败"; exit 1; fi
+  exit 0
+fi
+
 LOCK=/tmp/xsk-deploy.lock
 if ! mkdir "$LOCK" 2>/dev/null; then
   echo "❌ 已有 deploy 在跑（$LOCK）"; exit 1
 fi
 trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
 
-PUB=$(public_url)
-STATUS=/tmp/prod-last-status
-DEPLOY_START_TS=$(date -u +%FT%TZ)
 echo "══ deploy → $DEPLOY_HOST:$DEPLOY_PATH | 公网 $PUB ══"
 
 # 1 前置
@@ -74,20 +100,6 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
 done
 
 # 7 冒烟（超时也跑，作兜底判断）
-smoke() {
-  local ok=1
-  [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$PUB/ai/login")" = "200" ] || { echo "  ❌ login页"; ok=0; }
-  [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$PUB/ai/api/conversations/getList")" = "401" ] || { echo "  ❌ 未登录API应401"; ok=0; }
-  [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$PUB/")" = "200" ] || { echo "  ❌ 博客"; ok=0; }
-  local PW
-  PW=$(awk '/^AUTH_PASSWORD=/{sub(/^AUTH_PASSWORD=/,""); print; exit}' "$ROOT/.env")
-  local CJ=/tmp/deploy-smoke-cookies.txt
-  rm -f "$CJ"
-  [ "$(curl -s -m 20 -X POST "$PUB/ai/api/auth/login" -H 'Content-Type: application/json' -d "{\"password\":\"$PW\"}" -c "$CJ" -o /dev/null -w '%{http_code}')" = "200" ] || { echo "  ❌ 登录"; ok=0; }
-  [ "$(curl -s -o /dev/null -m 15 -b "$CJ" -w '%{http_code}' "$PUB/ai/api/conversations/getList")" = "200" ] || { echo "  ❌ 带Cookie API"; ok=0; }
-  rm -f "$CJ"
-  return $((1 - ok))
-}
 echo "── 公网冒烟 ──"
 if smoke; then
   if [ -n "$RESULT" ] && [ "$RESULT" != "0" ]; then
@@ -101,10 +113,4 @@ if smoke; then
 else
   echo "❌ 冒烟失败（prod exit=${RESULT:-timeout}）——ssh 上去看 /tmp/prod-server.log"
   exit 1
-fi
-
-# 单跑冒烟子命令（函数定义之后）
-if [ "${1:-}" = "smoke" ]; then
-  echo "── 公网冒烟（仅） $PUB ──"
-  if smoke; then echo "✅ 冒烟全绿"; else echo "❌ 冒烟失败"; exit 1; fi
 fi

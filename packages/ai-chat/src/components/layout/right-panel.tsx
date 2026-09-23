@@ -1,7 +1,7 @@
 "use client";
 
 import { BASE } from "@/lib/utils/utils";
-import { useMemo, useEffect, useState, useRef } from "react";
+import { useMemo, useEffect, useState } from "react";
 import type { UIMessage } from "ai";
 import { calculateCost, formatTokens } from "@/lib/utils/cost";
 
@@ -36,16 +36,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   qwen: "通义千问",
 };
 
-function getLogColor(line: string) {
-  if (line.includes("[ERR]")) return { color: "var(--destructive)" };
-  if (line.includes("[INFO]")) return { color: "var(--blue)" };
-  if (line.includes("[WARN]")) return { color: "var(--orange)" };
-  return {};
-}
-
 export default function RightPanel({ messages, isLoading }: { messages: UIMessage[]; isLoading: boolean }) {
-  const [logLines, setLogLines] = useState<string[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval>>(null);
   const [settings, setSettings] = useState<{ providers: Providers; selection: Selection } | null>(null);
 
   useEffect(() => {
@@ -55,21 +46,6 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
     ]).then(([p, s]) => {
       setSettings({ providers: p, selection: s });
     });
-  }, []);
-
-  useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const res = await fetch(`${BASE}/api/logs`);
-        if (res.ok) {
-          const data = await res.json();
-          setLogLines(data.lines);
-        }
-      } catch { /* ignore */ }
-    };
-    fetchLogs();
-    timerRef.current = setInterval(fetchLogs, 5000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
   const stats = useMemo(() => {
@@ -195,31 +171,6 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
             </div>
           </div>
         )}
-
-        {/* 运行日志 */}
-        <div className="brutal bg-card overflow-hidden">
-          <div className="px-2.5 py-1.5 text-[11px] font-bold font-mono text-foreground bg-yellow border-b-2 border-border">
-            运行日志 ({logLines.length})
-          </div>
-          <div className="p-2.5 max-h-[370px] overflow-y-auto">
-            <div className="space-y-0.5">
-              {logLines.length === 0 && (
-                <p className="text-[11px] font-mono text-muted-foreground/50">
-                  暂无日志
-                </p>
-              )}
-              {logLines.map((line, i) => (
-                <div
-                  key={i}
-                  className="text-[10px] font-mono leading-relaxed break-all"
-                  style={getLogColor(line)}
-                >
-                  {line}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
     </aside>
   );

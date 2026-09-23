@@ -1,20 +1,32 @@
 import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { marked } from "marked";
 import { fileURLToPath } from "node:url";
 import { searchChroma } from "../../lib/chroma.js";
 import { callLLM as callProviderLLM, generateImage, getWorkflowProvider } from "@app/shared/llm/index.js";
 import { publicBase } from "@app/shared/public-base.js";
 import { getApiKey } from "@app/shared/llm/config.js";
-import { sleep, shortId, downloadsDir } from "@app/shared/utils.js";
+import { sleep, shortId, xhsTasksDir, exportsDir } from "@app/shared/utils.js";
 import { writeTaskState, readTaskState, updateTask, getAdaptiveWait } from "../../lib/task-state.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { contentToMarkdown, selectCandidate, summarizeImages, updateImageState } from "./note-utils.js";
 
-const TASK_DIR = path.join(os.tmpdir(), "xhs-tasks");
+const TASK_DIR = xhsTasksDir;
 const TAG = "[xhs]";
+
+/** 清理 7 天前的导出，防 data/exports 膨胀 */
+function pruneOldExports() {
+  try {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    for (const name of fs.readdirSync(exportsDir)) {
+      const p = path.join(exportsDir, name);
+      if (fs.statSync(p).isDirectory() && fs.statSync(p).mtimeMs < cutoff) {
+        fs.rmSync(p, { recursive: true, force: true });
+      }
+    }
+  } catch { /* 目录不存在等忽略 */ }
+}
 
 const TEMPLATES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "templates");
 
@@ -522,7 +534,7 @@ export function register(server) {
 
   server.tool(
     "exportXiaohongshuNote",
-    "将小红书笔记导出为本地文件夹（含 HTML、MD 文件和图片），保存到 Downloads 目录。",
+    "将小红书笔记导出为可下载的文件夹（含 HTML、MD、图片），并同步到博客。返回 downloadUrl，用户点击即可下载到本地。",
     {
       taskId: z.string().min(1).describe("笔记任务 ID"),
     },
@@ -533,11 +545,11 @@ export function register(server) {
         if (!fs.existsSync(taskFile)) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "笔记任务不存在" }) }] };
 
         const state = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
-        const safeName = state.title.replace(/[\/\\:*?"<>|]/g, "_");
-        let exportDir = path.join(downloadsDir, safeName);
-        if (fs.existsSync(exportDir)) {
-          exportDir = path.join(downloadsDir, `${safeName}_${Date.now()}`);
-        }
+        // 导出到受控目录（浏览器可下载），每次重建保证幂等；顺手清理过期导出
+        fs.mkdirSync(exportsDir, { recursive: true });
+        pruneOldExports();
+        const exportDir = path.join(exportsDir, taskId);
+        fs.rmSync(exportDir, { recursive: true, force: true });
         const imgDir = path.join(exportDir, "images");
         fs.mkdirSync(imgDir, { recursive: true });
 
@@ -659,18 +671,24 @@ ${state.images[0]?.url ? `<img class="cover" src="./images/cover.jpg" alt="封�
         const htmlSize = htmlExists ? fs.statSync(htmlPath).size : 0;
         const mdSize = mdExists ? fs.statSync(mdPath).size : 0;
 
+        // 记录导出目录（供 /api/exports 打包下载）
+        updateTask(workDir, { exportDir, exportedAt: Date.now() });
+
+        // 浏览器下载链接：优先绝对地址（便于复制到手机/浏览器），无 DEPLOY_TARGET 时回落相对路径
+        let downloadUrl = `/api/exports/${taskId}`;
+        try { downloadUrl = `${publicBase()}/api/exports/${taskId}`; } catch { /* 本地无 DEPLOY_TARGET */ }
+
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
               ok: true,
               exportDir,
+              downloadUrl,
               blogUrl: blogSynced ? blogUrl : null,
               files: { html: htmlPath, md: mdPath, images: imgCount },
               verified: { htmlExists, mdExists, htmlSize, mdSize, imgCount },
-              note: blogSynced
-                ? `笔记已导出到 ${exportDir}，博客地址：${blogUrl}`
-                : `笔记已导出到 ${exportDir}（博客同步失败：${blogErr?.message || "未知"}）`,
+              note: `笔记已导出。下载：${downloadUrl}${blogSynced ? `；博客：${blogUrl}` : "（博客同步失败）"}`,
             }, null, 2),
           }],
         };

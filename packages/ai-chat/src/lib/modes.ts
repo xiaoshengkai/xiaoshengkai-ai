@@ -78,9 +78,9 @@ const TOOLS_PROMPT_READ = `
     context: 当前对话的关键讨论内容(必填，确保笔记包含对话上下文)
     style: knowledge(知识分享)/product_review(好物推荐)/experience(经验复盘)/opinion(观点讨论)，LLM自动推断
     subcategory: 二级类目(如finance)，LLM自动推断
-   checkXiaohongshuNoteProgress(taskId, interval=3): 轮询直到ready、partial或failed；partial表示部分图片失败，是终态，不要继续轮询。ready/partial返回的iframe字段直接嵌入聊天展示预览
+   checkXiaohongshuNoteProgress(taskId, interval=3): 轮询直到ready、partial或failed；partial表示部分图片失败，是终态，不要继续轮询。ready/partial的预览卡由界面自动渲染，禁止手写 <iframe>（会因 basePath/端口导致空白）
   修改: updateXiaohongshuNote({ taskId, field, value }), field: title/content/tags/image_N
-  导出: exportXiaohongshuNote({ taskId })，仅在用户明确说"导出"时调用
+  导出: exportXiaohongshuNote({ taskId })，仅在用户明确说"导出"时调用；返回的 downloadUrl 直接给用户（可点击/复制到浏览器或手机下载）
   注意: 生成后不自动导出、不打开浏览器，直接输出iframe预览
   
 - 联网搜索: searchWeb({ query, category, maxResults=5, fetchContent=true })

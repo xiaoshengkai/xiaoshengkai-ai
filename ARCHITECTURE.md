@@ -39,13 +39,13 @@ ai-engineer-journey/
 │   └── README.md               # 字段 + 消费者清单
 ├── scripts/                    # 部署 / 运维脚本
 │   ├── prod.sh / dev.sh / stop.sh / log.sh   # prod.sh：体检→门禁→stop→start→暴露自适应→自检（见「生产部署」）
-│   ├── deploy.sh             # Mac 侧发版编排（npm run deploy）：永远 master，pull origin 90s 超时→bundle 兜底→prod.sh→状态轮询→公网冒烟五连
+│   ├── deploy.sh             # Mac 侧发版编排（npm run deploy）：永远 master，pull origin 90s 超时→bundle 兜底→prod.sh→状态轮询→公网冒烟五连；`deploy:smoke` 前置短路=仅冒烟
 │   ├── deploy-common.sh      # deploy/sync/prod 共享解析：DEPLOY_TARGET/DEPLOY_PATH（env>.env）+ public_url 单源
-│   ├── sync.sh               # 部署同步：env / site(server→Mac 镜像) / site-push / migrate-data / backup(30min) / install-cron / uninstall-cron / harden
+│   ├── sync.sh               # 部署同步：env / site(server→Mac 镜像) / site-push / migrate-data / backup(30min) / conv-pull(server→Mac 对话) / install-cron / uninstall-cron / harden
 │   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
 │   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；默认回环、PROXY_BIND 可放开；静态服务带路径穿越防护）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs
-├── data/                       # 运行时数据（chroma / tasks / settings / static / workflows）
+├── data/                       # 运行时数据（chroma / tasks / settings / static / workflows / xhs-tasks / exports）
 ├── logs/                       # 日志（app/ + tasks/ + services/ + workflows/）
 ├── site/                       # 博客静态文件
 └── packages/
@@ -78,10 +78,11 @@ ai-engineer-journey/
     │   │   │   ├── modes.ts           # chat/plan/build 模式：MODE_INFO（状态+行为指令）+ WRITE_TOOLS/filterToolsByMode（工具权限）+ buildToolsSection（按模式拼工具清单）
     │   │   │   └── utils/       # utils(cn+BASE) / types / cost / env
     │   │   └── app/
-    │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）
+    │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）/ logs（日志页）
     │   │       ├── login/       # 登录页（(main) 组外，Neo-Brutalism 居中卡片）
-    │   │       ├── api/         # chat / memory / settings / services / conversations / auth(login·logout·change-password) ... + workflows、tasks 仅 catch-all 挂载点
+    │   │       ├── api/         # chat / memory / settings / services / conversations / logs / note / exports / auth(login·logout·change-password) ... + workflows、tasks 仅 catch-all 挂载点
     │   │       ├── note/[taskId]/page.tsx
+    │   │       ├── logs/page.tsx        # 日志页：分组（app/tasks/services/workflows/backup）+ 文件选择 + tail 自动刷新 + 下载
     │   │       ├── preview/[taskId]/route.ts
     │   │       ├── settings/page.tsx
     │   │       └── layout.tsx / globals.css
@@ -327,6 +328,8 @@ logs/
 
 > `logs/app/app-*.log` 由 ai-chat（NEXT logger）、MCP 子进程、`/api/client-log` 三方共享，统一**追加写（时间正序）**；读取方（`/api/logs`、`scripts/log.sh`）取尾部再反转展示。禁止「读整文件 → 前插 → 重写」（多进程会互相覆盖）。`createDateLogger`（workflows/tasks/services）仍是每 item 独立文件 + 倒序。
 
+> **日志页**：侧栏「日志」→ `(main)/logs`。`/api/logs` 三种形态：`?list=1` 列分组文件、`?group&file&tail=N` 取尾部行（≤2000）、`?group&file&download=1` 附件流式下载；分组 app/tasks/services/workflows/backup，路径白名单防穿越。原 right-panel 的临时「运行日志」块已移除（集中到日志页）。
+
 ## MCP 系统
 
 统一 MCP 服务器（`packages/mcp/`，stdio 协议），由 ai-chat 的 `lib/mcp-client.ts` spawn `node ../mcp/index.js` 拉起，进程内 `shared/llm` 每次调用 fresh-read 配置（改配置无需重建客户端）。客户端单例缓存 Promise，子进程死亡后由 `loadMcpTools` 调 `resetMCPClient()` 重连。
@@ -347,7 +350,7 @@ packages/mcp/
     ├── chroma/              # 5 tools：知识库增删查
     ├── media/               # 5 tools：generateImage / generateImageFromImage / checkImageProgress / generateMusic / checkMusicProgress
     ├── diagram/             # 2 tools：generateDiagram / checkDiagramProgress（Mermaid/D2）
-    ├── xiaohongshu/         # 4 tools：小红书笔记生成/修稿/导出/进度；finance 两阶段策划→正文，note-utils 负责候选评分/状态摘要/导出转换
+    ├── xiaohongshu/         # 4 tools：小红书笔记生成/修稿/导出/进度；finance 两阶段策划→正文，note-utils 负责候选评分/状态摘要/导出转换。任务状态存 data/xhs-tasks/<id>（跨重启），导出到 data/exports/<id>（浏览器经 /api/exports/<id> 打 zip 下载，7 天清理）
     ├── document/            # 2 tools：convertDocument / convertDocumentBatch（Pandoc→PDF/Word）
     └── todo/                # 6 tools（暂未注册）
 ```

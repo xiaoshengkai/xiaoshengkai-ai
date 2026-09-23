@@ -5,6 +5,7 @@
 #   site-push      应急 Mac→server 镜像推送 site/（会删服务器独有文件，跑前确认）
 #   migrate-data   Mac→server 一次性全量迁移 data/（含 chroma；跑前两端停服）
 #   backup         server→Mac 拉备份到 data-backup/（排除 chroma/bin；无 --delete）
+#   conv-pull      server→Mac 拉对话（本地优先，只补服务器独有；--with-uploads 连图片一起拉）
 #   install-cron   装定时备份（mac: LaunchDaemon 30min+wake 补跑+装即首跑；linux: 打印 cron 行）
 #   uninstall-cron 卸定时备份
 #   harden         服务器加固：sshd 关密码门（带回滚保险）+ fail2ban + 监听审计
@@ -21,9 +22,11 @@ LOCK_DIR="$BACKUP_DIR/.lock"
 CRON_LABEL=com.xiaoshengkai.backup
 # DRY_RUN=1 时 rsync 只演不传（验证参数/排除列表用）
 DRY=${DRY_RUN:+--dry-run}
+# conv-pull 可选：连 data/uploads 一起拉（体积大，默认关）
+[ "${2:-}" = "--with-uploads" ] && WITH_UPLOADS=1
 
 usage() {
-  echo "用法: scripts/sync.sh <env|site|site-push|migrate-data|backup|install-cron|uninstall-cron|harden>"
+  echo "用法: scripts/sync.sh <env|site|site-push|migrate-data|backup|conv-pull|install-cron|uninstall-cron|harden>"
   exit 1
 }
 
@@ -203,12 +206,27 @@ REMOTE
   fi
 }
 
+cmd_conv_pull() {
+  # server→Mac 拉对话：本地优先（--ignore-existing，只补服务器独有，不覆盖/不删除本地）
+  preflight_local
+  mkdir -p "$ROOT/data/conversations"
+  rsync -az $DRY --ignore-existing -e "$RSYNC_E" "$DEPLOY_HOST:$DEPLOY_PATH/data/conversations/" "$ROOT/data/conversations/"
+  if [ -n "$WITH_UPLOADS" ]; then
+    mkdir -p "$ROOT/data/uploads"
+    rsync -az $DRY --ignore-existing -e "$RSYNC_E" "$DEPLOY_HOST:$DEPLOY_PATH/data/uploads/" "$ROOT/data/uploads/"
+    echo "✅ conversations + uploads 已从服务器拉取（本地优先，未覆盖）"
+  else
+    echo "✅ conversations 已从服务器拉取（本地优先，未覆盖）；加 --with-uploads 可连图片一起拉"
+  fi
+}
+
 case "${1:-}" in
   env) cmd_env ;;
   site) cmd_site ;;
   site-push) cmd_site_push ;;
   migrate-data) cmd_migrate_data ;;
   backup) cmd_backup ;;
+  conv-pull) cmd_conv_pull ;;
   install-cron) cmd_install_cron ;;
   uninstall-cron) cmd_uninstall_cron ;;
   harden) cmd_harden ;;

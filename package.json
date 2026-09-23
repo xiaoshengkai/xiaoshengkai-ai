@@ -19,7 +19,7 @@
     "tasks:run": "node packages/tasks/run-task.js",
     "test": "npm run test:shared && npm run test:mm && npm run test:search",
     "test:shared": "node --test packages/shared/test/*.test.js",
-    "test:mm": "npm exec -w packages/ai-chat -- tsx --test ../shared/test/ai-chat-multimodal.test.ts ../shared/test/conversations-store.test.ts ../shared/test/services-manager.test.ts ../shared/test/modes.test.ts",
+    "test:mm": "npm exec -w packages/ai-chat -- tsx --test ../shared/test/ai-chat-multimodal.test.ts ../shared/test/conversations-store.test.ts ../shared/test/services-manager.test.ts ../shared/test/modes.test.ts ../shared/test/note-src.test.ts ../shared/test/zip.test.ts",
     "test:search": "node --test packages/services/search/test/normalize.test.js",
     "test:search:live": "node --test packages/services/search/test/live.test.js",
     "typecheck": "npm exec -w packages/ai-chat tsc -- --noEmit --incremental false",

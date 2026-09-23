@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.36 (2026-09-23) — 小红书预览/下载修复 + 在线日志页 + 对话拉取
+
+### 变更
+- **小红书笔记预览修复**：聊天里裸 `<iframe src="/note/x">` 依赖 proxy 重写 + 端口，模型写绝对地址漏端口即 connection refused。`markdown-components` 捕获 `/note/<id>` iframe（带/不带 basePath、绝对、错端口都命中）→ 改渲染 `NotePreviewCard`（同源 fetch，历史消息一并修好）；prompt 禁止手写 iframe。任务状态 `os.tmpdir()/xhs-tasks` → `data/xhs-tasks`（重启不再丢；读侧保留 /tmp 回退）。
+- **小红书下载到本地**：导出从服务器 `~/Downloads` 改为 `data/exports/<id>`（每次重建 + 7 天清理），`exportXiaohongshuNote` 返回 `downloadUrl`（优先 `publicBase()` 绝对地址，可复制到浏览器/手机）；新增 `GET /api/exports/[taskId]`，用 `lib/zip.ts`（node:zlib 手写最小 zip，零依赖）打包流式下载。旧 `/downloads/...` 系 AI 现编的假链接，废弃。
+- **在线日志页**：侧栏删「工具库」、设置下加「日志」→ `(main)/logs`（分组 app/tasks/services/workflows/backup、文件选择、tail 自动刷新可关、下载按钮）；`/api/logs` 扩展 `?list=1` / `?group&file&tail=N`(≤2000) / `?group&file&download=1`（分组+文件名白名单防穿越）；移除 right-panel 临时「运行日志」块；`getLogColor` 抽到 `lib/utils/log-color.ts`；proxy 路由去 `/tools` 加 `/logs`。
+- **对话拉取**：新增 `sync.sh conv-pull`（server→Mac，本地优先 `--ignore-existing`，只补服务器独有；`--with-uploads` 连图片），已跑一次把服务器「金融学习」拉回本地。文档同步 ARCHITECTURE/DESIGN。
+- **`deploy:smoke` 修成真"仅冒烟"**：原 `deploy.sh smoke` 的分支放在发版流程末尾，导致它先完整发版一遍再冒烟（现两遍）。`smoke()` 上移 + 前置短路 `exit`，`deploy:smoke` 不再碰 lock/ssh/服务器（实测仅冒烟路径）。
+
+### 验证
+- `npm run typecheck` 干净；`npm run test` 56+25+6 全绿（新增 note-src / zip 用例，zip 经 `unzip -t` 校验）；`npm run build` 成功（产出 `/api/exports/[taskId]`、`/logs`）；`bash -n sync.sh`、`node --check proxy.cjs` 通过
+- `sync.sh conv-pull` 实跑：本地对话 18 → 19（含「金融学习」）
+
 ## v0.11.35 (2026-09-23) — 模式感知（AI 知道 chat/plan/build）+ 移除本机自动 funnel
 
 ### 变更

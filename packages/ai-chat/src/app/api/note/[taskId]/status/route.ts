@@ -8,7 +8,11 @@ export async function GET(
 ) {
   const { taskId } = await params;
 
-  const taskDir = path.join(os.tmpdir(), "xhs-tasks", taskId);
+  // 持久化目录优先（data/xhs-tasks），旧数据回退 /tmp/xhs-tasks（重启前的任务仍可读）
+  const dataDir = path.resolve(process.cwd(), "..", "..", "data", "xhs-tasks", taskId);
+  const legacyDir = path.join(os.tmpdir(), "xhs-tasks", taskId);
+  const hasTask = (d: string) => fs.existsSync(path.join(d, "task.json"));
+  const taskDir = hasTask(dataDir) || !hasTask(legacyDir) ? dataDir : legacyDir;
   const taskFile = path.join(taskDir, "task.json");
   if (!fs.existsSync(taskFile)) {
     // ponytail: 区分"任务从未创建"vs"task.json 丢失"（目录存在但文件缺失）

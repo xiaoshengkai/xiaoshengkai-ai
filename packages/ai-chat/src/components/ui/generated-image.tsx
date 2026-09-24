@@ -9,10 +9,19 @@ interface GeneratedImageProps {
   alt?: string;
 }
 
+/** 本地上传图预览走压缩版（?preview=1）；lightbox 仍看原图（register 原 src）。远程/CDN 图不动。 */
+function previewSrc(src: string): string {
+  if (!/\/api\/uploads\//.test(src)) return src;
+  if (!/\.(png|jpe?g|webp)(\?|$)/i.test(src)) return src;
+  if (/[?&]preview=/.test(src)) return src;
+  return `${src}${src.includes("?") ? "&" : "?"}preview=1`;
+}
+
 export default function GeneratedImage({ src, alt }: GeneratedImageProps) {
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
   const { register, open } = useImageViewer();
   const indexRef = useRef<number>(0);
+  const display = previewSrc(src);
 
   useEffect(() => { indexRef.current = register(src); }, [src]);
 
@@ -20,8 +29,8 @@ export default function GeneratedImage({ src, alt }: GeneratedImageProps) {
     const img = new Image();
     img.onload = () => setState("loaded");
     img.onerror = () => setState("error");
-    img.src = src;
-  }, [src]);
+    img.src = display;
+  }, [display]);
 
   useEffect(() => {
     if (state === "loaded" || state === "error") {
@@ -46,7 +55,7 @@ export default function GeneratedImage({ src, alt }: GeneratedImageProps) {
   // eslint-disable-next-line @next/next/no-img-element
   return (
     <img
-      src={src}
+      src={display}
       alt={alt}
       className="border-[3px] shadow-md my-2 cursor-zoom-in max-w-full"
       onClick={() => open(indexRef.current!)}

@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.11.38 (2026-09-24) — 大图预览压缩（漫画页/上传图/角色图）
+
+### 变更
+- **预览压缩（单一真相源）**：新增 `packages/shared/image-preview.js`——sharp 长边 1600 + JPEG q85（视觉无损），伴生缓存 `<原文件>.preview.jpg`（mtime 校验、tmp→rename 原子、失败回退原图）。预览走小图，**导出/下载始终原文件**。
+- **两个 choke point 接 `?preview=1`**：`capability.js` 的 `stream` 原语（覆盖漫画页 `tasks/*/pages/*.png`、角色图 `assets/characters/*.png`、anchors）与 `app/api/uploads/[filename]`（覆盖聊天附件 `data/static/images/*`，视频/Range 原样）。本地实测：聊天图 72MB/93 个、漫画页单张 2.6–3.4MB。
+- **UI 接线**：执行页漫画页 img、（工作流类型页）角色图两处加 `?preview=1`；`GeneratedImage` 对 `/api/uploads/` 图片自动显示预览版、lightbox 仍注册原图（历史消息零改动自动生效）。
+- **不动**：comic/xhs 导出（原文件）；远程 CDN 图（压不了）；视频转码。
+
+### 验证
+- `node --test packages/shared/test/image-preview.test.js`（纯函数 + sharp 真实往返：预览更小、二次命中缓存 mtime 不变）；typecheck / test / build
+- 线上实测 `?preview=1` 的 Content-Length 远小于原图、二次请求命中缓存；导出 Downloads 仍为原图
+
 ## v0.11.37 (2026-09-24) — 日志页入 git + 状态面板撑满 + 未登录导航跳登录页
 
 ### 变更

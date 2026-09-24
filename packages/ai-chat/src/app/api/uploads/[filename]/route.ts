@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, stat } from "fs/promises";
 import { createReadStream } from "node:fs";
 import path from "node:path";
+import { getPreview, isPreviewRequest } from "@app/shared/image-preview.js";
 
 const MIME: Record<string, string> = {
   png: "image/png",
@@ -75,6 +76,24 @@ export async function GET(
   const contentType = MIME[ext] || "application/octet-stream";
   const fileStat = await stat(filePath);
   const fileSize = fileStat.size;
+
+  // 预览压缩：?preview=1 且是图片 → 走伴生缓存小图；失败回退原图
+  if (isPreviewRequest(req.url, ext ? `.${ext}` : "")) {
+    try {
+      const previewPath = await getPreview(filePath);
+      const ps = await stat(previewPath);
+      const stream = createReadStream(previewPath);
+      // @ts-expect-error - Web ReadableStream from Node ReadStream
+      return new NextResponse(stream, {
+        headers: {
+          "Content-Type": "image/jpeg",
+          "Content-Length": String(ps.size),
+          "Cache-Control": "no-cache",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    } catch { /* 回退原图 */ }
+  }
 
   // Range 请求（视频拖动播放需要）
   const rangeHeader = req.headers.get("range");

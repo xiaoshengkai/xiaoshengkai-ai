@@ -1378,7 +1378,9 @@ function ImagesGallery({ output, executionId, v, onTweakPage }: { output: string
               </div>
             );
           }
-          const src = `${fileBase}/${p.file}${v ? `?v=${v}` : ""}`;
+          const q = new URLSearchParams({ preview: "1" });
+          if (v) q.set("v", String(v));
+          const src = `${fileBase}/${p.file}?${q}`;
           const idx = register(src);
           return (
             <div key={p.page} className="relative">

@@ -52,11 +52,12 @@ ai-engineer-journey/
     ├── shared/                 # 跨包共享模块（@app/shared workspace 包，裸导入）
     │   ├── package.json        # name: @app/shared（private, type: module）
     │   ├── capability.js       # 通用能力 dispatcher（actions.json 4 原语）
+    │   ├── image-preview.js    # 图片预览压缩：sharp 长边1600+JPEG q85、伴生 .preview.jpg 缓存（预览用，导出用原图）
     │   ├── auth.js             # 登录鉴权：密码校验（data/auth.json 优先，.env 兜底）/ HMAC token 签发校验（含密码指纹）/ 防爆破计数
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir / withTimeout（网络调用硬超时兜底）
-    │   ├── test/               # 共享测试（auth / capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store）
+    │   ├── test/               # 共享测试（auth / capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store / image-preview）
     │   └── llm/                # LLM 共享封装
     │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
     │       ├── config.js       # providers.json / selection.json fresh-read（真源，env 兜底）
@@ -134,7 +135,7 @@ ai-chat 对 workflows/tasks 只保留 1 个 catch-all 挂载点（`app/api/{work
 | 原语 | 行为 | 使用方 |
 |---|---|---|
 | `cli` | spawn `node cli.js <command> <json>`，解析 stdout JSON；支持 required 校验 / notFound→404 / timeout / detached fire&forget | workflows 通用动作 |
-| `stream` | 文件流 + Range 206 + 穿越守卫 + MIME | file/* |
+| `stream` | 文件流 + Range 206 + 穿越守卫 + MIME；`?preview=1` 图片走 `image-preview` 压缩小图（漫画页/角色图/anchors） | file/*、assets/characters/* |
 | `upload` | formData 收文件写盘（扩展名白名单） | BGM 上传 |
 | `custom` | 包内 JS handler（http.js 静态注入函数） | generate-content / tasks 全套 |
 

@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { execFile, spawn } from "node:child_process";
+import { getPreview, isPreviewRequest } from "./image-preview.js";
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -173,7 +174,7 @@ const MIME = {
 };
 
 /** stream 原语：dir + params 值 + rest 段拼文件路径，Range 206 分段（从旧 file 路由移植） */
-function serveStream(action, match, request) {
+async function serveStream(action, match, request) {
   const relParts = [...Object.values(match.params), ...match.rest];
   const filePath = path.resolve(action.dir, ...relParts);
 
@@ -193,6 +194,21 @@ function serveStream(action, match, request) {
   const ext = path.extname(filename).toLowerCase();
   const contentType = MIME[ext] || "application/octet-stream";
   const fileSize = stat.size;
+
+  // 预览压缩：?preview=1 且是图片 → 走伴生缓存小图；失败回退原图
+  if (isPreviewRequest(request.url, ext)) {
+    try {
+      const previewPath = await getPreview(filePath);
+      const ps = fs.statSync(previewPath);
+      return new Response(fs.createReadStream(previewPath), {
+        headers: {
+          "Content-Type": "image/jpeg",
+          "Content-Length": String(ps.size),
+          "Cache-Control": "no-cache",
+        },
+      });
+    } catch { /* 回退原图 */ }
+  }
 
   const rangeHeader = request.headers.get("range");
   if (rangeHeader) {

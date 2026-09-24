@@ -457,7 +457,7 @@ export default function WorkflowTypePage() {
                           <div key={c.id} onClick={() => setFormValues({ ...formValues, characterRef: c.id })}
                             className={`shrink-0 cursor-pointer p-1 text-center ${formValues.characterRef === c.id ? "bg-yellow-soft" : ""}`}
                             style={{ border: `2px solid ${formValues.characterRef === c.id ? "var(--primary)" : "var(--border)"}` }}>
-                            <img src={`${BASE}/api/workflows/assets/characters/${c.id}.png`} alt={c.name}
+                            <img src={`${BASE}/api/workflows/assets/characters/${c.id}.png?preview=1`} alt={c.name}
                               className="w-16 h-16 object-cover" />
                             <div className="text-xs mt-1 max-w-16 truncate">{c.name}</div>
                           </div>
@@ -605,7 +605,7 @@ export default function WorkflowTypePage() {
             <div className="text-xs font-bold">已保存 ({characters.length})</div>
             {characters.map(c => (
               <div key={c.id} className="flex items-center gap-2 p-2 bg-card border-2 border-border">
-                <img src={`${BASE}/api/workflows/assets/characters/${c.id}.png`} alt={c.name}
+                <img src={`${BASE}/api/workflows/assets/characters/${c.id}.png?preview=1`} alt={c.name}
                   className="w-14 h-14 object-cover border border-border shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-bold truncate">{c.name}</div>

@@ -23,13 +23,20 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // 浏览器直接导航（Accept 含 text/html，如 dashboard/推送/下载链接）→ 未登录跳登录页，而不是甩一坨 JSON
+  const wantsHtml = (request.headers.get("accept") || "").includes("text/html");
+  // JSON 错误显式带 charset=utf-8，否则 Safari 在中文环境按 GBK 猜解 → 乱码
+  const jsonErr = (error: string, status: number) =>
+    NextResponse.json({ ok: false, error }, { status, headers: { "content-type": "application/json; charset=utf-8" } });
+
   const configured = isAuthConfigured();
   if (!configured) {
     if (process.env.NODE_ENV === "production") {
       // fail-closed：密钥未配置不放行任何请求（login 接口会给出明确错误）
-      return pathname.startsWith("/api/")
-        ? NextResponse.json({ ok: false, error: "auth_not_configured: 服务端未配置 AUTH_PASSWORD/AUTH_SECRET" }, { status: 503 })
-        : NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
+      if (pathname.startsWith("/api/") && !wantsHtml) {
+        return jsonErr("auth_not_configured: 服务端未配置 AUTH_PASSWORD/AUTH_SECRET", 503);
+      }
+      return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
     }
     return NextResponse.next(); // dev 未配置密码 → 不启用登录
   }
@@ -39,8 +46,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.json({ ok: false, error: "unauthorized: 未登录" }, { status: 401 });
+  if (pathname.startsWith("/api/") && !wantsHtml) {
+    return jsonErr("unauthorized: 未登录", 401);
   }
   return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
 }

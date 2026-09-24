@@ -28,6 +28,8 @@ packages/ai-chat/.next
 packages/ai-chat/.next-prod
 data
 logs/
+# 单独剔除：日志 UI 页面目录不叫 logs 会被上面的 logs/ 误伤（运行时 logs/ 仍忽略）
+!packages/ai-chat/src/app/(main)/logs/
 site/
 docs/
 packages/.planning/packages/workflows/templates/video-generation-v2/lib/sfx/*.mp3

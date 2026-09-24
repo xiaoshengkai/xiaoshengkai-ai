@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.37 (2026-09-24) — 日志页入 git + 状态面板撑满 + 未登录导航跳登录页
+
+### 变更
+- **`/ai/logs` 404 根因**：`.gitignore` 的 `logs/` 无锚定，误伤 `packages/ai-chat/src/app/(main)/logs/` 页面目录 → 页面从未进 git → 服务器构建无此路由（本地因文件在磁盘上看着正常）。修复：单独剔除 `!packages/ai-chat/src/app/(main)/logs/`，运行时 `logs/` 仍忽略。
+- **状态面板留白**：right-panel「检索记忆」改弹性撑满（`flex-1 min-h-0` + 内部滚动、去 `max-h-[220px]`、空态占位），底边与输入框对齐。
+- **未登录导航 + 乱码**：`proxy.ts` 对浏览器导航（`Accept` 含 `text/html`，如 tasks dashboard / 推送 / 下载链接）未登录时 302 跳 `/login`（不再甩 401 JSON）；JSON 错误显式 `charset=utf-8`（修 Safari 中文环境按 GBK 猜解导致的乱码）。
+
+### 验证
+- `npm run typecheck` / `test`(56+25+6) / `build`（产出 `○ /logs`）全绿；`git check-ignore` 页面目录不再命中、运行时 `logs/app/*.log` 仍忽略
+
 ## v0.11.36 (2026-09-23) — 小红书预览/下载修复 + 在线日志页 + 对话拉取
 
 ### 变更

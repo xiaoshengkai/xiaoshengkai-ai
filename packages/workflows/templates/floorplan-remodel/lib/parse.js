@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import sharp from "sharp";
 import { callMultimodalLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderStructure } from "./render.js";
@@ -8,12 +8,11 @@ import { loadWallMask, snapPoint, nearMask, snapPerimeter, buildMaskGrid, slideR
 
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 
-function getImageSize(imagePath) {
+// ponytail: sharp metadata 跨平台读尺寸（sips 是 macOS 专属，上云后 Linux 必挂）
+export async function getImageSize(imagePath) {
   try {
-    const out = execFileSync("sips", ["-g", "pixelWidth", "-g", "pixelHeight", imagePath], { encoding: "utf-8" });
-    const w = Number((out.match(/pixelWidth:\s*(\d+)/) || [])[1]);
-    const h = Number((out.match(/pixelHeight:\s*(\d+)/) || [])[1]);
-    if (w > 0 && h > 0) return { imgW: w, imgH: h };
+    const { width, height } = await sharp(imagePath).metadata();
+    if (width > 0 && height > 0) return { imgW: width, imgH: height };
   } catch { /* fall through */ }
   return { imgW: null, imgH: null };
 }
@@ -224,7 +223,7 @@ export async function parseFloorPlan(imagePath, executionDir) {
   if (!mime) throw new Error("不支持的图片格式，请上传 png/jpg/webp");
   const imgFile = `floorplan${ext}`;
   fs.copyFileSync(imagePath, path.join(executionDir, imgFile));
-  const { imgW, imgH } = getImageSize(imagePath);
+  const { imgW, imgH } = await getImageSize(imagePath);
   if (!imgW) throw new Error("无法读取图片尺寸，请换 png/jpg 格式重试");
   const dataUrl = `data:${mime};base64,${fs.readFileSync(imagePath).toString("base64")}`;
 

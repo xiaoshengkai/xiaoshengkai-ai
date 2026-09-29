@@ -3,7 +3,9 @@ import assert from "node:assert";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import sharp from "sharp";
 import { validatePlanWithRules, generatePlans } from "../../workflows/templates/floorplan-remodel/lib/generate.js";
+import { getImageSize } from "../../workflows/templates/floorplan-remodel/lib/parse.js";
 import { renderStructure } from "../../workflows/templates/floorplan-remodel/lib/render.js";
 import { roomTypeByLabel } from "../../workflows/templates/floorplan-remodel/lib/metrics.js";
 import { buildMaskGrid, slideRefit, wallThickness, detectOpenings, mergeCollinearWalls, pickEntryDoor } from "../../workflows/templates/floorplan-remodel/lib/snap.js";
@@ -199,4 +201,15 @@ test("面积近miss（≥60% 下限）降级告警不丢方案，远低于仍硬
   assert.ok(near.warnings.some(w => w.includes("仅示意")), JSON.stringify(near));
   const far = validatePlanWithRules({ title: "t", summary: "s", demolish: [], build: [], newRooms: [{ label: "书房", bbox: [0, 0, 100, 100] }] }, structure, rules);
   assert.ok(far.errors.some(e => e.includes("远低于")), JSON.stringify(far));
+});
+
+test("getImageSize 跨平台读尺寸（sharp，非 sips）", async () => {
+  const file = path.join(os.tmpdir(), `fp-size-${process.pid}.png`);
+  await sharp({ create: { width: 123, height: 45, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toFile(file);
+  try {
+    assert.deepEqual(await getImageSize(file), { imgW: 123, imgH: 45 });
+    assert.deepEqual(await getImageSize(path.join(os.tmpdir(), "fp-size-nope.png")), { imgW: null, imgH: null });
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
 });

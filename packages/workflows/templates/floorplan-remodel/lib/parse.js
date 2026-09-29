@@ -4,7 +4,8 @@ import sharp from "sharp";
 import { callMultimodalLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderStructure } from "./render.js";
-import { loadWallMask, snapPoint, nearMask, snapPerimeter, buildMaskGrid, slideRefit, wallThickness, loadColorRaw, detectOpenings, mergeCollinearWalls, pickEntryDoor } from "./snap.js";
+import { extractWalls } from "./extract-walls.js";
+import { loadWallMask, snapPoint, nearMask, snapPerimeter, buildMaskGrid, slideRefit, wallThickness, loadColorRaw, detectOpenings, mergeCollinearWalls, pickEntryDoor, maskExtent } from "./snap.js";
 
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
 
@@ -17,7 +18,15 @@ export async function getImageSize(imagePath) {
   return { imgW: null, imgH: null };
 }
 
-function buildSystem(imgW, imgH) {
+function buildSystem(imgW, imgH, cv) {
+  const wallRules = cv
+    ? `- 墙体与门窗已由像素级提取完成：walls 与 openings 输出空数组，不要输出墙线段/门窗
+- entryDoorId 不确定写 null（下游会用像素检测复核）`
+    : `- 每面直墙一条线段，端点精确贴合墙线中心；线段必须沿图中黑色墙体的中心线描摹
+- 外墙与加粗黑墙 bearing=true，室内薄隔墙 bearing=false
+- 承重判断不确定时 confidence<0.7（下游会把低置信墙按承重处理，宁可保守）
+- 门=带弧线开口，窗=墙上细线开口
+- 入户门：通常是最外侧一扇 door，识别到则其 id 写入 entryDoorId，不确定写 null`;
   return `你是户型图结构化识别专家。观察用户上传的户型图，输出严格 JSON（不要 markdown 围栏）。
 坐标系：原图像素坐标，x∈[0,${imgW}]，y∈[0,${imgH}]，y 向下。
 {
@@ -27,26 +36,22 @@ function buildSystem(imgW, imgH) {
   "dims": [{ "edge": "top|bottom|left|right", "values": [<该排尺寸标注的毫米数，按从左到右/从上到下顺序>], "x1": <该排标注覆盖的起点x>, "y1": <起点y>, "x2": <终点x>, "y2": <终点y> }],
   "entryDoorId": "<入户门 opening 的 id（最外侧一扇门），不确定写 null",
   "wetRooms": ["<厨房/卫生间等湿区 room id>"],
-  "adjacency": [{ "a": "<room id>", "b": "<相邻 room id>" }],
+  "adjacency": [{ "a": "<room id>", "b": "<相邻 room id> }],
   "notes": "<朝向等说明，一句话>"
 }
 识别规则：
-- 每面直墙一条线段，端点精确贴合墙线中心；线段必须沿图中黑色墙体的中心线描摹
+${wallRules}
 - 尺寸标注线（图外围带箭头和数字的细线）不是墙！坐标严禁参考标注线，必须落在墙体像素上
-- 外墙与加粗黑墙 bearing=true，室内薄隔墙 bearing=false
-- 承重判断不确定时 confidence<0.7（下游会把低置信墙按承重处理，宁可保守）
 - rooms.bbox 取房间墙线内边界矩形；center 取几何中心
-- 门=带弧线开口，窗=墙上细线开口
-- 入户门：通常是最外侧一扇 door，识别到则其 id 写入 entryDoorId，不确定写 null
 - wetRooms：所有厨房、卫生间、淋浴间等湿区的 room id 数组（这些房间有排水立管）
 - adjacency：输出相邻房间的 room id 对 [{a,b}]，每对两个房间共享一堵墙或有门相通
 - dims：只录图上清晰可见的尺寸标注排（如顶部 2670/3415/1070），values 按标注原文数字，x1y1x2y2 取该排尺寸线两端对应的墙体像素位置；看不清就不录`;
 }
 
-function validate(structure) {
+function validate(structure, cv) {
   const errors = [];
   if (!structure || typeof structure !== "object") return ["输出不是 JSON 对象"];
-  if (!Array.isArray(structure.walls) || structure.walls.length === 0) errors.push("walls 为空");
+  if (!cv && (!Array.isArray(structure.walls) || structure.walls.length === 0)) errors.push("walls 为空");
   if (!Array.isArray(structure.rooms) || structure.rooms.length === 0) errors.push("rooms 为空");
   (structure.walls || []).forEach((w, i) => {
     if (!["x1", "y1", "x2", "y2"].every(k => Number.isFinite(Number(w?.[k])))) errors.push(`walls[${i}] 坐标不完整`);
@@ -66,7 +71,7 @@ function dedupeWalls(walls, minLen) {
   });
 }
 
-function normalize(structure, imgW, imgH) {
+function normalize(structure, imgW, imgH, cvWalls) {
   const clampC = v => Math.max(0, Math.min(1, Number(v) || 0));
   const clampX = v => imgW ? Math.max(0, Math.min(imgW, Number(v) || 0)) : Number(v) || 0;
   const clampY = v => imgH ? Math.max(0, Math.min(imgH, Number(v) || 0)) : Number(v) || 0;
@@ -74,11 +79,12 @@ function normalize(structure, imgW, imgH) {
     imgW, imgH,
     width: imgW || 1000,
     height: imgH || 700,
-    walls: dedupeWalls((structure.walls || []).map((w, i) => ({
+    walls: dedupeWalls((cvWalls || structure.walls || []).map((w, i) => ({
       id: String(w.id || `w${i + 1}`),
       x1: clampX(w.x1), y1: clampY(w.y1), x2: clampX(w.x2), y2: clampY(w.y2),
       bearing: Boolean(w.bearing) || clampC(w.confidence) < 0.7,
       confidence: clampC(w.confidence),
+      ...(Number.isFinite(w.thickness) ? { thickness: w.thickness } : {}),
     })), Math.max(8, (imgW || 1000) * 0.01)),
     rooms: (structure.rooms || []).map((r, i) => ({
       id: String(r.id || `r${i + 1}`),
@@ -172,11 +178,17 @@ async function snapWalls(normalized, imagePath) {
     }
   }
   for (const w of normalized.walls) if (!w.unverified) w.thickness = wallThickness(w, pts);
-  const xs = pts.map(p => p[0]).sort((a, b) => a - b);
-  const ys = pts.map(p => p[1]).sort((a, b) => a - b);
-  const q = (arr, t) => arr[Math.min(arr.length - 1, Math.floor(arr.length * t))];
-  const extent = pts.length ? { left: q(xs, 0.01), right: q(xs, 0.99), top: q(ys, 0.01), bottom: q(ys, 0.99) } : null;
-  return { snapped, missed, extent, det };
+  return { snapped, missed, extent: maskExtent(pts), det };
+}
+
+// CV 墙段后处理：门窗像素检测 + 外围 extent（墙坐标已像素级准确，无需吸附）
+async function cvPrepare(walls, imagePath) {
+  const pts = await loadWallMask(imagePath);
+  const img = await loadColorRaw(imagePath);
+  const det = detectOpenings(walls, pts, img);
+  const kept = walls.filter(w => !det.drops.includes(w.id));
+  det.openings = det.openings.filter(o => !det.drops.includes(o.wallId));
+  return { walls: kept, extent: maskExtent(pts), det };
 }
 
 // 承重判定：贴外围轮廓或墙厚显著大于中位数 → 承重；未验证墙一律按承重（不可拆兜底）
@@ -195,6 +207,13 @@ function reclassifyBearing(normalized, extent) {
   }
 }
 
+function pointSegDist(px, py, w) {
+  const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+  const len2 = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((px - w.x1) * dx + (py - w.y1) * dy) / len2));
+  return Math.hypot(px - (w.x1 + dx * t), py - (w.y1 + dy * t));
+}
+
 function qualityChecks(normalized) {
   const checks = [];
   const { imgW, imgH, walls } = normalized;
@@ -202,8 +221,9 @@ function qualityChecks(normalized) {
   let orphans = 0;
   for (const w of walls) {
     for (const [x, y] of [[w.x1, w.y1], [w.x2, w.y2]]) {
+      // 端点连通 = 碰到他墙端点或落在他墙线上（T 型交点）
       const connected = walls.some(o => o !== w &&
-        (Math.hypot(o.x1 - x, o.y1 - y) < tol || Math.hypot(o.x2 - x, o.y2 - y) < tol));
+        Math.hypot(o.x1 - x, o.y1 - y) < tol || Math.hypot(o.x2 - x, o.y2 - y) < tol || pointSegDist(x, y, o) < tol);
       if (!connected) orphans++;
     }
   }
@@ -212,6 +232,7 @@ function qualityChecks(normalized) {
   checks.push({ rule: "房间 bbox 完整", pass: noBbox === 0, note: noBbox ? `${noBbox} 个房间缺 bbox` : "" });
   const bearingRatio = walls.filter(w => w.bearing).length / Math.max(1, walls.length);
   checks.push({ rule: "承重比例合理", pass: bearingRatio > 0.2 && bearingRatio < 0.95, note: `承重占 ${(bearingRatio * 100).toFixed(0)}%` });
+  checks.push({ rule: "几何来源", pass: true, note: normalized.source === "cv" ? `CV 墙段 ${walls.length}` : `vision 墙段 ${walls.length}` });
   if (imgW) checks.push({ rule: "坐标在图内", pass: true, note: "" });
   return checks;
 }
@@ -229,10 +250,11 @@ export async function parseFloorPlan(imagePath, executionDir) {
 
   let lastErrors = [];
   const candidates = [];
+  const cv = await extractWalls(imagePath);
   for (let attempt = 0; attempt < 2; attempt++) {
     const retryHint = lastErrors.length ? `\n上次输出有问题：${lastErrors.join("；")}。请修正后重新输出完整 JSON。` : "";
     const { text } = await callMultimodalLLM({
-      system: buildSystem(imgW, imgH) + retryHint,
+      system: buildSystem(imgW, imgH, !!cv) + retryHint,
       user: "识别这张户型图，直接输出 JSON，不要冗长推理。",
       images: [dataUrl],
       temperature: 0.2,
@@ -245,18 +267,26 @@ export async function parseFloorPlan(imagePath, executionDir) {
       lastErrors = [e instanceof Error ? e.message : String(e)];
       continue;
     }
-    lastErrors = validate(parsed);
-    if (lastErrors.length === 0) candidates.push(normalize(parsed, imgW, imgH));
+    lastErrors = validate(parsed, !!cv);
+    if (lastErrors.length === 0) candidates.push(normalize(parsed, imgW, imgH, cv ? cv.walls : null));
   }
   if (candidates.length === 0) throw new Error(`户型图识别失败：${lastErrors.join("；")}。请换更清晰的户型图重试`);
 
   let normalized = null;
   let snapStats = null;
+  const cvPre = cv ? await cvPrepare(candidates[0].walls, imagePath) : null;
   for (const c of candidates) {
     c.mmPerPx = computeMmPerPx(c);
+    if (cvPre) continue;
     const stats = await snapWalls(c, imagePath);
     if (!normalized || stats.missed < snapStats.missed) { normalized = c; snapStats = stats; }
   }
+  if (cvPre) {
+    normalized = candidates[0];
+    normalized.walls = cvPre.walls;
+    snapStats = { snapped: normalized.walls.length * 2, missed: 0, extent: cvPre.extent, det: cvPre.det };
+  }
+  normalized.source = cv ? "cv" : "vision";
   reclassifyBearing(normalized, snapStats.extent);
   if (snapStats.det && snapStats.det.openings.length > 0) {
     normalized.openings = snapStats.det.openings
@@ -283,6 +313,6 @@ export async function parseFloorPlan(imagePath, executionDir) {
   return {
     pages: [{ page: 1, file: "structure.svg" }],
     structureJson: JSON.stringify(normalized),
-    output: `识别到 ${normalized.walls.length} 面墙（承重 ${normalized.walls.filter(w => w.bearing).length} 面）、${normalized.rooms.length} 个房间${normalized.mmPerPx ? `，比例尺 ${normalized.mmPerPx}mm/px` : ""}。请核对红线与原图墙体是否贴合，有误请重试。${warnings.length ? ` 质检提示：${warnings.join("；")}` : ""}`,
+    output: `【${normalized.source === "cv" ? "CV 几何" : "vision 几何"}】识别到 ${normalized.walls.length} 面墙（承重 ${normalized.walls.filter(w => w.bearing).length} 面）、${normalized.rooms.length} 个房间${normalized.mmPerPx ? `，比例尺 ${normalized.mmPerPx}mm/px` : ""}。请核对红线与原图墙体是否贴合，有误请重试。${warnings.length ? ` 质检提示：${warnings.join("；")}` : ""}`,
   };
 }

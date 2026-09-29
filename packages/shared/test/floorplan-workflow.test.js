@@ -6,6 +6,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { validatePlanWithRules, generatePlans } from "../../workflows/templates/floorplan-remodel/lib/generate.js";
 import { getImageSize } from "../../workflows/templates/floorplan-remodel/lib/parse.js";
+import { extractWalls } from "../../workflows/templates/floorplan-remodel/lib/extract-walls.js";
 import { renderStructure } from "../../workflows/templates/floorplan-remodel/lib/render.js";
 import { roomTypeByLabel } from "../../workflows/templates/floorplan-remodel/lib/metrics.js";
 import { buildMaskGrid, slideRefit, wallThickness, detectOpenings, mergeCollinearWalls, pickEntryDoor } from "../../workflows/templates/floorplan-remodel/lib/snap.js";
@@ -209,6 +210,44 @@ test("getImageSize 跨平台读尺寸（sharp，非 sips）", async () => {
   try {
     assert.deepEqual(await getImageSize(file), { imgW: 123, imgH: 45 });
     assert.deepEqual(await getImageSize(path.join(os.tmpdir(), "fp-size-nope.png")), { imgW: null, imgH: null });
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
+// 合成黑墙图：外环 4 墙 + 带门洞内墙 1（断口合并）+ 薄线假墙剔除
+async function syntheticPlan(file) {
+  const W = 600, H = 400;
+  const buf = Buffer.alloc(W * H, 250);
+  const px = (x, y) => { if (x >= 0 && y >= 0 && x < W && y < H) buf[y * W + x] = 10; };
+  const rect = (x1, y1, x2, y2) => { for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) px(x, y); };
+  rect(50, 50, 550, 55); rect(50, 345, 550, 350); rect(50, 50, 55, 350); rect(545, 50, 550, 350);
+  rect(300, 55, 305, 180); rect(300, 230, 305, 345);   // 内墙，门洞 y181-229
+  rect(55, 250, 300, 255);                               // 横向隔墙（凑真实户型墙数下限）
+  rect(100, 150, 500, 151);                              // 薄线假墙（th2）
+  await sharp(buf, { raw: { width: W, height: H, channels: 1 } }).png().toFile(file);
+}
+
+test("extractWalls: 外环+门洞内墙合并，薄线剔除", async () => {
+  const file = path.join(os.tmpdir(), `fp-extract-${process.pid}.png`);
+  await syntheticPlan(file);
+  try {
+    const r = await extractWalls(file);
+    assert.ok(r, "应提取到墙");
+    assert.strictEqual(r.walls.length, 6, JSON.stringify(r.walls));
+    const inner = r.walls.find(w => Math.abs(w.x1 - w.x2) < 5 && w.x1 > 200 && w.x1 < 400);
+    assert.ok(inner, "门洞内墙应合并为一段");
+    assert.ok(inner.y1 <= 60 && inner.y2 >= 340, JSON.stringify(inner));
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
+test("extractWalls: 非黑墙图返回 null 触发 vision 兜底", async () => {
+  const file = path.join(os.tmpdir(), `fp-extract-blank-${process.pid}.png`);
+  await sharp({ create: { width: 300, height: 200, channels: 3, background: { r: 240, g: 240, b: 240 } } }).png().toFile(file);
+  try {
+    assert.strictEqual(await extractWalls(file), null);
   } finally {
     fs.rmSync(file, { force: true });
   }

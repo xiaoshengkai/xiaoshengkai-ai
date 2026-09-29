@@ -36,6 +36,14 @@ export function nearMask(x, y, pts, r) {
   return pts.some(([px, py]) => Math.hypot(px - x, py - y) < r);
 }
 
+export function maskExtent(pts) {
+  if (!pts.length) return null;
+  const xs = pts.map(p => p[0]).sort((a, b) => a - b);
+  const ys = pts.map(p => p[1]).sort((a, b) => a - b);
+  const q = (arr, t) => arr[Math.min(arr.length - 1, Math.floor(arr.length * t))];
+  return { left: q(xs, 0.01), right: q(xs, 0.99), top: q(ys, 0.01), bottom: q(ys, 0.99) };
+}
+
 export function buildMaskGrid(pts, cell = 6) {
   const g = new Set();
   for (const [x, y] of pts) g.add(Math.floor(x / cell) * 100000 + Math.floor(y / cell));

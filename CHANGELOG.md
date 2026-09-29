@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.39 (2026-09-29) — 聊天图片描述内联化 + 缺失降级（修"AI 看不到上传图"）
+
+### 问题
+- 纯文本 provider 的图片描述整块注入 system prompt，长历史/多相似图时模型无法把"图N"与消息占位符对齐 → 拒答"只看到占位符"（生产实测：90 条历史 + 3 张户型图）。
+- 上传文件在服务器丢失后，`preprocess` 对本地缺文件硬抛错 → 含该标记的对话**每轮 500** 永久砖化。
+
+### 变更
+- `preprocess.ts`：重写为逐图并行 vision 调用，返回 `Map<占位来源, 内联文本>`；本地缺失/超限、远程下载失败、vision 失败一律降级注记 `[图片已失效或无法读取，内容缺失]`，不抛错。
+- `pipeline.ts`：`inlineDescriptions` 把描述原位替换回消息占位符（marker/URL/file part）；删除 `systemInjection` 返回字段；深度外消息仍 strip 成 `[图片]`。
+- `route.ts`：删除 system prompt 注入链路（参数 + 模板行，纯删除）。
+- `multimodal-config.ts`：`missingFileStrategy` 默认 `error` → `ignore`（direct 分支同族隐患一并兜住）；`image.ts` ignore 分支补降级注记。
+- 决策见 `DESIGN.md`「聊天图片附件：内联描述与降级」。
+
+### 验证
+- `ai-chat-multimodal.test.ts` 改写 10 用例（缺文件/超限/下载失败/vision 失败降级、逐图一调用、同图去重复用、direct 不变）；typecheck / test / build 全绿。
+
 ## v0.11.38 (2026-09-24) — 大图预览压缩（漫画页/上传图/角色图）
 
 ### 变更

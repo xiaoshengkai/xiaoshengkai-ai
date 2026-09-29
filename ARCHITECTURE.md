@@ -71,7 +71,7 @@ ai-engineer-journey/
     │   │   ├── lib/
     │   │   │   ├── core/        # LLM 基础设施：embedding / workflow-model / fetch-interceptors
     │   │   │   ├── strategies/  # chat 路由：chat-strategy + 4 provider strategy（deepseek/glm/minimax/qwen，classifyTask 在 deepseek.ts）
-    │   │   │   ├── multimodal/  # 附件处理：attachment / image / video(仅 stripVideos) / pipeline / preprocess(复用 vision 模块) / modality-detector / multimodal-config / mime
+    │   │   │   ├── multimodal/  # 附件处理：attachment / image / video(仅 stripVideos) / pipeline / preprocess(vision 逐图描述→内联替换消息占位符) / modality-detector / multimodal-config / mime
     │   │   │   ├── rag/         # retrieve.ts / vector-store.ts / chroma-server.ts
     │   │   │   ├── settings/    # store / init / dispatcher / types
     │   │   │   ├── services/    # manager.ts：packages/services/* 清单扫描 + 启停/健康检查（服务监控）

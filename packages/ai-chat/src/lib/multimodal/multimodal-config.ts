@@ -66,7 +66,8 @@ export const DEFAULT_CONFIG: MultimodalConfig = {
   videoHistoryDepth: 1,
   maxImageFileSize: 10 * 1024 * 1024,
   maxFileSize: 50 * 1024 * 1024,  // 50MB（M3 base64 视频上限）
-  missingFileStrategy: 'error',
+  // ponytail: 上传文件可能被运维清理/迁移丢失 → 缺失降级注记，不 500 阻断整轮对话
+  missingFileStrategy: 'ignore',
 };
 
 /**

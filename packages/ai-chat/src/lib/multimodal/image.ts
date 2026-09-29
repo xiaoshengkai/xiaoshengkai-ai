@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_CONFIG, readHistoryDepth } from './multimodal-config';
-import { IMAGE_URL_REGEX, IMAGE_UPLOAD_REGEX, downloadRemoteImage, assertMediaDataSize } from './attachment';
+import { IMAGE_URL_REGEX, IMAGE_UPLOAD_REGEX, IMAGE_MISSING_NOTE, downloadRemoteImage, assertMediaDataSize } from './attachment';
 import type { FilePart, Message, MessagePart, TextPart } from "../utils/types"
 
 const ROOT_DIR = path.resolve(process.cwd(), '..', '..');
@@ -109,8 +109,7 @@ export async function processImagesDirect(messages: Message[]): Promise<Message[
         if (strategy === 'error') throw err;
         if (strategy === 'ignore') {
           console.warn(`[image] 忽略缺失图片: ${(err as Error).message}`);
-          if (!cleanText) continue;
-          newParts.push({ type: 'text', text: cleanText });
+          newParts.push({ type: 'text', text: [cleanText, IMAGE_MISSING_NOTE].filter(Boolean).join('\n') });
         } else {
           return msg;
         }

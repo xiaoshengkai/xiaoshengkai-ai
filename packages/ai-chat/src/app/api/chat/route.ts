@@ -8,8 +8,8 @@
  * 数据流:浏览器 → UIMessage[] → processAttachments() → ModelMessage[] → LLM
  *
  * 多模态路径：
- * - 图片：AI SDK streamText (file→image_url 自动转换)
- * - 视频：raw fetch 绕过 AI SDK (OpenAI/Anthropic provider 都不支持 video file)
+ * - 图片：多模态 provider 走 AI SDK file part 直传；纯文本 provider 由 vision 逐图描述内联进消息占位符
+ * - 视频：已不支持，管线静默丢弃成 [视频] 占位
  * ============================================================================
  */
 
@@ -106,9 +106,8 @@ export async function POST(req: Request) {
     const provider = strategy.getProviderName();
 
     // 多模态处理：图片 + 视频附件
-    const { messages: processedMessages, systemInjection: multimodalInjection } =
+    const { messages: processedMessages } =
       await processAttachments({ provider, model: actualModel, messages });
-    console.log(`[multimodal] systemInjection len=${multimodalInjection?.length ?? 0}`);
 
     const modelMessages = toModelMessages(processedMessages);
 
@@ -121,7 +120,6 @@ export async function POST(req: Request) {
     const tools = filterToolsByMode(await loadMcpTools(), currentMode);
 
     const systemPrompt = buildSystemPrompt({
-      multimodalInjection,
       knowledgeContext,
       mode: currentMode,
       hasTools: Object.keys(tools).length > 0,
@@ -176,12 +174,10 @@ export async function POST(req: Request) {
  * 构建 system prompt
  */
 function buildSystemPrompt({
-  multimodalInjection,
   knowledgeContext,
   mode,
   hasTools,
 }: {
-  multimodalInjection?: string;
   knowledgeContext: string;
   mode: ChatMode;
   hasTools: boolean;
@@ -205,7 +201,6 @@ ${modeInstruction}
  技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
         ${SKILL_LIST}
         ${toolsSection}
-        ${multimodalInjection ? `\n用户消息中的 [图片]/[视频] 占位符对应的实际内容如下（由视觉模型生成，等同附件本身）。请据此理解并回答用户问题，不要声称看不到附件：\n${multimodalInjection}\n` : ''}
         ${knowledgeContext}`;
 }
 

@@ -15,6 +15,9 @@ export const IMAGE_MARKER_STRIP = /\[图片:[^\]]+\]/g;
 export const VIDEO_MARKER_STRIP = /\[视频:[^\]]+\]/g;
 export const IMAGE_MARKER_TRIM = /\[图片:[^\]]+\]\n?/g;
 
+/** 图片缺失/不可读时内联到占位符位置的降级注记 */
+export const IMAGE_MISSING_NOTE = '[图片已失效或无法读取，内容缺失]';
+
 export const IMAGE_URL_REGEX = /https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?/gi;
 export const VIDEO_URL_REGEX = /https?:\/\/[^\s]+\.(?:mp4|mov|avi|mkv)(?:\?[^\s]*)?/gi;
 export const ATTACHMENT_REGEX = /\[(图片|视频):[^\]]+\]|https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|mp4|mov|avi|mkv)(?:\?[^\s]*)?/gi;

@@ -5,15 +5,16 @@
  *
  * 策略：
  * - direct: AI SDK 直传（M3 等支持多模态）
- * - preprocess: preprocess model 描述 → 文字注入 system（DeepSeek 等纯文本 provider）
+ * - preprocess: vision 模型逐图描述 → 内联替换消息占位符（DeepSeek 等纯文本 provider）
  */
 
 import { getModalityStrategy, isWithinHistoryDepth } from './multimodal-config';
 import { processImagesDirect, stripImages } from './image';
 import { stripVideos } from './video';
-import { preprocessAttachmentsDescription } from './preprocess';
-import { IMAGE_URL_REGEX } from './attachment';
-import type { Message, TextPart } from "../utils/types"
+import { preprocessAttachmentsDescriptions } from './preprocess';
+import { ATTACHMENT_REGEX, IMAGE_MISSING_NOTE, IMAGE_URL_REGEX } from './attachment';
+import { parseAttachment } from './modality-detector';
+import type { FilePart, Message, MessagePart, TextPart } from "../utils/types"
 
 export interface ProcessInput {
   provider: string;
@@ -23,8 +24,6 @@ export interface ProcessInput {
 
 export interface ProcessResult {
   messages: Message[];
-  /** Preprocess 模式下注入到 system prompt 的图片描述 */
-  systemInjection?: string;
 }
 
 /** 处理消息中的图片附件（视频已不支持，静默丢弃） */
@@ -37,22 +36,47 @@ export async function processAttachments({ provider, model, messages }: ProcessI
   });
 
   const imageStrategy = getModalityStrategy(provider, model, 'image');
-  const containsImage = hasImage(scopedMessages);
-  if (!containsImage) return { messages: scopedMessages };
+  if (!hasImage(scopedMessages)) return { messages: scopedMessages };
 
-  const preprocessImage = containsImage && imageStrategy === 'none';
-  const description = preprocessImage
-    ? await preprocessAttachmentsDescription(scopedMessages)
-    : undefined;
+  if (imageStrategy === 'direct') {
+    return { messages: await processImagesDirect(scopedMessages) };
+  }
 
-  const processed = imageStrategy === 'direct'
-    ? await processImagesDirect(scopedMessages)
-    : scopedMessages.map(stripImages);
-
+  const descs = await preprocessAttachmentsDescriptions(scopedMessages);
   return {
-    messages: processed,
-    systemInjection: description,
+    messages: scopedMessages.map((message, index) =>
+      isWithinHistoryDepth(index, scopedMessages.length, 'image')
+        ? inlineDescriptions(message, descs)
+        : message),
   };
+}
+
+/** 把视觉描述原位替换回占位符（marker/URL 文本 + file part） */
+function inlineDescriptions(msg: Message, descs: Map<string, string>): Message {
+  const parts: MessagePart[] = [];
+  for (const part of msg.parts || []) {
+    if (part.type === 'file') {
+      const file = part as FilePart;
+      if (!file.mediaType?.startsWith('image/')) {
+        parts.push(part);
+        continue;
+      }
+      parts.push({ type: 'text', text: descs.get(file.data) ?? IMAGE_MISSING_NOTE });
+      continue;
+    }
+    if (part.type !== 'text') {
+      parts.push(part);
+      continue;
+    }
+    const text = (part as TextPart).text || '';
+    const replaced = text.replace(ATTACHMENT_REGEX, (source) => {
+      const attachment = parseAttachment(source);
+      if (!attachment || attachment.modality !== 'image') return source;
+      return descs.get(source) ?? source;
+    });
+    parts.push({ ...(part as TextPart), text: replaced });
+  }
+  return { ...msg, parts };
 }
 
 // ponytail: 用 String.search 而非 RegExp.test — 全局 regex 的 .test() 会保留 lastIndex，

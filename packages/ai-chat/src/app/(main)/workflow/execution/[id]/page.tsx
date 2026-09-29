@@ -155,6 +155,16 @@ export default function ExecutionDetailPage() {
   }, [structureJsonStr]);
   const floorplanConfirmed = floorplanStructure?.confirmed === true || fpConfirmed;
   const floorplanBlocked = isFloorplan && parseStep?.status === "completed" && !floorplanConfirmed;
+  const mdFiles = useMemo(() => {
+    const out: string[] = [];
+    for (const s of execution?.steps || []) {
+      try {
+        const o = typeof s.output === "string" ? JSON.parse(s.output) : s.output;
+        if (Array.isArray(o?.mdFiles)) out.push(...o.mdFiles);
+      } catch { /* ignore */ }
+    }
+    return out;
+  }, [execution]);
 
   useEffect(() => {
     clientLog(id, "INFO", `useEffect run: executionStatus=${execution?.status}`);
@@ -509,6 +519,21 @@ export default function ExecutionDetailPage() {
         </div>
 
         <div className="overflow-auto p-4">
+          {isFloorplan && mdFiles.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2 text-xs">
+              {mdFiles.map(f => (
+                <a
+                  key={f}
+                  href={`${BASE}/api/workflows/execution/${id}/file/${f}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2 py-1 border-2 border-border bg-card font-bold hover:bg-muted"
+                >
+                  📄 {f}
+                </a>
+              ))}
+            </div>
+          )}
           {(() => {
             // 优先级0：floorplan parse → 底图确认面板
             if (isFloorplan && activeStep.id === "parse" && parseStep?.status === "completed" && !floorplanConfirmed) {

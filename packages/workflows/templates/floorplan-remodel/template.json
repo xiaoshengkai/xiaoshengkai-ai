@@ -2,14 +2,15 @@
   "name": "floorplan-remodel",
   "label": "户型改造",
   "description": "上传户型图 → 识别并确认底图 → 生成 N 套二维矢量改造方案（红=砸墙、蓝=砌墙）",
-  "available": false,
+  "available": true,
   "params": [
     { "name": "title", "label": "项目标题", "type": "text", "required": true, "placeholder": "如：滨江两居室加书房" },
     { "name": "floorplan", "label": "户型图", "type": "text", "required": true },
     { "name": "needs", "label": "改造诉求（可多选）", "type": "checkbox", "required": false,
       "options": ["2改3", "3改2", "加书房/多功能房", "加独立马桶间", "开放式厨房", "干湿分离", "加衣帽间"] },
     { "name": "needsText", "label": "补充诉求（可选）", "type": "textarea", "required": false, "placeholder": "如：功能房用来办公和打游戏；厕所只要马桶+洗漱台" },
-    { "name": "planCount", "label": "方案数量（1-6，默认 4）", "type": "number", "required": false }
+    { "name": "planCount", "label": "方案数量（1-6，默认 4）", "type": "number", "required": false },
+    { "name": "areaM2", "label": "建筑面积㎡（可选；图无尺寸标注时用于估算比例尺）", "type": "number", "required": false }
   ],
   "steps": [
     {
@@ -19,7 +20,7 @@
       "previewType": "images",
       "module": "./lib/parse.js",
       "function": "parseFloorPlan",
-      "args": ["{floorplan}", "{executionDir}"]
+      "args": ["{floorplan}", "{executionDir}", "{areaM2}"]
     },
     {
       "id": "generate",

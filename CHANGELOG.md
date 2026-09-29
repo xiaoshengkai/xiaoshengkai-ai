@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.40 (2026-09-30) — 户型改造 v6：CV 几何 + 符号锚点 + MD 双渲染
+
+### 问题
+- 服务器（Linux）跑户型识别必挂：`parse` 用 macOS 专属 `sips` 读图片尺寸（rc1 修复）。
+- 识别不准根因：vision 像素坐标不可靠（148a 干净中介图仅 7 墙/承重 86%/8 端点吸附失败），且无尺寸标注时面积校验静默关闭。
+- 锚点不准根因：`generate` 让文本 LLM 直接 hallucinate 新墙像素坐标，靠事后吸附补救。
+
+### 变更
+- **rc1**：`getImageSize` 改 sharp metadata；`sharp` 在 shared 显式声明。
+- **rc2**：新增 `extract-walls.js`（黑墙 mask→厚度滤波游程→共线合并[门洞同墙]→交点吸附→薄线剔除），vision 降为语义层+兜底；连通性质检支持 T 型交点；148a 验收 7墙→14墙、承重 86%→36%、质检全绿。
+- **rc3**：新增 `anchors.js`；`generate` 输出符号锚点（{wall,t}/{room,edge,t}）与 newRooms {room,rel}，确定性解析像素；删 snapBuilds；plans schemaVersion=2 兼容旧执行。
+- **v6**：新增 `render-md.js` MD 派生视图（ASCII 户型画+表格），parse/generate/confirm 维护 structure.md/plan-pN.md，execution 页 mdFiles 链接，capability stream 补 .md MIME；可选参数 `areaM2` 兜底比例尺（`mmPerPxFromArea`）；模板 `available: true` 放开。
+
+### 验证
+- 新增单测：getImageSize / extractWalls 合成图（门洞合并+薄线剔除+非黑墙 null）/ resolveAnchor+resolvePlanSpecs / metrics 兜底换算；148a 图 parse+generate 端到端（符号锚点→像素、校验 0 错误）；typecheck / test / build。
+
 ## v0.11.39 (2026-09-29) — 聊天图片描述内联化 + 缺失降级（修"AI 看不到上传图"）
 
 ### 问题

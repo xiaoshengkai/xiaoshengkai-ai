@@ -3,6 +3,7 @@ import path from "node:path";
 import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderPlan, readImg } from "./render.js";
+import { renderPlanMd } from "./render-md.js";
 import { loadWallMask, nearMask } from "./snap.js";
 import { resolvePlanSpecs } from "./anchors.js";
 import { areaM2, roomTypeByLabel } from "./metrics.js";
@@ -217,11 +218,12 @@ ${tierList}
   const pages = plans.map((p, i) => {
     const file = `plan-p${i + 1}.svg`;
     fs.writeFileSync(path.join(executionDir, file), renderPlan(structure, p, img, [...extraLines, ...(p.safetyNotes || [])]));
+    fs.writeFileSync(path.join(executionDir, `plan-p${i + 1}.md`), renderPlanMd(structure, p));
     return { page: i + 1, file };
   });
   const output = plans.map(p => `【${p.tier}】${p.title}：${p.summary}`).join("\n") +
     (extraLines.length ? `\n${extraLines.join("；")}` : "");
-  return { pages, output };
+  return { pages, mdFiles: plans.map((_, i) => `plan-p${i + 1}.md`), output };
 }
 
 function writeQuality(qualityPath, section) {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { renderStructure, readImg } from "./render.js";
+import { renderStructureMd } from "./render-md.js";
 
 const PROJECT_ROOT = path.resolve(process.cwd(), "..", "..");
 
@@ -17,8 +18,9 @@ export async function handle({ params, request }) {
 
   try {
     fs.writeFileSync(path.join(dir, "structure.svg"), renderStructure(merged, readImg(dir, merged)));
+    fs.writeFileSync(path.join(dir, "structure.md"), renderStructureMd(merged));
     for (const f of fs.readdirSync(dir)) {
-      if (f === "plans.json" || /^plan-p\d+\.svg$/.test(f)) fs.rmSync(path.join(dir, f));
+      if (f === "plans.json" || /^plan-p\d+\.(svg|md)$/.test(f)) fs.rmSync(path.join(dir, f));
     }
   } catch { /* 预览产物与缓存清理，structure.json 仍是后端唯一事实源 */ }
 

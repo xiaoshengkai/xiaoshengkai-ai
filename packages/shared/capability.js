@@ -171,6 +171,7 @@ const MIME = {
   ".css": "text/css",
   ".js": "application/javascript",
   ".srt": "text/plain; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
 };
 
 /** stream 原语：dir + params 值 + rest 段拼文件路径，Range 206 分段（从旧 file 路由移植） */

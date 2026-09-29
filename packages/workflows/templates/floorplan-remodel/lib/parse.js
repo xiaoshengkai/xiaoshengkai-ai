@@ -4,7 +4,9 @@ import sharp from "sharp";
 import { callMultimodalLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderStructure } from "./render.js";
+import { renderStructureMd } from "./render-md.js";
 import { extractWalls } from "./extract-walls.js";
+import { mmPerPxFromArea } from "./metrics.js";
 import { loadWallMask, snapPoint, nearMask, snapPerimeter, buildMaskGrid, slideRefit, wallThickness, loadColorRaw, detectOpenings, mergeCollinearWalls, pickEntryDoor, maskExtent } from "./snap.js";
 
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
@@ -237,7 +239,7 @@ function qualityChecks(normalized) {
   return checks;
 }
 
-export async function parseFloorPlan(imagePath, executionDir) {
+export async function parseFloorPlan(imagePath, executionDir, areaM2) {
   if (!imagePath || !fs.existsSync(imagePath)) throw new Error("缺少户型图，请先上传");
   const ext = path.extname(imagePath).toLowerCase();
   const mime = MIME[ext];
@@ -296,6 +298,15 @@ export async function parseFloorPlan(imagePath, executionDir) {
     if (entry) normalized.entryDoorId = entry;
   }
   const checks = qualityChecks(normalized);
+  if (normalized.mmPerPx) normalized.scaleSource = "dims";
+  else {
+    const fb = mmPerPxFromArea(areaM2, snapStats.extent);
+    if (fb) {
+      normalized.mmPerPx = fb;
+      normalized.scaleSource = "areaM2";
+      checks.push({ rule: "比例尺兜底", pass: true, note: `无尺寸标注，按建筑面积 ${areaM2}㎡ 估算 ${fb}mm/px` });
+    }
+  }
   if (snapStats.det) {
     const doors = normalized.openings.filter(o => o.type === "door").length;
     checks.push({ rule: "门窗像素检测", pass: normalized.openings.length > 0, note: `门 ${doors} · 窗 ${normalized.openings.length - doors} · 入户 ${normalized.entryDoorId || "未识别"}` });
@@ -309,9 +320,11 @@ export async function parseFloorPlan(imagePath, executionDir) {
   fs.writeFileSync(path.join(executionDir, "quality.json"), JSON.stringify({ parse: checks }, null, 2));
   fs.writeFileSync(path.join(executionDir, "structure.svg"),
     renderStructure(normalized, { base64: fs.readFileSync(path.join(executionDir, imgFile)).toString("base64"), mime }));
+  fs.writeFileSync(path.join(executionDir, "structure.md"), renderStructureMd(normalized));
   const warnings = checks.filter(c => !c.pass).map(c => c.note || c.rule);
   return {
     pages: [{ page: 1, file: "structure.svg" }],
+    mdFiles: ["structure.md"],
     structureJson: JSON.stringify(normalized),
     output: `【${normalized.source === "cv" ? "CV 几何" : "vision 几何"}】识别到 ${normalized.walls.length} 面墙（承重 ${normalized.walls.filter(w => w.bearing).length} 面）、${normalized.rooms.length} 个房间${normalized.mmPerPx ? `，比例尺 ${normalized.mmPerPx}mm/px` : ""}。请核对红线与原图墙体是否贴合，有误请重试。${warnings.length ? ` 质检提示：${warnings.join("；")}` : ""}`,
   };

@@ -3,7 +3,8 @@ import path from "node:path";
 import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderPlan, readImg } from "./render.js";
-import { loadWallMask, snapPoint, nearMask } from "./snap.js";
+import { loadWallMask, nearMask } from "./snap.js";
+import { resolvePlanSpecs } from "./anchors.js";
 import { areaM2, roomTypeByLabel } from "./metrics.js";
 
 const TIERS = [
@@ -139,14 +140,14 @@ export async function generatePlans(needs, needsText, planCount, executionDir) {
 ${principles.map(r => `- ${r}`).join("\n")}
 硬约束（违反即方案作废）：
 - demolish 只能从可拆墙白名单中选择：${removableIds.join(", ") || "无（不可拆任何墙）"}；承重墙 ${bearingIds.join(", ") || "无"} 绝对不可拆
-- build 新墙坐标必须是数字，端点必须贴在已有墙上或落在被改造房间的 bbox 内，形成闭合空间
-- 每个新增/改造出的功能空间必须输出 newRooms：{label, bbox:[x1,y1,x2,y2]}，bbox 用像素坐标框出该空间矩形（如新隔出的马桶间、书房）
+- build 新墙用符号锚点：{"from":<锚点>,"to":<锚点>}；锚点 ∈ {"wall":"<墙id>","t":0-1 沿墙比例} 或 {"room":"<房间id>","edge":"N|S|W|E","t":0-1 沿边比例}；墙id/房间id 必须取自上方结构数据，严禁直接编造像素坐标
+- 每个新增/改造出的功能空间必须输出 newRooms：{label, room:"<空间所在房间id>", rel:[x1,y1,x2,y2] 该房间 bbox 内 0-1 相对矩形}（如新隔出的马桶间、书房）
 - 新增马桶间必须紧邻现有卫生间或厨房（排水立管位置），否则在 checks 中标 ✗ 并注明提升泵
 - 方案之间必须有实质差异，严格按梯度区分改造力度
 每套方案对以下规则逐条自检输出 checks：
 ${CHECK_RULES.map(r => `- ${r}`).join("\n")}
 输出严格 JSON（不要 markdown 围栏）：
-{"plans":[{"title":"…","demolish":["w3"],"build":[{"x1":0,"y1":0,"x2":0,"y2":0}],"newRooms":[{"label":"独立马桶间","bbox":[x1,y1,x2,y2]}],"roomChanges":[{"roomId":"r2","newLabel":"儿童房"}],"summary":"2-3句，用 newRooms 标签呼应（如「电竞舱」「独立马桶间」）","checks":[{"rule":"${CHECK_RULES[0]}","pass":true,"note":"可选说明"}]}]}
+{"plans":[{"title":"…","demolish":["w3"],"build":[{"from":{"wall":"w3","t":0.4},"to":{"room":"r2","edge":"N","t":0.5}}],"newRooms":[{"label":"独立马桶间","room":"r2","rel":[0.6,0,1,0.35]}],"roomChanges":[{"roomId":"r2","newLabel":"儿童房"}],"summary":"2-3句，用 newRooms 标签呼应（如「电竞舱」「独立马桶间」）","checks":[{"rule":"${CHECK_RULES[0]}","pass":true,"note":"可选说明"}]}]}
 plans 数组顺序必须与梯度编号 1~${n} 一一对应。`;
     const user = `户型结构 JSON：
 ${JSON.stringify(structure)}
@@ -162,7 +163,6 @@ ${tierList}
     let best = { valid: [], report: [] };
     const maskFile = fs.readdirSync(executionDir).find(f => /^floorplan\.(png|jpe?g|webp)$/.test(f));
     const mask = (structure.imgW && maskFile) ? await loadWallMask(path.join(executionDir, maskFile)) : null;
-    const Rb = Math.max(40, (structure.imgW || 1000) * 0.06);
     for (let attempt = 0; attempt < 3; attempt++) {
       const { text } = await callLLM({
         system: system + (lastErrors.length ? `\n上次输出校验失败：${lastErrors.join("；")}。请修正。` : ""),
@@ -177,10 +177,14 @@ ${tierList}
         lastErrors = [e instanceof Error ? e.message : String(e)];
         continue;
       }
-      snapBuilds(parsed, mask, Rb);
       const report = (Array.isArray(parsed.plans) ? parsed.plans : []).map((p, i) => {
+        const spec = { buildSpec: p?.build, newRoomsSpec: p?.newRooms };
+        const res = resolvePlanSpecs(p || {}, structure);
+        if (p && typeof p === "object") {
+          Object.assign(p, res, spec, { schemaVersion: 2 });
+        }
         const v = validatePlanWithRules(p, structure, rules, mask);
-        return { index: i + 1, title: p?.title || `方案${i + 1}`, errors: v.errors, warnings: v.warnings, plan: p };
+        return { index: i + 1, title: p?.title || `方案${i + 1}`, errors: [...res.errors, ...v.errors], warnings: v.warnings, plan: p };
       });
       const valid = report.filter(r => r.errors.length === 0).map(r => r.plan);
       if (valid.length === n) { best = { valid: report.filter(r => r.errors.length === 0), report }; break; }
@@ -218,22 +222,6 @@ ${tierList}
   const output = plans.map(p => `【${p.tier}】${p.title}：${p.summary}`).join("\n") +
     (extraLines.length ? `\n${extraLines.join("；")}` : "");
   return { pages, output };
-}
-
-function snapBuilds(parsed, mask, R) {
-  for (const p of Array.isArray(parsed?.plans) ? parsed.plans : []) {
-    if (!Array.isArray(p?.build)) continue;
-    for (const b of p.build) {
-      if (!["x1", "y1", "x2", "y2"].every(k => Number.isFinite(Number(b?.[k])))) continue;
-      const vertical = Math.abs(b.y2 - b.y1) >= Math.abs(b.x2 - b.x1);
-      for (const [kx, ky] of [["x1", "y1"], ["x2", "y2"]]) {
-        const s = mask ? snapPoint(b[kx], b[ky], mask, R) : null;
-        if (s) { b[kx] = Math.round(s.x); b[ky] = Math.round(s.y); }
-      }
-      if (vertical) { const x = Math.round((b.x1 + b.x2) / 2); b.x1 = x; b.x2 = x; }
-      else { const y = Math.round((b.y1 + b.y2) / 2); b.y1 = y; b.y2 = y; }
-    }
-  }
 }
 
 function writeQuality(qualityPath, section) {

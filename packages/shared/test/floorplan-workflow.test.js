@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { validatePlanWithRules, generatePlans } from "../../workflows/templates/floorplan-remodel/lib/generate.js";
 import { getImageSize } from "../../workflows/templates/floorplan-remodel/lib/parse.js";
 import { extractWalls } from "../../workflows/templates/floorplan-remodel/lib/extract-walls.js";
+import { resolveAnchor, resolvePlanSpecs } from "../../workflows/templates/floorplan-remodel/lib/anchors.js";
 import { renderStructure } from "../../workflows/templates/floorplan-remodel/lib/render.js";
 import { roomTypeByLabel } from "../../workflows/templates/floorplan-remodel/lib/metrics.js";
 import { buildMaskGrid, slideRefit, wallThickness, detectOpenings, mergeCollinearWalls, pickEntryDoor } from "../../workflows/templates/floorplan-remodel/lib/snap.js";
@@ -251,4 +252,26 @@ test("extractWalls: 非黑墙图返回 null 触发 vision 兜底", async () => {
   } finally {
     fs.rmSync(file, { force: true });
   }
+});
+
+test("resolveAnchor: 墙比例/房间边/像素直传/缺引用", () => {
+  assert.deepEqual(resolveAnchor({ wall: "w2", t: 0.5 }, structure), { x: 250, y: 0 });
+  assert.deepEqual(resolveAnchor({ room: "r1", edge: "E", t: 0.5 }, structure), { x: 100, y: 50 });
+  assert.deepEqual(resolveAnchor({ x: 7, y: 8 }, structure), { x: 7, y: 8 });
+  assert.strictEqual(resolveAnchor({ wall: "nope", t: 0 }, structure), null);
+  assert.strictEqual(resolveAnchor({ room: "r1", edge: "X", t: 0 }, structure), null);
+});
+
+test("resolvePlanSpecs: 符号规格解析为像素，坏引用记 errors", () => {
+  const ok = resolvePlanSpecs({
+    build: [{ from: { wall: "w2", t: 0 }, to: { wall: "w1", t: 0.4 } }],
+    newRooms: [{ label: "马桶间", room: "r1", rel: [0.5, 0.5, 1, 1] }],
+  }, structure);
+  assert.deepEqual(ok.errors, []);
+  assert.deepEqual(ok.build[0], { x1: 0, y1: 0, x2: 0, y2: 200 });
+  assert.deepEqual(ok.newRooms[0].bbox, [50, 50, 100, 100]);
+
+  const bad = resolvePlanSpecs({ build: [{ from: { wall: "zz", t: 0 }, to: { wall: "w1", t: 0 } }], newRooms: [] }, structure);
+  assert.strictEqual(bad.build.length, 0);
+  assert.strictEqual(bad.errors.length, 1);
 });

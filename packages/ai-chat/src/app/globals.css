@@ -247,3 +247,9 @@
   }
   html { scroll-behavior: auto; }
 }
+
+/* 户型确认预览：内联 SVG 交互高亮（列表↔图徽章联动） */
+.fp-svg svg { width: 100%; height: auto; display: block; }
+.fp-svg [data-id] { cursor: pointer; }
+.fp-svg .fp-hl { filter: drop-shadow(0 0 5px #fa8c16) drop-shadow(0 0 2px #fa8c16); }
+.fp-svg line.fp-hl { stroke-width: 14px; }

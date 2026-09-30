@@ -1,7 +1,7 @@
 "use client";
 
 import { BASE } from "@/lib/utils/utils";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp, Edit3, History } from "lucide-react";
 import { toast } from "sonner";
@@ -915,6 +915,29 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
   const rooms: any[] = structure?.rooms || [];
   const walls: any[] = structure?.walls || [];
   const doors = openings.filter((o: any) => o.type === "door");
+  const [svgText, setSvgText] = useState<string | null>(null);
+  const [hl, setHl] = useState<string | null>(null);
+  const svgBoxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let dead = false;
+    fetch(svgSrc)
+      .then(r => (r.ok ? r.text() : null))
+      .then(t => { if (!dead && t) setSvgText(t); })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, [svgSrc]);
+
+  useEffect(() => {
+    const root = svgBoxRef.current;
+    if (!root) return;
+    root.querySelectorAll(".fp-hl").forEach(el => el.classList.remove("fp-hl"));
+    if (hl) root.querySelectorAll(`[data-id="${hl}"]`).forEach(el => el.classList.add("fp-hl"));
+  }, [hl, svgText]);
+
+  const dot = (color: string) => (
+    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+  );
 
   const setEntryDoor = (v: string) => onChange({ ...structure, entryDoorId: v || null });
   const toggleOpeningType = (id: string) => onChange({
@@ -946,14 +969,30 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="self-start lg:sticky lg:top-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={svgSrc}
-            alt="户型识别对比图"
-            className="w-full h-auto max-h-[calc(100vh-120px)] object-contain border-2 border-border bg-card cursor-zoom-in"
-            onClick={() => open(register(svgSrc))}
-          />
-          <p className="text-xs text-muted-foreground mt-1">对比图：淡化原图+识别线；w=墙 d=门窗 r=房间，编号对应右侧编辑区；点击可放大。</p>
+          {svgText ? (
+            <div
+              ref={svgBoxRef}
+              className="fp-svg w-full border-2 border-border bg-card max-h-[calc(100vh-120px)] overflow-auto"
+              onMouseOver={(e) => {
+                const t = (e.target as Element).closest?.("[data-id]");
+                setHl(t?.getAttribute("data-id") ?? null);
+              }}
+              onMouseLeave={() => setHl(null)}
+              dangerouslySetInnerHTML={{ __html: svgText }}
+            />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={svgSrc}
+              alt="户型识别对比图"
+              className="w-full h-auto max-h-[calc(100vh-120px)] object-contain border-2 border-border bg-card cursor-zoom-in"
+              onClick={() => open(register(svgSrc))}
+            />
+          )}
+          <div className="flex items-center gap-2 mt-1">
+            <a href={svgSrc} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue underline">🔍 新标签放大查看</a>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">对比图：淡化原图+识别线；徽章配色=列表圆点（墙灰/承重红、门蓝、窗青、入户品红、房间绿）；悬停/点击列表项或图上徽章互相高亮。</p>
         </div>
 
         <div className="space-y-3">
@@ -977,7 +1016,13 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
         ) : (
           <div className="space-y-1">
             {openings.map(o => (
-              <div key={o.id} className="flex items-center gap-2">
+              <div
+                key={o.id}
+                className={`flex items-center gap-2 px-1 ${hl === o.id ? "bg-yellow-soft" : ""}`}
+                onMouseEnter={() => setHl(o.id)}
+                onMouseLeave={() => setHl(null)}
+              >
+                {dot(o.id === structure?.entryDoorId ? "#eb2f96" : o.type === "door" ? "#1677ff" : "#13c2c2")}
                 <span className="font-bold w-10 shrink-0">{o.id}</span>
                 <button onClick={() => toggleOpeningType(o.id)} className="px-2 py-0.5 border-2 border-border font-bold bg-yellow-soft">{o.type === "door" ? "门" : "窗"}</button>
                 <span className="text-muted-foreground/70 flex-1">{o.wallId || ""}</span>
@@ -990,10 +1035,16 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
 
       <div className="border-2 border-border bg-card p-3 text-xs">
         <label className="font-bold text-foreground block mb-1.5">🏠 房间名（{rooms.length}）</label>
-        <div className="space-y-1">
-          {rooms.map(r => (
-            <div key={r.id} className="flex items-center gap-2">
-              <span className="font-bold w-10 shrink-0">{r.id}</span>
+          <div className="space-y-1">
+            {rooms.map(r => (
+              <div
+                key={r.id}
+                className={`flex items-center gap-2 px-1 ${hl === r.id ? "bg-yellow-soft" : ""}`}
+                onMouseEnter={() => setHl(r.id)}
+                onMouseLeave={() => setHl(null)}
+              >
+                {dot("#52c41a")}
+                <span className="font-bold w-10 shrink-0">{r.id}</span>
               <input
                 value={r.label ?? ""}
                 onChange={(e) => setRoomLabel(r.id, e.target.value)}
@@ -1014,7 +1065,9 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
               <button
                 key={w.id}
                 onClick={() => toggleBearing(w.id)}
-                className={`px-2 py-1 border-2 border-border font-bold ${w.bearing ? "bg-gray-800 text-white" : "bg-muted text-muted-foreground"}`}
+                onMouseEnter={() => setHl(w.id)}
+                onMouseLeave={() => setHl(null)}
+                className={`px-2 py-1 border-2 border-border font-bold ${w.bearing ? "bg-gray-800 text-white" : "bg-muted text-muted-foreground"} ${hl === w.id ? "outline outline-2 outline-orange-400" : ""}`}
                 title={w.unverified ? "该墙识别存疑" : ""}
               >
                 {w.id} {w.bearing ? "承重" : "非承重"}{w.unverified ? " ⚠" : ""}

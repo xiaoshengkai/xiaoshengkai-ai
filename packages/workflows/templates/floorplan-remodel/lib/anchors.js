@@ -59,7 +59,16 @@ export function resolvePlanSpecs(p, structure) {
       errors.push(`build[${i}] 锚点无法解析（wall/room id 不存在或形态错误）`);
       return null;
     }
-    return { x1: Math.round(from.x), y1: Math.round(from.y), x2: Math.round(to.x), y2: Math.round(to.y) };
+    const seg = { x1: Math.round(from.x), y1: Math.round(from.y), x2: Math.round(to.x), y2: Math.round(to.y) };
+    // 墙必须轴对齐：斜锚点对取主轴拉直（不可施工的斜墙根因）
+    if (Math.abs(seg.x2 - seg.x1) >= Math.abs(seg.y2 - seg.y1)) {
+      const y = Math.round((seg.y1 + seg.y2) / 2);
+      seg.y1 = y; seg.y2 = y;
+    } else {
+      const x = Math.round((seg.x1 + seg.x2) / 2);
+      seg.x1 = x; seg.x2 = x;
+    }
+    return seg;
   }).filter(Boolean);
 
   const newRoomsIn = Array.isArray(p.newRooms) ? p.newRooms : [];

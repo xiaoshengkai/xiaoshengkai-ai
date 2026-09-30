@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.43 (2026-09-30) — 改造设计知识库 v2 + 围合/孤儿化硬校验 + 老识别防呆
+
+### 问题
+- 生成方案缺乏基本室内设计知识：悬空功能舱、拆空气墙、阳台设湿区等不可施工方案频出。
+- 老执行（CV 上线前 parse）的 structure 无 source 标记，用户在假墙结构上确认 → 方案从根上错。
+
+### 变更
+- `rules.json` 扩为五段知识库 v2：minDimsMm/hardMinAreaM2（马桶间硬下限 1.5㎡）、designPrinciples 12、hardRules 6、patterns 12（三分离/一卫分二S墙/洗手台外移/借邻扩卫/套间化/玻璃书房/阳台并入/家政柜/LDK/餐厅兼书房/卡座/榻榻米，来源：知乎×2+百度案例+curated）、constructionNotes 9（异层排水/抬地找坡/套管洞/防水/配重墙/燃气）。
+- `generate.js`：prompt 注入知识库并要求引用 pattern id；**newRooms 为隔断真源**——未围合边代码自动补新墙（synthesizeEnclosure，确定性）；新增校验：newRooms 四边围合≥80%、拆墙孤儿化（除非 roomChanges 合并）、马桶间 <1.5㎡ 硬错误；build 端点允许落同方案新墙交点（L/T 型）。
+- 执行页：structure 无 `source`（pre-CV 老识别）时确认面板黄条提示重跑识别。
+
+### 验证
+- 新增单测：围合/L型交点、孤儿化+合并豁免、硬下限；148a CV 结构 e2e：3 套方案 2 套过检（引用 P1/P2/P3/P5/P9、排水注明），悬空套被质检丢弃；test 69+26+6、typecheck、build。
+
 ## v0.11.42 (2026-09-30) — 修「重新生成」无效：retryForce 下发步骤
 
 ### 问题

@@ -12,7 +12,7 @@ import { renderStructure } from "../../workflows/templates/floorplan-remodel/lib
 import { roomTypeByLabel } from "../../workflows/templates/floorplan-remodel/lib/metrics.js";
 import { buildMaskGrid, slideRefit, wallThickness, detectOpenings, mergeCollinearWalls, pickEntryDoor } from "../../workflows/templates/floorplan-remodel/lib/snap.js";
 
-const rules = { minAreaM2: { bedroom: 9, study: 5, toilet: 2 } };
+const rules = { minAreaM2: { bedroom: 9, study: 5, toilet: 2 }, hardMinAreaM2: { toilet: 1.5 } };
 const structure = {
   imgW: 1000, mmPerPx: 10,
   walls: [
@@ -198,7 +198,7 @@ test("build 端点贴原图墙像素（mask）不算悬空", () => {
 });
 
 test("面积近miss（≥60% 下限）降级告警不丢方案，远低于仍硬错误", () => {
-  const near = validatePlanWithRules({ title: "t", summary: "s", demolish: [], build: [], newRooms: [{ label: "书房", bbox: [0, 0, 212, 212] }] }, structure, rules);
+  const near = validatePlanWithRules({ title: "t", summary: "s", demolish: [], build: [{ x1: 0, y1: 212, x2: 212, y2: 212 }, { x1: 212, y1: 0, x2: 212, y2: 212 }], newRooms: [{ label: "书房", bbox: [0, 0, 212, 212] }] }, structure, rules);
   assert.strictEqual(near.errors.length, 0, JSON.stringify(near));
   assert.ok(near.warnings.some(w => w.includes("仅示意")), JSON.stringify(near));
   const far = validatePlanWithRules({ title: "t", summary: "s", demolish: [], build: [], newRooms: [{ label: "书房", bbox: [0, 0, 100, 100] }] }, structure, rules);
@@ -305,4 +305,28 @@ test("generatePlans: force 重试 bypass plans.json 缓存，普通补跑复用"
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("围合校验：悬空新房间报错，L 型新墙围合通过", () => {
+  const open = validatePlanWithRules({ title: "t", summary: "s", demolish: [], build: [], newRooms: [{ label: "书房", room: "r1", bbox: [300, 300, 400, 400] }] }, structure, rules);
+  assert.ok(open.errors.some(e => e.includes("未围合")), JSON.stringify(open.errors));
+  const closed = validatePlanWithRules({
+    title: "t", summary: "s", demolish: [],
+    build: [{ x1: 0, y1: 200, x2: 200, y2: 200 }, { x1: 200, y1: 0, x2: 200, y2: 200 }],
+    newRooms: [{ label: "书房", room: "r1", bbox: [0, 0, 200, 200] }],
+  }, structure, rules);
+  assert.ok(!closed.errors.some(e => e.includes("未围合")), JSON.stringify(closed.errors));
+  assert.ok(!closed.errors.some(e => e.includes("悬空")), JSON.stringify(closed.errors));
+});
+
+test("拆墙孤儿化：缺口报错，roomChanges 声明合并后豁免", () => {
+  const orphan = validatePlanWithRules({ title: "t", summary: "s", demolish: ["w2"], build: [], newRooms: [] }, structure, rules);
+  assert.ok(orphan.errors.some(e => e.includes("围合缺口")), JSON.stringify(orphan.errors));
+  const merged = validatePlanWithRules({ title: "t", summary: "s", demolish: ["w2"], build: [], newRooms: [], roomChanges: [{ roomId: "r1", newLabel: "开放卫浴" }] }, structure, rules);
+  assert.ok(!merged.errors.some(e => e.includes("围合缺口")), JSON.stringify(merged.errors));
+});
+
+test("马桶间硬下限 1.5㎡ 报错", () => {
+  const r = validatePlanWithRules({ title: "t", summary: "s", demolish: [], build: [], newRooms: [{ label: "独立马桶间", bbox: [0, 0, 140, 100] }] }, structure, rules);
+  assert.ok(r.errors.some(e => e.includes("硬下限")), JSON.stringify(r.errors));
 });

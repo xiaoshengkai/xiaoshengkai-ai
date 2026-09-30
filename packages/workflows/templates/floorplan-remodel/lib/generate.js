@@ -19,11 +19,13 @@ const TIERS = [
 
 const CHECK_RULES = [
   "承重结构未破坏",
-  "新增房间面积合理（功能房≥5㎡、马桶间≥2㎡）",
+  "新增房间面积合理（功能房≥5㎡、马桶间≥2㎡，硬下限1.5㎡）",
+  "新房间四边围合（新墙两端接墙，不悬空）",
+  "拆墙有补：重建围合或声明空间合并，不孤儿化房间",
   "居住空间直接采光未被破坏",
   "厨卫通风",
   "动线未被阻断、逃生通道畅通",
-  "新马桶间邻近排水立管（卫生间/厨房），否则注明墙排/提升泵方案",
+  "新马桶间邻近排水立管（卫生间/厨房），否则注明墙排/提升泵",
 ];
 
 function distToSeg(px, py, w) {
@@ -55,7 +57,10 @@ function validatePlan(p, structure, tol, maskPts) {
       const inBbox = (structure.rooms || []).some(r => r.bbox &&
         x >= r.bbox[0] - tol && x <= r.bbox[2] + tol && y >= r.bbox[1] - tol && y <= r.bbox[3] + tol);
       const onMask = maskPts ? nearMask(Number(x), Number(y), maskPts, tol) : false;
-      if (!onWall && !inBbox && !onMask) errors.push(`build[${j}] 端点(${x},${y})悬空：不贴墙也不在任何房间 bbox 内`);
+      // L/T 型新墙交点：端点落在同方案另一新墙上合法
+      const onBuild = (p.build || []).some(o => o !== b &&
+        ["x1", "y1", "x2", "y2"].every(k => Number.isFinite(Number(o?.[k]))) && distToSeg(Number(x), Number(y), o) < tol);
+      if (!onWall && !inBbox && !onMask && !onBuild) errors.push(`build[${j}] 端点(${x},${y})悬空：不贴墙也不在任何房间 bbox 内`);
     }
   });
   (p.newRooms || []).forEach((nr, j) => {
@@ -88,6 +93,7 @@ export function validatePlanWithRules(p, structure, rules = {}, maskPts = null) 
       return;
     }
     if (a < minArea[type] * 0.6) v.errors.push(`newRooms[${j}]（${nr.label}）面积 ${a}㎡ 远低于 ${type} 下限 ${minArea[type]}㎡`);
+    else if ((rules.hardMinAreaM2 || {})[type] && a < rules.hardMinAreaM2[type]) v.errors.push(`newRooms[${j}]（${nr.label}）面积 ${a}㎡ 低于硬下限 ${rules.hardMinAreaM2[type]}㎡`);
     else if (a < minArea[type]) v.warnings.push(`newRooms[${j}]（${nr.label}）面积 ${a}㎡ 低于 ${type} 下限 ${minArea[type]}㎡，仅示意`);
   });
 
@@ -110,7 +116,106 @@ export function validatePlanWithRules(p, structure, rules = {}, maskPts = null) 
     if (!near) v.warnings.push(`newRooms[${j}]（${nr.label}）不邻湿区，需墙排/提升泵`);
   });
 
+  // 围合校验：newRooms 四边须被"拆后墙图+新墙"覆盖≥80%（治悬空功能舱）
+  const keptWalls = (structure.walls || []).filter(w => !(p.demolish || []).includes(w.id));
+  const segs = [...keptWalls, ...(p.build || []).filter(b => b && ["x1", "y1", "x2", "y2"].every(k => Number.isFinite(Number(b[k]))) )];
+  (p.newRooms || []).forEach((nr, j) => {
+    if (!nr || !Array.isArray(nr.bbox) || nr.bbox.length !== 4 || !nr.bbox.every(x => Number.isFinite(Number(x)))) return;
+    const [x1, y1, x2, y2] = nr.bbox.map(Number);
+    const sides = [
+      { n: "上", s: { x1, y1, x2, y2: y1 } },
+      { n: "下", s: { x1, y1: y2, x2, y2 } },
+      { n: "左", s: { x1, y1, x2: x1, y2 } },
+      { n: "右", s: { x1: x2, y1, x2, y2 } },
+    ];
+    for (const { n, s } of sides) {
+      if (sideCoverage(s, segs, tol) < 0.8) {
+        v.errors.push(`newRooms[${j}]（${nr.label || "?"}）${n}边未围合（拆后墙+新墙覆盖<80%）`);
+      }
+    }
+  });
+
+  // 拆墙孤儿化校验：拆墙使需围合房间(卧/书/卫)边界缺口且未声明合并 → 报错
+  const mergedRooms = new Set((p.roomChanges || []).map(rc => rc?.roomId).filter(Boolean));
+  const enclosedTypes = new Set(["bedroom", "study", "toilet"]);
+  (p.demolish || []).forEach(id => {
+    const w = (structure.walls || []).find(x => x.id === id);
+    if (!w) return;
+    for (const r of structure.rooms || []) {
+      if (!r.bbox || mergedRooms.has(r.id)) continue;
+      const type = roomTypeByLabel(r.label);
+      if (!type || !enclosedTypes.has(type)) continue;
+      const [x1, y1, x2, y2] = r.bbox.map(Number);
+      const sides = [
+        { x1, y1, x2, y2: y1 }, { x1, y1: y2, x2, y2 },
+        { x1, y1, x2: x1, y2 }, { x1: x2, y1, x2, y2 },
+      ];
+      const wLen = Math.hypot(w.x2 - w.x1, w.y2 - w.y1) || 1;
+      if (sides.some(sd => {
+        const sLen = Math.hypot(sd.x2 - sd.x1, sd.y2 - sd.y1) || 1;
+        return collinearOverlap(sd, w, tol) > 0.5 * Math.min(sLen, wLen);
+      })) {
+        v.errors.push(`拆墙 ${id} 使 ${r.id}（${r.label}）围合缺口且未用 roomChanges 声明合并`);
+      }
+    }
+  });
+
   return v;
+}
+
+/** newRooms 四边中未被"保留墙+已有新墙"覆盖≥80% 的边 → 自动补新墙 */
+function synthesizeEnclosure(p, structure, tol) {
+  const kept = (structure.walls || []).filter(w => !(p.demolish || []).includes(w.id));
+  const added = [];
+  for (const nr of p.newRooms || []) {
+    if (!nr || !Array.isArray(nr.bbox) || nr.bbox.length !== 4 || !nr.bbox.every(x => Number.isFinite(Number(x)))) continue;
+    const [x1, y1, x2, y2] = nr.bbox.map(Number);
+    const sides = [
+      { x1, y1, x2, y2: y1 }, { x1, y1: y2, x2, y2 },
+      { x1, y1, x2: x1, y2 }, { x1: x2, y1, x2, y2 },
+    ];
+    for (const sd of sides) {
+      if (sideCoverage(sd, [...kept, ...(p.build || []), ...added], tol) >= 0.8) continue;
+      added.push({ x1: sd.x1, y1: sd.y1, x2: sd.x2, y2: sd.y2, auto: true });
+    }
+  }
+  return added;
+}
+
+/** 线段 side 被 segments 中同向共线段的覆盖比例 */
+function sideCoverage(side, segments, tol) {
+  const horiz = Math.abs(side.y2 - side.y1) <= Math.abs(side.x2 - side.x1);
+  const len = Math.hypot(side.x2 - side.x1, side.y2 - side.y1) || 1;
+  const base = horiz ? side.x1 : side.y1;
+  const intervals = [];
+  for (const s of segments) {
+    const ov = collinearOverlap(side, s, tol);
+    if (ov <= 0) continue;
+    const a1 = horiz ? Math.max(s.x1, side.x1) : Math.max(s.y1, side.y1);
+    const a2 = horiz ? Math.min(s.x2, side.x2) : Math.min(s.y2, side.y2);
+    intervals.push([a1 - base, a2 - base]);
+  }
+  intervals.sort((a, b) => a[0] - b[0]);
+  let cov = 0, cur = -1;
+  for (const [a, b] of intervals) {
+    const s0 = Math.max(a, cur);
+    if (b > s0) { cov += b - s0; cur = b; }
+  }
+  return cov / len;
+}
+
+/** 两线段同向共线（轴距≤tol）时的重叠长度 */
+function collinearOverlap(a, b, tol) {
+  if (!a || !b || !["x1", "y1", "x2", "y2"].every(k => Number.isFinite(Number(a[k])) && Number.isFinite(Number(b[k])))) return 0;
+  const aH = Math.abs(a.y2 - a.y1) <= Math.abs(a.x2 - a.x1);
+  const bH = Math.abs(b.y2 - b.y1) <= Math.abs(b.x2 - b.x1);
+  if (aH !== bH) return 0;
+  if (aH) {
+    if (Math.abs(a.y1 - b.y1) > tol) return 0;
+    return Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1);
+  }
+  if (Math.abs(a.x1 - b.x1) > tol) return 0;
+  return Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1);
 }
 
 function nearBbox(a, b, tol) {
@@ -145,19 +250,29 @@ export async function generatePlans(needs, needsText, planCount, executionDir, r
     const removableIds = (structure.walls || []).filter(w => !w.bearing && !w.unverified).map(w => w.id);
     const tierList = TIERS.slice(0, n).map(([id, desc], i) => `${i + 1}. tier=${id}：${desc}`).join("\n");
     const principles = rules.designPrinciples || [];
+    const patterns = (rules.patterns || []).map(p => `- ${p.id} ${p.name}｜适用:${p.when}｜做法:${p.how}｜约束:${p.limits}`).join("\n");
+    const notes = (rules.constructionNotes || []).map(x => `- ${x}`).join("\n");
+    const hardRules = (rules.hardRules || []).map(x => `- ${x}`).join("\n");
     const system = `你是资深住宅改造设计师。基于结构化户型数据（像素坐标，图宽 ${structure.imgW || structure.width}），按指定梯度生成 ${n} 套改造方案。
 设计准则（逐条遵守）：
 ${principles.map(r => `- ${r}`).join("\n")}
+改造套路库（优先组合引用，summary 中注明所用套路 id）：
+${patterns}
+施工注意（涉及时在 summary/checks 注明）：
+${notes}
+硬规则（代码会校验，违反即方案作废）：
+${hardRules}
 硬约束（违反即方案作废）：
 - demolish 只能从可拆墙白名单中选择：${removableIds.join(", ") || "无（不可拆任何墙）"}；承重墙 ${bearingIds.join(", ") || "无"} 绝对不可拆
-- build 新墙用符号锚点：{"from":<锚点>,"to":<锚点>}；锚点 ∈ {"wall":"<墙id>","t":0-1 沿墙比例} 或 {"room":"<房间id>","edge":"N|S|W|E","t":0-1 沿边比例}；墙id/房间id 必须取自上方结构数据，严禁直接编造像素坐标
-- 每个新增/改造出的功能空间必须输出 newRooms：{label, room:"<空间所在房间id>", rel:[x1,y1,x2,y2] 该房间 bbox 内 0-1 相对矩形}（如新隔出的马桶间、书房）
+- 拆墙必须有补：同方案内用 build 重建围合，或用 roomChanges 声明被拆墙两侧空间合并；禁止拆了不补留下开放缺口
+- build 新墙用符号锚点：{"from":<锚点>,"to":<锚点>}；锚点 ∈ {"wall":"<墙id>","t":0-1 沿墙比例} 或 {"room":"<房间id>","edge":"N|S|W|E","t":0-1 沿边比例}；墙id/房间id 必须取自上方结构数据，严禁直接编造像素坐标；新墙两端必须落在墙/房间边上形成闭合空间
+- 每个新增/改造出的功能空间必须输出 newRooms：{label, room:"<空间所在房间id>", rel:[x1,y1,x2,y2] 该房间 bbox 内 0-1 相对矩形}（如新隔出的马桶间、书房）；newRooms 的四边必须被既有墙+本方案新墙围合
 - 新增马桶间必须紧邻现有卫生间或厨房（排水立管位置），否则在 checks 中标 ✗ 并注明提升泵
 - 方案之间必须有实质差异，严格按梯度区分改造力度
 每套方案对以下规则逐条自检输出 checks：
 ${CHECK_RULES.map(r => `- ${r}`).join("\n")}
 输出严格 JSON（不要 markdown 围栏）：
-{"plans":[{"title":"…","demolish":["w3"],"build":[{"from":{"wall":"w3","t":0.4},"to":{"room":"r2","edge":"N","t":0.5}}],"newRooms":[{"label":"独立马桶间","room":"r2","rel":[0.6,0,1,0.35]}],"roomChanges":[{"roomId":"r2","newLabel":"儿童房"}],"summary":"2-3句，用 newRooms 标签呼应（如「电竞舱」「独立马桶间」）","checks":[{"rule":"${CHECK_RULES[0]}","pass":true,"note":"可选说明"}]}]}
+{"plans":[{"title":"…","demolish":["w3"],"build":[{"from":{"wall":"w3","t":0.4},"to":{"room":"r2","edge":"N","t":0.5}}],"newRooms":[{"label":"独立马桶间","room":"r2","rel":[0.6,0,1,0.35]}],"roomChanges":[{"roomId":"r2","newLabel":"儿童房"}],"summary":"2-3句，注明所用套路 id（如 P2/P3），用 newRooms 标签呼应","checks":[{"rule":"${CHECK_RULES[0]}","pass":true,"note":"可选说明"}]}]}
 plans 数组顺序必须与梯度编号 1~${n} 一一对应。`;
     const user = `户型结构 JSON：
 ${JSON.stringify(structure)}
@@ -192,6 +307,12 @@ ${tierList}
         const res = resolvePlanSpecs(p || {}, structure);
         if (p && typeof p === "object") {
           Object.assign(p, res, spec, { schemaVersion: 2 });
+          // newRooms 为隔断真源：未被既有墙/新墙覆盖的边自动补新墙（确定性，治悬空舱）
+          const auto = synthesizeEnclosure(p, structure, tol);
+          if (auto.length) {
+            p.build = [...(p.build || []), ...auto];
+            p.buildSpec = [...(p.buildSpec || []), ...auto.map(() => ({ auto: true, along: "newRooms 未围合边" }))];
+          }
         }
         const v = validatePlanWithRules(p, structure, rules, mask);
         return { index: i + 1, title: p?.title || `方案${i + 1}`, errors: [...res.errors, ...v.errors], warnings: v.warnings, plan: p };

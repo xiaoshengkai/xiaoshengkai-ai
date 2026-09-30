@@ -967,6 +967,12 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
 
       {notice && <div className="border-2 border-border bg-yellow-soft p-2 text-xs text-foreground">{notice}</div>}
 
+      {!structure?.source && (
+        <div className="border-2 border-border bg-yellow-soft p-2 text-xs font-bold text-foreground">
+          ⚠️ 本结构为旧版 vision 识别产物（无 CV 几何标记），墙线可能不准。建议先点左栏「户型结构识别」步骤的 ↻ 重跑识别，再核对确认。
+        </div>
+      )}
+
       <div className="grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="self-start lg:sticky lg:top-0">
           {svgText ? (

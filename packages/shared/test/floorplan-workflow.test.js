@@ -275,3 +275,34 @@ test("resolvePlanSpecs: 符号规格解析为像素，坏引用记 errors", () =
   assert.strictEqual(bad.build.length, 0);
   assert.strictEqual(bad.errors.length, 1);
 });
+
+test("generatePlans: force 重试 bypass plans.json 缓存，普通补跑复用", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fp-gen-"));
+  const s = {
+    confirmed: true, imgW: 1000, mmPerPx: 10,
+    walls: [
+      { id: "w1", x1: 0, y1: 0, x2: 0, y2: 500, bearing: true },
+      { id: "w2", x1: 0, y1: 0, x2: 500, y2: 0, bearing: false },
+    ],
+    rooms: [{ id: "r1", label: "卫生间", bbox: [0, 0, 100, 100] }],
+    wetRooms: ["r1"], openings: [],
+  };
+  fs.writeFileSync(path.join(dir, "structure.json"), JSON.stringify(s));
+  fs.writeFileSync(path.join(dir, "plans.json"), JSON.stringify([{ id: "p1", tier: "conservative", title: "old", summary: "old", demolish: [], build: [], newRooms: [] }]));
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return Response.json({ choices: [{ message: { content: JSON.stringify({ plans: [{ title: "new", summary: "s", demolish: [], build: [{ from: { wall: "w2", t: 0.2 }, to: { wall: "w1", t: 0.2 } }], newRooms: [], checks: [] }] }) } }] });
+  };
+  try {
+    await generatePlans("", "", 1, dir, "yes");
+    assert.ok(calls >= 1, "force 应调 LLM");
+    const plans = JSON.parse(fs.readFileSync(path.join(dir, "plans.json"), "utf-8"));
+    assert.strictEqual(plans[0].title, "new");
+    const before = calls;
+    await generatePlans("", "", 1, dir);
+    assert.strictEqual(calls, before, "无 force 应复用缓存不调 LLM");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

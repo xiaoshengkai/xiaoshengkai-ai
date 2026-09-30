@@ -118,7 +118,7 @@ function nearBbox(a, b, tol) {
   return !(a[2] + tol < b[0] || b[2] + tol < a[0] || a[3] + tol < b[1] || b[3] + tol < a[1]);
 }
 
-export async function generatePlans(needs, needsText, planCount, executionDir) {
+export async function generatePlans(needs, needsText, planCount, executionDir, retryForce) {
   const structure = JSON.parse(fs.readFileSync(path.join(executionDir, "structure.json"), "utf-8"));
   if (!structure.confirmed) throw Object.assign(new Error("户型结构尚未确认，请先在上一步确认入户门/门窗/房间/承重墙"), { retryable: false });
   const rules = JSON.parse(fs.readFileSync(new URL("../rules.json", import.meta.url), "utf-8"));
@@ -126,6 +126,15 @@ export async function generatePlans(needs, needsText, planCount, executionDir) {
   const plansPath = path.join(executionDir, "plans.json");
   const qualityPath = path.join(executionDir, "quality.json");
   const tol = (structure.imgW || 1000) * 0.02;
+
+  // force 重试（↻ 重新生成）= 主动重新生成：清产物缓存真跑 LLM；普通补跑继续复用
+  if (retryForce && fs.existsSync(plansPath)) {
+    fs.rmSync(plansPath);
+    for (const f of fs.readdirSync(executionDir)) {
+      if (/^plan-p\d+\.(svg|md)$/.test(f)) fs.rmSync(path.join(executionDir, f));
+    }
+    console.log("[floorplan] force 重试：清除旧方案缓存，重新生成");
+  }
 
   let plans;
   let discarded = [];

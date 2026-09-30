@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.11.42 (2026-09-30) — 修「重新生成」无效：retryForce 下发步骤
+
+### 问题
+执行页 ↻（已完成步骤，force=true）点「重新生成」0.1s 返回旧方案：engine 把 force 写成 `step.retryForce` 但从未传给步骤函数，`generate` 命中 plans.json 缓存直接重渲染旧方案。
+
+### 变更
+- `engine.js`：runSteps/runNextStep 的 vars 注入 `retryForce`（step 级，完成后清除逻辑原有）。
+- floorplan `template.json`：generate args 追加 `{retryForce}`；`generate.js` 第 5 参为真时清 plans.json + plan 产物真跑 LLM，普通补跑仍复用缓存。
+
+### 验证
+- 新增单测：force 绕缓存/普通复用；test 66+26+6 全绿。
+
 ## v0.11.41 (2026-09-30) — 户型确认预览交互高亮 + 方案图可读性
 
 ### 变更

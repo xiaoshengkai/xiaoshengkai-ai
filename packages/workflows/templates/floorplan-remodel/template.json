@@ -29,7 +29,7 @@
       "previewType": "images",
       "module": "./lib/generate.js",
       "function": "generatePlans",
-      "args": ["{needs}", "{needsText}", "{planCount}", "{executionDir}"]
+      "args": ["{needs}", "{needsText}", "{planCount}", "{executionDir}", "{retryForce}"]
     }
   ]
 }

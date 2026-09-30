@@ -160,7 +160,7 @@ async function runSteps(dir, state, template, params, logger) {
     logger.info(`[${i + 1}/${template.steps.length}] ${step.name} 开始...`);
 
     try {
-      const output = await executeStep(step, vars, dir, templateDir);
+      const output = await executeStep(step, { ...vars, retryForce: state.steps[i].retryForce ? "yes" : "" }, dir, templateDir);
       const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
       state.steps[i].status = "completed";
       state.steps[i].output = output;
@@ -334,7 +334,8 @@ export async function runNextStep(executionId) {
   logger.info(`[${nextIdx + 1}/${template.steps.length}] ${step.name} 开始...`);
 
   try {
-    const output = await executeStep(step, vars, dir, templateDir);
+    // retryForce 经 vars 下发步骤：force 重试=主动重新生成（步骤侧据此 bypass 产物缓存）
+    const output = await executeStep(step, { ...vars, retryForce: state.steps[nextIdx].retryForce ? "yes" : "" }, dir, templateDir);
     const elapsed = ((Date.now() - stepStart) / 1000).toFixed(1);
 
     const freshState = readState(dir);

@@ -215,7 +215,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 ### CLI 子命令
 
-`start`（创建执行）/ `run`（一次跑完）/ `next`（单步）/ `get` / `list` / `delete` / `templates`（模板列表）/ `retry`（组合：重置+执行；`force=true` 表示主动重新生成，普通补跑继续复用已生成产物）/ `skip` / `auto`（detached 后台跑完）/ `tweak-auto`（微调全流程编排）/ `switch-version`（按模板分发）。
+`start`（创建执行）/ `run`（一次跑完）/ `next`（单步）/ `get` / `list` / `delete` / `templates`（模板列表）/ `retry`（组合：重置+执行；`force=true` 表示主动重新生成——经 `{retryForce}` 变量下发步骤 bypass 产物缓存，普通补跑继续复用已生成产物）/ `skip` / `auto`（detached 后台跑完）/ `tweak-auto`（微调全流程编排）/ `switch-version`（按模板分发）。
 
 ### 引擎与模板边界
 

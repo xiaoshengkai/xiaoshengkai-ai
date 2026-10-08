@@ -2,7 +2,7 @@
 "use client";
 
 import { BASE } from "@/lib/utils/utils";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, memo } from "react";
 import { isToolUIPart, isReasoningUIPart, type UIMessage } from "ai";
 import { getModelDisplay } from "./_model-display";
 import ReactMarkdown from "react-markdown";
@@ -18,7 +18,7 @@ import { useMarkdownComponents } from "@/components/chat/markdown-components";
 import { useImageViewer } from "@/components/ui/image-viewer";
 import NotePreviewCard from "@/components/chat/note-preview-card";
 
-export default function MessageItem({
+function MessageItem({
   msg,
   isLoading,
 }: {
@@ -247,3 +247,5 @@ toast.error("保存失败，请重试", {
     </div>
   );
 }
+
+export default memo(MessageItem);

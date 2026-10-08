@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/utils/utils";
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
 import { Send, ChevronDown, Image as ImageIcon, Square } from "lucide-react";
@@ -89,6 +89,7 @@ export default function ChatPage() {
 
   const { messages, setMessages, sendMessage, status, stop } = useChat({
     transport,
+    experimental_throttle: 100,
     onError: (err) => {
       console.error("[chat] error:", err.message);
       const msg = err.message && err.message !== "An error occurred."
@@ -126,7 +127,6 @@ export default function ChatPage() {
     if (activeConversationId === convIdRef.current) return;
 
     const switchConversation = async () => {
-      console.log("[scroll-debug] 切换对话:", activeConversationId, "| isAtBottom:", isAtBottom, "| atBottomRef:", atBottomRef.current);
       stop(); // 中断AI回答
       if (activeConversationId && !newIdsRef.current.has(activeConversationId)) {
         setLoadingConv(true);
@@ -168,6 +168,14 @@ export default function ChatPage() {
   const isLoading = status === "streaming" || status === "submitted";
   const showFooter = isLoading && (messages.length === 0 || messages[messages.length - 1]?.role === "user");
   const hasMessages = messages.length > 0;
+
+  const renderItem = useCallback((index: number, msg: UIMessage) => (
+    <div className="py-2 px-4">
+      <div className="max-w-3xl mx-auto">
+        <MessageItem msg={msg} isLoading={isLoading && index === messages.length - 1} />
+      </div>
+    </div>
+  ), [isLoading, messages.length]);
 
   const handleSend = async () => {
     const value = inputRef.current?.value.trim();
@@ -301,7 +309,6 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    console.log("[scroll-debug] msgs.length变化:", messages.length, "| atBottomRef:", atBottomRef.current, "| isAtBottom:", isAtBottom);
     virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" });
   }, [messages.length]);
 
@@ -336,19 +343,12 @@ export default function ChatPage() {
             className="flex-1 min-h-0"
             followOutput="auto"
             atBottomStateChange={(atBottom) => {
-              console.log("[scroll-debug] atBottomStateChange:", atBottom, "| msgs:", messages.length);
               atBottomRef.current = atBottom;
               setIsAtBottom(atBottom);
             }}
             data={messages}
             computeItemKey={(_, msg) => msg.id}
-            itemContent={(index, msg) => (
-              <div className="py-2 px-4">
-                <div className="max-w-3xl mx-auto">
-                  <MessageItem msg={msg} isLoading={isLoading && index === messages.length - 1} />
-                </div>
-              </div>
-            )}
+            itemContent={renderItem}
             components={{
               EmptyPlaceholder: () =>
                 loadingConv ? (
@@ -378,7 +378,6 @@ export default function ChatPage() {
               {!isAtBottom && messages.length > 5 && (
                 <button
                   onClick={() => {
-                    console.log("[scroll-debug] 点击下滑 | isAtBottom:", isAtBottom, "| msgs:", messages.length);
                     virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" });
                   }}
                   className="brutal-btn bg-yellow text-foreground w-8 h-8 flex items-center justify-center cursor-pointer absolute -top-12 right-0"

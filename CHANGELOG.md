@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.44 (2026-10-08) — 流式渲染节流 + 消息 memo：治长回答卡顿与切 tab 白屏
+
+### 问题
+- AI 输出越长页面越卡：useChat 每 chunk 一次 setState，且 itemContent 内联闭包使可见区每条消息的 markdown 全量重解析（O(n)/chunk，累计 O(n²)）。
+- 流式期间切 tab 再回来白屏假死：后台渲染积压 + 回来一次性绘制/测量，主线程阻塞数秒以上。
+
+### 变更
+- `page.tsx`：useChat 加 `experimental_throttle: 100`（渲染通知降至 ~10/s，useSyncExternalStore 渲染时读最新快照，保存不截断）；itemContent 提为 useCallback 稳定引用；删 `[scroll-debug]` 日志。
+- `message-item.tsx`：`memo(MessageItem)`——非流式消息引用不变即跳过重渲染，每 chunk 只重解析流式那一条。
+
+### 验证
+- typecheck、test（69+26+6）、build 全绿。
+
 ## v0.11.43 (2026-09-30) — 改造设计知识库 v2 + 围合/孤儿化硬校验 + 老识别防呆
 
 ### 问题

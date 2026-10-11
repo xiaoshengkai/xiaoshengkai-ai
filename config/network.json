@@ -10,6 +10,8 @@
     },
     "chroma": 8000,
     "searxng": 8080,
-    "searchService": 8090
+    "searchService": 8090,
+    "corpSocks": 11080,
+    "corpHealth": 11081
   }
 }

@@ -54,6 +54,7 @@ ai-engineer-journey/
     │   ├── capability.js       # 通用能力 dispatcher（actions.json 4 原语）
     │   ├── image-preview.js    # 图片预览压缩：sharp 长边1600+JPEG q85、伴生 .preview.jpg 缓存（预览用，导出用原图）
     │   ├── auth.js             # 登录鉴权：密码校验（data/auth.json 优先，.env 兜底）/ HMAC token 签发校验（含密码指纹）/ 防爆破计数
+    │   ├── egress.js           # 内网出口层：白名单域名走反向隧道（SOCKS），其余直连；installEgress 补丁 globalThis.fetch
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir / withTimeout（网络调用硬超时兜底）
@@ -92,7 +93,8 @@ ai-engineer-journey/
     ├── mcp/                     # MCP 工具服务（36 tools，详见「MCP 系统」）
     ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
     ├── services/                # 独立常驻服务（非 npm workspace 内聚目录）
-    │   └── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
+    │   ├── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
+    │   └── corp-egress/         # 内网出口隧道（Mac 侧常驻：本机 SOCKS5 + ssh -R 反投给服务器，见「内网出口」）
     ├── tasks/                   # 定时任务（@app/tasks，详见「定时任务系统」）
     └── workflows/               # 工作流引擎（@app/workflows，详见「工作流系统」）
         ├── package.json
@@ -402,6 +404,26 @@ Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(q
 - Firecrawl key：根 `.env` 的 `FIRECRAWL_API_KEY`
 - 搜索失败语义：主搜+兜底均失败才报错（`search_failed: firecrawl(…) | searxng(…)`）；主搜失败已兜底或部分引擎失败返回 `degraded=true`；响应含 `provider`(firecrawl/searxng)
 - 正文抓取失败不丢弃搜索结果（`contentFetched=false` + `contentError`）
+
+## 内网出口（corp egress）
+
+公网云服务器无法访问公司内网（如 `yapi.cai-inc.com`）。Mac 在内网侧，跑一个常驻隧道服务把**本机 SOCKS5 出口**经反向 SSH 暴露到服务器；服务器侧的出口层按**域名白名单**决定请求走隧道还是直连——单点判断，MCP / 各处 `fetch` 自动受益。
+
+```
+Mac（公司内网）                              云服务器
+corp-egress 服务                             @app/shared/egress.js
+  ├─ 本机 SOCKS5 :11080  ◀──── ssh -R ────▶  127.0.0.1:11080（隧道入口）
+  └─ ssh -N -R 127.0.0.1:11080:127.0.0.1:11080 root@server
+                                             installEgress() 补丁 globalThis.fetch
+                                               └─ host ∈ 白名单 → SOCKS；否则直连
+```
+
+- 隧道服务 `packages/services/corp-egress/`（`runner.js` + `socks-server.js`）：本机起**真正从本机出网**的 SOCKS5（`ssh -D` 出口在服务器侧、方向相反，故自实现最小 SOCKS5），再 `ssh -R` 反投；keepalive 重连 + `/health`。由本地 ai-chat 服务监控启停。
+- 出口层 `@app/shared/egress.js`：`readEgressConfig()` fresh 读 `data/settings/egress.json`；`isCorpHost()`（精确 / `.后缀` / CIDR）；`egressFetch()` / `installEgress()`。corp 路径统一用 npm `undici`（与 Agent 同版本，避免与 Node 内建 fetch 的 undici 跨版本冲突）+ `socks` 自定义 `Agent.connect` → SOCKS → TLS。
+- 挂载：ai-chat `instrumentation.ts` + MCP `index.js` 启动时 `installEgress()`。
+- 配置/UI：设置页「网络出口」tab（开关 + 白名单增删改 + proxy + 连通性测试）；API `/api/settings/egress`(+`/test`)。
+- 端口：`config/network.json` 的 `corpSocks`(11080) / `corpHealth`(11081)。
+- **边界**：仅当 Mac 开机 + 公司网 + 隧道服务在线时生效（云服务器进内网只能借内网机器）；`workflows`/`tasks` 是独立子进程，不继承补丁（将来需内网时各自 `installEgress()`）。
 
 ## 登录鉴权
 

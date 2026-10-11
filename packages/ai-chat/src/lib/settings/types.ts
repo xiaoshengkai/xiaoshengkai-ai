@@ -23,3 +23,12 @@ export type Module = 'chat' | 'media' | 'vector' | 'workflow' | 'tts' | 'music' 
 
 export type Providers = Record<string, ProviderEntry>;
 export type Selection = Record<Module, SelectionEntry>;
+
+/** 内网出口：白名单域名走反向隧道（Mac 公司网络），其余直连 */
+export interface EgressConfig {
+  enabled: boolean;
+  /** SOCKS 代理地址 host:port（服务器侧反向隧道入口） */
+  proxy: string;
+  /** 白名单：精确 host / .后缀 / CIDR */
+  whitelist: string[];
+}

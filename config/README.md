@@ -29,6 +29,8 @@
     "chroma": 8000            // chroma-server 端口
     "searxng": 8080           // 本地 SearXNG 搜索服务端口
     "searchService": 8090     // 搜索编排服务（Node）端口
+    "corpSocks": 11080        // 内网出口隧道：Mac 本机 SOCKS + 服务器侧 -R 入口
+    "corpHealth": 11081       // 内网出口隧道服务 health（Mac 本机）
   },
 }
 ```

@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.46 (2026-10-11) — 内网出口层：白名单域名经本机隧道出网（云服务器访问公司内网）
+
+### 变更
+- 新增内网出口层 `packages/shared/egress.js`：按**域名白名单**单点判断，命中走反向隧道 SOCKS、其余直连；`egressFetch()` + `installEgress()`（补丁 `globalThis.fetch`，幂等）。corp 路径统一用 npm `undici`（与 `Agent` 同版本，规避 Node 内建 fetch 的 undici 跨版本冲突）+ `socks` 自定义 `Agent.connect`（含 https TLS 包装 / SOCKS5h 远程解析）。
+- 新增 Mac 侧常驻服务 `packages/services/corp-egress/`（`runner.js` + `socks-server.js`）：本机起真正从本机出网的 SOCKS5（`ssh -D` 出口在服务器侧、方向相反，故自实现最小 SOCKS5），再 `ssh -R` 反投给服务器；keepalive 重连 + `/health`。由本地 ai-chat 服务监控启停。
+- 挂载 `installEgress()`：ai-chat `instrumentation.ts` + MCP `index.js`；`yapiApi` 改用 `egressFetch`。
+- 设置页新增「网络出口」tab：总开关 + 白名单增删改列表 + proxy 地址 + 连通性测试；API `/api/settings/egress`(+`/test`)；存储 `data/settings/egress.json`（fresh-read）。
+- `next.config.ts` 外部化 `undici`/`socks`；`config/network.json` 增 `corpSocks`(11080)/`corpHealth`(11081)。
+
+### 验证
+- 本地：`ssh -D` 对比出口 IP 验证 dispatcher（隧道/直连出口 IP 不同）；`corp-egress` 服务 + 真实链路——**服务器经隧道访问 yapi 返回 `errcode:0`，出口为 Mac 公网 IP**。
+- egress 单测 5/5；test 74+26+6、typecheck、build 全绿；MCP `tools/list`=36。
+
 ## v0.11.45 (2026-10-11) — 新增 MCP yapi 工具：YApi 接口页 URL → 接口定义（JSON/TS）
 
 ### 变更

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { schemaToType } from "./schema-to-ts.js";
+import { egressFetch } from "@app/shared/egress.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const USAGE = "请提供有效的 YApi 接口页链接，示例：https://yapi.cai-inc.com/project/3222/interface/api/243396";
@@ -47,7 +48,7 @@ async function fetchInterface(origin, id, token) {
   const timer = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT_MS);
   try {
     const api = `${origin}/api/interface/get?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`;
-    const res = await fetch(api, { signal: ctrl.signal });
+    const res = await egressFetch(api, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } finally {

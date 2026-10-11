@@ -29,6 +29,10 @@ export async function register(): Promise<void> {
   const { initSettings } = await import("@/lib/settings/init");
   initSettings();
 
+  // 内网出口层：白名单域名自动走反向隧道（未开启则零副作用）
+  const { installEgress } = await import("@app/shared/egress.js");
+  installEgress();
+
   const { ensureChromaRunning } = await import("@/lib/rag/chroma-server");
   await ensureChromaRunning();
 }

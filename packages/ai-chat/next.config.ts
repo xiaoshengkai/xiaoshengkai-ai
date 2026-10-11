@@ -44,6 +44,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "chromadb",
     "@chroma-core/default-embed",
+    // egress.js（内网出口层）用 undici 自定义 connect + socks，native 依赖走外部 require
+    "undici",
+    "socks",
     // chroma-server.ts 整个文件直接走外部 require,绕过 webpack
     "./src/lib/chroma-server",
     "./src/lib/chroma-server.ts",

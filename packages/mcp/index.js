@@ -1,6 +1,9 @@
 import "./lib/env.js";
 // 日志必须最先初始化：工具模块在顶层 console.log，需在它们被 import 前拦截 stdout
 import "./lib/logger-setup.js";
+// 内网出口层：白名单域名自动走反向隧道（未开启则零副作用）
+import { installEgress } from "@app/shared/egress.js";
+installEgress();
 
 // ─── 进程级死因兜底：子进程异常/被杀时留下证据 ───
 process.on("uncaughtException", (err) => {

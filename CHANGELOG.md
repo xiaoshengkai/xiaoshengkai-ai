@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.45 (2026-10-11) — 新增 MCP yapi 工具：YApi 接口页 URL → 接口定义（JSON/TS）
+
+### 变更
+- 新增 `packages/mcp/tools/yapi/`（`yapiApi` 工具）：传 YApi 详情页 URL（自动解析 origin / 接口 id）+ 项目 token，调 `GET /api/interface/get` 返回原始 JSON 或 TS 类型定义。base 从 URL 自取；token 支持参数或 URL 查询串兜底；errcode 40011（token 无效）/ 402（接口不存在）友好报错。
+- `schema-to-ts.js`：YApi JSON Schema → TS 内联类型；字段备注（description + 枚举 enumDesc）输出为 JSDoc 列表；覆盖 required / enum / 非法属性名 / 空对象 / 非 schema 降级。
+- `packages/mcp/index.js` 注册 yapi 模块；`ARCHITECTURE.md` 工具数 35→36。
+
+### 验证
+- schema-to-ts 单测 10/10；test 69+26+6、typecheck 全绿；stdio `tools/list`=36；实测 243396 / 588722 / 254440 / 316730 输出正确。
+
 ## v0.11.44 (2026-10-08) — 流式渲染节流 + 消息 memo：治长回答卡顿与切 tab 白屏
 
 ### 问题

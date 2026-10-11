@@ -16,7 +16,7 @@ npm workspaces（根 package.json，packages/*）
      │
 ai-chat（Next.js，组合根）──注册──▶ workflows / tasks / mcp / skills
      │                                （能力 100% 在包内，ai-chat 只留挂载点）
-     ├─ stdio spawn ──▶ mcp（35 tools，自包含）
+     ├─ stdio spawn ──▶ mcp（36 tools，自包含）
      ├─ stdio spawn ──▶ chromadb（Python standalone :8000）
      └─ catch-all 委托 ─▶ @app/workflows/http、@app/tasks/http
 
@@ -89,7 +89,7 @@ ai-engineer-journey/
     │   │       └── layout.tsx / globals.css
     │   ├── scripts/             # generate-embeddings / verify-migration
     │   └── package.json
-    ├── mcp/                     # MCP 工具服务（35 tools，详见「MCP 系统」）
+    ├── mcp/                     # MCP 工具服务（36 tools，详见「MCP 系统」）
     ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
     ├── services/                # 独立常驻服务（非 npm workspace 内聚目录）
     │   └── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
@@ -353,10 +353,11 @@ packages/mcp/
     ├── diagram/             # 2 tools：generateDiagram / checkDiagramProgress（Mermaid/D2）
     ├── xiaohongshu/         # 4 tools：小红书笔记生成/修稿/导出/进度；finance 两阶段策划→正文，note-utils 负责候选评分/状态摘要/导出转换。任务状态存 data/xhs-tasks/<id>（跨重启），导出到 data/exports/<id>（浏览器经 /api/exports/<id> 打 zip 下载，7 天清理）
     ├── document/            # 2 tools：convertDocument / convertDocumentBatch（Pandoc→PDF/Word）
+    ├── yapi/                # 1 tool：yapiApi（YApi 接口页 URL + 项目 token → 原始 JSON / TS 类型定义；schema-to-ts 纯转换器）
     └── todo/                # 6 tools（暂未注册）
 ```
 
-共 35 个已注册工具。skill / exec 与 `packages/skills/` 联动：AI 在 system prompt 看到 `<available_skills>` 列表，按需 `loadSkill` 加载，用 `exec` 运行 skill 内脚本。
+共 36 个已注册工具。skill / exec 与 `packages/skills/` 联动：AI 在 system prompt 看到 `<available_skills>` 列表，按需 `loadSkill` 加载，用 `exec` 运行 skill 内脚本。
 
 ## 搜索服务系统
 

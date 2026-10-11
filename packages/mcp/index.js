@@ -33,6 +33,7 @@ import { register as registerMedia } from "./tools/media/index.js";
 import { register as registerDiagram } from "./tools/diagram/index.js";
 import { register as registerXiaohongshu } from "./tools/xiaohongshu/index.js";
 import { register as registerDocument, checkPandoc } from "./tools/document/index.js";
+import { register as registerYapi } from "./tools/yapi/index.js";
 
 console.log(`[mcp] server-id: ${Date.now().toString(36)}`);
 
@@ -69,6 +70,7 @@ const modules = [
   { name: "diagram", register: registerDiagram },
   { name: "xiaohongshu", register: registerXiaohongshu },
   { name: "document", register: registerDocument },
+  { name: "yapi", register: registerYapi },
 ];
 
 let totalTools = 0;

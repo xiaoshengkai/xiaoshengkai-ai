@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.11.47 (2026-10-11) — 内网出口稳定性修复 + 设置页「网络出口」改版 & 菜单去红点
+
+### 问题
+- 云服务器上误启动 corp-egress：其 SOCKS 抢占服务器 `127.0.0.1:11080`，导致 Mac 的 `ssh -R` 绑不上 → 隧道断（双端显示 stopped），云端 yapi 请求经服务器 SOCKS 连内网黑洞 → 15s 超时。
+- `service.json` 的 stop 命令 `pkill -f .../runner.js` 匹配不到实际 cmdline `node runner.js` → restart 杀不掉旧进程（端口僵尸）。
+- socks-server 上游 connect 无超时 → 黑洞连接 hang 满客户端超时。
+
+### 变更
+- `corp-egress/runner.js`：启动前**内网探针守卫**（TCP `yapi.cai-inc.com:443` 3s，`CORP_PROBE_HOST/PORT` 可覆盖），不在内网则拒绝启动；`process.title=corp-egress-runner`；stop 改 `pkill -f corp-egress-runner`。
+- `corp-egress/socks-server.js`：上游 connect 10s 超时 → 快速失败回 `0x05`（不再 hang）。
+- `service.json`：`optional: true`；`services/manager.ts` 透传 `optional`。
+- `tools/yapi/index.js`：超时 15s→30s。
+- 设置页：**「网络出口」tab 改版**（统一 `max-w-3xl` 列宽 / 三块分组 / 开关整行可点 / 删除降 ghost / 测试降 secondary / 空态虚线框 / 配色收敛）+ **自动保存**（600ms 防抖，删右上角保存钮）；**删除左栏菜单全部红点**；服务卡加「可选」badge。
+
+### 验证
+- 本地：新 runner 探针通过→SOCKS+隧道起来；`ps` 见 `corp-egress-runner`、`pkill` 命中；**服务器经隧道打 yapi `errcode:0`，出口为 Mac IP**；socks 连黑洞 ~10s 失败（不 hang）。
+- typecheck / build / test（74+26+6）全绿。
+
 ## v0.11.46 (2026-10-11) — 内网出口层：白名单域名经本机隧道出网（云服务器访问公司内网）
 
 ### 变更

@@ -12,11 +12,15 @@
  * 前提：Mac 能免密 ssh 到 DEPLOY_TARGET（同 deploy-common 的部署目标）。
  */
 import http from "node:http";
+import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createSocksServer } from "./socks-server.js";
+
+// 供 pkill 精确匹配（stop 命令用），避免 restart 杀不掉旧进程
+process.title = "corp-egress-runner";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "..", "..", "..");
@@ -42,10 +46,27 @@ const HEALTH_PORT = network.ports.corpHealth;
 
 const TARGET = readEnv("DEPLOY_TARGET");
 const SSH_PORT = readEnv("DEPLOY_PORT") || "22";
+// 内网可达探针：只有能连上内网的主机才该跑这个服务（挡掉在云服务器上误启动）
+const PROBE_HOST = readEnv("CORP_PROBE_HOST") || "yapi.cai-inc.com";
+const PROBE_PORT = Number(readEnv("CORP_PROBE_PORT") || "443");
 
 if (!TARGET) {
   console.error("[corp-egress] 缺 DEPLOY_TARGET（.env），无法建立隧道");
   process.exit(1);
+}
+
+function probeCorp(host, port, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    const sock = net.connect({ host, port });
+    const done = (ok) => {
+      sock.destroy();
+      resolve(ok);
+    };
+    sock.setTimeout(timeoutMs);
+    sock.once("connect", () => done(true));
+    sock.once("timeout", () => done(false));
+    sock.once("error", () => done(false));
+  });
 }
 
 let child = null;
@@ -98,18 +119,25 @@ for (const sig of ["SIGTERM", "SIGINT"]) {
   });
 }
 
-// 先起本机 SOCKS（从本机出网），再建反向隧道把它暴露到服务器
-createSocksServer({ host: HOST, port: SOCKS_PORT })
-  .then(() => {
-    socksUp = true;
-    console.log(`[corp-egress] 本机 SOCKS5 已就绪 on ${HOST}:${SOCKS_PORT}`);
-    startTunnel();
-  })
-  .catch((err) => {
-    console.error(`[corp-egress] SOCKS 启动失败: ${err.message}`);
+// 探针守卫 → 起本机 SOCKS → 建反向隧道把它暴露到服务器
+async function main() {
+  const canReachCorp = await probeCorp(PROBE_HOST, PROBE_PORT);
+  if (!canReachCorp) {
+    console.error(
+      `[corp-egress] 无法连通内网 ${PROBE_HOST}:${PROBE_PORT} —— 本机不在公司内网，拒绝启动（该服务只能在能访问内网的主机上运行）`,
+    );
     process.exit(1);
+  }
+  await createSocksServer({ host: HOST, port: SOCKS_PORT });
+  socksUp = true;
+  console.log(`[corp-egress] 本机 SOCKS5 已就绪 on ${HOST}:${SOCKS_PORT}`);
+  startTunnel();
+  health.listen(HEALTH_PORT, HOST, () => {
+    console.log(`[corp-egress] health on http://${HOST}:${HEALTH_PORT}/health`);
   });
+}
 
-health.listen(HEALTH_PORT, HOST, () => {
-  console.log(`[corp-egress] health on http://${HOST}:${HEALTH_PORT}/health`);
+main().catch((err) => {
+  console.error(`[corp-egress] 启动失败: ${err.message}`);
+  process.exit(1);
 });

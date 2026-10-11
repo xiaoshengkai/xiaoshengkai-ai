@@ -7,8 +7,9 @@
       "description": "反向 SSH 隧道：把本机 SOCKS5 出口暴露到云服务器，供白名单内网域名访问（仅在公司内网的 Mac 上有意义）",
       "cwd": "packages/services/corp-egress",
       "start": ["node", "runner.js"],
-      "stop": ["pkill", "-f", "packages/services/corp-egress/runner.js"],
-      "health": { "type": "http", "url": "http://127.0.0.1:11081/health" }
+      "stop": ["pkill", "-f", "corp-egress-runner"],
+      "health": { "type": "http", "url": "http://127.0.0.1:11081/health" },
+      "optional": true
     }
   ]
 }

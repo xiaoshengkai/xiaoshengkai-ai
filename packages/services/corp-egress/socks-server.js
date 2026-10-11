@@ -49,14 +49,34 @@ export function createSocksServer({ host = "127.0.0.1", port }) {
       client.once("data", (req) => {
         const parsed = parseRequest(req);
         if (!parsed) return reply(client, 0x07); // command not supported
-        const upstream = net.connect(parsed.port, parsed.host, () => {
+        let responded = false;
+        const fail = (code) => {
+          if (responded) return;
+          responded = true;
+          reply(client, code);
+          client.destroy();
+        };
+        const upstream = net.connect(parsed.port, parsed.host);
+        // 上游 10s 上限：黑洞连接（不可路由）快速失败，而非 hang 满客户端超时
+        upstream.setTimeout(10000);
+        upstream.once("connect", () => {
+          responded = true;
+          upstream.setTimeout(0);
           reply(client, 0x00);
           upstream.pipe(client);
           client.pipe(upstream);
         });
-        upstream.on("error", () => {
-          reply(client, 0x05); // connection refused
-          client.destroy();
+        upstream.once("timeout", () => {
+          fail(0x05);
+          upstream.destroy();
+        });
+        upstream.once("error", () => {
+          if (responded) {
+            upstream.destroy();
+            client.destroy();
+            return;
+          }
+          fail(0x05);
         });
         client.on("close", () => upstream.destroy());
       });

@@ -12,6 +12,8 @@ type ManifestService = {
   start: string[];
   stop: string[];
   health?: { type: "http"; url: string };
+  /** 可选服务：缺失/未运行不视为异常（如仅特定主机有意义的服务） */
+  optional?: boolean;
 };
 
 type ServiceDef = ManifestService & { group: string; healthUrl: string };
@@ -24,6 +26,7 @@ export type ManagedService = {
   cwd: string;
   healthUrl: string;
   status: ServiceStatus;
+  optional: boolean;
 };
 
 const PROJECT_ROOT = path.resolve(process.cwd(), "..", "..");
@@ -93,6 +96,7 @@ async function toManaged(service: ServiceDef): Promise<ManagedService> {
     cwd: service.cwd,
     healthUrl: service.healthUrl,
     status: await checkHealth(service),
+    optional: !!service.optional,
   };
 }
 

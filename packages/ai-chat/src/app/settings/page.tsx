@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { BASE } from "@/lib/utils/utils";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ interface ManagedService {
   cwd: string;
   healthUrl: string;
   status: "running" | "starting" | "stopped" | "unknown";
+  optional?: boolean;
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -67,7 +68,8 @@ export default function SettingsPage() {
   const [pwdForm, setPwdForm] = useState({ oldPassword: "", newPassword: "", confirm: "" });
   const [pwdBusy, setPwdBusy] = useState(false);
   const [egress, setEgress] = useState<EgressConfig | null>(null);
-  const [dirtyEgress, setDirtyEgress] = useState(false);
+  const [egressSave, setEgressSave] = useState<"idle" | "saving" | "saved">("idle");
+  const savedEgressRef = useRef("");
   const [egressTestUrl, setEgressTestUrl] = useState("https://yapi.cai-inc.com");
   const [egressTest, setEgressTest] = useState<{ ok: boolean; msg: string } | null>(null);
   const [egressTesting, setEgressTesting] = useState(false);
@@ -82,6 +84,7 @@ export default function SettingsPage() {
       setProviders(p);
       setSelection(s);
       setEgress(e);
+      savedEgressRef.current = JSON.stringify(e);
     });
   }, []);
 
@@ -187,8 +190,31 @@ export default function SettingsPage() {
 
   const updateEgress = useCallback((patch: Partial<EgressConfig>) => {
     setEgress((prev) => (prev ? { ...prev, ...patch } : prev));
-    setDirtyEgress(true);
   }, []);
+
+  // 自动保存：egress 变更 600ms 防抖写盘（对比上次已存快照，避免首帧误触发）
+  useEffect(() => {
+    if (!egress) return;
+    const snapshot = JSON.stringify(egress);
+    if (snapshot === savedEgressRef.current) return;
+    setEgressSave("saving");
+    const timer = setTimeout(async () => {
+      try {
+        const r = await fetch(`${BASE}/api/settings/egress`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: snapshot,
+        });
+        if (!r.ok) throw new Error("save failed");
+        savedEgressRef.current = snapshot;
+        setEgressSave("saved");
+        setTimeout(() => setEgressSave("idle"), 1800);
+      } catch {
+        setEgressSave("idle");
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [egress]);
 
   const runEgressTest = useCallback(async () => {
     setEgressTesting(true);
@@ -228,21 +254,12 @@ export default function SettingsPage() {
         if (!r.ok) throw new Error("selection save failed");
         setDirtySel(false);
       }
-      if (dirtyEgress && egress) {
-        const r = await fetch(`${BASE}/api/settings/egress`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(egress),
-        });
-        if (!r.ok) throw new Error("egress save failed");
-        setDirtyEgress(false);
-      }
       toast("🟢 设置已保存");
     } catch (e) {
       toast(`🔴 保存失败: ${e instanceof Error ? e.message : "未知错误"}`);
     }
     setSaving(false);
-  }, [dirtyProv, dirtySel, dirtyEgress, providers, selection, egress]);
+  }, [dirtyProv, dirtySel, providers, selection]);
 
   if (!providers || !selection || !egress) {
     return (
@@ -252,7 +269,7 @@ export default function SettingsPage() {
     );
   }
 
-  const hasChanges = dirtyProv || dirtySel || dirtyEgress;
+  const hasChanges = dirtyProv || dirtySel;
 
   const statusClass: Record<ManagedService["status"], string> = {
     running: "bg-lime-soft text-foreground",
@@ -282,10 +299,10 @@ export default function SettingsPage() {
       <div className="flex flex-1 overflow-hidden">
       <nav className="shrink-0 flex flex-row flex-wrap md:flex-col items-start md:items-stretch gap-2 p-3 border-b-2 md:border-b-0 md:border-r-2 border-border md:w-44 bg-card overflow-auto">
         {([
-          { id: "models", label: "模型", dot: hasChanges },
-          { id: "services", label: "服务", dot: !serviceLoading && services.some((s) => s.status !== "running") },
-          { id: "egress", label: "网络出口", dot: dirtyEgress },
-          { id: "security", label: "安全", dot: false },
+          { id: "models", label: "模型" },
+          { id: "services", label: "服务" },
+          { id: "egress", label: "网络出口" },
+          { id: "security", label: "安全" },
         ] as const).map((t) => (
           <button
             key={t.id}
@@ -295,7 +312,6 @@ export default function SettingsPage() {
             }`}
           >
             <span>{t.label}</span>
-            {t.dot && <span aria-label="提醒" className="w-2 h-2 bg-destructive shrink-0" />}
           </button>
         ))}
       </nav>
@@ -384,7 +400,12 @@ export default function SettingsPage() {
             <div key={service.id} className="brutal bg-card p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold font-heading">{service.name}</h3>
+                  <h3 className="text-sm font-bold font-heading flex items-center gap-2">
+                    {service.name}
+                    {service.optional && (
+                      <span className="brutal-chip px-1.5 py-0 text-[9px] bg-muted text-muted-foreground">可选</span>
+                    )}
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-1">{service.description}</p>
                 </div>
                 <span className={`brutal-chip px-2 py-0.5 text-[10px] ${statusClass[service.status]}`}>{service.status}</span>
@@ -413,109 +434,113 @@ export default function SettingsPage() {
 
       {tab === "egress" && (
       /* 内网出口 */
-      <div>
-        <div className="flex items-center justify-between mb-3">
+      <div className="max-w-3xl">
+        <div className="flex items-center gap-2 mb-3">
           <h2 className="text-sm font-bold text-foreground font-heading">🌐 网络出口</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => updateEgress({ enabled: !egress.enabled })}
-              className={`brutal-btn px-2 py-1 text-xs font-bold ${egress.enabled ? "bg-lime-soft text-foreground" : "bg-muted text-muted-foreground"}`}
-            >
-              {egress.enabled ? "已开启" : "已关闭"}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!dirtyEgress || saving}
-              className={`brutal-btn px-2 py-1 text-xs font-bold ${dirtyEgress && !saving ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}
-            >
-              {saving ? "保存中..." : dirtyEgress ? "保存更改" : "已保存"}
-            </button>
-          </div>
+          <span className={`brutal-chip px-2 py-0.5 text-[10px] ${egress.enabled ? "bg-lime-soft text-foreground" : "bg-muted text-muted-foreground"}`}>
+            {egress.enabled ? "已开启" : "已关闭"}
+          </span>
+          {egressSave === "saving" && <span className="text-[10px] font-mono text-muted-foreground">保存中…</span>}
+          {egressSave === "saved" && <span className="text-[10px] font-mono text-muted-foreground">已保存 ✓</span>}
         </div>
 
-        <div className="brutal bg-yellow-soft p-3 text-xs font-mono mb-3 text-foreground/70">
-          白名单内的域名经「本地电脑的反向隧道」出网，用于访问公司内网（如 yapi）；其余域名照常直连。
-          依赖本地 ai-chat 的「内网出口隧道」服务在线（见「服务」页），Mac 关机/离网则失效。
+        <div className="brutal bg-yellow-soft p-2.5 text-[11px] font-mono mb-3 text-foreground/70">
+          白名单域名经「本地电脑的反向隧道」出网（访问公司内网，如 yapi）；其余直连。
+          依赖本地 ai-chat 的「内网出口隧道」服务在线，Mac 关机/离网则失效。
         </div>
 
-        <div className="brutal bg-card p-4 space-y-4 max-w-2xl text-xs font-mono">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={egress.enabled}
-              onChange={(e) => updateEgress({ enabled: e.target.checked })}
-            />
-            启用内网出口（仅白名单域名改道）
-          </label>
+        <div className="brutal bg-card p-4 space-y-5 text-xs font-mono">
+          {/* A 开关块 */}
+          <button
+            type="button"
+            onClick={() => updateEgress({ enabled: !egress.enabled })}
+            className="w-full flex items-center justify-between gap-3 text-left brutal bg-card p-3"
+          >
+            <span>
+              <span className="block text-xs font-bold text-foreground">启用内网出口</span>
+              <span className="block text-[11px] text-muted-foreground mt-0.5">仅白名单域名改走隧道，其余照常直连</span>
+            </span>
+            <span className={`brutal-chip px-2 py-0.5 text-[10px] shrink-0 ${egress.enabled ? "bg-lime-soft text-foreground" : "bg-muted text-muted-foreground"}`}>
+              {egress.enabled ? "开" : "关"}
+            </span>
+          </button>
 
-          <div>
-            <label className="text-muted-foreground block mb-0.5 text-[10px]">SOCKS 代理（服务器侧隧道入口）</label>
-            <input
-              value={egress.proxy}
-              onChange={(e) => updateEgress({ proxy: e.target.value })}
-              placeholder="127.0.0.1:11080"
-              className="w-full px-2 py-1 border-2 border-border bg-card focus:outline-none focus:border-ring"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-muted-foreground text-[10px]">白名单（精确 host / .后缀 / CIDR）</label>
-              <button
-                onClick={() => updateEgress({ whitelist: [...egress.whitelist, ""] })}
-                className="brutal-btn px-2 py-0.5 text-[11px] font-bold bg-card text-foreground"
-              >
-                + 添加
-              </button>
+          {/* B 代理 + 白名单 */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4 border-t-2 border-border pt-4">
+            <div>
+              <label className="text-foreground/60 block mb-1 text-[11px]">SOCKS 代理</label>
+              <input
+                value={egress.proxy}
+                onChange={(e) => updateEgress({ proxy: e.target.value })}
+                placeholder="127.0.0.1:11080"
+                className="w-full px-2 py-1.5 border-2 border-border bg-card focus:outline-none focus:border-ring"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">服务器侧隧道入口地址</p>
             </div>
-            {egress.whitelist.length === 0 ? (
-              <div className="text-[11px] text-muted-foreground">（空）例：.cai-inc.com</div>
-            ) : (
-              <div className="space-y-1">
-                {egress.whitelist.map((w, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      value={w}
-                      placeholder=".cai-inc.com"
-                      onChange={(e) => {
-                        const list = [...egress.whitelist];
-                        list[i] = e.target.value;
-                        updateEgress({ whitelist: list });
-                      }}
-                      className="flex-1 px-2 py-1 border-2 border-border bg-card focus:outline-none focus:border-ring"
-                    />
-                    <button
-                      onClick={() => updateEgress({ whitelist: egress.whitelist.filter((_, j) => j !== i) })}
-                      className="brutal-btn px-2 py-1 text-[11px] font-bold bg-destructive text-white"
-                    >
-                      删除
-                    </button>
-                  </div>
-                ))}
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-foreground/60 text-[11px]">白名单</label>
+                <button
+                  onClick={() => updateEgress({ whitelist: [...egress.whitelist, ""] })}
+                  className="brutal-btn px-2 py-0.5 text-[11px] font-bold bg-card text-foreground"
+                >
+                  + 添加
+                </button>
               </div>
-            )}
+              {egress.whitelist.length === 0 ? (
+                <div className="border-2 border-dashed border-border p-3 text-[11px] text-muted-foreground">
+                  空。添加一个，例：<span className="text-foreground">.cai-inc.com</span>（匹配任意子域）
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {egress.whitelist.map((w, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        value={w}
+                        placeholder="精确 host / .后缀 / CIDR"
+                        onChange={(e) => {
+                          const list = [...egress.whitelist];
+                          list[i] = e.target.value;
+                          updateEgress({ whitelist: list });
+                        }}
+                        className="flex-1 px-2 py-1.5 border-2 border-border bg-card focus:outline-none focus:border-ring"
+                      />
+                      <button
+                        onClick={() => updateEgress({ whitelist: egress.whitelist.filter((_, j) => j !== i) })}
+                        className="brutal-btn px-2 py-1 text-[11px] font-bold bg-card text-muted-foreground hover:text-destructive"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-1">精确 host / <code>.后缀</code>（任意子域）/ CIDR</p>
+            </div>
           </div>
 
-          <div className="border-t-2 border-border pt-3">
-            <label className="text-muted-foreground block mb-0.5 text-[10px]">连通性测试（经隧道请求一个白名单内地址）</label>
+          {/* C 连通性测试 */}
+          <div className="border-t-2 border-border pt-4">
+            <label className="text-foreground/60 block mb-1 text-[11px]">连通性测试（经隧道请求一个白名单内地址）</label>
             <div className="flex gap-2">
               <input
                 value={egressTestUrl}
                 onChange={(e) => setEgressTestUrl(e.target.value)}
-                className="flex-1 px-2 py-1 border-2 border-border bg-card focus:outline-none focus:border-ring"
+                className="flex-1 px-2 py-1.5 border-2 border-border bg-card focus:outline-none focus:border-ring"
               />
               <button
                 onClick={runEgressTest}
                 disabled={egressTesting}
-                className="brutal-btn px-3 py-1 text-xs font-bold bg-primary text-foreground disabled:opacity-50"
+                className="brutal-btn px-3 py-1.5 text-xs font-bold bg-card text-foreground disabled:opacity-50"
               >
                 {egressTesting ? "测试中..." : "测试"}
               </button>
             </div>
             {egressTest && (
-              <div className={`mt-1 text-[11px] ${egressTest.ok ? "text-foreground" : "text-destructive"}`}>
+              <span className={`brutal-chip inline-flex mt-2 px-2 py-0.5 text-[11px] ${egressTest.ok ? "bg-lime-soft text-foreground" : "bg-orange-soft text-foreground"}`}>
                 {egressTest.msg}
-              </div>
+              </span>
             )}
           </div>
         </div>

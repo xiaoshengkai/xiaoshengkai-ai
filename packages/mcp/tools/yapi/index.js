@@ -2,7 +2,7 @@ import { z } from "zod";
 import { schemaToType } from "./schema-to-ts.js";
 import { egressFetch } from "@app/shared/egress.js";
 
-const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_TIMEOUT_MS = 30000;
 const USAGE = "请提供有效的 YApi 接口页链接，示例：https://yapi.cai-inc.com/project/3222/interface/api/243396";
 
 function toolResult(payload) {

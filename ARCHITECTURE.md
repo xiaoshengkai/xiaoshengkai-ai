@@ -418,7 +418,7 @@ corp-egress 服务                             @app/shared/egress.js
                                                └─ host ∈ 白名单 → SOCKS；否则直连
 ```
 
-- 隧道服务 `packages/services/corp-egress/`（`runner.js` + `socks-server.js`）：本机起**真正从本机出网**的 SOCKS5（`ssh -D` 出口在服务器侧、方向相反，故自实现最小 SOCKS5），再 `ssh -R` 反投；keepalive 重连 + `/health`。由本地 ai-chat 服务监控启停。
+- 隧道服务 `packages/services/corp-egress/`（`runner.js` + `socks-server.js`）：本机起**真正从本机出网**的 SOCKS5（`ssh -D` 出口在服务器侧、方向相反，故自实现最小 SOCKS5），再 `ssh -R` 反投；keepalive 重连 + `/health`。由本地 ai-chat 服务监控启停（`service.json` 标 `optional`，见「服务监控系统」）。启动前做**内网可达探针**（TCP `yapi.cai-inc.com:443`，3s，`CORP_PROBE_HOST` 可覆盖）：不通=本机不在内网 → 拒绝启动（挡掉在云服务器上误启动抢端口）。`process.title=corp-egress-runner`，stop 用 `pkill -f corp-egress-runner` 精确匹配（否则 `node runner.js` 的老进程杀不掉、端口僵尸）。
 - 出口层 `@app/shared/egress.js`：`readEgressConfig()` fresh 读 `data/settings/egress.json`；`isCorpHost()`（精确 / `.后缀` / CIDR）；`egressFetch()` / `installEgress()`。corp 路径统一用 npm `undici`（与 Agent 同版本，避免与 Node 内建 fetch 的 undici 跨版本冲突）+ `socks` 自定义 `Agent.connect` → SOCKS → TLS。
 - 挂载：ai-chat `instrumentation.ts` + MCP `index.js` 启动时 `installEgress()`。
 - 配置/UI：设置页「网络出口」tab（开关 + 白名单增删改 + proxy + 连通性测试）；API `/api/settings/egress`(+`/test`)。
@@ -455,7 +455,8 @@ corp-egress 服务                             @app/shared/egress.js
 packages/services/*/service.json      # 清单（services 数组，一目录可多进程）
   ├── id / name / description / cwd
   ├── start / stop                    # 命令数组，直接 spawn（不走 shell）
-  └── health: { type: "http", url }   # 健康检查 URL
+  ├── health: { type: "http", url }   # 健康检查 URL
+  └── optional?                        # 可选服务（如仅特定主机有意义的 corp-egress）：未运行不算异常，UI 标「可选」badge
 
 ai-chat/src/lib/services/manager.ts   # 清单扫描 + 启停 + 健康检查（状态机）
 ai-chat/src/app/api/services/route.ts             # GET /api/services

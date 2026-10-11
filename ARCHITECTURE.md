@@ -405,6 +405,10 @@ Firecrawl 主搜仅限 page=1（无分页），2 credits/次；timeRange→tbs(q
 - 搜索失败语义：主搜+兜底均失败才报错（`search_failed: firecrawl(…) | searxng(…)`）；主搜失败已兜底或部分引擎失败返回 `degraded=true`；响应含 `provider`(firecrawl/searxng)
 - 正文抓取失败不丢弃搜索结果（`contentFetched=false` + `contentError`）
 
+## 聊天上下文（多轮）
+
+`POST /api/chat` 把前端 `useChat` 的 `UIMessage[]` 经 `api/chat/to-model-messages.ts` 转成 AI SDK `ModelMessage[]`。**全量保留、不截断**：`text`/`file` + assistant 的 `reasoning`（provider 发为 `reasoning_content`）+ `tool-call`（发为 `tool_calls`）+ 紧随的 `role:'tool'` 消息（工具结果）。这是 MiniMax 多轮 Function Call 的硬要求（保持思维链连续），也是 deepseek 等多轮工具对话准确的前提；缺了就会出现「追问瞎猜」。未完成态（input-streaming/available）工具跳过以免悬空 tool-call。上下文过长用「压缩」功能（`/api/chat/compress`）治理，**不在转换层截断**。自写转换器（非 `convertToModelMessages`）以保留 `file.data`。
+
 ## 内网出口（corp egress）
 
 公网云服务器无法访问公司内网（如 `yapi.cai-inc.com`）。Mac 在内网侧，跑一个常驻隧道服务把**本机 SOCKS5 出口**经反向 SSH 暴露到服务器；服务器侧的出口层按**域名白名单**决定请求走隧道还是直连——单点判断，MCP / 各处 `fetch` 自动受益。

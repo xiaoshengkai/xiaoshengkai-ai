@@ -15,7 +15,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { streamText, stepCountIs, type ModelMessage as AISDKModelMessage } from 'ai';
+import { streamText, stepCountIs } from 'ai';
 
 import { env } from '@/lib/utils/env';
 import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
@@ -25,7 +25,7 @@ import { getProviderConfig } from '@/lib/settings/dispatcher';
 import { getMCPClient, resetMCPClient } from '@/lib/mcp-client';
 import { processAttachments } from '@/lib/multimodal/pipeline';
 import { filterToolsByMode, buildToolsSection, MODE_INFO, type ChatMode } from '@/lib/modes';
-import type { Message, MessagePart } from '@/lib/utils/types';
+import { toModelMessages } from './to-model-messages';
 
 // ─── Skill 列表（启动时扫描，注入 system prompt）───────────────────────
 
@@ -68,25 +68,6 @@ console.log('[SKILL_LIST]', SKILL_LIST || '(空)');
 // 由 lib/mcp-client.ts 提供，MCP 子进程内 shared/llm 每次调用 fresh-read 配置
 
 // ─── POST /api/chat ───────────────────────────────────────────────────
-
-/**
- * ModelMessage 构造（自己来，因为 AI SDK 6 convertToModelMessages 会丢 file.data）
- */
-function toModelMessages(messages: Message[]): AISDKModelMessage[] {
-  return messages.map((msg) => {
-    const content: Array<{ type: string; text?: string; mediaType?: string; data?: string }> = [];
-    for (const p of msg.parts || []) {
-      if (p.type === 'text') {
-        const tp = p as MessagePart & { text: string };
-        content.push({ type: 'text', text: tp.text });
-      } else if (p.type === 'file') {
-        const fp = p as MessagePart & { mediaType: string; data: string };
-        content.push({ type: 'file', mediaType: fp.mediaType, data: fp.data });
-      }
-    }
-    return { role: msg.role, content } as unknown as AISDKModelMessage;
-  });
-}
 
 export async function POST(req: Request) {
   try {

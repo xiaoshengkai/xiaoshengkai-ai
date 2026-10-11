@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.48 (2026-10-11) — 修复多轮上下文丢失：全量回传 tool-call/tool-result + reasoning
+
+### 问题
+- `api/chat/route.ts` 的 `toModelMessages` 只保留 `text`/`file`，**丢弃** assistant 的 `reasoning` 与 `dynamic-tool`（工具调用+结果）。多轮工具对话时模型看不到上一轮工具返回，追问只能瞎猜；MiniMax 因 `reasoning_split` 正文薄受影响最重，deepseek 靠正文冗余掩盖了问题。
+
+### 变更
+- 抽出 `api/chat/to-model-messages.ts`：全量保留 text/file + assistant 的 `reasoning`（provider 发为 `reasoning_content`）与 `tool-call`（发为 `tool_calls`），并补 `role:'tool'` 的 `tool-result`；未完成态（input-streaming/available）跳过避免悬空 tool-call；**不截断**（上下文治理交给既有「压缩」功能；MiniMax-M3 1M 上下文无压力）。
+- 不再用 AI SDK `convertToModelMessages`（会丢 `file.data`）。符合 MiniMax 多轮 Function Call「必须完整回传 assistant（含 tool_calls + 思考）」规范。
+
+### 验证
+- 真实存档对话经新转换：**5 条 `role:tool` + 11 个 `tool-call` + reasoning 全保留**（旧代码为 0）。
+- 单测 5 用例；test 74+31+6、typecheck、build 全绿。
+
 ## v0.11.47 (2026-10-11) — 内网出口稳定性修复 + 设置页「网络出口」改版 & 菜单去红点
 
 ### 问题

@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.11.49 (2026-10-21) — 户型改造四视图交付：原始建筑图 + 平面布置图 + 效果图 + 俯视平面图
+
+### 变更
+- 户型改造 work在「保留原户型 + 每套改造方案」基础上，产出四种设计交付视图（generate 一步全出）：
+  - **原始建筑图** `structure-arch.svg`：干净矢量重绘（承重红/隔墙黑/门窗符号/房间面积）+ 尺寸标注链（`structure.dims` 标注行，无标注时用 `mmPerPx` 反算外围 extent 兜底）。
+  - **平面布置图** `layout-original.svg` / `layout-pN.svg`：2D 线稿全屋家具俯视图元（床/沙发/餐桌/马桶/洗手台/淋浴/浴缸/橱柜/书桌/衣柜/电视柜/冰箱/洗衣机/茶几/椅凳/收纳）。
+  - **效果图** `render-pN.png`：人视点透视渲染（纯文本 prompt）。
+  - **俯视平面图** `birdview-pN.png`：鸟瞰 3D 渲染，以平面布置图 SVG 栅格化 PNG 作图生图参考（锁空间布局）。
+- 新增 `lib/render-arch.js`（`renderArchitectural`/`renderLayout` + 家具图元库）与 `lib/generate-render.js`（`generateRenderings` + `STYLE_PROMPTS` 11 种装修风格）。
+- 新增参数 `style`（装修风格 select，默认现代简约）：注入效果图/俯视平面图 prompt。
+- `anchors.js` 加 `resolveFurniture`（`{roomId|nr, items:[{type,rel}]}` → 空间内像素矩形，治 LLM 家具像素 hallucinate）；原户型「现状布置」单独一次轻量 LLM（`layout-original.svg` 存在即复用，补跑不重跑）。
+- `generate.js` 扩展 LLM schema 输出 `furniture`，step output 扩 `architecture/layoutOriginal/renderings`；渲染图幂等复用（存在即跳过，`retryForce` 重跑）、单张失败降级（写 error 字段不废方案）。
+- 前端 execution 页新增 `FloorplanGallery`：原户型卡（建筑图+现状布置）+ 每方案卡（布置图/效果图/鸟瞰），失败图占位。
+
+### 验证
+- `floorplan-workflow.test.js` 新增 3 项（resolveFurniture / renderArchitectural / renderLayout）；test:shared 77、typecheck、build 全绿。
+
 ## v0.11.48 (2026-10-11) — 修复多轮上下文丢失：全量回传 tool-call/tool-result + reasoning
 
 ### 问题

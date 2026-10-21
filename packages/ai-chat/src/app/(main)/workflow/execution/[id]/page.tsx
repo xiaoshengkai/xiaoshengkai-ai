@@ -554,6 +554,11 @@ export default function ExecutionDetailPage() {
               );
             }
 
+            // 优先级0.5：floorplan generate → 设计交付四视图画廊
+            if (isFloorplan && activeStep.id === "generate" && activeStep.status === "completed") {
+              return <FloorplanGallery step={activeStep} executionId={execution.executionId} />;
+            }
+
             // 优先级1：script step → JSON tabs
             if (activeStep.id === "script" && activeStep.output) {
               if (activeStep.status === "running") {
@@ -899,6 +904,80 @@ export default function ExecutionDetailPage() {
       </div>
     );
   }
+}
+
+function FloorplanGallery({ step, executionId }: { step: ExecutionStep; executionId: string }) {
+  const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
+  const { register, open } = useImageViewer();
+  let data: any = null;
+  try {
+    data = typeof step.output === "string" ? JSON.parse(step.output) : step.output;
+  } catch { data = null; }
+  if (!data) return <p className="text-xs text-muted-foreground/70">暂无输出</p>;
+
+  const renderings: any[] = data.renderings || [];
+
+  const img = (file: string, alt: string) => {
+    if (!file) return null;
+    const src = `${fileBase}/${file}?preview=1`;
+    const idx = register(src);
+    return (
+      <div className="border-2 border-border bg-muted/20">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} loading="lazy" className="w-full block cursor-zoom-in" onClick={() => open(idx)} />
+      </div>
+    );
+  };
+
+  const placeholder = (label: string, error?: string) => (
+    <div className="aspect-video flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border bg-muted p-3">
+      <span className="text-2xl">🖼️</span>
+      <p className="text-xs font-bold text-muted-foreground">{label}生成失败</p>
+      {error ? <p className="text-[10px] text-muted-foreground/70 text-center break-words max-h-12 overflow-hidden">{error}</p> : null}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {data.output && (
+        <div className="border-2 border-border bg-yellow-soft p-2 text-xs whitespace-pre-wrap text-foreground">{data.output}</div>
+      )}
+
+      <div className="border-2 border-border bg-card p-3">
+        <h3 className="text-xs font-bold text-foreground mb-2">🏠 原户型</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">原始建筑图（量房结构）</p>
+            {img(data.architecture, "原始建筑图")}
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">平面布置图（现状）</p>
+            {img(data.layoutOriginal, "现状平面布置图")}
+          </div>
+        </div>
+      </div>
+
+      {renderings.map((r, i) => (
+        <div key={r.planId || i} className="border-2 border-border bg-card p-3">
+          <h3 className="text-xs font-bold text-foreground mb-2">📐 方案 {i + 1} · {r.title || r.planId}</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">平面布置图</p>
+              {img(r.layout, "平面布置图")}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">效果图（人视点）</p>
+              {r.renderError ? placeholder("效果图", r.renderError) : img(r.render, "效果图")}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">俯视平面图（鸟瞰）</p>
+              {r.birdviewError ? placeholder("俯视平面图", r.birdviewError) : img(r.birdview, "俯视平面图")}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onConfirm, confirming }: {

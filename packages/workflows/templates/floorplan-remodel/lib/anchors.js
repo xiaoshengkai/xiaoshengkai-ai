@@ -97,3 +97,46 @@ export function resolvePlanSpecs(p, structure) {
 
   return { build, newRooms, errors };
 }
+
+/**
+ * 家具布置解析：{ roomId, items:[{type, rel:[0-1 x4]}] } → 房间 bbox 内像素矩形（确定性，治 LLM 像素 hallucinate）
+ * 返回扁平 { type, bbox:[x1,y1,x2,y2] } 列表，renderLayout 直接绘制。
+ */
+export function resolveFurniture(p, structure) {
+  const errors = [];
+  const furniture = [];
+  const newRooms = Array.isArray(p?.newRooms) ? p.newRooms : [];
+  for (const fr of (p?.furniture || [])) {
+    let box = null;
+    if (fr?.roomId) {
+      const r = (structure.rooms || []).find(x => x.id === fr.roomId);
+      box = r && Array.isArray(r.bbox) && r.bbox.length === 4 ? r.bbox : null;
+      if (!box) { errors.push(`furniture.roomId ${fr.roomId} 不存在或无 bbox`); continue; }
+    } else if (fr?.nr != null) {
+      const nr = newRooms[Number(fr.nr)];
+      box = nr && Array.isArray(nr.bbox) && nr.bbox.length === 4 ? nr.bbox : null;
+      if (!box) { errors.push(`furniture.nr ${fr.nr} 不存在`); continue; }
+    } else {
+      errors.push(`furniture 组缺 roomId 或 nr`);
+      continue;
+    }
+    const [x1, y1, x2, y2] = box.map(Number);
+    for (const it of (fr.items || [])) {
+      if (!it || !Array.isArray(it.rel) || it.rel.length !== 4) {
+        errors.push(`furniture item 缺 rel 相对框`);
+        continue;
+      }
+      const [a, b, c, d] = it.rel.map(clamp01);
+      furniture.push({
+        type: String(it.type || "storage"),
+        bbox: [
+          Math.round(x1 + (x2 - x1) * Math.min(a, c)),
+          Math.round(y1 + (y2 - y1) * Math.min(b, d)),
+          Math.round(x1 + (x2 - x1) * Math.max(a, c)),
+          Math.round(y1 + (y2 - y1) * Math.max(b, d)),
+        ],
+      });
+    }
+  }
+  return { furniture, errors };
+}

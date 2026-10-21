@@ -4,8 +4,11 @@ import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderPlan, readImg } from "./render.js";
 import { renderPlanMd } from "./render-md.js";
+import { renderArchitectural, renderLayout } from "./render-arch.js";
 import { loadWallMask, nearMask } from "./snap.js";
-import { resolvePlanSpecs } from "./anchors.js";
+import { resolvePlanSpecs, resolveFurniture } from "./anchors.js";
+import { generateRenderings } from "./generate-render.js";
+import { readState, writeState } from "../../../lib/state.js";
 import { areaM2, roomTypeByLabel } from "./metrics.js";
 
 const TIERS = [
@@ -27,6 +30,34 @@ const CHECK_RULES = [
   "动线未被阻断、逃生通道畅通",
   "新马桶间邻近排水立管（卫生间/厨房），否则注明墙排/提升泵",
 ];
+
+// 家具俯视图元类型（render-arch.js GLYPHS 与 LLM 输出共用的封闭词表）
+const FURN_TYPES = ["bed", "sofa", "dining", "toilet", "sink", "shower", "bathtub", "kitchen", "desk", "wardrobe", "tv", "fridge", "washer", "table", "stool", "storage"];
+
+function updateProgress(executionDir, text) {
+  try {
+    const st = readState(executionDir);
+    const gs = st.steps?.find(s => s.id === "generate");
+    if (gs) {
+      gs.progress = text;
+      writeState(executionDir, st);
+    }
+  } catch { /* ignore */ }
+}
+
+// 原户型「现状布置」：量房图无家具，LLM 出一套合理默认布局
+async function generateOriginalFurniture(structure) {
+  const system = `你是家居布置师。基于原始户型结构 JSON（像素坐标），为每个房间布置一套合理的现状家具（俯视占位矩形）。输出严格 JSON（不要 markdown 围栏）：
+{"furniture":[{"roomId":"<结构房间id>","items":[{"type":"sofa","rel":[0.05,0.1,0.45,0.4]}]}]}
+- type ∈ ${FURN_TYPES.join("/")}，仅用这些值
+- rel 为该房间 bbox 内 0-1 相对矩形（每个家具一个占位）
+- 每个房间按功能布置 1-4 件主要家具，湿区（卫生间/厨房）布置洁具/橱柜`;
+  const user = `户型结构 JSON：\n${JSON.stringify(structure)}\n\n输出：`;
+  const { text } = await callLLM({ system, user, temperature: 0.4 });
+  const parsed = parseJSON(text);
+  if (parsed && Array.isArray(parsed.furniture)) return resolveFurniture({ furniture: parsed.furniture }, structure).furniture;
+  return [];
+}
 
 function distToSeg(px, py, w) {
   const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
@@ -223,7 +254,7 @@ function nearBbox(a, b, tol) {
   return !(a[2] + tol < b[0] || b[2] + tol < a[0] || a[3] + tol < b[1] || b[3] + tol < a[1]);
 }
 
-export async function generatePlans(needs, needsText, planCount, executionDir, retryForce) {
+export async function generatePlans(needs, needsText, planCount, executionDir, retryForce, style) {
   const structure = JSON.parse(fs.readFileSync(path.join(executionDir, "structure.json"), "utf-8"));
   if (!structure.confirmed) throw Object.assign(new Error("户型结构尚未确认，请先在上一步确认入户门/门窗/房间/承重墙"), { retryable: false });
   const rules = JSON.parse(fs.readFileSync(new URL("../rules.json", import.meta.url), "utf-8"));
@@ -267,12 +298,13 @@ ${hardRules}
 - 拆墙必须有补：同方案内用 build 重建围合，或用 roomChanges 声明被拆墙两侧空间合并；禁止拆了不补留下开放缺口
 - build 新墙用符号锚点：{"from":<锚点>,"to":<锚点>}；锚点 ∈ {"wall":"<墙id>","t":0-1 沿墙比例} 或 {"room":"<房间id>","edge":"N|S|W|E","t":0-1 沿边比例}；墙id/房间id 必须取自上方结构数据，严禁直接编造像素坐标；新墙两端必须落在墙/房间边上形成闭合空间
 - 每个新增/改造出的功能空间必须输出 newRooms：{label, room:"<空间所在房间id>", rel:[x1,y1,x2,y2] 该房间 bbox 内 0-1 相对矩形}（如新隔出的马桶间、书房）；newRooms 的四边必须被既有墙+本方案新墙围合
+- 每套方案必须输出 furniture 家具布置：为每个结构房间（roomId）和每个新空间（nr=<newRooms 下标>）布置俯视家具。形如 [{"roomId":"r2","items":[{"type":"sofa","rel":[0.05,0.1,0.45,0.4]}]} 或 {"nr":0,"items":[...]}]；type 仅用 ${FURN_TYPES.join("/")}；rel 为该空间 bbox 内的 0-1 相对矩形（每个家具一个占位）
 - 新增马桶间必须紧邻现有卫生间或厨房（排水立管位置），否则在 checks 中标 ✗ 并注明提升泵
 - 方案之间必须有实质差异，严格按梯度区分改造力度
 每套方案对以下规则逐条自检输出 checks：
 ${CHECK_RULES.map(r => `- ${r}`).join("\n")}
 输出严格 JSON（不要 markdown 围栏）：
-{"plans":[{"title":"…","demolish":["w3"],"build":[{"from":{"wall":"w3","t":0.4},"to":{"room":"r2","edge":"N","t":0.5}}],"newRooms":[{"label":"独立马桶间","room":"r2","rel":[0.6,0,1,0.35]}],"roomChanges":[{"roomId":"r2","newLabel":"儿童房"}],"summary":"2-3句，注明所用套路 id（如 P2/P3），用 newRooms 标签呼应","checks":[{"rule":"${CHECK_RULES[0]}","pass":true,"note":"可选说明"}]}]}
+{"plans":[{"title":"…","demolish":["w3"],"build":[{"from":{"wall":"w3","t":0.4},"to":{"room":"r2","edge":"N","t":0.5}}],"newRooms":[{"label":"独立马桶间","room":"r2","rel":[0.6,0,1,0.35]}],"furniture":[{"roomId":"r2","items":[{"type":"sofa","rel":[0.05,0.1,0.45,0.4]}]},{"nr":0,"items":[{"type":"toilet","rel":[0.1,0.1,0.5,0.9]}]}],"roomChanges":[{"roomId":"r2","newLabel":"儿童房"}],"summary":"2-3句，注明所用套路 id（如 P2/P3），用 newRooms 标签呼应","checks":[{"rule":"${CHECK_RULES[0]}","pass":true,"note":"可选说明"}]}]}
 plans 数组顺序必须与梯度编号 1~${n} 一一对应。`;
     const user = `户型结构 JSON：
 ${JSON.stringify(structure)}
@@ -351,9 +383,38 @@ ${tierList}
     fs.writeFileSync(path.join(executionDir, `plan-p${i + 1}.md`), renderPlanMd(structure, p));
     return { page: i + 1, file };
   });
+
+  // 原始建筑图 + 现状平面布置图（SVG 存在即复用，补跑不重跑家具 LLM）
+  const architecture = "structure-arch.svg";
+  fs.writeFileSync(path.join(executionDir, architecture), renderArchitectural(structure));
+  const layoutOriginal = "layout-original.svg";
+  const layoutOriginalPath = path.join(executionDir, layoutOriginal);
+  if (!retryForce && fs.existsSync(layoutOriginalPath)) {
+    // 复用已生成的现状布置
+  } else {
+    updateProgress(executionDir, "生成现状布置…");
+    const originalFurniture = await generateOriginalFurniture(structure);
+    fs.writeFileSync(layoutOriginalPath, renderLayout(structure, null, originalFurniture));
+  }
+
+  // 每套方案：平面布置图 + 效果图 + 俯视平面图（图生失败降级不废方案）
+  const renderings = [];
+  for (let i = 0; i < plans.length; i++) {
+    const p = plans[i];
+    const idx = i + 1;
+    const furniture = resolveFurniture(p, structure).furniture;
+    const layoutFile = `layout-p${idx}.svg`;
+    fs.writeFileSync(path.join(executionDir, layoutFile), renderLayout(structure, p, furniture));
+    updateProgress(executionDir, `生成渲染图 ${idx}/${plans.length}…`);
+    const r = await generateRenderings({ structure, plan: p, style, layoutFile: path.join(executionDir, layoutFile), executionDir, planIdx: idx, retryForce });
+    renderings.push({ planId: p.id, title: p.title, layout: layoutFile, ...r });
+  }
+
+  const renderFailed = renderings.some(r => r.renderError || r.birdviewError);
   const output = plans.map(p => `【${p.tier}】${p.title}：${p.summary}`).join("\n") +
-    (extraLines.length ? `\n${extraLines.join("；")}` : "");
-  return { pages, mdFiles: plans.map((_, i) => `plan-p${i + 1}.md`), output };
+    (extraLines.length ? `\n${extraLines.join("；")}` : "") +
+    (renderFailed ? "\n部分渲染图生成失败（方案仍有效，可重试本步补图）" : "");
+  return { pages, mdFiles: plans.map((_, i) => `plan-p${i + 1}.md`), architecture, layoutOriginal, renderings, output };
 }
 
 function writeQuality(qualityPath, section) {

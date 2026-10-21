@@ -10,7 +10,9 @@
       "options": ["2改3", "3改2", "加书房/多功能房", "加独立马桶间", "开放式厨房", "干湿分离", "加衣帽间"] },
     { "name": "needsText", "label": "补充诉求（可选）", "type": "textarea", "required": false, "placeholder": "如：功能房用来办公和打游戏；厕所只要马桶+洗漱台" },
     { "name": "planCount", "label": "方案数量（1-6，默认 4）", "type": "number", "required": false },
-    { "name": "areaM2", "label": "建筑面积㎡（可选；图无尺寸标注时用于估算比例尺）", "type": "number", "required": false }
+    { "name": "areaM2", "label": "建筑面积㎡（可选；图无尺寸标注时用于估算比例尺）", "type": "number", "required": false },
+    { "name": "style", "label": "装修风格（影响效果图/鸟瞰渲染）", "type": "select", "required": false,
+      "options": ["现代简约", "奶油风", "原木日式", "北欧", "中古风", "侘寂风", "新中式", "轻奢风", "法式复古", "工业风", "极简黑白灰"] }
   ],
   "steps": [
     {
@@ -29,7 +31,7 @@
       "previewType": "images",
       "module": "./lib/generate.js",
       "function": "generatePlans",
-      "args": ["{needs}", "{needsText}", "{planCount}", "{executionDir}", "{retryForce}"]
+      "args": ["{needs}", "{needsText}", "{planCount}", "{executionDir}", "{retryForce}", "{style}"]
     }
   ]
 }

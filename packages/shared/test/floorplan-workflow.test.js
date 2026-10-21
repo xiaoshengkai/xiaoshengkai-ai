@@ -7,8 +7,9 @@ import sharp from "sharp";
 import { validatePlanWithRules, generatePlans } from "../../workflows/templates/floorplan-remodel/lib/generate.js";
 import { getImageSize } from "../../workflows/templates/floorplan-remodel/lib/parse.js";
 import { extractWalls } from "../../workflows/templates/floorplan-remodel/lib/extract-walls.js";
-import { resolveAnchor, resolvePlanSpecs } from "../../workflows/templates/floorplan-remodel/lib/anchors.js";
+import { resolveAnchor, resolvePlanSpecs, resolveFurniture } from "../../workflows/templates/floorplan-remodel/lib/anchors.js";
 import { renderStructure } from "../../workflows/templates/floorplan-remodel/lib/render.js";
+import { renderArchitectural, renderLayout } from "../../workflows/templates/floorplan-remodel/lib/render-arch.js";
 import { roomTypeByLabel } from "../../workflows/templates/floorplan-remodel/lib/metrics.js";
 import { buildMaskGrid, slideRefit, wallThickness, detectOpenings, mergeCollinearWalls, pickEntryDoor } from "../../workflows/templates/floorplan-remodel/lib/snap.js";
 
@@ -290,8 +291,16 @@ test("generatePlans: force 重试 bypass plans.json 缓存，普通补跑复用"
   fs.writeFileSync(path.join(dir, "structure.json"), JSON.stringify(s));
   fs.writeFileSync(path.join(dir, "plans.json"), JSON.stringify([{ id: "p1", tier: "conservative", title: "old", summary: "old", demolish: [], build: [], newRooms: [] }]));
   let calls = 0;
-  globalThis.fetch = async () => {
+  globalThis.fetch = async (url, init) => {
     calls++;
+    const u = String(url);
+    if (u.includes("image_generation") || u.includes("images/generations")) {
+      return Response.json({ base_resp: { status_code: 0 }, data: { image_urls: ["https://example.com/img.png"] } });
+    }
+    const body = JSON.parse((init && init.body) || "{}");
+    if (JSON.stringify(body).includes("家居布置师")) {
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ furniture: [{ roomId: "r1", items: [{ type: "toilet", rel: [0.1, 0.1, 0.9, 0.9] }] }] }) } }] });
+    }
     return Response.json({ choices: [{ message: { content: JSON.stringify({ plans: [{ title: "new", summary: "s", demolish: [], build: [{ from: { wall: "w2", t: 0.2 }, to: { wall: "w1", t: 0.2 } }], newRooms: [], checks: [] }] }) } }] });
   };
   try {
@@ -329,4 +338,51 @@ test("拆墙孤儿化：缺口报错，roomChanges 声明合并后豁免", () =>
 test("马桶间硬下限 1.5㎡ 报错", () => {
   const r = validatePlanWithRules({ title: "t", summary: "s", demolish: [], build: [], newRooms: [{ label: "独立马桶间", bbox: [0, 0, 140, 100] }] }, structure, rules);
   assert.ok(r.errors.some(e => e.includes("硬下限")), JSON.stringify(r.errors));
+});
+
+test("resolveFurniture: roomId 与 nr 引用解析为空间内像素矩形", () => {
+  const s = { rooms: [{ id: "r1", bbox: [0, 0, 100, 200] }] };
+  const p = {
+    newRooms: [{ label: "书房", bbox: [100, 100, 300, 300] }],
+    furniture: [
+      { roomId: "r1", items: [{ type: "bed", rel: [0.1, 0.1, 0.9, 0.9] }] },
+      { nr: 0, items: [{ type: "desk", rel: [0, 0, 1, 1] }] },
+    ],
+  };
+  const { furniture, errors } = resolveFurniture(p, s);
+  assert.strictEqual(errors.length, 0, JSON.stringify(errors));
+  assert.deepEqual(furniture[0].bbox, [10, 20, 90, 180]);
+  assert.deepEqual(furniture[1].bbox, [100, 100, 300, 300]);
+  const bad = resolveFurniture({ furniture: [{ roomId: "zz", items: [{ type: "bed", rel: [0, 0, 1, 1] }] }] }, s);
+  assert.strictEqual(bad.errors.length, 1);
+});
+
+test("renderArchitectural 含尺寸标注且无编号徽章、不叠原图", () => {
+  const s = {
+    imgW: 1000, imgH: 700, mmPerPx: 7,
+    walls: [{ id: "w1", x1: 50, y1: 50, x2: 950, y2: 50, bearing: true }],
+    rooms: [{ id: "r1", label: "客厅", center: [500, 350], bbox: [50, 50, 950, 650] }],
+    openings: [{ id: "d1", type: "door", wallId: "w1", pos: 0.5 }],
+    dims: [{ edge: "top", values: [3600, 2700], x1: 50, y1: 50, x2: 950, y2: 50 }],
+  };
+  const svg = renderArchitectural(s);
+  assert.ok(svg.includes("原始建筑图"), "标题");
+  assert.ok(svg.includes("3600") && svg.includes("2700"), "尺寸标注值");
+  assert.ok(!svg.includes("data-id"), "无编号徽章");
+  assert.ok(!svg.includes("<image href="), "不叠原图");
+});
+
+test("renderLayout 家具俯视图元 + 砸墙/新墙标记", () => {
+  const s = {
+    imgW: 1000, imgH: 700,
+    walls: [{ id: "w1", x1: 0, y1: 0, x2: 500, y2: 0, bearing: false }],
+    rooms: [{ id: "r1", label: "客厅", center: [250, 350], bbox: [0, 0, 500, 700] }],
+    openings: [],
+  };
+  const plan = { title: "方案A", demolish: ["w1"], build: [{ x1: 0, y1: 350, x2: 500, y2: 350 }] };
+  const furniture = [{ type: "sofa", bbox: [50, 50, 200, 200] }];
+  const svg = renderLayout(s, plan, furniture);
+  assert.ok(svg.includes("平面布置图"), "标题");
+  assert.ok(svg.includes("沙发"), "家具标签");
+  assert.ok(svg.includes("dasharray"), "砸墙/新房间虚线标记");
 });

@@ -290,27 +290,30 @@ test("generatePlans: force 重试 bypass plans.json 缓存，普通补跑复用"
   };
   fs.writeFileSync(path.join(dir, "structure.json"), JSON.stringify(s));
   fs.writeFileSync(path.join(dir, "plans.json"), JSON.stringify([{ id: "p1", tier: "conservative", title: "old", summary: "old", demolish: [], build: [], newRooms: [] }]));
-  let calls = 0;
+  let planCalls = 0;
   globalThis.fetch = async (url, init) => {
-    calls++;
-    const u = String(url);
-    if (u.includes("image_generation") || u.includes("images/generations")) {
-      return Response.json({ base_resp: { status_code: 0 }, data: { image_urls: ["https://example.com/img.png"] } });
+    let body = {};
+    try { body = JSON.parse((init && init.body) || "{}"); } catch { /* ignore */ }
+    const text = JSON.stringify(body);
+    // 方案 LLM：按 system prompt 标记区分，与渲染 provider 无关（本地/服务器 media provider 不同也能确定性断言）
+    if (text.includes("住宅改造设计师")) {
+      planCalls++;
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ plans: [{ title: "new", summary: "s", demolish: [], build: [{ from: { wall: "w2", t: 0.2 }, to: { wall: "w1", t: 0.2 } }], newRooms: [], checks: [] }] }) } }] });
     }
-    const body = JSON.parse((init && init.body) || "{}");
-    if (JSON.stringify(body).includes("家居布置师")) {
+    if (text.includes("家居布置师")) {
       return Response.json({ choices: [{ message: { content: JSON.stringify({ furniture: [{ roomId: "r1", items: [{ type: "toilet", rel: [0.1, 0.1, 0.9, 0.9] }] }] }) } }] });
     }
-    return Response.json({ choices: [{ message: { content: JSON.stringify({ plans: [{ title: "new", summary: "s", demolish: [], build: [{ from: { wall: "w2", t: 0.2 }, to: { wall: "w1", t: 0.2 } }], newRooms: [], checks: [] }] }) } }] });
+    // 图片生成/下载：返回空结果 → 各 provider 抛错，generateRenderings 降级（不废方案）
+    return Response.json({ base_resp: { status_code: 0 }, data: { image_urls: [] } });
   };
   try {
     await generatePlans("", "", 1, dir, "yes");
-    assert.ok(calls >= 1, "force 应调 LLM");
+    assert.ok(planCalls >= 1, "force 应调方案 LLM");
     const plans = JSON.parse(fs.readFileSync(path.join(dir, "plans.json"), "utf-8"));
     assert.strictEqual(plans[0].title, "new");
-    const before = calls;
+    const before = planCalls;
     await generatePlans("", "", 1, dir);
-    assert.strictEqual(calls, before, "无 force 应复用缓存不调 LLM");
+    assert.strictEqual(planCalls, before, "无 force 应复用方案缓存不调方案 LLM");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

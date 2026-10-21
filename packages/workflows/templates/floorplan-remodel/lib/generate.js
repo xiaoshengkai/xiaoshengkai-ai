@@ -397,7 +397,7 @@ ${tierList}
     fs.writeFileSync(layoutOriginalPath, renderLayout(structure, null, originalFurniture));
   }
 
-  // 每套方案：平面布置图 + 效果图 + 俯视平面图（图生失败降级不废方案）
+  // 每套方案：平面布置图 + 多视角效果图 + 俯视平面图（图生失败降级不废方案）
   const renderings = [];
   for (let i = 0; i < plans.length; i++) {
     const p = plans[i];
@@ -405,12 +405,14 @@ ${tierList}
     const furniture = resolveFurniture(p, structure).furniture;
     const layoutFile = `layout-p${idx}.svg`;
     fs.writeFileSync(path.join(executionDir, layoutFile), renderLayout(structure, p, furniture));
+    const layoutCleanFile = `layout-p${idx}-clean.svg`;
+    fs.writeFileSync(path.join(executionDir, layoutCleanFile), renderLayout(structure, p, furniture, { noLabels: true }));
     updateProgress(executionDir, `生成渲染图 ${idx}/${plans.length}…`);
-    const r = await generateRenderings({ structure, plan: p, style, layoutFile: path.join(executionDir, layoutFile), executionDir, planIdx: idx, retryForce });
+    const r = await generateRenderings({ structure, plan: p, style, layoutCleanFile: path.join(executionDir, layoutCleanFile), executionDir, planIdx: idx, retryForce });
     renderings.push({ planId: p.id, title: p.title, layout: layoutFile, ...r });
   }
 
-  const renderFailed = renderings.some(r => r.renderError || r.birdviewError);
+  const renderFailed = renderings.some(r => r.birdviewError || (r.effects || []).some(e => e.error));
   const output = plans.map(p => `【${p.tier}】${p.title}：${p.summary}`).join("\n") +
     (extraLines.length ? `\n${extraLines.join("；")}` : "") +
     (renderFailed ? "\n部分渲染图生成失败（方案仍有效，可重试本步补图）" : "");

@@ -20,7 +20,7 @@ export async function handle({ params, request }) {
     fs.writeFileSync(path.join(dir, "structure.svg"), renderStructure(merged, readImg(dir, merged)));
     fs.writeFileSync(path.join(dir, "structure.md"), renderStructureMd(merged));
     for (const f of fs.readdirSync(dir)) {
-      if (/^(plans\.json|plan-p\d+\.(svg|md)|structure-arch\.svg|layout-(original|p\d+)\.svg|render-p\d+\.png|birdview-p\d+\.png)$/.test(f)) fs.rmSync(path.join(dir, f));
+      if (/^(plans\.json|plan-p\d+\.(svg|md)|structure-arch\.svg|layout-(original|p\d+)(-clean)?\.svg|render-p\d+(-[a-z]+)?\.png|birdview-p\d+\.png)$/.test(f)) fs.rmSync(path.join(dir, f));
     }
   } catch { /* 预览产物与缓存清理，structure.json 仍是后端唯一事实源 */ }
 

@@ -966,8 +966,16 @@ function FloorplanGallery({ step, executionId }: { step: ExecutionStep; executio
               {img(r.layout, "平面布置图")}
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">效果图（人视点）</p>
-              {r.renderError ? placeholder("效果图", r.renderError) : img(r.render, "效果图")}
+              <p className="text-xs text-muted-foreground mb-1">效果图（多视角）</p>
+              <div className="space-y-2">
+                {(r.effects || []).map((e: any) => (
+                  <div key={e.file}>
+                    <p className="text-[10px] text-muted-foreground/70 mb-0.5">{e.label}</p>
+                    {e.error ? placeholder(e.label, e.error) : img(e.file, e.label)}
+                  </div>
+                ))}
+                {(!r.effects || r.effects.length === 0) && <p className="text-xs text-muted-foreground/70">暂无效果图</p>}
+              </div>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">俯视平面图（鸟瞰）</p>

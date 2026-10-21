@@ -184,26 +184,29 @@ const GLYPHS = {
 export function furnitureGlyph(type, box) {
   const [x1, y1, x2, y2] = box.map(Number);
   const w = Math.max(1, x2 - x1), h = Math.max(1, y2 - y1);
+  // 浅灰底填充让家具呈「实心块」，图生图模型更好识别为家具而非线框
+  const base = `<rect x="${x1}" y="${y1}" width="${w}" height="${h}" rx="3" fill="#e6e6e6" stroke="none"/>`;
   const draw = GLYPHS[type];
-  if (!draw) return `<rect x="${x1}" y="${y1}" width="${w}" height="${h}" fill="none" stroke="${C.furn}" stroke-dasharray="4 3"/>`;
-  return `<g stroke="${C.furn}" stroke-width="2" fill="none">${draw(x1, y1, w, h)}</g>`;
+  if (!draw) return base + `<rect x="${x1}" y="${y1}" width="${w}" height="${h}" fill="none" stroke="${C.furn}" stroke-dasharray="4 3"/>`;
+  return `<g>${base}<g stroke="${C.furn}" stroke-width="2" fill="none">${draw(x1, y1, w, h)}</g></g>`;
 }
 
 const FURN_LABEL = { bed: "床", sofa: "沙发", dining: "餐桌", toilet: "马桶", sink: "洗手台", shower: "淋浴", bathtub: "浴缸", kitchen: "橱柜", desk: "书桌", wardrobe: "衣柜", tv: "电视柜", fridge: "冰箱", washer: "洗衣机", table: "茶几", stool: "椅凳", storage: "收纳" };
 
-function furnitureEls(furniture) {
+function furnitureEls(furniture, noLabels = false) {
   return (furniture || []).map((f, i) => {
     if (!f || !Array.isArray(f.bbox) || f.bbox.length !== 4) return "";
     const label = FURN_LABEL[f.type];
     const [x1, y1, x2, y2] = f.bbox.map(Number);
     const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
     return `<g opacity="0.9">${furnitureGlyph(f.type, f.bbox)}` +
-      (label && (x2 - x1) > 22 && (y2 - y1) > 16 ? `<text x="${cx}" y="${cy}" text-anchor="middle" font-size="11" fill="#888888" font-family="sans-serif">${label}</text>` : "") +
+      (!noLabels && label && (x2 - x1) > 22 && (y2 - y1) > 16 ? `<text x="${cx}" y="${cy}" text-anchor="middle" font-size="11" fill="#888888" font-family="sans-serif">${label}</text>` : "") +
       `</g>`;
   }).join("\n");
 }
 
-export function renderLayout(structure, plan, furniture) {
+export function renderLayout(structure, plan, furniture, opts = {}) {
+  const { noLabels = false } = opts;
   const W = structure.imgW || structure.width || 1000;
   const H = structure.imgH || structure.height || 700;
   const strokeW = Math.max(4, W * 0.006);
@@ -217,7 +220,10 @@ export function renderLayout(structure, plan, furniture) {
   const newRooms = (plan?.newRooms || []).filter(nr => Array.isArray(nr.bbox)).map(nr =>
     `<rect x="${nr.bbox[0]}" y="${nr.bbox[1]}" width="${Math.max(0, nr.bbox[2] - nr.bbox[0])}" height="${Math.max(0, nr.bbox[3] - nr.bbox[1])}" fill="none" stroke="${C.build}" stroke-width="1.5" stroke-dasharray="6 4"/>`
   ).join("\n");
-  const body = [walls, build, newRooms, openingElsArch(structure, strokeW), roomElsArch(structure), furnitureEls(furniture)].join("\n");
+  const parts = [walls, build, newRooms, openingElsArch(structure, strokeW)];
+  if (!noLabels) parts.push(roomElsArch(structure));
+  parts.push(furnitureEls(furniture, noLabels));
+  const body = parts.join("\n");
   const title = plan ? `平面布置图 · ${plan.title || plan.id}` : "平面布置图（现状）";
   return svgWrap(W, H, title, ["图例：灰=墙 红虚线=砸墙 蓝=新墙/新房间 · 家具俯视图元"], body);
 }
@@ -248,6 +254,8 @@ export function demo() {
   assert(!arch.includes("data-id"), "architecture has no id badges");
   assert(layout.includes("平面布置图") && layout.includes(C.demolish) && layout.includes("床") && layout.includes("餐桌"), "layout has walls/furniture");
   assert(layoutOrig.includes("现状"), "original layout title");
+  const layoutClean = renderLayout(structure, plan, furniture, { noLabels: true });
+  assert(!layoutClean.includes(">床<") && !layoutClean.includes(">客厅<") && layoutClean.includes(C.build), "noLabels removes text labels but keeps walls/furniture glyphs");
   console.log("render-arch self-check OK");
 }
 

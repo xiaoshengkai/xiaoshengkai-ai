@@ -389,3 +389,22 @@ test("renderLayout 家具俯视图元 + 砸墙/新墙标记", () => {
   assert.ok(svg.includes("沙发"), "家具标签");
   assert.ok(svg.includes("dasharray"), "砸墙/新房间虚线标记");
 });
+
+test("判型：细门扇线跨门洞=door，宽玻璃跨门洞=window（≥3 命中阈值）", () => {
+  const W = 360, H = 120, ch = 3;
+  const data = Buffer.alloc(W * H * ch, 250);
+  const px = (x, y, g) => { const k = (y * W + x) * ch; data[k] = g; data[k + 1] = g; data[k + 2] = g; };
+  const pts = [];
+  for (let x = 0; x < W; x += 2) {
+    const inDoor = x >= 60 && x <= 90;
+    const inWin = x >= 230 && x <= 270;
+    if (inDoor) { for (let y = 49; y <= 51; y++) px(x, y, 150); continue; }   // 门扇细线（3px 跨断口）
+    if (inWin) { for (let y = 44; y <= 56; y++) px(x, y, 170); continue; }    // 窗玻璃宽带（13px 跨断口）
+    for (let y = 46; y <= 54; y += 2) { px(x, y, 30); pts.push([x, y]); }
+  }
+  const det = detectOpenings([{ id: "w1", x1: 0, y1: 50, x2: W, y2: 50 }], pts, { data, W, H, ch });
+  const door = det.openings.find(o => o.pos < 0.5);
+  const win = det.openings.find(o => o.pos > 0.5);
+  assert.strictEqual(door?.type, "door", JSON.stringify(det.openings));
+  assert.strictEqual(win?.type, "window", JSON.stringify(det.openings));
+});

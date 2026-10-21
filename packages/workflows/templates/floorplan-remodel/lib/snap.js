@@ -164,16 +164,17 @@ function classifyGap(w, s0, s1, ux, uy, px, py, img) {
   let cols = 0, midCols = 0;
   for (let s = s0; s <= s1; s += 3) {
     cols++;
-    let hit = false;
+    // ponytail: 门扇细线(1-2px)只命中 1-2 个采样点，窗玻璃宽带命中≥4；≥3 阈值区分二者（治入户门细门扇线被误判窗）
+    let hits = 0;
     for (let o = -5; o <= 5; o += 2) {
       const x = Math.round(w.x1 + ux * s + px * o);
       const y = Math.round(w.y1 + uy * s + py * o);
       if (x < 0 || y < 0 || x >= img.W || y >= img.H) continue;
       const k = (y * img.W + x) * img.ch;
       const gray = (img.data[k] + img.data[k + 1] + img.data[k + 2]) / 3;
-      if (gray >= 90 && gray <= 225) { hit = true; break; }
+      if (gray >= 90 && gray <= 225) hits++;
     }
-    if (hit) midCols++;
+    if (hits >= 3) midCols++;
   }
   return cols > 0 && midCols / cols >= 0.5 ? "window" : "door";
 }

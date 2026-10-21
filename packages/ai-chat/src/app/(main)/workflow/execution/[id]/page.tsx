@@ -993,7 +993,6 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
   const openings: any[] = structure?.openings || [];
   const rooms: any[] = structure?.rooms || [];
   const walls: any[] = structure?.walls || [];
-  const doors = openings.filter((o: any) => o.type === "door");
   const [svgText, setSvgText] = useState<string | null>(null);
   const [hl, setHl] = useState<string | null>(null);
   const svgBoxRef = useRef<HTMLDivElement>(null);
@@ -1018,7 +1017,12 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
   );
 
-  const setEntryDoor = (v: string) => onChange({ ...structure, entryDoorId: v || null });
+  const setEntryDoor = (v: string) => onChange({
+    ...structure,
+    entryDoorId: v || null,
+    // 选中某开口作为入户门时，若被误判为窗则翻转为门（入口门语义上就是门）
+    openings: openings.map(o => o.id === v ? { ...o, type: "door" } : o),
+  });
   const toggleOpeningType = (id: string) => onChange({
     ...structure,
     openings: openings.map(o => o.id === id ? { ...o, type: o.type === "door" ? "window" : "door" } : o),
@@ -1089,9 +1093,9 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
           className="w-full px-2 py-1.5 text-sm border-2 border-[var(--border)] rounded-none bg-card focus:outline-none"
         >
           <option value="">未识别</option>
-          {doors.map(d => <option key={d.id} value={d.id}>{d.id}</option>)}
+          {openings.map(o => <option key={o.id} value={o.id}>{o.id}（{o.type === "door" ? "门" : "窗"}）</option>)}
         </select>
-        {doors.length === 0 && <p className="text-muted-foreground mt-1">未识别到门，请选择「未识别」或重新识别。</p>}
+        {openings.length === 0 && <p className="text-muted-foreground mt-1">未识别到门窗，请选择「未识别」或重新识别。</p>}
       </div>
 
       <div className="border-2 border-border bg-card p-3 text-xs">

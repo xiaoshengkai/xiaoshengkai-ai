@@ -17,7 +17,8 @@ Neo-Brutalism 糖果色 AI 对话助手，集成 RAG 知识库、MCP 工具调�
 - 🖼️ 文生图 + 图生图（MiniMax），异步模式，73 种视觉风格可选
 - 🎙️ TTS 语音合成（MiniMax speech-2.8-hd）+ BGM 音乐生成（music-2.6）
 - 📊 图表生成：Mermaid + D2 双引擎，异步模式，支持 10 种图表类型
-- 🎬 工作流引擎（@app/workflows，声明式 actions.json + 模板驱动）：短视频生成（MD 风格描述 + GSAP 动画 + HyperFrames 渲染）、逐步执行/重试/微调/版本切换
+- 🎬 工作流引擎（@app/workflows，声明式 actions.json + 模板驱动）：短视频生成（MD 风格描述 + GSAP 动画 + HyperFrames 渲染）、逐步执行/重试/微调/版本切换/awaitInput 人工停靠
+- 🔍 人物公开信息研究工作流（person-research）：姓名 + 可选线索 → 多源搜索去重抓取 → LLM 聚类候选（同名消歧）→ 人工确认 → 多轮定向研究 → 商业版图（股东/任职/对外投资，聚合站二跳）→ 用户纠错闭环（否定/补充即时生效）→ 带来源引用的版本化报告（引用可点溯源）
 - ⏰ 定时任务系统（@app/tasks，node-cron 调度，独立进程，日志隔离，仪表盘预览）
 - 📦 npm workspaces monorepo（@app/shared 公共包，能力包自包含 + ai-chat 声明式注册）
 

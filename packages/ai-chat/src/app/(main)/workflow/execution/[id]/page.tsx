@@ -12,6 +12,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Root, Portal, Backdrop, Popup, Header, Title, Close } from "@/components/ui/drawer";
 import { ImageViewerProvider, useImageViewer } from "@/components/ui/image-viewer";
+import PersonResearchPanel from "@/components/workflow/person-research-panel";
 
 interface ExecutionStep {
   id: string; name: string; type: string; previewType?: string; previewField?: string;
@@ -122,6 +123,7 @@ export default function ExecutionDetailPage() {
   const supportsTweak = templates.find(t => t.id === execution?.template)?.tweak === true;
   const isComic = execution?.template === "comic-generation";
   const isFloorplan = execution?.template === "floorplan-remodel";
+  const isPersonResearch = execution?.template === "person-research";
   const comicPages: { page: number }[] = (() => {
     try {
       const g = execution?.steps?.find(s => s.id === "generate-pages");
@@ -179,13 +181,28 @@ export default function ExecutionDetailPage() {
     }
     // ponytail: 无 running step 且无阻塞中的 next/auto/retry 请求时不轮询
     // （next/auto/retry 的 POST 在服务端阻塞执行，期间客户端看不到 running step，靠 loading 态维持轮询）
-    if (!anyStepRunning && !autoLoading && !nextLoading && !retrying) {
+    // person-research：pending/running 态持续轮询（auto detached 触发到步骤落盘之间有间隙，awaiting_input 停靠后停）
+    if (!anyStepRunning && !autoLoading && !nextLoading && !retrying
+      && !(isPersonResearch && (execution?.status === "pending" || execution?.status === "running"))) {
       return;
     }
     clientLog(id, "INFO", `useEffect start polling: status=${execution?.status}`);
     const timer = setInterval(fetchExecution, 2000);
     return () => clearInterval(timer);
-  }, [fetchExecution, execution?.status, execution?.tweakTask?.status, anyStepRunning, isTerminalStatus, autoLoading, nextLoading, retrying, id]);
+  }, [fetchExecution, execution?.status, execution?.tweakTask?.status, anyStepRunning, isTerminalStatus, autoLoading, nextLoading, retrying, isPersonResearch, id]);
+
+  // person-research：创建后自动启动候选发现（恰好一次）
+  const personAutoStarted = useRef(false);
+  useEffect(() => {
+    if (!isPersonResearch) return;
+    if (personAutoStarted.current) return;
+    if (execution?.status !== "pending") return;
+    personAutoStarted.current = true;
+    clientLog(id, "INFO", "person-research auto start discovery");
+    fetch(`${BASE}/api/workflows/execution/${id}/auto`, { method: "POST" })
+      .then(() => fetchExecution())
+      .catch(() => {});
+  }, [isPersonResearch, execution?.status, id, fetchExecution]);
 
   useEffect(() => {
     if (isTerminalStatus) {
@@ -518,7 +535,8 @@ export default function ExecutionDetailPage() {
           <p className="text-xs text-muted-foreground text-center pt-2">{completed}/{execution.steps.length} 步完成{warnings > 0 ? ` · ${warnings} 警告` : ""}</p>
         </div>
 
-        <div className="overflow-auto p-4">
+        {/* person-research：去底部 padding，让面板的 sticky 继续研究框贴死滚动区底边（其它模板保持 p-4） */}
+        <div className={isPersonResearch ? "overflow-auto p-4 pb-0" : "overflow-auto p-4"}>
           {isFloorplan && mdFiles.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2 text-xs">
               {mdFiles.map(f => (
@@ -535,6 +553,18 @@ export default function ExecutionDetailPage() {
             </div>
           )}
           {(() => {
+            // 优先级-1：person-research → 人物研究面板（候选/报告/轮次/继续研究）
+            if (isPersonResearch) {
+              return (
+                <PersonResearchPanel
+                  executionId={execution.executionId}
+                  status={execution.status}
+                  busy={anyStepRunning || execution.status === "running" || execution.status === "pending"}
+                  onRefresh={fetchExecution}
+                />
+              );
+            }
+
             // 优先级0：floorplan parse → 底图确认面板
             if (isFloorplan && activeStep.id === "parse" && parseStep?.status === "completed" && !floorplanConfirmed) {
               return (

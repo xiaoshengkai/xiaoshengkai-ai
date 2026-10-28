@@ -117,10 +117,14 @@ ai-engineer-journey/
             ├── comic-generation/# 漫画生成（2 步：script/generate-pages）
                 ├── actions.json # 模板级动作（export / scene-group / generate-content）
                 └── lib/         # storyboard / generate-pages / tweak / scene-groups / export / generate-content
-            └── floorplan-remodel/# 户型改造（2 步：parse/generate；CV 像素几何+vision 语义→人工确认底图→符号锚点方案→四视图交付：原始建筑图/平面布置图/效果图/俯视平面图）
+            ├── floorplan-remodel/# 户型改造（2 步：parse/generate；CV 像素几何+vision 语义→人工确认底图→符号锚点方案→四视图交付：原始建筑图/平面布置图/效果图/俯视平面图）
                 ├── actions.json # 模板级动作（floorplan-upload / confirm-structure）
                 ├── rules.json   # 户型规则（尺寸下限+设计准则）
                 └── lib/         # parse（视觉+sharp 墙像素 mask 吸附+quality.json）/ generate（承重硬校验+可拆白名单+按方案判定不回退+四视图编排）/ metrics（px→mm/面积/房间类型）/ confirm（confirm-structure：写回结构+confirmed 盖章）/ render（纯二维矢量+门窗符号+洁具图元）/ render-arch（原始建筑图尺寸标注+平面布置图家具俯视图元库）/ generate-render（效果图人视点+俯视鸟瞰图生图+STYLE_PROMPTS）/ snap（墙像素 mask/吸附/外围 bbox）/ anchors（符号锚点+resolveFurniture 家具解析）
+            └── person-research/# 人物公开信息研究（姓名+线索→搜索去重抓取→LLM 聚类候选→awaitInput 停靠人工选定→多轮定向研究+商业版图→证据归并→版本化报告）
+                ├── actions.json # 模板级动作（research-select / research-continue / research-report）
+                ├── PLAN.md      # 设计文档（V1~V4 路线）+ IMPLEMENTATION.md（实现计划）
+                └── lib/         # discovery / research（商业轮+二跳+用户纠错）/ report / prompts（LLM 契约+校验）/ evidence（归并+商业关联+纠错应用）/ queries（固定商业查询集）/ normalize / search-client / privacy / store / handlers
 ```
 
 ## 能力注册机制（v0.11.0）
@@ -224,6 +228,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 - `engine.js`：纯模板无关的步骤编排（创建/逐步/重试/跳过/终态），**无 video 概念**
 - 脚本版本 / 微调等 video 概念在 `templates/video-generation/lib/`：tweak.js / switch-version.js / script-version.js
 - **模板不 import engine.js**；cli 是子进程组合层，按 `state.template` 动态分发模板能力模块（如 `templates/<t>/lib/tweak.js`）
+- 引擎支持步骤声明 `awaitInput: true`：完成且非末步时停靠 `status="awaiting_input"`，`next`/`auto` 拒绝越权推进，由模板动作重臂步骤后恢复（person-research 的 select/continue 在用）；模板列表扫描跳过无 `template.json` 的目录（纯文档目录不炸列表）
 - `lib/state.js` / `lib/skip-when.js` 是 engine 与模板共用的基础设施
 
 ### 步骤类型
@@ -242,6 +247,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 - `templates/video-generation/`：视频生成（含微调/版本切换/内容生成等模板级动作）
 - `templates/comic-generation/`：漫画生成（故事→AI 分镜→每个 `sceneId` 生成无文字/无气泡锚点→逐页生成漫画图；`sceneId/scenePrompt` + 独立锚点锁连续场景且不继承成品页气泡；角色参考图锁人物一致性 + 风格库锁画风；分镜支持可选旁白 `narration`（灰底方框置顶）；每页生成后 `verifyPage` vision 质检气泡文字/尾巴指向、不通过带反馈重试一次；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
 - `templates/floorplan-remodel/`：户型改造（v6：几何换源——`parse` 由 `extract-walls.js` CV 像素提取轴对齐墙段（黑墙 mask→厚度滤波游程→共线合并[门洞断口同墙]→交点吸附→薄线剔除；墨量越界/墙段<6 回退 vision 墙），vision 降为语义层（房间 bbox/名称、dims、wetRooms、adjacency）+ `detectOpenings` 门窗像素检测 + `pickEntryDoor` + 墙厚定承重；`generate` 输出符号锚点（`anchors.js`：{wall,t}/{room,edge,t} → 确定性解析像素，治 LLM 像素 hallucinate；newRooms 用 {room,rel} 相对框），承重硬校验+可拆白名单+面积/邻湿区校验不变；双渲染：SVG 叠原图 + `render-md.js` MD 派生视图（ASCII 户型画+表格，execution 页 mdFiles 链接，聊天 AI 可读上下文）；可选参数 `areaM2` 在图无尺寸标注时按外围 extent 兜底比例尺（`mmPerPxFromArea`）；创建页 checkbox 多选 + floorplan 上传 + title；v4：确认底图硬门槛；v5：确认预览叠原图+ID 芯片，确认后作废 plans 强制重生成（含 plan-*.md）；v6：确认面板彩色徽章+列表↔图交互高亮、方案图去胶囊/新墙轴对齐；v7：rules.json 五段知识库（patterns/constructionNotes/hardRules）+ newRooms 围合真源自动补墙 + 围合/孤儿化/硬下限校验 + 无 source 老识别黄条防呆；v8：四视图交付——`render-arch.js` 产出原始建筑图（`structure-arch.svg` 干净矢量+尺寸标注链）与平面布置图（`layout-original.svg`/`layout-pN.svg` 全屋家具俯视图元库），`generate-render.js` 产出效果图（`render-pN.png` 人视点）+俯视平面图（`birdview-pN.png` 鸟瞰，以布置图 SVG 栅格化 PNG 作 `image_url` 图生图参考）；`anchors.js` `resolveFurniture` 家具 rel→像素；`generate` LLM 扩 `furniture` 输出、原户型现状布置单独轻量 LLM；参数 `style`（11 种装修风格）注入渲染 prompt；渲染幂等复用+失败降级（写 error 字段不废方案）；execution 页 `FloorplanGallery` 原户型卡+每方案卡；v9：效果图多视角——`generate-render.js` 按房间类型选 3 视角（客餐厅/主卧/厨卫，缺则回退最大房/卫生间）产出 `render-pN-{living,master,wet}.png`，各视角独立 prompt（家具清单+风格+面积）；鸟瞰去文字——`renderLayout` 加 `noLabels` 产出 `layout-pN-clean.svg`（去房间名/面积/家具文字）作图生图参考 + 家具图元浅灰底实心化 + prompt 增 `layoutDescription` 文本布局锚定与强约束；`classifyGap` 判窗阈值 1 点→≥3 点命中（治入户门细门扇线误判窗）+ 入户门下拉框列全部开口可翻转类型）
+- `templates/person-research/`：人物公开信息研究（V1，2026-10-28）：姓名+可选线索（手机号仅作公开页面匹配线索，normalizePhone 校验后存 `private.json` 与报告隔离，`redactPhone` 全量脱敏落盘）→ 多查询并发搜索 + URL 归一去重 + 域名分级（A 政府/B 媒体/C 平台/D 论坛）+ 同域名抓取限额 → LLM 聚类候选（同名消歧）+ 抽取主张（quote 逐字摘录软校验）→ `awaiting_input` 停靠，人工选定/排除/补充 → 多轮定向研究（意图 LLM 生成查询；证据归并：独立域名≥2 升 supported、冲突主张双向引用）→ 版本化 Markdown 报告（`[S#]` 引用校验剔除+重试、无主张走模板分支）。3 个 custom 动作（select/continue/report）经 http.js 注册；前端 execution 页 `PersonResearchPanel`（候选卡/证据/轮次/报告/继续输入框，创建后自动触发 discovery）。设计路线见模板目录 PLAN.md
 
 ### 资产库（工作流级通用）
 

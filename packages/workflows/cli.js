@@ -64,6 +64,7 @@ async function main() {
     } else {
       const templates = fs.readdirSync(TEMPLATES_DIR)
         .filter(f => fs.statSync(path.join(TEMPLATES_DIR, f)).isDirectory())
+        .filter(f => fs.existsSync(path.join(TEMPLATES_DIR, f, "template.json")))
         .map(f => {
           const t = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f, "template.json"), "utf-8"));
           return { id: f, ...t, tweak: fs.existsSync(path.join(TEMPLATES_DIR, f, "lib", "tweak.js")) };

@@ -1,0 +1,5 @@
+[
+  { "type": "custom", "method": "POST", "path": "/execution/:id/research-select",   "handler": "person-research-select" },
+  { "type": "custom", "method": "POST", "path": "/execution/:id/research-continue", "handler": "person-research-continue" },
+  { "type": "custom", "method": "GET",  "path": "/execution/:id/research-report",   "handler": "person-research-report" }
+]

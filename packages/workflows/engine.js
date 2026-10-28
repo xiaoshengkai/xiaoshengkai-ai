@@ -19,6 +19,14 @@ export function deriveTerminalStatus(steps) {
 
 const TERMINAL_STATUSES = ["completed", "completed_with_warnings", "failed"];
 
+/** awaitInput 步骤完成后的停靠状态：非末步停靠等用户输入（select/continue 动作重臂后继续） */
+const AWAITING_INPUT_STATUS = "awaiting_input";
+
+/** awaitInput 步骤停靠判定：非末步完成时返回停靠状态，其余返回 null（继续跑/正常终态） */
+export function parkedStatusAfter(step, isLast) {
+  return step?.awaitInput && !isLast ? AWAITING_INPUT_STATUS : null;
+}
+
 export function listExecutions() {
   if (!fs.existsSync(DATA_DIR)) return [];
   const dirs = fs.readdirSync(DATA_DIR)
@@ -144,6 +152,7 @@ async function runSteps(dir, state, template, params, logger) {
   });
   const totalStart = Date.now();
   const templateDir = path.resolve(__dirname, "templates", template.name);
+  let parkedAtInput = false;
 
   for (let i = 0; i < template.steps.length; i++) {
     const step = template.steps[i];
@@ -171,6 +180,12 @@ async function runSteps(dir, state, template, params, logger) {
       if (i === template.steps.length - 1) {
         state.status = "completed";
         state.completedAt = new Date().toISOString();
+      }
+
+      const parked = parkedStatusAfter(step, i === template.steps.length - 1);
+      if (parked) {
+        state.status = parked;
+        parkedAtInput = true;
       }
 
       const outputPreview = typeof output === "string"
@@ -204,13 +219,18 @@ async function runSteps(dir, state, template, params, logger) {
     }
 
     writeState(dir, state);
+    if (parkedAtInput) break;
   }
 
   const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1);
-  state.status = "completed";
-  state.completedAt = new Date().toISOString();
-  writeState(dir, state);
-  logger.info(`工作流执行完成，总耗时: ${totalElapsed}s`);
+  if (parkedAtInput) {
+    logger.info(`工作流停靠等待用户输入，已耗时: ${totalElapsed}s`);
+  } else {
+    state.status = "completed";
+    state.completedAt = new Date().toISOString();
+    writeState(dir, state);
+    logger.info(`工作流执行完成，总耗时: ${totalElapsed}s`);
+  }
 
   console.log = origLog;
   console.warn = origWarn;
@@ -267,6 +287,10 @@ export async function runNextStep(executionId) {
   const state = readState(dir);
   if (TERMINAL_STATUSES.includes(state.status)) {
     return { ok: false, error: "执行已结束" };
+  }
+
+  if (state.status === AWAITING_INPUT_STATUS) {
+    return { ok: false, error: "等待用户输入中" };
   }
 
   // 防止并发：检查是否有正在运行的步骤
@@ -344,9 +368,14 @@ export async function runNextStep(executionId) {
     freshState.steps[nextIdx].elapsed = elapsed;
     delete freshState.steps[nextIdx].retryForce;
 
-    if (nextIdx === template.steps.length - 1) {
+    const parked = parkedStatusAfter(step, nextIdx === template.steps.length - 1);
+    if (parked) {
+      freshState.status = parked;
+    } else if (nextIdx === template.steps.length - 1) {
       freshState.status = deriveTerminalStatus(freshState.steps);
       freshState.completedAt = new Date().toISOString();
+    } else if (parkedStatusAfter(step, false)) {
+      freshState.status = "awaiting_input";
     }
 
     writeState(dir, freshState);

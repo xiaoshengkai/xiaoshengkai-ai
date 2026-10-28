@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.11.53 (2026-10-28) — person-research 用户纠错闭环 + Tab 式研究面板
+
+### 变更
+- **用户纠错闭环**：continue 消息里的否定/补充（"他不是浙江大学的"、"他是绍兴人"）经 `buildUserAssertionPrompt` LLM 解析 → 既有主张标 `rejected`（带否定理由）+ 追加 `user_provided` 主张（无公开来源，quote=用户原话）+ 同步清理候选 signals（否定实体在其他信号字段一并剔除）+ 更新一句话身份（以正面事实为主）。每轮 continue 都跑（纯研究方向返回空无副作用，selection 轮跳过）。
+- **报告尊重更正**：`rejected` 主张不进主张列表、单列"已被用户否定的主张（不要采纳）"区；`user_provided` 标注「用户补充（无公开来源）」；emptyReport 判定按 active 主张数。
+- **面板 Tab 重排**：`完整报告`（默认，核心，[S#] 超链接）与 `研究过程`（候选/商业版图/关键事实/时间线/证据主张/轮次/来源）双 Tab；Hero/关键事实/时间线排除 rejected；证据主张区 rejected 灰显带理由；状态条显示"已排除 N"。
+- **三个布局修正**：busy 蒙层 `fixed inset-0` 视口居中不随滚动；继续研究 `sticky bottom-0` 钉底；状态条取消 sticky。
+- **补丁（同日）**：① 断言提示词与测试夹具脱敏——初版把真实研究对象的个人信息（姓名/籍贯/昵称）抄进了示例与夹具，已全量替换为通用「张三/某公司/某大学/北京人」（含面板 placeholder），杜绝隐私入库与 prompt 偏置；② 继续研究钉底实测仍有 16px 空隙（滚动容器 `p-4` 底 padding 钳制 sticky 参考边，负 margin 方案被 Chrome 滚动区域计算否决）——改为 person-research 时容器条件 `pb-0`（其它模板不受影响），浏览器实测双滚动状态 gap=0。
+
+### 验证
+- test:shared 109（新增 5：validateCorrectionOutput / applyCorrection / 报告 rejected 分区）；typecheck、build 全绿。
+- 8cad6b3008df 真实任务两轮纠错实测："他不是浙江大学的，请更正；他是绍兴人" → c-1 rejected（理由留档）+ 绍兴人 user_provided + company 信号清除；"学校只有丽水学院" → school 信号剔除浙大 + 摘要改为正面事实；报告 v6 教育经历仅丽水学院、浙大只在"用户已更正"语境出现。浏览器实测 Tab 切换/23 个报告链接/fixed 蒙层/sticky 底栏。
+
+## v0.11.52 (2026-10-28) — person-research 商业版图 + 摘要式研究面板
+
+### 变更
+- **商业关系调查（默认执行）**：选定候选后自动跑商业轮——固定查询集（股东/持股/法定代表人/董事/监事/对外投资 + site:aiqicha/qcc/tianyancha/gsxt，无 OR 布尔符）+ **商业二跳**（聚合站公司页 title 提取公司名 → 「公司+股东」「公司+人名」再搜，摘要即证据）；continue 消息含商业意图词（股东/持股/名下公司等）也触发。
+- **结构化商业关系**：`business.json`（companyName/relation 枚举/shareholding/position/companyStatus/quote/sourceIds/status）+ `evidence.js` 纯函数归并（同公司同角色并来源补字段、独立域名≥2 升 supported）+ LLM 抽取契约（摘要可作 quote；股东名单未见目标人物不得推断）+ **规则化关联**（人名商业查询全文匹配的聚合站公司页 → `association/unverified`，不依赖 LLM）。
+- **免费数据源边界实测**：爱企查 PC 地域封锁（海外 IP）、企查查/天眼查正文 JS 墙（含 waitFor 亦不可得）、11467 无收录；可用层 = 搜索引擎摘要（仅前排股东，如汇泽青创：丁亭鑫 35.83%/王少华 28.83%，未见小股东）。聚合站抓取优先级 -5 主导、prompt 来源池并入历史聚合页（防关键线索轮次丢失）。
+- **报告与面板**：报告新增「商业版图」章节（角色/持股仅来源明确给出才写，unverified 关联呈现人工核验路径）；前端 `PersonResearchPanel` 重构为摘要式——核心结论卡（置信度/匹配状态/机构信号/单一来源警示）+ 商业版图（结构化）+ 关键事实分组（商业/教育/职业/账号/事件）+ 时间线，完整报告/证据原文/轮次默认折叠。
+- **修复**：research intent 轮查询对象化统一（two-hop 重构曾致字符串数组 q.query undefined 全空查询）；`extractBusinessRelations` 补 await（Promise 被当数组吞掉 4 轮抽取结果）。
+
+### 验证
+- test:shared 105（新增 8：商业查询集/validateBusinessOutput 含 associations/merge/recompute/选定与继续的商业标记/报告商业章节）；typecheck、build 全绿。
+- 孟培炜真实任务 14 轮端到端：商业轮 → 二跳 3 公司 → 股东名单摘要入库 → `association/unverified`（汇泽青创 s-33）→ 报告 v14 商业版图章节 + 人工核验指引；诚实呈现「公开摘要层未见其股东角色」而非编造。
+
+## v0.11.51 (2026-10-28) — 新增 person-research 人物公开信息研究工作流（V1）
+
+### 变更
+- **新模板 `templates/person-research/`**：输入姓名+可选线索 → 多查询并发搜索（search-service，URL 归一去重/域名分级/同域名限额）→ 正文抓取 → LLM 聚类候选人物（同名消歧）→ 人工选定/排除 → 多轮定向研究（意图→查询→抽取→证据归并升级/冲突双向引用）→ 带引用版本化研究报告（`report/vNNN.md` + `current.md`）。设计文档见模板目录 `PLAN.md`，实现计划 `IMPLEMENTATION.md`。
+- **引擎通用增强（最小）**：步骤可声明 `awaitInput: true`——完成且非末步时停靠 `status="awaiting_input"`，`runNextStep`/`runSteps` 拒绝越权推进；由模板动作（select/continue）重臂 research/report 步骤后恢复。`parkedStatusAfter` 纯函数 + `AWAITING_INPUT_STATUS` 常量。
+- **模板级动作 3 个**（custom handler，http.js 注册）：`POST /execution/:id/research-select`（选/排候选）、`POST /execution/:id/research-continue`（补充线索/定向继续，写入 pendingRound 并重臂）、`GET /execution/:id/research-report`（组装报告+候选+主张+轮次+来源元数据）。
+- **隐私红线**：原始手机号仅存 `private.json`（normalizePhone 校验，占位符/垃圾归空串）；`redactPhone` 全部落盘文本过滤（quote/claim/报告双保险）；report 落盘前再全量兜底；报告引用校验（无效 `[S#]` 剔除+重试）。
+- **前端**：execution 页 `isPersonResearch` 分支渲染 `PersonResearchPanel`（候选卡+证据主张+轮次+ReactMarkdown 报告+建议按钮+继续研究输入框）；创建后自动触发 discovery（恰一次，ref 守卫）；pending/running 态持续轮询。
+- **加固**：模板列表扫描（`executor.loadTemplates` + cli `templates`）跳过无 `template.json` 的目录（纯文档目录不再 ENOENT 崩列表）。
+
+### 验证
+- `person-research.test.js` 20 项（引擎停靠守卫/privacy 归一脱敏/store 版本递增/queries/normalize/三个校验器/evidence 归并/handlers 纯函数/report 空分支）；test:shared 78→98、typecheck、build 全绿。
+- CLI 全链路真实冒烟（雷军）：发现轮 4 查询 27 来源 2 候选 22 主张 → 停靠 awaiting_input → 选定 a1 → 第 2 轮 5 定向查询 8 新来源 → 报告 v1（同名两人正确区分、引用标注、多来源一致/冲突状态、无手机号泄漏）。
+
 ## v0.11.50 (2026-10-21) — 户型效果图多视角 + 鸟瞰去文字参考锚定
 
 ### 变更

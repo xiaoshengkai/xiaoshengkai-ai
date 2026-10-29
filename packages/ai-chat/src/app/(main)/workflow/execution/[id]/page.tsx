@@ -961,9 +961,9 @@ function FloorplanGallery({ step, executionId, onTweak }: { step: ExecutionStep;
     const src = `${fileBase}/${file}?preview=1`;
     const idx = register(src);
     return (
-      <div className="border-2 border-border bg-muted/20">
+      <div className="border-2 border-border bg-muted/20 min-w-0 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} loading="lazy" className="w-full block cursor-zoom-in" onClick={() => open(idx)} />
+        <img src={src} alt={alt} loading="lazy" className="w-full max-w-full h-auto block cursor-zoom-in" onClick={() => open(idx)} />
       </div>
     );
   };
@@ -977,19 +977,19 @@ function FloorplanGallery({ step, executionId, onTweak }: { step: ExecutionStep;
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       {data.output && (
-        <div className="border-2 border-border bg-yellow-soft p-2 text-xs whitespace-pre-wrap text-foreground">{data.output}</div>
+        <div className="border-2 border-border bg-yellow-soft p-2 text-xs whitespace-pre-wrap break-words text-foreground">{data.output}</div>
       )}
 
       <div className="border-2 border-border bg-card p-3">
         <h3 className="text-xs font-bold text-foreground mb-2">🏠 原户型</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground mb-1">原始建筑图（量房结构）</p>
             {img(data.architecture, "原始建筑图")}
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground mb-1">平面布置图（现状）</p>
             {img(data.layoutOriginal, "现状平面布置图")}
           </div>
@@ -1000,15 +1000,15 @@ function FloorplanGallery({ step, executionId, onTweak }: { step: ExecutionStep;
         <div key={r.planId || i} className="border-2 border-border bg-card p-3">
           <h3 className="text-xs font-bold text-foreground mb-2">📐 方案 {i + 1} · {r.title || r.planId}</h3>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground mb-1">平面布置图</p>
               {img(r.layout, "平面布置图")}
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground mb-1">效果图（多视角）</p>
               <div className="space-y-2">
                 {(r.effects || []).map((e: any) => (
-                  <div key={e.file}>
+                  <div key={e.file} className="min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <p className="text-[10px] text-muted-foreground/70">{e.label}</p>
                       {!e.error && (
@@ -1021,7 +1021,7 @@ function FloorplanGallery({ step, executionId, onTweak }: { step: ExecutionStep;
                 {(!r.effects || r.effects.length === 0) && <p className="text-xs text-muted-foreground/70">暂无效果图</p>}
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground mb-1">俯视平面图（鸟瞰）</p>
               {r.birdviewError ? placeholder("俯视平面图", r.birdviewError) : img(r.birdview, "俯视平面图")}
             </div>

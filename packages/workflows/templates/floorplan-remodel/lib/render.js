@@ -55,7 +55,7 @@ function svgWrap(W, H, title, lines, body, legend) {
     legendRow,
     ...lines.map((l, i) => `<text x="16" y="${H + 58 + (legend?.length ? 24 : 0) + i * 24}" font-size="16" fill="${C.sub}" font-family="sans-serif">${esc(l)}</text>`),
   ].join("\n");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${total}" font-family="sans-serif">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${total}" viewBox="0 0 ${W} ${total}" font-family="sans-serif">
 <rect width="${W}" height="${total}" fill="#ffffff"/>
 <rect width="${W}" height="${H}" fill="#ffffff"/>
 ${body}

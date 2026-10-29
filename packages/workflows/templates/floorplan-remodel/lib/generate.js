@@ -167,9 +167,14 @@ export function validatePlanWithRules(p, structure, rules = {}, maskPts = null) 
     }
   });
 
-  // 拆墙孤儿化校验：拆墙使需围合房间(卧/书/卫)边界缺口且未声明合并 → 报错
+  // 拆墙孤儿化校验：拆墙使需围合房间(卧/书/卫)边界缺口、该边未被"保留墙+新墙"重新覆盖、且未声明合并 → 报错
+  // （拆墙+重建是合法操作：新墙 build 覆盖了被拆边 ≥80% 即不算孤儿化）
   const mergedRooms = new Set((p.roomChanges || []).map(rc => rc?.roomId).filter(Boolean));
   const enclosedTypes = new Set(["bedroom", "study", "toilet"]);
+  const reSegs = [
+    ...(structure.walls || []).filter(w => !(p.demolish || []).includes(w.id)),
+    ...(p.build || []).filter(b => b && ["x1", "y1", "x2", "y2"].every(k => Number.isFinite(Number(b[k])))),
+  ];
   (p.demolish || []).forEach(id => {
     const w = (structure.walls || []).find(x => x.id === id);
     if (!w) return;
@@ -185,7 +190,10 @@ export function validatePlanWithRules(p, structure, rules = {}, maskPts = null) 
       const wLen = Math.hypot(w.x2 - w.x1, w.y2 - w.y1) || 1;
       if (sides.some(sd => {
         const sLen = Math.hypot(sd.x2 - sd.x1, sd.y2 - sd.y1) || 1;
-        return collinearOverlap(sd, w, tol) > 0.5 * Math.min(sLen, wLen);
+        // 该墙是否拆到房间这条边
+        if (collinearOverlap(sd, w, tol) <= 0.5 * Math.min(sLen, wLen)) return false;
+        // 拆了这条边，但保留墙+新墙仍覆盖 ≥80% → 不算孤儿化缺口
+        return sideCoverage(sd, reSegs, tol) < 0.8;
       })) {
         v.errors.push(`拆墙 ${id} 使 ${r.id}（${r.label}）围合缺口且未用 roomChanges 声明合并`);
       }
@@ -267,8 +275,10 @@ export async function generatePlans(needs, needsText, planCount, executionDir, r
   // force 重试（↻ 重新生成）= 主动重新生成：清产物缓存真跑 LLM；普通补跑继续复用
   if (retryForce && fs.existsSync(plansPath)) {
     fs.rmSync(plansPath);
+    // 清全部交付产物（方案图 + 四视图），避免上一轮 N 套的陈旧文件残留磁盘
+    const DELIVERABLE = /^(plan-p\d+\.(svg|md)|structure-arch\.svg|layout-(original|p\d+)(-clean)?\.svg|render-p\d+(-[a-z]+)?\.png|birdview-p\d+\.(svg|png))$/;
     for (const f of fs.readdirSync(executionDir)) {
-      if (/^plan-p\d+\.(svg|md)$/.test(f)) fs.rmSync(path.join(executionDir, f));
+      if (DELIVERABLE.test(f)) fs.rmSync(path.join(executionDir, f));
     }
     console.log("[floorplan] force 重试：清除旧方案缓存，重新生成");
   }

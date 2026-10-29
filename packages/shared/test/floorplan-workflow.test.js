@@ -338,6 +338,11 @@ test("拆墙孤儿化：缺口报错，roomChanges 声明合并后豁免", () =>
   assert.ok(!merged.errors.some(e => e.includes("围合缺口")), JSON.stringify(merged.errors));
 });
 
+test("拆墙+重建：新墙覆盖被拆边≥80% 不算孤儿化", () => {
+  const rebuilt = validatePlanWithRules({ title: "t", summary: "s", demolish: ["w2"], build: [{ x1: 0, y1: 0, x2: 100, y2: 0 }], newRooms: [], roomChanges: [] }, structure, rules);
+  assert.ok(!rebuilt.errors.some(e => e.includes("围合缺口")), JSON.stringify(rebuilt.errors));
+});
+
 test("马桶间硬下限 1.5㎡ 报错", () => {
   const r = validatePlanWithRules({ title: "t", summary: "s", demolish: [], build: [], newRooms: [{ label: "独立马桶间", bbox: [0, 0, 140, 100] }] }, structure, rules);
   assert.ok(r.errors.some(e => e.includes("硬下限")), JSON.stringify(r.errors));

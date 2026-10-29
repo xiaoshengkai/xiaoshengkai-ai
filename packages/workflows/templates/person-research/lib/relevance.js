@@ -46,6 +46,13 @@ export function scoreSource(raw, ctx) {
   if (ctx.phone && blob.includes(ctx.phone)) { score += 8; matchedSignals.push("phone"); }
   if (knownUrlHit(raw.url, ctx.knownUrl)) { score += 8; matchedSignals.push("known-url"); }
 
+  // 负向锚点（用户明确否定的人的身份特征）：命中 -6，基本必丢弃，仅留极端强锚点逃生通道
+  const negAnchors = (ctx.negativeAnchors || []).filter(Boolean);
+  if (negAnchors.some(a => blob.includes(a) || content.includes(a))) {
+    score -= 6;
+    matchedSignals.push("negative-anchor");
+  }
+
   const cls = raw.domainClass || domainClass(domainOf(raw.url));
   if (cls === "A") score += 2;
   else if (cls === "B") score += 1;
@@ -171,10 +178,12 @@ async function reviewBoundarySources(ctx, sources) {
       parsed = parseJSON(text);
     } catch (err) {
       lastErr = err.message;
+      // API 级错误（内容过滤 422 / 配额 / 网络）重试无意义，早退按未复核处理
+      if (/API 错误|HTTP|ECONN|timeout|超时/i.test(err.message)) break;
     }
   }
   if (!parsed) {
-    console.warn(`[person-research] 边界复核连续解析失败（按未复核处理）: ${lastErr}`);
+    console.warn(`[person-research] 边界复核失败（按未复核处理）: ${lastErr}`);
     return [];
   }
   return validateBoundaryReviewOutput(parsed, sources);

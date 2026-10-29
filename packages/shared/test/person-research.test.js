@@ -13,9 +13,9 @@ import { canonicalUrl, sameSource, domainOf, domainClass } from "../../workflows
 import { CONFIG } from "../../workflows/templates/person-research/lib/config.js";
 import { scoreSource, partitionSources, markLead } from "../../workflows/templates/person-research/lib/relevance.js";
 import { buildClusterPrompt, validateClusterOutput, validateIntentOutput, validateReportCitations, validateBusinessOutput, buildReportPrompt, validateCorrectionOutput, validateBoundaryReviewOutput } from "../../workflows/templates/person-research/lib/prompts.js";
-import { applyExtract, mergeBusinessRelations, recomputeBusinessStatus, applyCorrection } from "../../workflows/templates/person-research/lib/evidence.js";
+import { applyExtract, mergeBusinessRelations, recomputeBusinessStatus, applyCorrection, applyCandidateRejection, reIdCandidates } from "../../workflows/templates/person-research/lib/evidence.js";
+import { applySelectInState, applyContinueInState, applyCandidateRejectInState, applyClaimRejectInState } from "../../workflows/templates/person-research/lib/handlers.js";
 import { generateReport } from "../../workflows/templates/person-research/lib/report.js";
-import { applySelectInState, applyContinueInState } from "../../workflows/templates/person-research/lib/handlers.js";
 
 test("parkedStatusAfter: awaitInput 非末步停靠，末步/无标记为 null", () => {
   assert.equal(parkedStatusAfter({ awaitInput: true }, false), "awaiting_input");
@@ -594,7 +594,7 @@ test("validateCorrectionOutput: 否定/补充/信号/摘要，越界 claimId 剔
 });
 
 test("validateCorrectionOutput: 非对象/空输入返回空结构", () => {
-  const empty = { negate: [], facts: [], signals: {}, candidateSummary: null };
+  const empty = { rejectCandidate: false, negativeAnchors: [], negate: [], facts: [], signals: {}, candidateSummary: null };
   assert.deepEqual(validateCorrectionOutput(null, EXISTING_CLAIMS), empty);
   assert.deepEqual(validateCorrectionOutput({ negate: [], facts: [], signals: {}, candidateSummary: null }, EXISTING_CLAIMS), empty);
 });
@@ -637,4 +637,125 @@ test("buildReportPrompt: rejected 不进主张列表、进已否定区并带理�
   assert.ok(claimSection.includes("某大学"));
   assert.ok(user.includes("已被用户否定的主张（1 条"));
   assert.ok(user.includes("用户指出并非就职于某公司"));
+});
+
+// ─── V1.2 整人纠错 + 身份锚点 ─────────────────────────────────────
+
+test("validateCorrectionOutput: 整人否定 + 负向锚点 + gender/birthYear + 摘要强制 null", () => {
+  const out = validateCorrectionOutput({
+    rejectCandidate: true,
+    negativeAnchors: ["某大学研究生院", "译者", "", "太长的锚点".repeat(10), "某大学研究生院"],
+    negate: [],
+    facts: [{ fact: "她是女性", quote: "女性" }],
+    signals: { gender: "女", birthYear: "1995", city: "绍兴" },
+    candidateSummary: "不应出现的摘要",
+  }, EXISTING_CLAIMS);
+  assert.equal(out.rejectCandidate, true);
+  assert.equal(out.candidateSummary, null); // 整人否定时强制清空
+  assert.deepEqual(out.negativeAnchors, ["某大学研究生院", "译者"]); // 去重 + 剔除空/超长
+  assert.equal(out.facts.length, 1);
+  assert.deepEqual(out.signals, { gender: "女", birthYear: "1995", city: "绍兴" });
+});
+
+test("reIdCandidates: 重新识别新候选避开既有编号，idMap 供主张重挂", () => {
+  const existing = [
+    { id: "a1", displayName: "张三 · 旧一", status: "rejected" },
+    { id: "a2", displayName: "张三 · 旧二", status: "unconfirmed" },
+  ];
+  const incoming = [
+    { id: "a1", displayName: "张三 · 新一", confidence: "high" },
+    { id: "a2", displayName: "张三 · 新二", confidence: "low" },
+  ];
+  const { candidates, idMap } = reIdCandidates(existing, incoming);
+  assert.deepEqual(candidates.map(c => c.id), ["a3", "a4"]);
+  assert.ok(candidates.every(c => c.status === "unconfirmed"));
+  assert.equal(idMap.get("a1"), "a3");
+  assert.equal(idMap.get("a2"), "a4");
+  // 空候选池：base=0 → a1 起
+  assert.deepEqual(reIdCandidates([], incoming).candidates.map(c => c.id), ["a1", "a2"]);
+});
+
+test("applyCandidateRejection: 目标连坐、user_provided 与其他存活候选保留、摘要清空", () => {  const claims = [
+    { id: "c-1", claim: "目标候选的主张", candidateId: "a1", status: "single_source" },
+    { id: "c-2", claim: "未归属主张", candidateId: null, status: "single_source" },
+    { id: "c-3", claim: "用户补充", candidateId: "a1", status: "user_provided" },
+    { id: "c-4", claim: "另一候选的主张", candidateId: "a2", status: "single_source" },
+    { id: "c-5", claim: "已排除不动", candidateId: "a1", status: "rejected", rejectedReason: "旧" },
+  ];
+  const candidates = [
+    { id: "a1", displayName: "张三 · 错的人", status: "selected", identitySummary: "错误摘要", signals: { occupation: "译者" } },
+    { id: "a2", displayName: "张三 · 另一人", status: "unconfirmed", identitySummary: "x" },
+  ];
+  const applied = applyCandidateRejection(claims, candidates, { candidateId: "a1", reason: "用户指出认错了人" });
+  assert.equal(applied.ok, true);
+  const a1 = applied.candidates.find(c => c.id === "a1");
+  assert.equal(a1.status, "rejected");
+  assert.equal(a1.identitySummary, null);
+  const st = id => applied.claims.find(c => c.id === id).status;
+  assert.equal(st("c-1"), "rejected");           // 目标候选名下连坐
+  assert.equal(st("c-2"), "rejected");           // 未归属也清（干净重来）
+  assert.equal(st("c-3"), "user_provided");      // 用户补充保留
+  assert.equal(st("c-4"), "single_source");      // 其他存活候选保留
+  assert.equal(st("c-5"), "rejected");           // 已排除不动
+  assert.ok(applied.claims.find(c => c.id === "c-1").rejectedReason.includes("候选整体排除"));
+});
+
+test("scoreSource: 负向锚点命中 -6（认错的人的页面基本必丢弃）", () => {
+  const ctx = { ...RCTX, negativeAnchors: ["某大学研究生院", "译者"] };
+  // 姓名标题 +5 命中"译者" -6 → -1 丢弃
+  const a = scoreSource({ title: "张三的译者主页", url: "https://a.com/p", snippet: "张三简介" }, ctx);
+  assert.equal(a.score, -1);
+  assert.ok(a.matchedSignals.includes("negative-anchor"));
+  // 不命中负向锚点不受影响
+  const b = scoreSource({ title: "张三的主页", url: "https://a.com/p", snippet: "张三简介" }, ctx);
+  assert.equal(b.score, 5);
+});
+
+test("applyCandidateRejectInState: 锚点提取 + redirect 轮置位 + 负向锚点累积", () => {
+  const state = makeResearchState();
+  state.research.candidates[0] = {
+    id: "a1", displayName: "张三 · 某大学研究生、译者", status: "selected",
+    identitySummary: "错误的人", signals: { occupation: "译者", school: "某大学" }, confidence: "high",
+  };
+  const claims = [
+    { id: "c-1", claim: "主张一", candidateId: "a1", status: "single_source" },
+    { id: "c-2", claim: "用户补充", candidateId: null, status: "user_provided" },
+  ];
+  const result = applyCandidateRejectInState(state, claims, { candidateId: "a1" });
+  assert.equal(result.ok, true);
+  assert.ok(result.negativeAnchors.includes("某大学研究生"));
+  assert.ok(result.negativeAnchors.includes("译者"));
+  assert.equal(state.research.candidates.find(c => c.id === "a1").status, "rejected");
+  assert.equal(state.research.pendingRound.source, "redirect");
+  assert.equal(state.research.pendingRound.business, false);
+  assert.ok(state.research.negativeAnchors.includes("译者"));
+  assert.equal(result.claims.find(c => c.id === "c-1").status, "rejected");
+  assert.equal(result.claims.find(c => c.id === "c-2").status, "user_provided");
+  assert.equal(result.rejectedClaims, 1);
+  assert.equal(state.status, "running");
+});
+
+test("applyClaimRejectInState: 单条 rejected + 只重臂 report 步骤", () => {
+  const state = makeResearchState();
+  state.steps = [
+    { id: "discovery", status: "completed", output: {} },
+    { id: "research", status: "completed", output: {} },
+    { id: "report", status: "completed", output: {} },
+  ];
+  const claims = [{ id: "c-1", claim: "有误的主张", candidateId: "a1", status: "single_source" }];
+  const result = applyClaimRejectInState(state, claims, { claimId: "c-1" });
+  assert.equal(result.ok, true);
+  assert.equal(claims[0].status, "rejected");
+  assert.equal(claims[0].rejectedReason, "用户标记有误");
+  assert.equal(state.steps[1].status, "completed"); // research 不重跑
+  assert.equal(state.steps[2].status, "pending");   // report 重臂
+  assert.equal(applyClaimRejectInState(state, claims, { claimId: "c-99" }).ok, false);
+});
+
+test("applySelectInState: 已排除候选不可直接选定", () => {
+  const state = makeResearchState();
+  state.research.candidates[0].status = "rejected";
+  const result = applySelectInState(state, { candidateId: "a1", action: "selected" });
+  assert.equal(result.ok, false);
+  assert.ok(result.error.includes("排除"));
 });

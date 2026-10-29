@@ -124,7 +124,7 @@ ai-engineer-journey/
             └── person-research/# 人物公开信息研究（姓名+线索→搜索去重抓取→LLM 聚类候选→awaitInput 停靠人工选定→多轮定向研究+商业版图→证据归并→版本化报告）
                 ├── actions.json # 模板级动作（research-select / research-continue / research-report）
                 ├── PLAN.md      # 设计文档（V1~V4 路线）+ IMPLEMENTATION.md（实现计划）
-                └── lib/         # discovery（高精度首搜+受控扩搜）/ research（商业轮+二跳+纠错+漏斗）/ relevance（V1.1 相关性评分+边界复核管线）/ report / prompts（LLM 契约+校验）/ evidence（归并+商业关联+纠错应用）/ queries（固定商业/扩搜查询集）/ normalize / search-client（strategy 透传）/ privacy / store / handlers
+                └── lib/         # discovery（高精度首搜+受控扩搜）/ research（断言纠错+整人否定+redirect 重新识别+商业二跳+漏斗）/ relevance（评分+负向锚点+边界复核管线）/ cluster（聚类复用）/ report / prompts / evidence（归并+连坐排除+重编号）/ queries / normalize / search-client / privacy / store / handlers
 ```
 
 ## 能力注册机制（v0.11.0）

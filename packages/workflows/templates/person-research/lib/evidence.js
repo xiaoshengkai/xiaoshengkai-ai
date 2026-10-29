@@ -91,6 +91,42 @@ export function applyCorrection(existingClaims, correction, { newClaimIds, candi
   };
 }
 
+// ─── 整人排除（候选级连坐） ────────────────────────────────────────
+
+/**
+ * 整人排除：候选 rejected + identitySummary 清空（严禁残留错误身份），
+ * 主张连坐——目标候选名下 + 未归属（candidateId 空）的全部主张作废；
+ * 保留 user_provided（用户补充的正确线索）与其他存活候选名下主张。
+ */
+export function applyCandidateRejection(claims, candidates, { candidateId, reason }) {
+  const target = candidates.find(c => c.id === candidateId);
+  if (!target) return { claims, candidates, ok: false };
+
+  const surviving = new Set(
+    candidates.filter(c => c.id !== candidateId && c.status !== "rejected").map(c => c.id),
+  );
+
+  const nextCandidates = candidates.map(c => c.id === candidateId
+    ? { ...c, status: "rejected", identitySummary: null, rejectedReason: reason }
+    : c);
+
+  const nextClaims = claims.map(cl => {
+    if (cl.status === "rejected" || cl.status === "user_provided") return cl;
+    if (cl.candidateId && surviving.has(cl.candidateId)) return cl;
+    return { ...cl, status: "rejected", rejectedReason: `候选整体排除：${reason}` };
+  });
+
+  return { claims: nextClaims, candidates: nextCandidates, ok: true };
+}
+
+/** 重新识别轮的新候选重编号（避开既有 a-N 编号防冲突），返回 { candidates, idMap } */
+export function reIdCandidates(existingCandidates, incoming) {
+  const base = Math.max(0, ...existingCandidates.map(c => parseInt(String(c.id).replace(/\D/g, ""), 10) || 0));
+  const idMap = new Map(incoming.map((c, i) => [c.id, `a${base + i + 1}`]));
+  const candidates = incoming.map(c => ({ ...c, id: idMap.get(c.id), status: "unconfirmed" }));
+  return { candidates, idMap };
+}
+
 // ─── 商业关系归并（纯函数） ────────────────────────────────────────
 
 function relationKey(r) {

@@ -1,5 +1,7 @@
 [
-  { "type": "custom", "method": "POST", "path": "/execution/:id/research-select",   "handler": "person-research-select" },
-  { "type": "custom", "method": "POST", "path": "/execution/:id/research-continue", "handler": "person-research-continue" },
-  { "type": "custom", "method": "GET",  "path": "/execution/:id/research-report",   "handler": "person-research-report" }
+  { "type": "custom", "method": "POST", "path": "/execution/:id/research-select",       "handler": "person-research-select" },
+  { "type": "custom", "method": "POST", "path": "/execution/:id/research-continue",     "handler": "person-research-continue" },
+  { "type": "custom", "method": "GET",  "path": "/execution/:id/research-report",       "handler": "person-research-report" },
+  { "type": "custom", "method": "POST", "path": "/execution/:id/research-reject",       "handler": "person-research-reject" },
+  { "type": "custom", "method": "POST", "path": "/execution/:id/research-reject-claim", "handler": "person-research-reject-claim" }
 ]

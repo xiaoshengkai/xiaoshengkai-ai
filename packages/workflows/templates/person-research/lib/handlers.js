@@ -8,7 +8,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DATA_DIR, readState, writeState } from "../../../lib/state.js";
-import { loadClaims, loadSources, loadRounds, loadBusiness } from "./store.js";
+import { loadClaims, loadSources, loadRounds, loadBusiness, saveClaims } from "./store.js";
+import { applyCandidateRejection } from "./evidence.js";
 
 const RESEARCH_STEP_IDS = ["research", "report"];
 const CANDIDATE_ACTIONS = ["selected", "rejected", "ambiguous"];
@@ -16,6 +17,20 @@ const CANDIDATE_ACTIONS = ["selected", "rejected", "ambiguous"];
 const BUSINESS_INTENT_RE = /股东|持股|股份|法定代表人|法人代表|商业|工商|对外投资|实际控制|受益所有人|名下公司/;
 // 深挖意图检测：用户主动要求放宽召回（低分来源降为 lead_only 线索）
 const DEEP_DIG_RE = /深挖|挖深|再挖|更多线索/;
+
+/** 候选 displayName/信号提取身份锚点（「不是这个人」按钮路径的负向锚点，规则法免 LLM） */
+function extractAnchorsFromCandidate(c) {
+  const anchors = new Set();
+  const identity = String(c.displayName || "").split("·").slice(1).join("·");
+  for (const part of identity.split(/[、,，/]/)) {
+    const p = part.trim();
+    if (p && p.length >= 2 && p.length <= 30) anchors.add(p);
+  }
+  for (const v of Object.values(c.signals || {})) {
+    if (v && String(v).length >= 2) anchors.add(String(v));
+  }
+  return [...anchors].slice(0, 5);
+}
 
 function rearmResearchSteps(state) {
   for (const s of state.steps) {
@@ -39,6 +54,9 @@ export function applySelectInState(state, { candidateId, action }) {
   }
   const candidate = (research.candidates || []).find(c => c.id === candidateId);
   if (!candidate) return { ok: false, error: `候选不存在: ${candidateId}` };
+  if (candidate.status === "rejected" && action === "selected") {
+    return { ok: false, error: "候选已被排除，请先恢复待定再选定" };
+  }
 
   if (action === "selected") {
     for (const c of research.candidates) {
@@ -123,6 +141,7 @@ export async function handleReport({ params }) {
     claims: loadClaims(dir),
     business: loadBusiness(dir),
     rounds: research.rounds || [],
+    negativeAnchors: research.negativeAnchors || [],
     sources: loadSources(dir).map(s => ({
       id: s.id, url: s.url, title: s.title, domain: s.domain,
       domainClass: s.domainClass, scraped: s.scraped, snippet: (s.snippet || "").slice(0, 120),
@@ -131,4 +150,83 @@ export async function handleReport({ params }) {
       evidenceUse: s.evidenceUse ?? null,
     })),
   };
+}
+
+// ─── 整人排除 / 单条主张纠错（V1.2） ───────────────────────────────
+
+/** 整人排除：候选 rejected + 摘要清空 + 主张连坐 + 负向锚点累积 + 置 redirect 研究轮（重新识别） */
+export function applyCandidateRejectInState(state, claims, { candidateId, note }) {
+  const research = state.research;
+  if (!research) return { ok: false, error: "research 未初始化（先跑候选发现）" };
+  const target = (research.candidates || []).find(c => c.id === candidateId);
+  if (!target) return { ok: false, error: `候选不存在: ${candidateId}` };
+
+  const anchors = extractAnchorsFromCandidate(target);
+  const reason = String(note || "").trim()
+    || (anchors.length > 0 ? `用户指出认错了人（非${anchors.join("、")}相关）` : "用户指出认错了人");
+  const applied = applyCandidateRejection(claims, research.candidates, { candidateId, reason });
+
+  research.candidates = applied.candidates;
+  research.negativeAnchors = [...new Set([...(research.negativeAnchors || []), ...anchors])];
+  research.pendingRound = {
+    kind: "research",
+    source: "redirect",
+    business: false,
+    deep: false,
+    input: `已排除候选「${target.displayName}」，用已知线索重新识别目标人物`,
+  };
+  rearmResearchSteps(state);
+  return {
+    ok: true,
+    status: "running",
+    claims: applied.claims,
+    negativeAnchors: anchors,
+    rejectedClaims: claims.filter(c => c.status !== "rejected").length
+      - applied.claims.filter(c => c.status !== "rejected").length,
+  };
+}
+
+/** 单条主张「有误」：rejected + 理由，只重臂 report（不重跑研究） */
+export function applyClaimRejectInState(state, claims, { claimId, note }) {
+  const research = state.research;
+  if (!research) return { ok: false, error: "research 未初始化（先跑候选发现）" };
+  const target = claims.find(c => c.id === claimId);
+  if (!target) return { ok: false, error: `主张不存在: ${claimId}` };
+
+  target.status = "rejected";
+  target.rejectedReason = String(note || "").trim() || "用户标记有误";
+
+  for (const s of state.steps) {
+    if (s.id === "report") {
+      s.status = "pending";
+      s.output = null;
+      s.error = null;
+      s.startedAt = null;
+      s.elapsed = null;
+      delete s.retryForce;
+    }
+  }
+  state.status = "running";
+  return { ok: true, status: "running" };
+}
+
+export async function handleCandidateReject({ params, request }) {
+  const { candidateId, note } = await request.json().catch(() => ({}));
+  const dir = path.join(DATA_DIR, params.id);
+  return withGuards(params.id, state => {
+    const result = applyCandidateRejectInState(state, loadClaims(dir), { candidateId, note });
+    if (result.ok) saveClaims(dir, result.claims);
+    return result;
+  });
+}
+
+export async function handleClaimReject({ params, request }) {
+  const { claimId, note } = await request.json().catch(() => ({}));
+  const dir = path.join(DATA_DIR, params.id);
+  return withGuards(params.id, state => {
+    const claims = loadClaims(dir);
+    const result = applyClaimRejectInState(state, claims, { claimId, note });
+    if (result.ok) saveClaims(dir, claims);
+    return result;
+  });
 }

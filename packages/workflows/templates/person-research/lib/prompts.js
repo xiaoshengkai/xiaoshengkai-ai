@@ -45,8 +45,12 @@ function renderProfile(profile) {
   if (c.school) lines.push(`学校：${c.school}`);
   if (c.company) lines.push(`公司/职业：${c.company}`);
   if (c.occupation) lines.push(`职业：${c.occupation}`);
+  if (c.gender) lines.push(`性别：${c.gender}`);
+  if (c.birthYear) lines.push(`出生年份：${c.birthYear}`);
   if (c.knownUrl) lines.push(`已知链接：${c.knownUrl}`);
   if (c.focus) lines.push(`研究重点：${c.focus}`);
+  const neg = profile.negativeAnchors || [];
+  if (neg.length > 0) lines.push(`已否定的身份锚点（认错了的人，勿与目标画像合并/查询避开）：${neg.join("、")}`);
   return lines.join("\n");
 }
 
@@ -313,24 +317,28 @@ export function validateExtractOutput(json, newSources, existingClaims) {
 
 // ─── 用户断言解析（更正/补充） ────────────────────────────────────
 
-const SIGNAL_KEYS = ["city", "school", "company", "occupation"];
+const SIGNAL_KEYS = ["city", "school", "company", "occupation", "gender", "birthYear"];
 
 export function buildUserAssertionPrompt(profile, candidate, message, existingClaims) {
-  const system = `你是用户断言解析器。用户在研究过程中提交了一条消息，解析其中关于目标人物的「明确事实断言」——包括更正（否定既有主张）与补充（新增事实）。
+  const system = `你是用户断言解析器。用户在研究过程中提交了一条消息，解析其中关于目标人物的「明确事实断言」——包括更正（否定既有主张/否定整个人）与补充（新增事实）。
 
 规则：
-1. 只提取用户明确陈述的身份事实（如"他不是某公司的"、"他是北京人"、"昵称是XX"）
-2. 纯研究方向（如"继续查教育经历"、"查名下公司"）不含事实断言 → 所有字段输出空
-3. negate：用户否定的既有主张（claimId 必须来自既有主张列表，reason 写用户依据）
-4. facts：用户补充的新事实（quote 填用户原话片段）
-5. signals：用户断言直接对应的信号更新（被否定 → null，被补充 → 新值）；被否定实体若也出现在其他信号字段（如学校/机构），该字段必须同步更新（剔除该实体保留剩余部分，空了置 null）
-6. candidateSummary：若断言改变了人物画像，输出更新后的一句话身份（≤80 字），以更正后的正面事实为主（不要以被否定的内容开头）；无变化输出 null
-7. 不推断、不扩展用户没说的内容；模棱两可不提取
+1. 只提取用户明确陈述的身份事实（如"他不是某公司的"、"她是女性"、"1995 年出生"、"昵称是XX"）
+2. 纯研究方向（如"继续查教育经历"）不含事实断言 → 所有字段输出空
+3. rejectCandidate：用户明确否定「整个人」——认错了人/找错了/不是这个人/不是XX机构的这个人 → true；此时 candidateSummary 必须为 null（清空错误候选摘要，严禁把用户线索缝进被否定的候选）
+4. negativeAnchors：被否定者的具体身份特征（机构全称/职业/关联身份），仅在整人否定或明确否定某身份时输出；宽泛词（"这个人"等）不提取，≤5 条
+5. negate：用户否定的既有主张（claimId 必须来自既有主张列表，reason 写用户依据）；整人否定时通常不需要逐条 negate（系统会连坐）
+6. facts：用户补充的新事实（quote 填用户原话片段）
+7. signals：断言直接对应的信号更新（city/school/company/occupation/gender/birthYear）；性别（男/女）→ gender；出生年份（"95年出生"→1995）→ birthYear；被否定 → null，被补充 → 新值；被否定实体若也出现在其他信号字段，该字段必须同步更新（剔除该实体保留剩余部分，空了置 null）
+8. candidateSummary：断言改变画像时输出更新后的一句话身份（≤80 字，以正面事实为主，不以被否定内容开头）；无变化或整人否定 → null
+9. 不推断、不扩展用户没说的内容；模棱两可不提取
 
 只输出 JSON：
-{ "negate": [{ "claimId": "c-1", "reason": "用户指出并非就职于某公司" }],
+{ "rejectCandidate": false,
+  "negativeAnchors": [],
+  "negate": [{ "claimId": "c-1", "reason": "用户指出并非就职于某公司" }],
   "facts": [{ "fact": "张三毕业于某大学", "quote": "毕业于某大学" }],
-  "signals": { "company": null },
+  "signals": { "company": null, "gender": "女", "birthYear": "1995" },
   "candidateSummary": "一句话身份或 null" }`;
 
   const user = `## 目标人物画像
@@ -350,10 +358,20 @@ ${message}
 }
 
 export function validateCorrectionOutput(json, existingClaims) {
-  const out = { negate: [], facts: [], signals: {}, candidateSummary: null };
+  const out = { rejectCandidate: false, negativeAnchors: [], negate: [], facts: [], signals: {}, candidateSummary: null };
   if (!json || typeof json !== "object") return out;
 
   const validIds = new Set(existingClaims.map(c => c.id));
+
+  out.rejectCandidate = Boolean(json.rejectCandidate);
+
+  for (const a of Array.isArray(json.negativeAnchors) ? json.negativeAnchors : []) {
+    const t = text(a);
+    if (t && t.length >= 2 && t.length <= 30 && !out.negativeAnchors.includes(t)) {
+      out.negativeAnchors.push(t);
+      if (out.negativeAnchors.length >= 5) break;
+    }
+  }
 
   for (const n of Array.isArray(json.negate) ? json.negate : []) {
     const claimId = String(n?.claimId ?? "").trim();
@@ -376,6 +394,7 @@ export function validateCorrectionOutput(json, existingClaims) {
   }
 
   out.candidateSummary = text(json.candidateSummary) || null;
+  if (out.rejectCandidate) out.candidateSummary = null;
   return out;
 }
 
@@ -386,7 +405,7 @@ export function buildBoundaryReviewPrompt(ctx, sources) {
 
 判定（三选一）：
 - relevant：页面明确关于目标人物（姓名匹配 + 身份线索/经历吻合）
-- other_person：同名但是另一个人（学校/公司/年代/领域明显不同）
+- other_person：同名但是另一个人（学校/公司/年代/领域明显不同，或命中已否定的身份锚点）
 - irrelevant：页面与目标人物无关（泛列表页、公司主页无此人、词典页、无关主题）
 
 规则：
@@ -397,8 +416,12 @@ export function buildBoundaryReviewPrompt(ctx, sources) {
 只输出 JSON：
 { "reviews": [ { "sourceId": "b-1", "decision": "relevant", "candidateKey": "某大学-某公司-某城市", "matchedSignals": ["name", "school"], "reason": "一句话依据" } ] }`;
 
+  const neg = (ctx.negativeAnchors || []).length > 0
+    ? `\n\n## 已否定的身份锚点（认错了的人；命中这些特征的页面一律判 other_person）\n${ctx.negativeAnchors.join("、")}`
+    : "";
+
   const user = `## 目标人物画像
-${renderProfile({ name: ctx.name, phone: ctx.phone, clues: ctx.clues || {} })}
+${renderProfile({ name: ctx.name, phone: ctx.phone, clues: ctx.clues || {} })}${neg}
 
 ## 待复核（${sources.length} 条）
 ${renderSources(sources)}

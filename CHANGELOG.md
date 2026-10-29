@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.11.58 (2026-10-29) — person-research V1.2 整人纠错 + 身份锚点（同名消歧）
+
+### 变更
+- **根因**（真实任务实测）：用户连续两轮说"不是中科大的这个人"，系统只否定单条主张（1/25），错误候选的身份锚点继续主导搜索与评分，后续轮发散采纳其他同名者的来源；且正面线索（绍兴/女/95年）被缝进错误候选的摘要，制造"看起来对了"的假象。
+- **整人否定**：断言解析新增 `rejectCandidate + negativeAnchors`（"不是这个人/找错了/不是XX机构的"）→ 候选 rejected + identitySummary 强制清空（严禁缝合用户线索）+ **主张连坐**（目标名下 + 未归属的非 user_provided 全部作废，其他存活候选保留）→ 报告回到仅用户补充状态。
+- **负向锚点进漏斗**：`state.research.negativeAnchors` 累积，评分命中 -6（基本必丢弃）；注入聚类/意图/边界复核 prompt（边界复核命中锚点判 other_person）；redirect 查询自动避开。
+- **redirect 重新识别轮**：整人否定后本轮转重新识别——查询由 user_provided 主张 + 正向锚点生成；采纳来源跑候选聚类（`lib/cluster.js` 抽离复用），新候选 `reIdCandidates` 重编号合并为 unconfirmed；「不是这个人」按钮路径（`research-reject` 动作）规则法提取锚点（displayName·后身份短语 + signals）后同样触发。
+- **身份信号扩展**：`gender / birthYear` 进 SIGNAL_KEYS 与 renderProfile；正面断言信号同时进目标画像（research.clues）与候选 signals。
+- **报告级纠错入口**：Hero 区常驻「✕ 不是这个人」（confirm 后排除 + 自动 redirect）；证据主张每条「✕ 有误」（`research-reject-claim` 单条 rejected + 仅重臂 report）；面板轮次标签「重新识别」；已排除候选不可直接选定。
+- **健壮性**：边界复核 API 级错误（内容过滤 422/配额）早退不重试；`handleReport` 返回 negativeAnchors。
+
+### 验证
+- test:shared 123（新增 8：整人否定校验/连坐/负向锚点评分/新动作/reIdCandidates）；typecheck、build 全绿。
+- 本地真实冒烟（孟佳颖复刻用户场景）：发现轮找到中科大候选 → 补"绍兴人，女性，95年出生"（3 条 user_provided + 查询用正向锚点）→ "不是中国科学技术大学研究生院这个人" → **候选排除 + 6 条错误主张连坐 + negativeAnchors 落盘 + redirect 查询全部正向锚点（绍兴/1995/小学同学）**，报告 v2 仅剩用户补充且明确"用户已更正"。
+
 ## v0.11.57 (2026-10-29) — 户型鸟瞰：确定性矢量锁布局 + AI 图生图
 
 ### 变更

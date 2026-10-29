@@ -11,7 +11,7 @@ import { handle as floorplanConfirm } from "./templates/floorplan-remodel/lib/co
 import { handle as comicExport } from "./templates/comic-generation/lib/export.js";
 import { handle as comicGenerateContent } from "./templates/comic-generation/lib/generate-content.js";
 import { handle as comicSceneGroup } from "./templates/comic-generation/lib/scene-groups.js";
-import { handleSelect as personResearchSelect, handleContinue as personResearchContinue, handleReport as personResearchReport } from "./templates/person-research/lib/handlers.js";
+import { handleSelect as personResearchSelect, handleContinue as personResearchContinue, handleReport as personResearchReport, handleCandidateReject as personResearchReject, handleClaimReject as personResearchRejectClaim } from "./templates/person-research/lib/handlers.js";
 import {
   listCharacterHandler,
   generateCharacterHandler,
@@ -44,6 +44,8 @@ const CUSTOM_HANDLERS = {
   "person-research-select": personResearchSelect,
   "person-research-continue": personResearchContinue,
   "person-research-report": personResearchReport,
+  "person-research-reject": personResearchReject,
+  "person-research-reject-claim": personResearchRejectClaim,
 };
 
 function collectActions() {

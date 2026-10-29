@@ -60,6 +60,7 @@ interface Round {
   kind: string;
   business?: boolean;
   deep?: boolean;
+  redirect?: boolean;
   input?: string | null;
   queryCount?: number;
   newSourceIds?: string[];
@@ -92,6 +93,7 @@ interface ReportData {
   claims: Claim[];
   business: BusinessRelation[];
   rounds: Round[];
+  negativeAnchors?: string[];
   sources: SourceMeta[];
 }
 
@@ -254,6 +256,50 @@ export default function PersonResearchPanel({ executionId, status, busy, onRefre
     setSubmitting(false);
   }, [executionId, input, runAuto]);
 
+  /** 整人排除：候选 rejected + 主张连坐 + 自动 redirect 重新识别 */
+  const handleRejectCandidate = useCallback(async () => {
+    const target = (data?.candidates || []).find(c => c.status === "selected")
+      || (data?.candidates || []).find(c => c.status !== "rejected");
+    if (!target) return;
+    if (!window.confirm(`确定排除「${target.displayName}」？\n其名下主张将全部作废（你的补充保留），并用已知线索重新搜索目标人物。`)) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${executionId}/research-reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateId: target.id }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        toast(`🟢 已排除（作废 ${json.rejectedClaims ?? "?"} 条主张），正在用已知线索重新识别`);
+        await runAuto();
+      } else {
+        toast(`🔴 ${json.error}`);
+      }
+    } catch { toast("🔴 请求失败"); }
+    setSubmitting(false);
+  }, [executionId, data, runAuto]);
+
+  /** 单条主张「有误」：rejected + 仅刷新报告 */
+  const handleRejectClaim = useCallback(async (claimId: string) => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${BASE}/api/workflows/execution/${executionId}/research-reject-claim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimId }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        toast("🟢 已标记有误，报告将刷新");
+        await runAuto();
+      } else {
+        toast(`🔴 ${json.error}`);
+      }
+    } catch { toast("🔴 请求失败"); }
+    setSubmitting(false);
+  }, [executionId, runAuto]);
+
   const sourceById = useMemo(() => new Map((data?.sources || []).map(s => [s.id, s])), [data]);
   const candidates = data?.candidates || [];
   const allClaims = data?.claims || [];
@@ -261,7 +307,9 @@ export default function PersonResearchPanel({ executionId, status, busy, onRefre
   const rejectedClaims = useMemo(() => allClaims.filter(c => c.status === "rejected"), [allClaims]);
   const business = data?.business || [];
   const rounds = useMemo(() => [...(data?.rounds || [])].sort((a, b) => b.n - a.n), [data]);
-  const main = candidates.find(c => c.status === "selected") || candidates[0] || null;
+  const main = candidates.find(c => c.status === "selected")
+    || candidates.find(c => c.status !== "rejected")
+    || null;
   const factGroups = useMemo(() => groupClaims(claims), [claims]);
   const timeline = useMemo(
     () => claims.filter(c => c.publishedAt).sort((a, b) => (a.publishedAt! < b.publishedAt! ? 1 : -1)),
@@ -385,6 +433,10 @@ export default function PersonResearchPanel({ executionId, status, busy, onRefre
             <span className="brutal-chip px-1.5 py-0.5 text-xs bg-muted">
               {main.status === "selected" ? "已选定候选" : "身份未确认"}
             </span>
+            <button onClick={handleRejectCandidate} disabled={busy || submitting}
+              className="brutal-btn px-2 py-1 text-xs font-bold bg-pink-soft ml-auto">
+              ✕ 不是这个人
+            </button>
           </div>
           {main.identitySummary && <p className="text-sm mt-2">{main.identitySummary}</p>}
           {(() => {
@@ -394,12 +446,17 @@ export default function PersonResearchPanel({ executionId, status, busy, onRefre
               <div className="flex gap-2 flex-wrap mt-2">
                 {sig.map(([k, v]) => (
                   <span key={k} className="brutal-chip px-1.5 py-0.5 text-xs bg-blue-soft">
-                    {k === "city" ? "地区" : k === "school" ? "学校" : k === "company" ? "机构" : "职业"}：{v as string}
+                    {k === "city" ? "地区" : k === "school" ? "学校" : k === "company" ? "机构" : k === "gender" ? "性别" : k === "birthYear" ? "出生" : "职业"}：{v as string}
                   </span>
                 ))}
               </div>
             );
           })()}
+          {(data?.negativeAnchors?.length ?? 0) > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              🚫 已排除身份锚点：{data!.negativeAnchors!.join("、")}（相关页面自动降权）
+            </p>
+          )}
           {(singleSourceCount > 0 || candidates.length > 1 || rejectedClaims.length > 0) && (
             <p className="text-xs text-muted-foreground mt-2 border-t-2 border-dashed border-border pt-2">
               {singleSourceCount > 0 && `⚠ ${singleSourceCount} 条主张仅单一来源支持`}
@@ -567,6 +624,12 @@ export default function PersonResearchPanel({ executionId, status, busy, onRefre
                           <a key={sid} href={sourceById.get(sid)?.url || "#"} target="_blank" rel="noreferrer"
                             className="brutal-chip px-1.5 py-0.5 hover:bg-muted">{sid}</a>
                         ))}
+                        {!rej && (
+                          <button onClick={() => handleRejectClaim(cl.id)} disabled={busy || submitting}
+                            className="brutal-btn px-1.5 py-0.5 text-[10px] font-bold bg-card ml-auto shrink-0">
+                            ✕ 有误
+                          </button>
+                        )}
                       </div>
                       {cl.quote && <p className="text-muted-foreground mt-1">「{cl.quote}」</p>}
                       {rej && <p className="text-muted-foreground mt-1">✕ 已排除：{cl.rejectedReason || "用户指出有误"}</p>}
@@ -587,7 +650,7 @@ export default function PersonResearchPanel({ executionId, status, busy, onRefre
             {rounds.map(r => (
               <div key={r.id} className="flex gap-2 flex-wrap">
                 <span className="font-bold shrink-0">
-                  第 {r.n} 轮（{r.business ? "商业调查" : r.deep ? "深挖" : r.kind === "discovery" ? "候选发现" : "定向研究"}）
+                  第 {r.n} 轮（{r.redirect ? "重新识别" : r.business ? "商业调查" : r.deep ? "深挖" : r.kind === "discovery" ? "候选发现" : "定向研究"}）
                 </span>
                 {r.input && <span className="truncate">{r.input}</span>}
                 <span className="text-muted-foreground ml-auto font-mono">

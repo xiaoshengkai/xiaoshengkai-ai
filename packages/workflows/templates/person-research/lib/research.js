@@ -1,9 +1,9 @@
 /**
- * 定向研究轮（步骤 2，由 continue/select 动作重臂触发，V1.1 相关性漏斗）：
- *   用户断言解析（更正/补充）→ LLM 生成定向查询 → 搜索（对既有来源去重）
- *   → 相关性漏斗（商业轮聚合站页走 lead_only；其余评分 + 边界复核；深挖放宽为 lead）
- *   → 只持久化过门槛来源 → 抓 evidence 正文 → LLM 抽取并归并证据 → 落盘轮次记录。
- * 空查询/零新来源都算成功轮（信息增量枯竭由用户决定是否继续深挖）。
+ * 定向研究轮（步骤 2，由 continue/select 动作重臂触发）：
+ *   用户断言解析（更正/补充/整人否定）→ 查询（redirect 轮重新识别 / 商业固定集 / 意图）
+ *   → 搜索去重 → 相关性漏斗（负向锚点惩罚；商业聚合站 lead；深挖放宽）
+ *   → 持久化过门槛来源 → redirect 轮聚类新候选 / 常规轮抽取归并证据 → 落盘轮次。
+ * 整人否定：候选排除 + 主张连坐（保留 user_provided 与其他存活候选）+ 负向锚点进评分与查询 + 本轮转重新识别。
  */
 import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
@@ -13,9 +13,10 @@ import { canonicalUrl, domainOf, domainClass } from "./normalize.js";
 import { readPrivate } from "./privacy.js";
 import { getResearch, updateResearch, allocSourceIds, allocClaimIds, saveSource, loadSources, saveClaims, loadClaims, saveRound, loadRounds, loadBusiness, saveBusiness } from "./store.js";
 import { buildIntentPrompt, validateIntentOutput, buildExtractPrompt, validateExtractOutput, buildBusinessExtractPrompt, validateBusinessOutput, buildUserAssertionPrompt, validateCorrectionOutput } from "./prompts.js";
-import { applyExtract, mergeBusinessRelations, recomputeBusinessStatus, collectAggregatorAssociations, companyNameFromTitle, applyCorrection } from "./evidence.js";
+import { applyExtract, mergeBusinessRelations, recomputeBusinessStatus, collectAggregatorAssociations, companyNameFromTitle, applyCorrection, applyCandidateRejection, reIdCandidates } from "./evidence.js";
 import { buildBusinessQueries } from "./queries.js";
 import { runRelevancePipeline, markLead } from "./relevance.js";
+import { clusterSources } from "./cluster.js";
 
 const CLASS_ORDER = { A: 0, B: 1, C: 2, D: 3 };
 const BUSINESS_DOMAIN_RE = /aiqicha|qcc\.com|tianyancha|gsxt\.gov\.cn|qixin|11467\.com|shuidi\.cn/;
@@ -34,45 +35,93 @@ export async function runResearch(name, executionDir) {
   const isBusinessRound = Boolean(pending.business);
   const isDeepRound = Boolean(pending.deep);
 
-  // 0. 用户断言解析（更正/补充）：纯研究方向消息返回空、无副作用；命中则
-  //    否定既有主张（rejected）+ 追加 user_provided 主张 + 更新候选信号与一句话身份
+  // 0. 用户断言解析（更正/补充/整人否定）：纯研究方向消息返回空、无副作用
   let correctedClaimIds = [];
-  if (pending.source !== "selection") {
+  let isRedirectRound = pending.source === "redirect";
+  let currentResearch = research;
+  let currentSelected = selected;
+  if (pending.source !== "selection" && pending.source !== "redirect") {
     const existingClaims = loadClaims(executionDir);
     const assertion = await parseUserAssertion(profile, selected, pending.input, existingClaims);
     const hasAssertion = assertion.negate.length > 0 || assertion.facts.length > 0
-      || Object.keys(assertion.signals).length > 0 || assertion.candidateSummary;
+      || Object.keys(assertion.signals).length > 0 || assertion.candidateSummary
+      || assertion.rejectCandidate;
     if (hasAssertion) {
       const observedAt = new Date().toISOString();
-      const newIds = allocClaimIds(executionDir, assertion.facts.length);
-      const applied = applyCorrection(existingClaims, assertion, {
-        newClaimIds: newIds, candidateId: selected?.id || null, observedAt,
-      });
-      saveClaims(executionDir, applied.claims);
-      correctedClaimIds = newIds;
+      const cluePatch = {};
+      for (const [k, v] of Object.entries(assertion.signals)) if (v) cluePatch[k] = v;
 
-      const target = selected || research.candidates?.[0];
-      if (target) {
-        const nextCandidates = research.candidates.map(c => c.id === target.id
-          ? {
-              ...c,
-              signals: { ...(c.signals || {}), ...assertion.signals },
-              identitySummary: assertion.candidateSummary || c.identitySummary,
-            }
-          : c);
-        updateResearch(executionDir, { candidates: nextCandidates });
+      if (assertion.rejectCandidate) {
+        // 整人否定：候选排除 + 主张连坐（保留 user_provided 与其他存活候选名下主张）
+        //   + 负向锚点累积 + 正向信号进目标画像（clues，严禁缝进被否定候选）+ 本轮转重新识别
+        const target = selected || research.candidates?.find(c => c.status !== "rejected");
+        const reason = assertion.negativeAnchors.length > 0
+          ? `用户指出认错了人（非${assertion.negativeAnchors.join("、")}相关）`
+          : "用户指出认错了人";
+        let claimsNow = existingClaims;
+        let candidatesNow = research.candidates;
+        if (target) {
+          const applied = applyCandidateRejection(existingClaims, research.candidates, { candidateId: target.id, reason });
+          claimsNow = applied.claims;
+          candidatesNow = applied.candidates;
+        }
+        if (assertion.facts.length > 0) {
+          const newIds = allocClaimIds(executionDir, assertion.facts.length);
+          const appliedFacts = applyCorrection(claimsNow, { negate: [], facts: assertion.facts, signals: {}, candidateSummary: null }, { newClaimIds: newIds, candidateId: null, observedAt });
+          claimsNow = appliedFacts.claims;
+          correctedClaimIds = newIds;
+        }
+        saveClaims(executionDir, claimsNow);
+        currentResearch = updateResearch(executionDir, {
+          candidates: candidatesNow,
+          negativeAnchors: [...new Set([...(research.negativeAnchors || []), ...assertion.negativeAnchors])],
+          clues: { ...(research.clues || {}), ...cluePatch },
+        });
+        currentSelected = null;
+        isRedirectRound = true;
+        console.log(`[person-research] 整人否定: ${target ? `候选 ${target.id} 排除（主张连坐）` : "无可排除候选"}，负向锚点 [${assertion.negativeAnchors.join("、")}]，本轮转重新识别`);
+      } else {
+        // 单条否定/补充：主张 rejected/user_provided + 候选信号与摘要更新 + 线索进目标画像
+        const newIds = allocClaimIds(executionDir, assertion.facts.length);
+        const applied = applyCorrection(existingClaims, assertion, { newClaimIds: newIds, candidateId: selected?.id || null, observedAt });
+        saveClaims(executionDir, applied.claims);
+        correctedClaimIds = newIds;
+
+        const target = selected || research.candidates?.[0];
+        if (target) {
+          const nextCandidates = research.candidates.map(c => c.id === target.id
+            ? {
+                ...c,
+                signals: { ...(c.signals || {}), ...assertion.signals },
+                identitySummary: assertion.candidateSummary || c.identitySummary,
+              }
+            : c);
+          currentResearch = updateResearch(executionDir, {
+            candidates: nextCandidates,
+            clues: { ...(research.clues || {}), ...cluePatch },
+          });
+        } else {
+          currentResearch = updateResearch(executionDir, { clues: { ...(research.clues || {}), ...cluePatch } });
+        }
+        console.log(`[person-research] 用户断言: 否定 ${assertion.negate.length} 条 / 补充 ${assertion.facts.length} 条`);
       }
-      console.log(`[person-research] 用户断言: 否定 ${assertion.negate.length} 条 / 补充 ${assertion.facts.length} 条`);
     }
   }
 
-  // 1. 查询规划：商业轮用固定查询集（选定时不再走意图 LLM；用户消息触发时合并意图查询）
+  // 1. 查询规划：redirect 轮重新识别（正向锚点 + user_provided 线索 + 避开负向锚点）；
+  //    商业轮固定查询集；其余意图查询。queryProfile 带负向锚点供 prompt 避开。
+  const queryProfile = { name, phone: profile.phone, clues: currentResearch.clues, negativeAnchors: currentResearch.negativeAnchors || [] };
   const doneQueries = loadRounds(executionDir)
     .flatMap(r => (r.queries || []).map(q => typeof q === "string" ? q : q.query));
-  const intentQueries = msg => planQueries(profile, msg, doneQueries)
+  const intentQueries = msg => planQueries(queryProfile, msg, doneQueries)
     .then(qs => qs.map(q => ({ query: q, category: "general", reason: "intent" })));
   let queries;
-  if (isBusinessRound) {
+  if (isRedirectRound) {
+    const userFacts = loadClaims(executionDir)
+      .filter(c => c.status === "user_provided").map(c => c.claim).join("；");
+    const msg = `已排除认错的人，请根据已知线索重新识别目标人物${userFacts ? `（已知：${userFacts}）` : ""}，生成搜索查询`;
+    queries = await intentQueries(msg);
+  } else if (isBusinessRound) {
     const fixed = buildBusinessQueries(name);
     const extra = pending.source === "continue" ? await intentQueries(pending.input) : [];
     queries = [...fixed, ...extra]
@@ -81,7 +130,7 @@ export async function runResearch(name, executionDir) {
   } else {
     queries = await intentQueries(pending.input);
   }
-  console.log(`[person-research] 第 ${roundN} 轮${isBusinessRound ? "（商业调查）" : ""}${isDeepRound ? "（深挖）" : ""}定向查询 ${queries.length} 组: ${queries.map(q => q.query).join(" / ")}`);
+  console.log(`[person-research] 第 ${roundN} 轮${isBusinessRound ? "（商业调查）" : ""}${isDeepRound ? "（深挖）" : ""}${isRedirectRound ? "（重新识别）" : ""}定向查询 ${queries.length} 组: ${queries.map(q => q.query).join(" / ")}`);
 
   // 2. 搜索（波次化）→ 对既有来源去重
   const existingSources = loadSources(executionDir);
@@ -121,9 +170,8 @@ export async function runResearch(name, executionDir) {
   const wave1 = await searchWave(queries);
 
   // 商业二跳：聚合站公司页 title 即公司名 → 「公司+股东 / 公司+人名」再搜（聚合站正文被反爬/JS 墙，摘要即证据）
-  // 公司名池 = 本轮 wave1 + 历史来源里的聚合站页（固定查询可能已被去重，历史公司线索仍可发起二跳）
   let hopQueries = [];
-  if (isBusinessRound) {
+  if (isBusinessRound && !isRedirectRound) {
     const aggrPool = [
       ...wave1,
       ...existingSources.filter(s => BUSINESS_DOMAIN_RE.test(s.domain || "")),
@@ -148,11 +196,9 @@ export async function runResearch(name, executionDir) {
   const wave2 = hopQueries.length > 0 ? await searchWave(hopQueries) : [];
   queries = [...queries, ...hopQueries];
 
-  // 3. 相关性漏斗（V1.1）：
-  //    商业轮：聚合站公司页（人名商业查询的全文匹配）→ lead_only（线索，不进事实抽取）
-  //    其余：评分 + 边界 LLM 复核 → evidence；深挖轮低分降 lead_only
-  const ctx = buildRelevanceCtx(name, executionDir, research, selected);
-  const isAggregatorLead = r => isBusinessRound
+  // 3. 相关性漏斗：负向锚点惩罚；商业轮聚合站页走 lead_only；深挖放宽为 lead
+  const ctx = buildRelevanceCtx(name, executionDir, currentResearch, currentSelected);
+  const isAggregatorLead = r => isBusinessRound && !isRedirectRound
     && BUSINESS_DOMAIN_RE.test(domainOf(r.url))
     && (r.foundBy || []).some(f => f?.reason === "business" || f?.reason === "business-hop");
 
@@ -174,6 +220,7 @@ export async function runResearch(name, executionDir) {
     persistedEvidence: evidence.length,
     leadOnly: leads.length,
     deep: isDeepRound,
+    redirect: isRedirectRound,
   };
   console.log(`[person-research] 漏斗: 原始 ${filterStats.rawResults} → 评分 ${filterStats.scored}（直接 ${filterStats.direct} / 边界 ${filterStats.boundary}）+ 聚合 lead ${aggregatorLeads.length} → evidence ${evidence.length} / lead ${leads.length}`);
 
@@ -216,66 +263,84 @@ export async function runResearch(name, executionDir) {
     }));
   }
 
-  // 5. 证据抽取与归并（只用 evidence 来源；lead_only 不进事实主张）
+  // 5. 证据处理：redirect 轮聚类新候选（重新识别）；常规轮抽取归并证据 + 商业关系
   let newClaimIds = [];
   const evidenceRecords = newRecords.filter(s => s.evidenceUse !== "lead_only");
   if (evidenceRecords.length > 0) {
-    const factPromptSources = [...evidenceRecords]
+    const promptSources = [...evidenceRecords]
       .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
       .slice(0, CONFIG.PROMPT_SOURCES_MAX)
       .map(s => ({ ...s, content: s.scraped ? s.content : s.snippet }));
 
-    const extract = await extractEvidence(profile, selected, factPromptSources, loadClaims(executionDir));
-    if (extract.newClaims.length + extract.updates.length + extract.conflicts.length > 0) {
+    if (isRedirectRound) {
+      // 重新识别：对采纳来源跑候选聚类（同 discovery 契约），新候选合并为 unconfirmed
+      const clustered = await clusterSources(queryProfile, promptSources);
+      const { candidates: newCandidates, idMap } = reIdCandidates(currentResearch.candidates, clustered.candidates);
+      const claimIds = allocClaimIds(executionDir, clustered.claims.length);
       const observedAt = new Date().toISOString();
-      const claimIds = allocClaimIds(executionDir, extract.newClaims.length + extract.conflicts.length);
-      const idAlloc = {
-        newClaimIds: claimIds.slice(0, extract.newClaims.length),
-        conflictClaimIds: claimIds.slice(extract.newClaims.length),
-        candidateId: selected?.id || null,
-        observedAt,
-      };
-      const sourceMap = new Map([...existingSources, ...newRecords].map(s => [s.id, s]));
-      const applied = applyExtract(loadClaims(executionDir), extract, sourceMap, idAlloc);
-      saveClaims(executionDir, applied.claims);
-      newClaimIds = applied.newClaimIds;
-      console.log(`[person-research] 证据归并: 新主张 ${extract.newClaims.length} / 更新 ${extract.updates.length} / 冲突 ${extract.conflicts.length}`);
-    }
-
-    // 商业轮：结构化商业关系 = LLM 抽取（有角色证据的） + 规则化关联（全文匹配但角色未证实）
-    //   商业 prompt 池 = 本轮来源（聚合 lead 优先）+ 历史聚合站来源（稳定证据池）
-    //   → 同公司同角色归并 → 独立域名升级状态
-    if (isBusinessRound) {
-      const bizPromptPool = [...newRecords, ...existingSources.filter(s => BUSINESS_DOMAIN_RE.test(s.domain || ""))];
-      const promptOrder = s =>
-        (BUSINESS_DOMAIN_RE.test(s.domain || "") ? 2 : 0) + Number(s.scraped);
-      const seenCanonical = new Set();
-      const bizPromptSources = bizPromptPool
-        .filter(s => {
-          const cu = s.canonicalUrl || canonicalUrl(s.url);
-          if (seenCanonical.has(cu)) return false;
-          seenCanonical.add(cu);
-          return true;
-        })
-        .sort((a, b) => (promptOrder(b) - promptOrder(a)))
-        .slice(0, CONFIG.PROMPT_SOURCES_MAX)
-        .map(s => ({ ...s, content: s.scraped ? s.content : s.snippet }));
-
-      const llmRelations = await extractBusinessRelations(profile, selected, bizPromptSources);
-      const ruleAssociations = collectAggregatorAssociations([...existingSources, ...newRecords], BUSINESS_DOMAIN_RE);
-      const all = [...llmRelations, ...ruleAssociations];
-      if (all.length > 0) {
+      const newClaims = clustered.claims.map((cl, i) => ({
+        id: claimIds[i], claim: cl.claim, quote: cl.quote, sourceIds: cl.sourceIds,
+        candidateId: idMap.get(cl.candidateId) || null, publishedAt: cl.publishedAt,
+        observedAt, status: "single_source", conflicts: [],
+      }));
+      saveClaims(executionDir, [...loadClaims(executionDir), ...newClaims]);
+      currentResearch = updateResearch(executionDir, {
+        candidates: [...currentResearch.candidates, ...newCandidates],
+        claimIds: [...(currentResearch.claimIds || []), ...claimIds],
+      });
+      newClaimIds = claimIds;
+      console.log(`[person-research] 重新识别: 新增候选 ${newCandidates.length} 个（${newCandidates.map(c => (c.displayName || "").split("·")[1] || c.id).join(" / ")}） / 主张 ${newClaims.length} 条`);
+    } else {
+      const extract = await extractEvidence(profile, currentSelected, promptSources, loadClaims(executionDir));
+      if (extract.newClaims.length + extract.updates.length + extract.conflicts.length > 0) {
         const observedAt = new Date().toISOString();
-        const stamped = all.map(r => ({ ...r, observedAt: observedAt.slice(0, 10) }));
+        const claimIds = allocClaimIds(executionDir, extract.newClaims.length + extract.conflicts.length);
+        const idAlloc = {
+          newClaimIds: claimIds.slice(0, extract.newClaims.length),
+          conflictClaimIds: claimIds.slice(extract.newClaims.length),
+          candidateId: currentSelected?.id || null,
+          observedAt,
+        };
         const sourceMap = new Map([...existingSources, ...newRecords].map(s => [s.id, s]));
-        const merged = recomputeBusinessStatus(
-          mergeBusinessRelations(loadBusiness(executionDir), stamped),
-          sourceMap,
-        );
-        saveBusiness(executionDir, merged);
-        console.log(`[person-research] 商业关系: LLM ${llmRelations.length} 条 + 规则关联 ${ruleAssociations.length} 条，归并后共 ${merged.length} 条`);
-      } else {
-        console.log("[person-research] 商业关系: 本轮未抽取到结构化关系（claims 里可能仍有文本线索）");
+        const applied = applyExtract(loadClaims(executionDir), extract, sourceMap, idAlloc);
+        saveClaims(executionDir, applied.claims);
+        newClaimIds = applied.newClaimIds;
+        console.log(`[person-research] 证据归并: 新主张 ${extract.newClaims.length} / 更新 ${extract.updates.length} / 冲突 ${extract.conflicts.length}`);
+      }
+
+      // 商业轮：结构化商业关系 = LLM 抽取（有角色证据的） + 规则化关联（全文匹配但角色未证实）
+      if (isBusinessRound) {
+        const bizPromptPool = [...newRecords, ...existingSources.filter(s => BUSINESS_DOMAIN_RE.test(s.domain || ""))];
+        const promptOrder = s =>
+          (BUSINESS_DOMAIN_RE.test(s.domain || "") ? 2 : 0) + Number(s.scraped);
+        const seenCanonical = new Set();
+        const bizPromptSources = bizPromptPool
+          .filter(s => {
+            const cu = s.canonicalUrl || canonicalUrl(s.url);
+            if (seenCanonical.has(cu)) return false;
+            seenCanonical.add(cu);
+            return true;
+          })
+          .sort((a, b) => (promptOrder(b) - promptOrder(a)))
+          .slice(0, CONFIG.PROMPT_SOURCES_MAX)
+          .map(s => ({ ...s, content: s.scraped ? s.content : s.snippet }));
+
+        const llmRelations = await extractBusinessRelations(profile, currentSelected, bizPromptSources);
+        const ruleAssociations = collectAggregatorAssociations([...existingSources, ...newRecords], BUSINESS_DOMAIN_RE);
+        const all = [...llmRelations, ...ruleAssociations];
+        if (all.length > 0) {
+          const observedAt = new Date().toISOString();
+          const stamped = all.map(r => ({ ...r, observedAt: observedAt.slice(0, 10) }));
+          const sourceMap = new Map([...existingSources, ...newRecords].map(s => [s.id, s]));
+          const merged = recomputeBusinessStatus(
+            mergeBusinessRelations(loadBusiness(executionDir), stamped),
+            sourceMap,
+          );
+          saveBusiness(executionDir, merged);
+          console.log(`[person-research] 商业关系: LLM ${llmRelations.length} 条 + 规则关联 ${ruleAssociations.length} 条，归并后共 ${merged.length} 条`);
+        } else {
+          console.log("[person-research] 商业关系: 本轮未抽取到结构化关系（claims 里可能仍有文本线索）");
+        }
       }
     }
   }
@@ -284,13 +349,15 @@ export async function runResearch(name, executionDir) {
   const roundClaimIds = [...correctedClaimIds, ...newClaimIds];
   const at = new Date().toISOString();
   saveRound(executionDir, {
-    id: `r-${roundN}`, n: roundN, kind: "research", business: isBusinessRound, deep: isDeepRound, input: pending.input,
+    id: `r-${roundN}`, n: roundN, kind: "research", business: isBusinessRound, deep: isDeepRound,
+    redirect: isRedirectRound, input: pending.input,
     queries, sourceIds: newSourceIds, claimIds: roundClaimIds, filterStats, at,
   });
   updateResearch(executionDir, {
     pendingRound: null,
     rounds: [...(research.rounds || []), {
-      id: `r-${roundN}`, n: roundN, kind: "research", business: isBusinessRound, deep: isDeepRound, input: pending.input,
+      id: `r-${roundN}`, n: roundN, kind: "research", business: isBusinessRound, deep: isDeepRound,
+      redirect: isRedirectRound, input: pending.input,
       queryCount: queries.length, newSourceIds, newClaimIds: roundClaimIds, filterStats, at,
     }],
   });
@@ -302,13 +369,15 @@ export async function runResearch(name, executionDir) {
     newSources: newSourceIds.length,
     newClaims: roundClaimIds.length,
     filterStats,
-    summary: newSourceIds.length > 0 || correctedClaimIds.length > 0
-      ? `第 ${roundN} 轮：新来源 ${newSourceIds.length} 条（原始 ${filterStats.rawResults} → 采纳 ${filterStats.persistedEvidence}${leads.length > 0 ? ` + 线索 ${leads.length}` : ""}），主张变更 ${roundClaimIds.length} 条`
-      : `第 ${roundN} 轮：无新增公开来源（可换个方向继续或深挖）`,
+    summary: isRedirectRound
+      ? `第 ${roundN} 轮（重新识别）：新来源 ${newSourceIds.length} 条，新增候选见候选区`
+      : newSourceIds.length > 0 || correctedClaimIds.length > 0
+        ? `第 ${roundN} 轮：新来源 ${newSourceIds.length} 条（原始 ${filterStats.rawResults} → 采纳 ${filterStats.persistedEvidence}${leads.length > 0 ? ` + 线索 ${leads.length}` : ""}），主张变更 ${roundClaimIds.length} 条`
+        : `第 ${roundN} 轮：无新增公开来源（可换个方向继续或深挖）`,
   };
 }
 
-/** 相关性评分上下文：用户线索优先，选定候选的信号补缺 */
+/** 相关性评分上下文：用户线索优先，选定候选的信号补缺，负向锚点惩罚认错的人 */
 function buildRelevanceCtx(name, executionDir, research, selected) {
   const phone = readPrivate(executionDir).phone || null;
   const userClues = {};
@@ -323,7 +392,8 @@ function buildRelevanceCtx(name, executionDir, research, selected) {
     name,
     phone,
     knownUrl: userClues.knownUrl || null,
-    clues: { ...signalClues, ...userClues, occupation: userClues.occupation || signalClues.occupation || null },
+    clues: { ...signalClues, ...userClues },
+    negativeAnchors: research.negativeAnchors || [],
   };
 }
 
@@ -342,7 +412,7 @@ async function parseUserAssertion(profile, candidate, message, existingClaims) {
   }
   if (!parsed) {
     console.warn(`[person-research] 用户断言解析失败（跳过，不影响研究轮）: ${lastErr}`);
-    return { negate: [], facts: [], signals: {}, candidateSummary: null };
+    return { rejectCandidate: false, negativeAnchors: [], negate: [], facts: [], signals: {}, candidateSummary: null };
   }
   return validateCorrectionOutput(parsed, existingClaims);
 }

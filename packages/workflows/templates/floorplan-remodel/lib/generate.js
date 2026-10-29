@@ -8,7 +8,7 @@ import { renderArchitectural, renderLayout } from "./render-arch.js";
 import { renderBirdview } from "./render-birdview.js";
 import { loadWallMask, nearMask } from "./snap.js";
 import { resolvePlanSpecs, resolveFurniture } from "./anchors.js";
-import { generateEffects } from "./generate-render.js";
+import { generateEffects, generateBirdview } from "./generate-render.js";
 import { readState, writeState } from "../../../lib/state.js";
 import { areaM2, roomTypeByLabel } from "./metrics.js";
 
@@ -276,7 +276,7 @@ export async function generatePlans(needs, needsText, planCount, executionDir, r
   if (retryForce && fs.existsSync(plansPath)) {
     fs.rmSync(plansPath);
     // 清全部交付产物（方案图 + 四视图），避免上一轮 N 套的陈旧文件残留磁盘
-    const DELIVERABLE = /^(plan-p\d+\.(svg|md)|structure-arch\.svg|layout-(original|p\d+)(-clean)?\.svg|render-p\d+(-[a-z]+)?\.png|birdview-p\d+\.(svg|png))$/;
+    const DELIVERABLE = /^(plan-p\d+\.(svg|md)|structure-arch\.svg|layout-(original|p\d+)(-clean)?\.svg|render-p\d+(-[a-z]+)?\.png|birdview-p\d+(-ref)?\.(svg|png))$/;
     for (const f of fs.readdirSync(executionDir)) {
       if (DELIVERABLE.test(f)) fs.rmSync(path.join(executionDir, f));
     }
@@ -408,7 +408,7 @@ ${tierList}
     fs.writeFileSync(layoutOriginalPath, renderLayout(structure, null, originalFurniture));
   }
 
-  // 每套方案：平面布置图 + 确定性俯视鸟瞰 + 多视角效果图（图生失败降级不废方案）
+  // 每套方案：平面布置图 + 鸟瞰(确定性矢量锁布局 + AI 图生图) + 多视角效果图（图生失败降级不废方案）
   const renderings = [];
   for (let i = 0; i < plans.length; i++) {
     const p = plans[i];
@@ -416,17 +416,30 @@ ${tierList}
     const furniture = resolveFurniture(p, structure).furniture;
     const layoutFile = `layout-p${idx}.svg`;
     fs.writeFileSync(path.join(executionDir, layoutFile), renderLayout(structure, p, furniture));
-    const birdviewFile = `birdview-p${idx}.svg`;
-    fs.writeFileSync(path.join(executionDir, birdviewFile), renderBirdview(structure, p, furniture, style));
-    updateProgress(executionDir, `生成效果图 ${idx}/${plans.length}…`);
+
+    // 确定性鸟瞰：full 版作兜底显示，plain 版作 AI 图生图参考
+    const birdviewSvg = `birdview-p${idx}.svg`;
+    fs.writeFileSync(path.join(executionDir, birdviewSvg), renderBirdview(structure, p, furniture, style));
+    const birdviewRef = `birdview-p${idx}-ref.svg`;
+    fs.writeFileSync(path.join(executionDir, birdviewRef), renderBirdview(structure, p, furniture, style, { noLabels: true, plain: true }));
+
+    updateProgress(executionDir, `生成渲染图 ${idx}/${plans.length}…`);
+    const bird = await generateBirdview({ structure, plan: p, style, refFile: path.join(executionDir, birdviewRef), executionDir, planIdx: idx, retryForce });
     const effects = await generateEffects({ structure, plan: p, style, executionDir, planIdx: idx, retryForce });
-    renderings.push({ planId: p.id, title: p.title, layout: layoutFile, birdview: birdviewFile, effects });
+    // AI 鸟瞰成功用 PNG，失败回退确定性 SVG
+    const birdviewOk = !bird.error && fs.existsSync(path.join(executionDir, bird.birdview));
+    renderings.push({
+      planId: p.id, title: p.title, layout: layoutFile,
+      birdview: birdviewOk ? bird.birdview : birdviewSvg,
+      birdviewError: bird.error || null,
+      effects,
+    });
   }
 
-  const renderFailed = renderings.some(r => (r.effects || []).some(e => e.error));
+  const renderFailed = renderings.some(r => r.birdviewError || (r.effects || []).some(e => e.error));
   const output = plans.map(p => `【${p.tier}】${p.title}：${p.summary}`).join("\n") +
     (extraLines.length ? `\n${extraLines.join("；")}` : "") +
-    (renderFailed ? "\n部分效果图生成失败（方案仍有效，可重试本步补图）" : "");
+    (renderFailed ? "\n部分渲染图生成失败（方案仍有效，可重试本步补图）" : "");
   return { pages, mdFiles: plans.map((_, i) => `plan-p${i + 1}.md`), architecture, layoutOriginal, renderings, output };
 }
 

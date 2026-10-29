@@ -1,13 +1,18 @@
 import fs from "node:fs";
+import sharp from "sharp";
 import { generateImage } from "@app/shared/llm/index.js";
 import { withTimeout } from "@app/shared/utils.js";
 import { areaM2 } from "./metrics.js";
 
 /**
- * 户型效果图（多视角人视点）生成：每方案 N 个关键空间视角（客餐厅/主卧/厨卫），
- * 纯文本 prompt + 结构化家具描述。幂等复用、单张失败降级（写 error 字段，不废方案）。
- * 俯视鸟瞰不在这里生成（改确定性 SVG，见 render-birdview.js）。
+ * 户型效果图（多视角人视点）+ 鸟瞰图生图。
+ * - 效果图：纯文本 prompt + 结构化家具描述，N 个关键空间视角。
+ * - 鸟瞰：确定性矢量参考图（render-birdview plain）作 image_url 图生图 + 文本布局锚定，锁布局 + AI 质感。
+ * 幂等复用、单张失败降级（写 error 字段，不废方案）。
  */
+
+// 风格一致性 seed：同 base + 方案/视角偏移
+const SEED_BASE = 42;
 
 const STYLE_PROMPTS = {
   "现代简约": "现代简约风格，白灰基调，线条利落，极简家具，明亮通透，中性色配少量点缀",
@@ -92,18 +97,81 @@ export function effectPrompt(view, structure, styleDesc) {
   return `室内设计效果图，人视点透视（正对空间主立面，广角镜头）。空间：${view.label}${areaText ? `（${areaText}）` : ""}。${styleDesc}。家具布置：${furnText}。真实光影、材质细腻、高清渲染、画面干净无文字无水印。`;
 }
 
+// ─── 鸟瞰图生图 ──────────────────────────────────────────────
+
+// 结构化文字布局描述（鸟瞰的文本锚定，与参考图互补）
+function layoutDescription(structure, plan) {
+  const byRoom = furnitureByRoom(plan);
+  const parts = [];
+  for (const r of structure.rooms || []) {
+    const types = byRoom[r.id] || [];
+    parts.push(`${r.label}：${types.length ? types.map(t => FURN_ZH[t] || t).join("、") : "无家具"}`);
+  }
+  for (let i = 0; i < (plan.newRooms || []).length; i++) {
+    const nr = plan.newRooms[i];
+    const types = byRoom[`nr:${i}`] || [];
+    parts.push(`${nr.label}：${types.length ? types.map(t => FURN_ZH[t] || t).join("、") : "无家具"}`);
+  }
+  return parts.join("；");
+}
+
+function birdviewPrompt(structure, plan, styleDesc) {
+  return `家居俯视鸟瞰效果图（3D 顶视图），正上方近似俯视，家具立体带侧面高度与阴影，真实材质与光影，白墙底平面。${styleDesc}。
+空间与家具布局（必须严格遵守）：${layoutDescription(structure, plan)}。
+严格依据参考平面布置图：墙体位置、房间比例、门窗位置与参考图完全一致，只把平面图元替换成对应真实材质 3D 家具，禁止新增/删除/移动家具，禁止输出任何文字标注。`;
+}
+
+const RATIOS = { "1:1": 1, "4:3": 4 / 3, "3:4": 3 / 4, "16:9": 16 / 9, "9:16": 9 / 16, "3:2": 3 / 2, "2:3": 2 / 3, "21:9": 21 / 9 };
+
+// 鸟瞰 aspectRatio 匹配户型比例，避免固定 16:9 拉伸/裁剪
+export function aspectRatioFor(imgW, imgH) {
+  const r = (Number(imgW) || 16) / (Number(imgH) || 9);
+  let best = "16:9", bd = Infinity;
+  for (const [k, v] of Object.entries(RATIOS)) {
+    const d = Math.abs(v - r);
+    if (d < bd) { bd = d; best = k; }
+  }
+  return best;
+}
+
+async function layoutPngBase64(layoutFile) {
+  const png = await sharp(fs.readFileSync(layoutFile)).png().toBuffer();
+  return `data:image/png;base64,${png.toString("base64")}`;
+}
+
+/**
+ * 鸟瞰图生图：以 plain 确定性矢量图作参考 + 文本布局锚定。
+ * 返回 { birdview, error? }；失败不抛（调用方回退矢量图）。
+ */
+export async function generateBirdview({ structure, plan, style, refFile, executionDir, planIdx, retryForce }) {
+  const styleDesc = stylePrompt(style);
+  const birdviewFile = `birdview-p${planIdx}.png`;
+  const p = `${executionDir}/${birdviewFile}`;
+  if (!retryForce && fs.existsSync(p) && fs.statSync(p).size > 0) return { birdview: birdviewFile };
+  try {
+    const ref = await layoutPngBase64(refFile);
+    const aspect = aspectRatioFor(structure.imgW || structure.width, structure.imgH || structure.height);
+    const urls = await generateImage(birdviewPrompt(structure, plan, styleDesc), { aspectRatio: aspect, image_url: ref, seed: SEED_BASE + planIdx * 10 + 3 });
+    if (!urls[0]) throw new Error("鸟瞰图未生成");
+    await download(urls[0], p);
+    return { birdview: birdviewFile };
+  } catch (e) {
+    return { birdview: birdviewFile, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /**
  * 为单套方案生成多视角效果图。返回 [{file,label,error?}]。
  */
 export async function generateEffects({ structure, plan, style, executionDir, planIdx, retryForce }) {
   const styleDesc = stylePrompt(style);
   const views = pickEffectViews(structure, plan);
-  return Promise.all(views.map(async (v) => {
+  return Promise.all(views.map(async (v, i) => {
     const file = `render-p${planIdx}-${v.key}.png`;
     const p = `${executionDir}/${file}`;
     if (!retryForce && fs.existsSync(p) && fs.statSync(p).size > 0) return { file, label: v.label };
     try {
-      const urls = await generateImage(effectPrompt(v, structure, styleDesc), { aspectRatio: "16:9" });
+      const urls = await generateImage(effectPrompt(v, structure, styleDesc), { aspectRatio: "16:9", seed: SEED_BASE + planIdx * 10 + i });
       if (!urls[0]) throw new Error("效果图未生成");
       await download(urls[0], p);
       return { file, label: v.label };

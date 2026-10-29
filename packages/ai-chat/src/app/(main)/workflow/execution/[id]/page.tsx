@@ -1023,7 +1023,8 @@ function FloorplanGallery({ step, executionId, onTweak }: { step: ExecutionStep;
             </div>
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground mb-1">俯视平面图（鸟瞰）</p>
-              {r.birdviewError ? placeholder("俯视平面图", r.birdviewError) : img(r.birdview, "俯视平面图")}
+              {img(r.birdview, "俯视平面图")}
+              {r.birdviewError && <p className="text-[10px] text-amber-600 mt-1">⚠ AI 渲染失败，已用矢量图</p>}
             </div>
           </div>
         </div>

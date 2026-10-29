@@ -44,8 +44,8 @@ function isTileRoom(label) {
   return /厨房|卫生间|卫|淋浴|洗手|浴室|阳台/.test(String(label || ""));
 }
 
-// 全局 defs：木纹/瓷砖 pattern + 投影模糊 + 每类家具渐变
-function defs(style) {
+// 全局 defs：木纹/瓷砖 pattern +（full 才加）投影模糊 + 每类家具渐变
+function defs(style, plain = false) {
   const wood = FLOOR[style] || FLOOR_DEFAULT;
   const woodDark = shade(wood, -0.14);
   const grads = Object.entries(FURN_COLOR).map(([type, color]) => {
@@ -53,6 +53,10 @@ function defs(style) {
     const dark = shade(color, -0.3);
     return `<linearGradient id="fp-${type}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></linearGradient>`;
   }).join("\n");
+  const fancy = plain ? "" : `<filter id="fp-blur" x="-30%" y="-30%" width="160%" height="160%">
+  <feGaussianBlur stdDeviation="3"/>
+</filter>
+${grads}`;
   return `<defs>
 <pattern id="fp-wood" width="72" height="9" patternUnits="userSpaceOnUse">
   <rect width="72" height="9" fill="${wood}"/>
@@ -66,10 +70,7 @@ function defs(style) {
   <path d="M0 0H38 M0 0V38" stroke="#ffffff" stroke-opacity="0.55" stroke-width="1.2"/>
   <rect x="1" y="1" width="36" height="36" fill="none" stroke="#00000008" stroke-width="1"/>
 </pattern>
-<filter id="fp-blur" x="-30%" y="-30%" width="160%" height="160%">
-  <feGaussianBlur stdDeviation="3"/>
-</filter>
-${grads}
+${fancy}
 </defs>`;
 }
 
@@ -84,27 +85,28 @@ function floorEls(structure, W, H) {
   return els.join("\n");
 }
 
-// 墙体：深色粗线 + 顶/左面高光(bevel)
-function wall3D(w, th, color) {
+// 墙体：深色粗线 + 顶/左面高光(bevel)；plain 时纯线
+function wall3D(w, th, color, plain = false) {
+  const base = `<line x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}" stroke="${color}" stroke-width="${th}" stroke-linecap="square"/>`;
+  if (plain) return base;
   const vertical = Math.abs(w.y2 - w.y1) >= Math.abs(w.x2 - w.x1);
   const hl = Math.max(1.5, th * 0.25);
   const ox = vertical ? -th / 2 + hl / 2 : 0;
   const oy = vertical ? 0 : -th / 2 + hl / 2;
-  return `<line x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}" stroke="${color}" stroke-width="${th}" stroke-linecap="square"/>` +
-    `<line x1="${w.x1 + ox}" y1="${w.y1 + oy}" x2="${w.x2 + ox}" y2="${w.y2 + oy}" stroke="#ffffff" stroke-width="${hl}" opacity="0.22" stroke-linecap="square"/>`;
+  return base + `<line x1="${w.x1 + ox}" y1="${w.y1 + oy}" x2="${w.x2 + ox}" y2="${w.y2 + oy}" stroke="#ffffff" stroke-width="${hl}" opacity="0.22" stroke-linecap="square"/>`;
 }
 
-function wallEls(structure, plan, strokeW) {
+function wallEls(structure, plan, strokeW, plain = false) {
   const demolish = new Set(plan?.demolish || []);
   const kept = (structure.walls || []).map(w => {
     const th = Math.max(strokeW, w.thickness || strokeW * 2.4);
-    return wall3D(w, th, w.bearing ? WALL_BEARING : WALL_COLOR);
+    return wall3D(w, th, w.bearing ? WALL_BEARING : WALL_COLOR, plain);
   }).join("\n");
   const demo = (structure.walls || []).filter(w => demolish.has(w.id)).map(w =>
     `<line x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}" stroke="${DEMOLISH_COLOR}" stroke-width="${Math.max(strokeW, (w.thickness || strokeW * 2.4))}" stroke-linecap="square" stroke-dasharray="10 8"/>`
   ).join("\n");
   const build = (plan?.build || []).map(b =>
-    wall3D(b, Math.max(strokeW, strokeW * 2.4), BUILD_COLOR)
+    wall3D(b, Math.max(strokeW, strokeW * 2.4), BUILD_COLOR, plain)
   ).join("\n");
   return kept + "\n" + demo + "\n" + build;
 }
@@ -135,53 +137,59 @@ function openingEls(structure, gapW) {
   return els.join("\n");
 }
 
-function newRoomEls(plan, W) {
+function newRoomEls(plan, W, noLabels = false) {
   return (plan?.newRooms || []).filter(nr => Array.isArray(nr.bbox)).map(nr => {
     const [x1, y1, x2, y2] = nr.bbox.map(Number);
     const fs2 = Math.max(12, W * 0.014);
+    const label = noLabels ? "" : `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2}" text-anchor="middle" font-size="${fs2}" fill="${BUILD_COLOR}" font-weight="bold" paint-order="stroke" stroke="#ffffff" stroke-width="3">${esc(nr.label || "")}</text>`;
     return `<rect x="${x1}" y="${y1}" width="${Math.max(0, x2 - x1)}" height="${Math.max(0, y2 - y1)}" fill="#2f6da81a" stroke="${BUILD_COLOR}" stroke-width="1.5" stroke-dasharray="6 4"/>
-<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2}" text-anchor="middle" font-size="${fs2}" fill="${BUILD_COLOR}" font-weight="bold" paint-order="stroke" stroke="#ffffff" stroke-width="3">${esc(nr.label || "")}</text>`;
+${label}`;
   }).join("\n");
 }
 
-// 家具：渐变材质 + 高斯模糊投影 + 顶部高光 + 图标
-function furn3D(type, box) {
+// 家具：full=渐变材质+模糊投影+高光；plain=纯色块+简单投影（作 AI 参考，防复刻扁平）
+function furn3D(type, box, plain = false) {
   const [x1, y1, x2, y2] = box.map(Number);
   const w = Math.max(1, x2 - x1), h = Math.max(1, y2 - y1);
   const color = FURN_COLOR[type] || "#d9d9d9";
   const dark = shade(color, -0.34);
   const r = Math.min(6, w * 0.12, h * 0.12);
   const off = Math.max(2, Math.min(w, h) * 0.1);
-  const shadow = `<rect x="${x1 + off}" y="${y1 + off}" width="${w}" height="${h}" rx="${r}" fill="#000000" opacity="0.3" filter="url(#fp-blur)"/>`;
-  const body = `<rect x="${x1}" y="${y1}" width="${w}" height="${h}" rx="${r}" fill="url(#fp-${type})" stroke="${dark}" stroke-width="1"/>`;
-  const hl = `<rect x="${x1 + 1}" y="${y1 + 1}" width="${Math.max(1, w - 2)}" height="${Math.max(1, h * 0.24)}" rx="${r}" fill="#ffffff" opacity="0.32"/>`;
+  const shadow = plain
+    ? `<rect x="${x1 + off}" y="${y1 + off}" width="${w}" height="${h}" rx="${r}" fill="#000000" opacity="0.16"/>`
+    : `<rect x="${x1 + off}" y="${y1 + off}" width="${w}" height="${h}" rx="${r}" fill="#000000" opacity="0.3" filter="url(#fp-blur)"/>`;
+  const body = plain
+    ? `<rect x="${x1}" y="${y1}" width="${w}" height="${h}" rx="${r}" fill="${color}" stroke="${dark}" stroke-width="1.2"/>`
+    : `<rect x="${x1}" y="${y1}" width="${w}" height="${h}" rx="${r}" fill="url(#fp-${type})" stroke="${dark}" stroke-width="1"/>`;
+  const hl = plain ? "" : `<rect x="${x1 + 1}" y="${y1 + 1}" width="${Math.max(1, w - 2)}" height="${Math.max(1, h * 0.24)}" rx="${r}" fill="#ffffff" opacity="0.32"/>`;
   const icon = GLYPHS[type] ? `<g stroke="#00000055" stroke-width="1.1" fill="none">${GLYPHS[type](x1, y1, w, h)}</g>` : "";
   return shadow + body + hl + icon;
 }
 
-function furnitureEls(furniture) {
+function furnitureEls(furniture, plain = false) {
   return (furniture || []).map(f => {
     if (!f || !Array.isArray(f.bbox) || f.bbox.length !== 4) return "";
-    return furn3D(f.type, f.bbox);
+    return furn3D(f.type, f.bbox, plain);
   }).join("\n");
 }
 
-export function renderBirdview(structure, plan, furniture, style = "") {
+export function renderBirdview(structure, plan, furniture, style = "", opts = {}) {
+  const { noLabels = false, plain = false } = opts;
   const W = structure.imgW || structure.width || 1000;
   const H = structure.imgH || structure.height || 700;
   const strokeW = Math.max(4, W * 0.006);
 
   const body = [
-    defs(style),
+    defs(style, plain),
     floorEls(structure, W, H),
-    wallEls(structure, plan, strokeW),
+    wallEls(structure, plan, strokeW, plain),
     openingEls(structure, strokeW),
-    newRoomEls(plan, W),
-    furnitureEls(furniture),
+    newRoomEls(plan, W, noLabels),
+    furnitureEls(furniture, plain),
   ].join("\n");
 
-  const total = H + 34;
-  const caption = `<text x="16" y="${H + 28}" font-size="20" font-weight="bold" fill="#333333" font-family="sans-serif">${esc(plan ? `俯视鸟瞰 · ${plan.title || plan.id}` : "俯视鸟瞰（现状）")}</text>`;
+  const total = noLabels ? H : H + 34;
+  const caption = noLabels ? "" : `<text x="16" y="${H + 28}" font-size="20" font-weight="bold" fill="#333333" font-family="sans-serif">${esc(plan ? `俯视鸟瞰 · ${plan.title || plan.id}` : "俯视鸟瞰（现状）")}</text>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${total}" viewBox="0 0 ${W} ${total}" font-family="sans-serif">
 <rect width="${W}" height="${total}" fill="#ffffff"/>
 ${body}
@@ -213,6 +221,9 @@ export function demo() {
   assert(svg.includes("fp-bed") && svg.includes("feGaussianBlur"), "furniture gradient + gaussian blur");
   assert(svg.includes(DEMOLISH_COLOR) && svg.includes(BUILD_COLOR), "demolish + build walls");
   assert(svg.includes('width="1000"') && svg.includes('height='), "svg has explicit width/height");
+  const plain = renderBirdview(structure, plan, furniture, "中古风", { noLabels: true, plain: true });
+  assert(!plain.includes("feGaussianBlur") && !plain.includes("fp-bed") && !plain.includes("俯视鸟瞰") && !plain.includes("书房"), "plain/noLabels strips gradient+blur+labels");
+  assert(plain.includes('id="fp-wood"') && plain.includes('id="fp-tile"'), "plain keeps wood/tile patterns");
   console.log("render-birdview self-check OK");
 }
 

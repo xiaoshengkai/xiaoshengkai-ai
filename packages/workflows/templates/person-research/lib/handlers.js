@@ -14,6 +14,8 @@ const RESEARCH_STEP_IDS = ["research", "report"];
 const CANDIDATE_ACTIONS = ["selected", "rejected", "ambiguous"];
 // 商业意图检测：明确指向工商关系才触发固定商业查询集（"任职与公司关系"这类泛职业词不算）
 const BUSINESS_INTENT_RE = /股东|持股|股份|法定代表人|法人代表|商业|工商|对外投资|实际控制|受益所有人|名下公司/;
+// 深挖意图检测：用户主动要求放宽召回（低分来源降为 lead_only 线索）
+const DEEP_DIG_RE = /深挖|挖深|再挖|更多线索/;
 
 function rearmResearchSteps(state) {
   for (const s of state.steps) {
@@ -64,7 +66,13 @@ export function applyContinueInState(state, message) {
   const input = String(message || "").trim();
   if (!input) return { ok: false, error: "message 不能为空" };
 
-  research.pendingRound = { kind: "research", source: "continue", business: BUSINESS_INTENT_RE.test(input), input };
+  research.pendingRound = {
+    kind: "research",
+    source: "continue",
+    business: BUSINESS_INTENT_RE.test(input),
+    deep: DEEP_DIG_RE.test(input),
+    input,
+  };
   rearmResearchSteps(state);
   return { ok: true, status: "running" };
 }

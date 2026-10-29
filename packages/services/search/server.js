@@ -24,8 +24,9 @@ function readEnv(key) {
 }
 
 const network = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "config", "network.json"), "utf-8"));
-const SEARXNG_PORT = network.ports.searxng;
-const SERVICE_PORT = network.ports.searchService;
+const SEARXNG_PORT = process.env.SEARXNG_PORT || network.ports.searxng;
+// SEARCH_SERVICE_PORT 覆盖（对齐 searxng/start.sh 的 SEARXNG_PORT 惯例：本地调试并行实例）
+const SERVICE_PORT = process.env.SEARCH_SERVICE_PORT || network.ports.searchService;
 const HOST = network.hosts.local;
 
 const searxngBase = `http://${HOST}:${SEARXNG_PORT}`;
@@ -58,9 +59,10 @@ async function handleSearch(url, res) {
   const language = url.searchParams.get("language") || undefined;
   const timeRange = url.searchParams.get("timeRange") || undefined;
   const page = Number(url.searchParams.get("page")) || 1;
+  const strategy = url.searchParams.get("strategy") || "auto";
 
   const result = await search({
-    query, category, language, timeRange, page,
+    query, category, language, timeRange, page, strategy,
     maxResults, fetchContent, searxngBase, firecrawlApiKey,
   });
   json(res, result.ok ? 200 : 502, result);

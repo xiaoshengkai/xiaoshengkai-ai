@@ -59,10 +59,17 @@ interface Round {
   n: number;
   kind: string;
   business?: boolean;
+  deep?: boolean;
   input?: string | null;
   queryCount?: number;
   newSourceIds?: string[];
   newClaimIds?: string[];
+  filterStats?: {
+    rawResults?: number;
+    accepted?: number;
+    persistedEvidence?: number;
+    leadOnly?: number;
+  };
 }
 
 interface SourceMeta {
@@ -92,7 +99,7 @@ const SUGGESTIONS = [
   "继续查教育经历",
   "继续查任职与公司关系",
   "查名下公司与股东关系",
-  "继续查新闻时间线",
+  "深挖更多相关线索",
 ];
 
 const CONFIDENCE_BADGE: Record<string, { label: string; cls: string }> = {
@@ -577,17 +584,20 @@ export default function PersonResearchPanel({ executionId, status, busy, onRefre
                 研究轮次（{rounds.length}）
               </summary>
               <div className="p-3 pt-0 space-y-1.5 text-xs">
-                {rounds.map(r => (
-                  <div key={r.id} className="flex gap-2 flex-wrap">
-                    <span className="font-bold shrink-0">
-                      第 {r.n} 轮（{r.business ? "商业调查" : r.kind === "discovery" ? "候选发现" : "定向研究"}）
-                    </span>
-                    {r.input && <span className="truncate">{r.input}</span>}
-                    <span className="text-muted-foreground ml-auto font-mono">
-                      查询 {r.queryCount ?? 0} · 新来源 {r.newSourceIds?.length ?? 0} · 主张变更 {r.newClaimIds?.length ?? 0}
-                    </span>
-                  </div>
-                ))}
+            {rounds.map(r => (
+              <div key={r.id} className="flex gap-2 flex-wrap">
+                <span className="font-bold shrink-0">
+                  第 {r.n} 轮（{r.business ? "商业调查" : r.deep ? "深挖" : r.kind === "discovery" ? "候选发现" : "定向研究"}）
+                </span>
+                {r.input && <span className="truncate">{r.input}</span>}
+                <span className="text-muted-foreground ml-auto font-mono">
+                  {r.filterStats?.rawResults != null
+                    ? `原始 ${r.filterStats.rawResults} → 采纳 ${(r.filterStats.persistedEvidence ?? r.filterStats.accepted ?? 0)}${r.filterStats.leadOnly ? ` + 线索 ${r.filterStats.leadOnly}` : ""} · `
+                    : ""}
+                  查询 {r.queryCount ?? 0} · 主张变更 {r.newClaimIds?.length ?? 0}
+                </span>
+              </div>
+            ))}
               </div>
             </details>
           )}

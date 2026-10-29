@@ -124,7 +124,7 @@ ai-engineer-journey/
             └── person-research/# 人物公开信息研究（姓名+线索→搜索去重抓取→LLM 聚类候选→awaitInput 停靠人工选定→多轮定向研究+商业版图→证据归并→版本化报告）
                 ├── actions.json # 模板级动作（research-select / research-continue / research-report）
                 ├── PLAN.md      # 设计文档（V1~V4 路线）+ IMPLEMENTATION.md（实现计划）
-                └── lib/         # discovery / research（商业轮+二跳+用户纠错）/ report / prompts（LLM 契约+校验）/ evidence（归并+商业关联+纠错应用）/ queries（固定商业查询集）/ normalize / search-client / privacy / store / handlers
+                └── lib/         # discovery（高精度首搜+受控扩搜）/ research（商业轮+二跳+纠错+漏斗）/ relevance（V1.1 相关性评分+边界复核管线）/ report / prompts（LLM 契约+校验）/ evidence（归并+商业关联+纠错应用）/ queries（固定商业/扩搜查询集）/ normalize / search-client（strategy 透传）/ privacy / store / handlers
 ```
 
 ## 能力注册机制（v0.11.0）
@@ -374,16 +374,16 @@ packages/mcp/
 ```
 packages/services/search/
 ├── service.json          # 服务监控清单（search-service + searxng）
-├── server.js             # Node HTTP 服务（/search /scrape /map /crawl /parse /health /ready）
+├── server.js             # Node HTTP 服务（/search /scrape /map /crawl /parse /health /ready；SEARCH_SERVICE_PORT env 覆盖端口）
 ├── lib/
 │   ├── searxng.js        # 调本地 SearXNG JSON API（类别→引擎映射）
 │   ├── firecrawl.js      # 调 Firecrawl Cloud（search/scrape/map/crawl/parse，crawl 内部轮询）
-│   └── search.js         # 编排：Firecrawl 主搜→SearXNG 兜底、去重、限额（≤10 结果、≤3 正文、≤20 页）、引擎状态
+│   └── search.js         # 编排：strategy 路由（auto/primary/expand）+ cleanResults 通用清洗（垃圾过滤/URL 去重并引擎/标题去重/sourceDomain）+ 限额；响应含 cleaning 统计
 ├── searxng/              # 本地 SearXNG Python 子服务（start.sh: clone→venv→install→run）
 │   ├── settings.yml      # 启用 baidu/sogou/bing 系列引擎 + json 输出；无用默认引擎 inactive 掉
 │   ├── limiter.toml      # 空 limiter 配置（消除 missing config 警告，用内置 schema 默认值）
 │   └── start.sh          # host/port 从 config/network.json 读取（SEARXNG_PORT/BIND_ADDRESS 覆盖）
-└── test/                 # normalize 单元测试 + live 真实集成测试
+└── test/                 # normalize + cleanResults 单元测试 + live 真实集成测试
 ```
 
 ### searchWeb 类别映射

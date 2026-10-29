@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.54 (2026-10-29) — person-research V1.1 搜索质量：三级相关性漏斗
+
+### 变更
+- **根因**：V1 实测（真实任务）406 条持久化来源中仅 0.7% 含目标姓名、0.5% 被主张引用——搜索结果进任务前无人物相关性门槛。V1.1 目标：自动阶段 ≤30 条、引用率 ≥15%、前 10 条相关率 ≥80%。
+- **Search Service 通用清洗**（`lib/search.js`）：`cleanResults` 垃圾过滤（空内容/`undefined` 字典页/403 错误页/反爬拦截页）+ canonical URL 去重并引擎 + 标题去重（同域同题；跨域同题+同摘要前缀=转载）+ `sourceDomain` 标准字段；响应新增 `cleaning` 统计；修复去重合并引擎时输出副本丢失合并结果的 bug（map 与输出改同一对象引用）。
+- **搜索策略参数**：`/search?strategy=auto|primary|expand`——auto 保持现状（兼容 MCP/聊天）；primary 仅 Firecrawl（0 结果即停，高精度首搜）；expand 仅 SearXNG（受控扩搜换引擎）。`SEARCH_SERVICE_PORT` env 覆盖端口（对齐 searxng `SEARXNG_PORT` 惯例，本地并行调试）。
+- **人物相关性漏斗**（新 `lib/relevance.js`）：规则评分（姓名标题+5/摘要+4/正文+2 取最高档；任一线索+3；手机号/已知URL +8；A 级+2/B 级+1）→ ≥6 直接保留 / 3~5 边界 LLM 批量复核（≤10 条，复核前限量抓正文 ≤5）/ <3 丢弃；`markLead` 聚合站 lead 标注。边界复核 LLM 失败不阻塞（严格丢弃/深挖降 lead）。
+- **三级搜索模式**：发现轮高精度首搜（primary）→ 有效来源 ≤2 自动受控扩搜一次（SearXNG + 精确名/线索变体 ≤5 条，`buildExpansionQueries`）→ 停止等用户；用户「深挖」消息（`DEEP_DIG_RE`）触发深挖轮：低分与未复核来源降 `lead_only`（≤20），不进事实主张与报告。
+- **来源质量字段**：`relevanceScore / relevanceDecision(direct|llm|lead) / matchedSignals / candidateHint / evidenceUse(evidence|lead_only)`；商业轮聚合站页走 lead_only（保住二跳与规则化关联通道）；事实抽取 prompt 仅喂 evidence。
+- **过滤审计**：轮次记录新增 `filterStats`（原始→清洗→评分→复核→采纳→持久化全链路计数），不保存被拒页面；面板轮次行显示「原始 X → 采纳 Y + 线索 Z」；建议按钮新增「深挖更多相关线索」。
+- **持久化上限**：首搜+扩搜 ≤20、研究轮 evidence ≤12、深挖 lead ≤20、商业聚合 lead ≤8。
+
+### 验证
+- test:shared 115（新增 8：评分/分档/markLead/扩搜查询/边界复核校验/深挖检测）+ search 清洗 2（垃圾判定/清洗统计）；typecheck、build 全绿。
+- 真实冒烟（雷军，新 search service 8091 实例）：首搜 原始 24→清洗 19→直接 4+复核 10→采纳 12（12/12 全相关，V1 同场景 27 条含大量垃圾）；深挖轮 原始 40→evidence 12+lead 8，**lead 被主张引用数 0**（隔离生效），引用覆盖率 46%（V1 为 0.5%）。
+
 ## v0.11.53 (2026-10-28) — person-research 用户纠错闭环 + Tab 式研究面板
 
 ### 变更

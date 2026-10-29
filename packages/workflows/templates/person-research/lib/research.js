@@ -1,7 +1,8 @@
 /**
- * 定向研究轮（步骤 2，由 continue/select 动作重臂触发）：
- * pendingRound 用户输入 → LLM 生成定向查询 → 搜索（对既有来源去重）
- * → 抓新来源正文 → LLM 抽取并归并证据 → 落盘轮次记录。
+ * 定向研究轮（步骤 2，由 continue/select 动作重臂触发，V1.1 相关性漏斗）：
+ *   用户断言解析（更正/补充）→ LLM 生成定向查询 → 搜索（对既有来源去重）
+ *   → 相关性漏斗（商业轮聚合站页走 lead_only；其余评分 + 边界复核；深挖放宽为 lead）
+ *   → 只持久化过门槛来源 → 抓 evidence 正文 → LLM 抽取并归并证据 → 落盘轮次记录。
  * 空查询/零新来源都算成功轮（信息增量枯竭由用户决定是否继续深挖）。
  */
 import { callLLM } from "@app/shared/llm/index.js";
@@ -14,6 +15,7 @@ import { getResearch, updateResearch, allocSourceIds, allocClaimIds, saveSource,
 import { buildIntentPrompt, validateIntentOutput, buildExtractPrompt, validateExtractOutput, buildBusinessExtractPrompt, validateBusinessOutput, buildUserAssertionPrompt, validateCorrectionOutput } from "./prompts.js";
 import { applyExtract, mergeBusinessRelations, recomputeBusinessStatus, collectAggregatorAssociations, companyNameFromTitle, applyCorrection } from "./evidence.js";
 import { buildBusinessQueries } from "./queries.js";
+import { runRelevancePipeline, markLead } from "./relevance.js";
 
 const CLASS_ORDER = { A: 0, B: 1, C: 2, D: 3 };
 const BUSINESS_DOMAIN_RE = /aiqicha|qcc\.com|tianyancha|gsxt\.gov\.cn|qixin|11467\.com|shuidi\.cn/;
@@ -30,6 +32,7 @@ export async function runResearch(name, executionDir) {
   const selected = research.candidates?.find(c => c.status === "selected") || null;
   const roundN = (research.rounds?.length || 0) + 1;
   const isBusinessRound = Boolean(pending.business);
+  const isDeepRound = Boolean(pending.deep);
 
   // 0. 用户断言解析（更正/补充）：纯研究方向消息返回空、无副作用；命中则
   //    否定既有主张（rejected）+ 追加 user_provided 主张 + 更新候选信号与一句话身份
@@ -78,18 +81,27 @@ export async function runResearch(name, executionDir) {
   } else {
     queries = await intentQueries(pending.input);
   }
-  console.log(`[person-research] 第 ${roundN} 轮${isBusinessRound ? "（商业调查）" : ""}定向查询 ${queries.length} 组: ${queries.map(q => q.query).join(" / ")}`);
+  console.log(`[person-research] 第 ${roundN} 轮${isBusinessRound ? "（商业调查）" : ""}${isDeepRound ? "（深挖）" : ""}定向查询 ${queries.length} 组: ${queries.map(q => q.query).join(" / ")}`);
 
   // 2. 搜索（波次化）→ 对既有来源去重
   const existingSources = loadSources(executionDir);
   const knownCanonical = new Set(existingSources.map(s => s.canonicalUrl || canonicalUrl(s.url)));
+  const cleaningAgg = { rawResults: 0, droppedGarbage: 0, droppedTitleDuplicate: 0, mergedUrlDuplicates: 0 };
 
   const searchWave = async waveQueries => {
     const searched = await mapLimit(waveQueries, CONFIG.SEARCH_CONCURRENCY,
-      q => searchWeb(q.query, { category: q.category || "general" }));
+      q => searchWeb(q.query, { category: q.category || "general", strategy: "auto" }));
+    for (const s of searched) {
+      const c = s?.cleaning;
+      if (!c) continue;
+      cleaningAgg.rawResults += c.rawResults || 0;
+      cleaningAgg.droppedGarbage += c.droppedGarbage || 0;
+      cleaningAgg.droppedTitleDuplicate += c.droppedTitleDuplicate || 0;
+      cleaningAgg.mergedUrlDuplicates += c.mergedUrlDuplicates || 0;
+    }
     const merged = new Map();
     waveQueries.forEach((q, qi) => {
-      for (const r of searched[qi] || []) {
+      for (const r of (searched[qi]?.results) || []) {
         const cu = canonicalUrl(r.url);
         if (!cu || !/^https?:\/\//.test(cu) || knownCanonical.has(cu) || merged.has(cu)) continue;
         merged.set(cu, {
@@ -136,28 +148,54 @@ export async function runResearch(name, executionDir) {
   const wave2 = hopQueries.length > 0 ? await searchWave(hopQueries) : [];
   queries = [...queries, ...hopQueries];
 
-  // 3. 新来源落盘 + 抓正文
-  const newSources = [...wave1, ...wave2].map(r => ({
-    id: null,
+  // 3. 相关性漏斗（V1.1）：
+  //    商业轮：聚合站公司页（人名商业查询的全文匹配）→ lead_only（线索，不进事实抽取）
+  //    其余：评分 + 边界 LLM 复核 → evidence；深挖轮低分降 lead_only
+  const ctx = buildRelevanceCtx(name, executionDir, research, selected);
+  const isAggregatorLead = r => isBusinessRound
+    && BUSINESS_DOMAIN_RE.test(domainOf(r.url))
+    && (r.foundBy || []).some(f => f?.reason === "business" || f?.reason === "business-hop");
+
+  const allRaws = [...wave1, ...wave2];
+  const aggregatorLeads = allRaws.filter(isAggregatorLead).slice(0, CONFIG.BUSINESS_LEADS_MAX);
+  const rest = allRaws.filter(r => !isAggregatorLead(r));
+  const pipeline = rest.length > 0
+    ? await runRelevancePipeline(rest, { ctx, deep: isDeepRound })
+    : { accepted: [], leads: [], stats: { scored: 0, direct: 0, boundary: 0, lowRelevance: 0, llmReviewed: 0, otherPerson: 0, llmIrrelevant: 0, reviewFailed: 0, accepted: 0, leadOnly: 0 } };
+
+  const evidence = [...pipeline.accepted]
+    .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+    .slice(0, CONFIG.MAX_PERSISTED_ROUND);
+  const leads = [...pipeline.leads, ...aggregatorLeads.map(markLead)]
+    .slice(0, CONFIG.MAX_PERSISTED_DEEP);
+  const filterStats = {
+    ...cleaningAgg,
+    ...pipeline.stats,
+    persistedEvidence: evidence.length,
+    leadOnly: leads.length,
+    deep: isDeepRound,
+  };
+  console.log(`[person-research] 漏斗: 原始 ${filterStats.rawResults} → 评分 ${filterStats.scored}（直接 ${filterStats.direct} / 边界 ${filterStats.boundary}）+ 聚合 lead ${aggregatorLeads.length} → evidence ${evidence.length} / lead ${leads.length}`);
+
+  // 4. 新来源落盘（evidence + lead_only，含相关性字段）+ 抓 evidence 正文
+  const newRecords = [...evidence, ...leads].map(r => ({
     ...r,
     domain: domainOf(r.url),
     domainClass: domainClass(domainOf(r.url)),
-    content: null, scraped: false, scrapeError: null,
+    scraped: Boolean(r.content),
+    scrapeError: null,
     foundInRound: roundN,
     observedAt: new Date().toISOString(),
   }));
   let newSourceIds = [];
-  if (newSources.length > 0) {
-    newSourceIds = allocSourceIds(executionDir, newSources.length);
-    newSources.forEach((s, i) => { s.id = newSourceIds[i]; saveSource(executionDir, s); });
-    console.log(`[person-research] 本轮新来源 ${newSources.length} 条（二跳 ${wave2.length}）`);
+  if (newRecords.length > 0) {
+    newSourceIds = allocSourceIds(executionDir, newRecords.length);
+    newRecords.forEach((s, i) => { s.id = newSourceIds[i]; saveSource(executionDir, s); });
+    console.log(`[person-research] 本轮持久化 ${newRecords.length} 条（evidence ${evidence.length} / lead ${leads.length}）`);
 
     const domainCount = new Map();
-    // 商业轮：工商聚合域绝对优先（-5 主导分级；聚合站正文常被反爬，但值得先试）
-    const scrapeOrder = s =>
-      (isBusinessRound && BUSINESS_DOMAIN_RE.test(s.domain) ? -5 : 0) + CLASS_ORDER[s.domainClass];
-    const toScrape = [...newSources]
-      .sort((a, b) => (scrapeOrder(a) - scrapeOrder(b)) || (a.rank - b.rank))
+    const toScrape = newRecords
+      .filter(s => s.evidenceUse !== "lead_only" && !s.content)
       .filter(s => {
         const n = domainCount.get(s.domain) || 0;
         if (n >= CONFIG.DOMAIN_SCRAPE_CAP) return false;
@@ -178,29 +216,16 @@ export async function runResearch(name, executionDir) {
     }));
   }
 
-  // 4. 证据抽取与归并（有可用新来源才调 LLM）
+  // 5. 证据抽取与归并（只用 evidence 来源；lead_only 不进事实主张）
   let newClaimIds = [];
-  if (newSources.length > 0) {
-    // 商业轮：聚合站摘要（股东名单所在）必须先进 prompt——抓取失败的聚合页比抓取成功的无关页更有价值；
-    // 且并入历史聚合站来源（全文匹配页是稳定证据池，只喂本轮新来源会丢失早轮关键线索）
-    const promptPool = isBusinessRound
-      ? [...newSources, ...existingSources.filter(s => BUSINESS_DOMAIN_RE.test(s.domain || ""))]
-      : newSources;
-    const promptOrder = s =>
-      (isBusinessRound && BUSINESS_DOMAIN_RE.test(s.domain) ? 2 : 0) + Number(s.scraped);
-    const seenCanonical = new Set();
-    const promptSources = promptPool
-      .filter(s => {
-        const cu = s.canonicalUrl || canonicalUrl(s.url);
-        if (seenCanonical.has(cu)) return false;
-        seenCanonical.add(cu);
-        return true;
-      })
-      .sort((a, b) => (promptOrder(b) - promptOrder(a)))
+  const evidenceRecords = newRecords.filter(s => s.evidenceUse !== "lead_only");
+  if (evidenceRecords.length > 0) {
+    const factPromptSources = [...evidenceRecords]
+      .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
       .slice(0, CONFIG.PROMPT_SOURCES_MAX)
       .map(s => ({ ...s, content: s.scraped ? s.content : s.snippet }));
 
-    const extract = await extractEvidence(profile, selected, promptSources, loadClaims(executionDir));
+    const extract = await extractEvidence(profile, selected, factPromptSources, loadClaims(executionDir));
     if (extract.newClaims.length + extract.updates.length + extract.conflicts.length > 0) {
       const observedAt = new Date().toISOString();
       const claimIds = allocClaimIds(executionDir, extract.newClaims.length + extract.conflicts.length);
@@ -210,7 +235,7 @@ export async function runResearch(name, executionDir) {
         candidateId: selected?.id || null,
         observedAt,
       };
-      const sourceMap = new Map([...existingSources, ...newSources].map(s => [s.id, s]));
+      const sourceMap = new Map([...existingSources, ...newRecords].map(s => [s.id, s]));
       const applied = applyExtract(loadClaims(executionDir), extract, sourceMap, idAlloc);
       saveClaims(executionDir, applied.claims);
       newClaimIds = applied.newClaimIds;
@@ -218,15 +243,31 @@ export async function runResearch(name, executionDir) {
     }
 
     // 商业轮：结构化商业关系 = LLM 抽取（有角色证据的） + 规则化关联（全文匹配但角色未证实）
+    //   商业 prompt 池 = 本轮来源（聚合 lead 优先）+ 历史聚合站来源（稳定证据池）
     //   → 同公司同角色归并 → 独立域名升级状态
     if (isBusinessRound) {
-      const llmRelations = await extractBusinessRelations(profile, selected, promptSources);
-      const ruleAssociations = collectAggregatorAssociations([...existingSources, ...newSources], BUSINESS_DOMAIN_RE);
+      const bizPromptPool = [...newRecords, ...existingSources.filter(s => BUSINESS_DOMAIN_RE.test(s.domain || ""))];
+      const promptOrder = s =>
+        (BUSINESS_DOMAIN_RE.test(s.domain || "") ? 2 : 0) + Number(s.scraped);
+      const seenCanonical = new Set();
+      const bizPromptSources = bizPromptPool
+        .filter(s => {
+          const cu = s.canonicalUrl || canonicalUrl(s.url);
+          if (seenCanonical.has(cu)) return false;
+          seenCanonical.add(cu);
+          return true;
+        })
+        .sort((a, b) => (promptOrder(b) - promptOrder(a)))
+        .slice(0, CONFIG.PROMPT_SOURCES_MAX)
+        .map(s => ({ ...s, content: s.scraped ? s.content : s.snippet }));
+
+      const llmRelations = await extractBusinessRelations(profile, selected, bizPromptSources);
+      const ruleAssociations = collectAggregatorAssociations([...existingSources, ...newRecords], BUSINESS_DOMAIN_RE);
       const all = [...llmRelations, ...ruleAssociations];
       if (all.length > 0) {
         const observedAt = new Date().toISOString();
         const stamped = all.map(r => ({ ...r, observedAt: observedAt.slice(0, 10) }));
-        const sourceMap = new Map([...existingSources, ...newSources].map(s => [s.id, s]));
+        const sourceMap = new Map([...existingSources, ...newRecords].map(s => [s.id, s]));
         const merged = recomputeBusinessStatus(
           mergeBusinessRelations(loadBusiness(executionDir), stamped),
           sourceMap,
@@ -239,18 +280,18 @@ export async function runResearch(name, executionDir) {
     }
   }
 
-  // 5. 轮次落盘 + 状态收尾（claimIds 含用户补充的更正主张）
+  // 6. 轮次落盘 + 状态收尾（claimIds 含用户补充的更正主张）
   const roundClaimIds = [...correctedClaimIds, ...newClaimIds];
   const at = new Date().toISOString();
   saveRound(executionDir, {
-    id: `r-${roundN}`, n: roundN, kind: "research", business: isBusinessRound, input: pending.input,
-    queries, sourceIds: newSourceIds, claimIds: roundClaimIds, at,
+    id: `r-${roundN}`, n: roundN, kind: "research", business: isBusinessRound, deep: isDeepRound, input: pending.input,
+    queries, sourceIds: newSourceIds, claimIds: roundClaimIds, filterStats, at,
   });
   updateResearch(executionDir, {
     pendingRound: null,
     rounds: [...(research.rounds || []), {
-      id: `r-${roundN}`, n: roundN, kind: "research", business: isBusinessRound, input: pending.input,
-      queryCount: queries.length, newSourceIds, newClaimIds: roundClaimIds, at,
+      id: `r-${roundN}`, n: roundN, kind: "research", business: isBusinessRound, deep: isDeepRound, input: pending.input,
+      queryCount: queries.length, newSourceIds, newClaimIds: roundClaimIds, filterStats, at,
     }],
   });
 
@@ -260,9 +301,29 @@ export async function runResearch(name, executionDir) {
     queries,
     newSources: newSourceIds.length,
     newClaims: roundClaimIds.length,
+    filterStats,
     summary: newSourceIds.length > 0 || correctedClaimIds.length > 0
-      ? `第 ${roundN} 轮：新来源 ${newSourceIds.length} 条，主张变更 ${roundClaimIds.length} 条`
-      : `第 ${roundN} 轮：无新增公开来源（可换个方向继续或结束研究）`,
+      ? `第 ${roundN} 轮：新来源 ${newSourceIds.length} 条（原始 ${filterStats.rawResults} → 采纳 ${filterStats.persistedEvidence}${leads.length > 0 ? ` + 线索 ${leads.length}` : ""}），主张变更 ${roundClaimIds.length} 条`
+      : `第 ${roundN} 轮：无新增公开来源（可换个方向继续或深挖）`,
+  };
+}
+
+/** 相关性评分上下文：用户线索优先，选定候选的信号补缺 */
+function buildRelevanceCtx(name, executionDir, research, selected) {
+  const phone = readPrivate(executionDir).phone || null;
+  const userClues = {};
+  for (const [k, v] of Object.entries(research.clues || {})) {
+    if (v && k !== "phoneTail" && k !== "note") userClues[k] = v;
+  }
+  const signalClues = {};
+  for (const [k, v] of Object.entries(selected?.signals || {})) {
+    if (v && !userClues[k]) signalClues[k] = v;
+  }
+  return {
+    name,
+    phone,
+    knownUrl: userClues.knownUrl || null,
+    clues: { ...signalClues, ...userClues, occupation: userClues.occupation || signalClues.occupation || null },
   };
 }
 

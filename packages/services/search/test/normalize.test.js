@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { normalizeResults, CATEGORY_ENGINES, categoryFetchesContent } from "../lib/searxng.js";
 import { normalizeFirecrawlSearch } from "../lib/firecrawl.js";
+import { cleanResults, isGarbageResult } from "../lib/search.js";
 
 const GENERAL_ENGINES = CATEGORY_ENGINES.general;
 
@@ -86,4 +87,37 @@ test("normalizeFirecrawlSearch: 拍平 web/news/images + 字段映射", () => {
   assert.equal(results[1].thumbnail, "https://img/1.jpg");
   assert.equal(results[2].thumbnail, "https://img/2.jpg");
   assert.deepEqual(normalizeFirecrawlSearch(null), []);
+});
+
+// ─── 通用清洗（V1.1） ──────────────────────────────────────────────
+
+test("isGarbageResult: 空内容/undefined 页/错误页/反爬拦截页", () => {
+  assert.equal(isGarbageResult({ title: "", url: "https://a.com", snippet: "" }), true);
+  assert.equal(isGarbageResult({ title: "UNDEFINED Definition & Meaning - Merriam-Webster", url: "https://www.m-w.com/dictionary/undefined" }), true);
+  assert.equal(isGarbageResult({ title: "403 Forbidden", url: "https://a.com/x" }), true);
+  assert.equal(isGarbageResult({ title: "正常页", url: "https://a.com/x", snippet: "Unauthorized Activity Detected" }), true);
+  assert.equal(isGarbageResult({ title: "正常页", url: "https://a.com/x", snippet: "当前暂时无法访问" }), true);
+  assert.equal(isGarbageResult({ title: "正常页", url: "https://a.com/x", snippet: "正常摘要" }), false);
+});
+
+test("cleanResults: 垃圾过滤 + URL 去重并引擎 + 标题去重 + sourceDomain", () => {
+  const { results, stats } = cleanResults([
+    { title: "张三的页面", url: "https://a.com/x?utm_source=g", snippet: "摘要一", engines: ["firecrawl"] },
+    { title: "张三的页面", url: "https://a.com/x", snippet: "摘要一", engines: ["baidu"] },            // canonical 同 URL → 并引擎
+    { title: "张三的页面", url: "https://b.com/y", snippet: "摘要一", engines: ["firecrawl"] },        // 跨域同题+同摘要前缀 → 转载剔除
+    { title: "张三的页面", url: "https://a.com/z", snippet: "另一摘要", engines: ["firecrawl"] },      // 同域同题 → 剔除
+    { title: "张三的简历", url: "https://a.com/z2", snippet: "另一摘要", engines: ["firecrawl"] },     // 同域不同题 → 保留
+    { title: "", url: "https://c.com/1", snippet: "", engines: ["bing"] },                            // 垃圾
+    { title: "UNDEFINED", url: "https://c.com/undefined", snippet: "x", engines: ["bing"] },          // 垃圾
+  ]);
+  assert.equal(stats.rawResults, 7);
+  assert.equal(stats.droppedGarbage, 2);
+  assert.equal(stats.mergedUrlDuplicates, 1);
+  assert.equal(stats.droppedTitleDuplicate, 2);
+  assert.equal(results.length, 2);
+  assert.equal(results[0].url, "https://a.com/x");
+  assert.ok(results[0].url.includes("utm_source") === false);
+  assert.deepEqual(results[0].engines.sort(), ["baidu", "firecrawl"]);
+  assert.equal(results[0].sourceDomain, "a.com");
+  assert.equal(results[1].title, "张三的简历");
 });

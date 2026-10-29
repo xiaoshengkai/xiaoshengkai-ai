@@ -11,20 +11,21 @@ function searchServiceBase() {
   return `http://${network.hosts.local}:${network.ports.searchService}`;
 }
 
-export async function searchWeb(query, { category = "general", maxResults = 8 } = {}) {
+export async function searchWeb(query, { category = "general", maxResults = 8, strategy = "auto" } = {}) {
   try {
     const url = new URL(`${searchServiceBase()}/search`);
     url.searchParams.set("query", query);
     url.searchParams.set("category", category);
     url.searchParams.set("maxResults", String(maxResults));
     url.searchParams.set("fetchContent", "false");
+    url.searchParams.set("strategy", strategy);
     const res = await withTimeout(fetch(url), CONFIG.SEARCH_TIMEOUT_MS, `searchWeb ${query}`);
     const json = await res.json();
-    if (!json.ok) return [];
-    return json.results || [];
+    if (!json.ok) return { results: [], cleaning: null };
+    return { results: json.results || [], cleaning: json.cleaning || null };
   } catch (err) {
     console.warn(`[person-research] 搜索失败: ${query}: ${err.message}`);
-    return [];
+    return { results: [], cleaning: null };
   }
 }
 

@@ -379,6 +379,58 @@ export function validateCorrectionOutput(json, existingClaims) {
   return out;
 }
 
+// ─── 边界复核（V1.1 相关性漏斗） ──────────────────────────────────
+
+export function buildBoundaryReviewPrompt(ctx, sources) {
+  const system = `你是人物相关性复核员。判断每条搜索结果是否属于目标人物（区分同名他人与无关页面）。
+
+判定（三选一）：
+- relevant：页面明确关于目标人物（姓名匹配 + 身份线索/经历吻合）
+- other_person：同名但是另一个人（学校/公司/年代/领域明显不同）
+- irrelevant：页面与目标人物无关（泛列表页、公司主页无此人、词典页、无关主题）
+
+规则：
+1. 只依据标题/摘要/正文摘录判断，不猜测
+2. 无法确定时输出 irrelevant（宁缺毋滥）
+3. relevant 时给出 candidateKey：用「学校-公司-城市」等身份特征拼接，便于同身份归组
+
+只输出 JSON：
+{ "reviews": [ { "sourceId": "b-1", "decision": "relevant", "candidateKey": "某大学-某公司-某城市", "matchedSignals": ["name", "school"], "reason": "一句话依据" } ] }`;
+
+  const user = `## 目标人物画像
+${renderProfile({ name: ctx.name, phone: ctx.phone, clues: ctx.clues || {} })}
+
+## 待复核（${sources.length} 条）
+${renderSources(sources)}
+
+逐条复核：`;
+  return { system, user };
+}
+
+export function validateBoundaryReviewOutput(json, sources) {
+  const out = [];
+  if (!json || typeof json !== "object") return out;
+
+  const validIds = new Set(sources.map(s => s.id));
+  const seen = new Set();
+
+  for (const r of Array.isArray(json.reviews) ? json.reviews : []) {
+    const sourceId = String(r?.sourceId ?? "").trim();
+    const decision = String(r?.decision ?? "").trim();
+    if (!validIds.has(sourceId) || seen.has(sourceId)) continue;
+    if (!["relevant", "other_person", "irrelevant"].includes(decision)) continue;
+    seen.add(sourceId);
+    out.push({
+      sourceId,
+      decision,
+      candidateKey: text(r?.candidateKey) || null,
+      matchedSignals: (Array.isArray(r?.matchedSignals) ? r.matchedSignals : []).map(String).slice(0, 5),
+      reason: text(r?.reason) || null,
+    });
+  }
+  return out;
+}
+
 // ─── 报告生成 ────────────────────────────────────────────────────
 
 export function buildReportPrompt(name, candidates, claims, business, sources, rounds, rejectedClaims = []) {

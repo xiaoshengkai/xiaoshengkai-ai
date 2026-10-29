@@ -1,24 +1,44 @@
 /**
- * 候选发现轮（步骤 1）：多查询并发搜索 → URL 归一去重 → 高价值页面抓正文
- * → LLM 聚类候选 + 抽取首轮主张 → 落盘 sources/claims/rounds。
- * 搜索全挂不失败（返回空候选停靠，等用户补线索）；只有 LLM 连续解析失败才算步骤失败。
+ * 候选发现轮（步骤 1，V1.1 三级漏斗）：
+ *   高精度首搜（strategy=primary，仅 Firecrawl）→ 通用清洗 + 人物相关性评分 + LLM 边界复核
+ *   → 有效来源 ≤2 时受控扩搜一次（SearXNG 换引擎 + 线索变体）→ 持久化 ≤MAX_PERSISTED_DISCOVERY
+ *   → 抓正文 → LLM 聚类候选 + 抽取首轮主张。
+ * 搜索全挂不失败（空停靠等用户补线索）；只有 LLM 聚类连续解析失败才算步骤失败。
+ * 噪声只留 filterStats 计数，不落盘。
  */
 import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { CONFIG } from "./config.js";
-import { buildDiscoveryQueries } from "./queries.js";
+import { buildDiscoveryQueries, buildExpansionQueries } from "./queries.js";
 import { searchWeb, scrape, mapLimit } from "./search-client.js";
 import { canonicalUrl, domainOf, domainClass } from "./normalize.js";
 import { phoneTail, savePrivate, normalizePhone } from "./privacy.js";
 import { initResearch, updateResearch, allocSourceIds, allocClaimIds, saveSource, saveClaims, saveRound } from "./store.js";
 import { buildClusterPrompt, validateClusterOutput } from "./prompts.js";
-
-const CLASS_ORDER = { A: 0, B: 1, C: 2, D: 3 };
+import { runRelevancePipeline } from "./relevance.js";
 
 /** 缺省模板参数可能以字面量 "{xxx}" 传入（CLI 最小参数场景），统一清洗为空串 */
 function cleanParam(v) {
   const s = String(v ?? "").trim();
   return s && !/^\{.+\}$/.test(s) ? s : "";
+}
+
+/** 聚合 search-service 返回的清洗统计 */
+function mergeCleaning(agg, searchedArr) {
+  for (const s of searchedArr) {
+    const c = s?.cleaning;
+    if (!c) continue;
+    agg.rawResults += c.rawResults || 0;
+    agg.droppedGarbage += c.droppedGarbage || 0;
+    agg.droppedTitleDuplicate += c.droppedTitleDuplicate || 0;
+    agg.mergedUrlDuplicates += c.mergedUrlDuplicates || 0;
+  }
+}
+
+function mergePipeStats(a, b) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b)) out[k] = (out[k] || 0) + v;
+  return out;
 }
 
 export async function runDiscovery(name, phone, note, city, school, company, knownUrl, focus, executionDir) {
@@ -36,26 +56,24 @@ export async function runDiscovery(name, phone, note, city, school, company, kno
   if (phone) savePrivate(executionDir, { phone });
   const clues = { note, city, school, company, knownUrl, focus, phoneTail: phoneTail(phone) || null };
   const profile = { name, phone: phone || null, clues };
+  const ctx = { name, phone: phone || null, knownUrl: knownUrl || null, clues };
   initResearch(executionDir, { name, clues });
 
-  // 2. 查询规划 + 并发搜索
-  const queries = buildDiscoveryQueries({ name, phone, city, school, company, focus });
-  console.log(`[person-research] 发现轮查询 ${queries.length} 组: ${queries.map(q => q.query).join(" / ")}`);
-  const searched = await mapLimit(queries, CONFIG.SEARCH_CONCURRENCY,
-    q => searchWeb(q.query, { category: q.category }));
+  const cleaningAgg = { rawResults: 0, droppedGarbage: 0, droppedTitleDuplicate: 0, mergedUrlDuplicates: 0 };
 
-  // 3. URL 归一去重（跨查询合并引擎与发现原因）
-  const merged = new Map();
-  queries.forEach((q, qi) => {
-    for (const r of searched[qi] || []) {
-      const cu = canonicalUrl(r.url);
-      if (!cu || !/^https?:\/\//.test(cu)) continue;
-      const prev = merged.get(cu);
-      if (prev) {
-        prev.engines = [...new Set([...prev.engines, ...(r.engines || [])])];
-        prev.foundBy.push(q.reason);
-      } else {
-        merged.set(cu, {
+  // 2. 高精度首搜（primary：仅 Firecrawl，0 结果即停由扩搜决定下一步）
+  const queries = buildDiscoveryQueries({ name, phone, city, school, company, focus });
+  console.log(`[person-research] 发现轮高精度首搜 ${queries.length} 组: ${queries.map(q => q.query).join(" / ")}`);
+  const searched = await mapLimit(queries, CONFIG.SEARCH_CONCURRENCY,
+    q => searchWeb(q.query, { category: q.category, strategy: "primary" }));
+  mergeCleaning(cleaningAgg, searched);
+
+  const mergeWave = (waveQueries, searchedArr, into, seen) => {
+    waveQueries.forEach((q, qi) => {
+      for (const r of (searchedArr[qi]?.results) || []) {
+        const cu = canonicalUrl(r.url);
+        if (!cu || !/^https?:\/\//.test(cu) || seen.has(cu) || into.has(cu)) continue;
+        into.set(cu, {
           url: r.url, canonicalUrl: cu,
           title: String(r.title || "").trim(),
           snippet: String(r.snippet || "").trim(),
@@ -64,39 +82,83 @@ export async function runDiscovery(name, phone, note, city, school, company, kno
           rank: r.rank || 99,
           publishedAt: r.publishedDate || null,
         });
+        seen.add(cu);
       }
-    }
-  });
-  console.log(`[person-research] 去重后来源 ${merged.size} 条`);
+    });
+  };
 
-  // 4. 全部落盘（未抓正文态）
-  const domainClassOrder = d => CLASS_ORDER[domainClass(d)];
-  const sources = [...merged.values()].map(r => ({
-    id: null, // 稍后统一分配
+  const seenCanonical = new Set();
+  const wave1 = new Map();
+  mergeWave(queries, searched, wave1, seenCanonical);
+
+  // 3. 相关性漏斗：规则评分 → 边界 LLM 批量复核 → 只留 evidence
+  let pipeStats = null;
+  let accepted = [];
+  if (wave1.size > 0) {
+    const pipeline = await runRelevancePipeline([...wave1.values()], { ctx });
+    pipeStats = pipeline.stats;
+    accepted = pipeline.accepted;
+  }
+
+  // 4. 受控扩搜（每任务最多一次）：有效来源 ≤2 → SearXNG 换引擎 + 线索变体重查
+  let expanded = false;
+  if (accepted.length <= 2) {
+    const expansionQueries = buildExpansionQueries({ name, school, company, city, focus });
+    if (expansionQueries.length > 0) {
+      console.log(`[person-research] 首搜有效来源 ${accepted.length} 条 → 受控扩搜一次（SearXNG）: ${expansionQueries.map(q => q.query).join(" / ")}`);
+      const expSearched = await mapLimit(expansionQueries, CONFIG.SEARCH_CONCURRENCY,
+        q => searchWeb(q.query, { strategy: "expand" }));
+      mergeCleaning(cleaningAgg, expSearched);
+      const expWave = new Map();
+      mergeWave(expansionQueries, expSearched, expWave, seenCanonical);
+      if (expWave.size > 0) {
+        const expPipeline = await runRelevancePipeline([...expWave.values()], { ctx });
+        accepted = [...accepted, ...expPipeline.accepted];
+        pipeStats = pipeStats ? mergePipeStats(pipeStats, expPipeline.stats) : expPipeline.stats;
+        expanded = true;
+      }
+    } else {
+      console.log("[person-research] 无可用线索变体，跳过扩搜");
+    }
+  }
+
+  // 5. 持久化上限（分数优先）+ 落盘（含相关性字段）
+  accepted.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+  const persisted = accepted.slice(0, CONFIG.MAX_PERSISTED_DISCOVERY);
+  const filterStats = {
+    ...cleaningAgg,
+    ...(pipeStats || { scored: 0, direct: 0, boundary: 0, lowRelevance: 0, llmReviewed: 0, otherPerson: 0, llmIrrelevant: 0, reviewFailed: 0, accepted: 0, leadOnly: 0 }),
+    persisted: persisted.length,
+    expanded,
+  };
+  console.log(`[person-research] 漏斗: 原始 ${filterStats.rawResults} → 清洗后 ${filterStats.scored} → 直接 ${filterStats.direct} / 边界 ${filterStats.boundary}（复核 ${filterStats.llmReviewed}，同名他人 ${filterStats.otherPerson}）→ 采纳 ${filterStats.accepted} → 持久化 ${persisted.length}${expanded ? "（含扩搜）" : ""}`);
+
+  const sources = persisted.map(r => ({
     ...r,
     domain: domainOf(r.url),
     domainClass: domainClass(domainOf(r.url)),
-    content: null, scraped: false, scrapeError: null,
+    scraped: Boolean(r.content),
+    scrapeError: null,
     foundInRound: 1,
     observedAt: new Date().toISOString(),
   }));
   const sourceIds = allocSourceIds(executionDir, sources.length);
   sources.forEach((s, i) => { s.id = sourceIds[i]; saveSource(executionDir, s); });
 
-  // 5. 无来源：空停靠（不算失败，用户补线索后可继续）
+  // 6. 无有效来源：空停靠（不算失败，用户补线索后可继续）
   if (sources.length === 0) {
     saveRound(executionDir, {
       id: "r-1", n: 1, kind: "discovery", input: null,
-      queries, sourceIds: [], claimIds: [], at: new Date().toISOString(),
+      queries, sourceIds: [], claimIds: [], filterStats, at: new Date().toISOString(),
     });
-    updateResearch(executionDir, { candidates: [], claimIds: [], rounds: [{ id: "r-1", n: 1, kind: "discovery", input: null, queryCount: queries.length, newSourceIds: [], newClaimIds: [], at: new Date().toISOString() }] });
-    return { round: 1, sources: 0, claims: 0, candidates: [], summary: "未发现可用公开来源：可补充城市/学校/公司等线索后继续" };
+    updateResearch(executionDir, { candidates: [], claimIds: [], rounds: [{ id: "r-1", n: 1, kind: "discovery", input: null, queryCount: queries.length, newSourceIds: [], newClaimIds: [], filterStats, at: new Date().toISOString() }] });
+    return { round: 1, sources: 0, claims: 0, candidates: [], filterStats, summary: "未发现可用公开来源：可补充城市/学校/公司等线索后继续" };
   }
 
-  // 6. 选高价值页面抓正文（A/B 级优先、同域名限额、总限额）
+  // 7. 抓正文（分数序、同域名限额；边界复核已抓的不重抓）
   const domainCount = new Map();
-  const toScrape = [...sources]
-    .sort((a, b) => (domainClassOrder(a.domain) - domainClassOrder(b.domain)) || (a.rank - b.rank))
+  const toScrape = sources
+    .filter(s => !s.content)
     .filter(s => {
       const n = domainCount.get(s.domain) || 0;
       if (n >= CONFIG.DOMAIN_SCRAPE_CAP) return false;
@@ -118,13 +180,12 @@ export async function runDiscovery(name, phone, note, city, school, company, kno
     saveSource(executionDir, s);
   }));
 
-  // 7. 组装 prompt 来源：有正文优先，其余带摘要，总量限额
-  const promptSources = [...sources]
-    .sort((a, b) => (Number(b.scraped) - Number(a.scraped)) || (domainClassOrder(a.domain) - domainClassOrder(b.domain)))
+  // 8. prompt 来源：分数序（sources 已按分数排序），有正文用正文
+  const promptSources = sources
     .slice(0, CONFIG.PROMPT_SOURCES_MAX)
     .map(s => ({ ...s, content: s.scraped ? s.content : s.snippet }));
 
-  // 8. LLM 聚类 + 抽取（storyboard 式解析重试）
+  // 9. LLM 聚类 + 抽取（storyboard 式解析重试）
   let parsed = null;
   let lastErr = "";
   for (let attempt = 0; attempt < 5 && !parsed; attempt++) {
@@ -146,7 +207,7 @@ export async function runDiscovery(name, phone, note, city, school, company, kno
     validated.claims = [];
   }
 
-  // 9. 分配 claim id + 候选统一补 unconfirmed 状态，落盘
+  // 10. 分配 claim id + 候选统一补 unconfirmed 状态，落盘
   const claimIds = allocClaimIds(executionDir, validated.claims.length);
   const claims = validated.claims.map((cl, i) => ({
     id: claimIds[i], claim: cl.claim, quote: cl.quote, sourceIds: cl.sourceIds,
@@ -158,7 +219,7 @@ export async function runDiscovery(name, phone, note, city, school, company, kno
   const candidates = validated.candidates.map(c => ({ ...c, status: "unconfirmed" }));
   const round = {
     id: "r-1", n: 1, kind: "discovery", input: null,
-    queries, sourceIds, claimIds,
+    queries, sourceIds, claimIds, filterStats,
     irrelevantSourceIds: validated.irrelevantSourceIds,
     at: new Date().toISOString(),
   };
@@ -169,20 +230,21 @@ export async function runDiscovery(name, phone, note, city, school, company, kno
     claimIds,
     rounds: [{
       id: "r-1", n: 1, kind: "discovery", input: null,
-      queryCount: queries.length, newSourceIds: sourceIds, newClaimIds: claimIds,
+      queryCount: queries.length, newSourceIds: sourceIds, newClaimIds: claimIds, filterStats,
       at: round.at,
     }],
   });
 
-  console.log(`[person-research] 发现轮完成: 候选 ${candidates.length} / 主张 ${claims.length} / 来源 ${sources.length}（正文 ${toScrape.length}）`);
+  console.log(`[person-research] 发现轮完成: 候选 ${candidates.length} / 主张 ${claims.length} / 来源 ${sources.length}（正文 ${sources.filter(s => s.scraped).length}）`);
   return {
     round: 1,
     sources: sources.length,
-    scraped: toScrape.filter(s => s.scraped).length,
+    scraped: sources.filter(s => s.scraped).length,
     claims: claims.length,
     candidates: candidates.map(c => ({ id: c.id, displayName: c.displayName, confidence: c.confidence })),
+    filterStats,
     summary: candidates.length > 0
-      ? `发现 ${candidates.length} 个候选人物，${claims.length} 条待核查主张`
+      ? `发现 ${candidates.length} 个候选人物，${claims.length} 条待核查主张（原始 ${filterStats.rawResults} → 采纳 ${filterStats.accepted}）`
       : "未聚类出候选人物：可补充线索后继续",
   };
 }

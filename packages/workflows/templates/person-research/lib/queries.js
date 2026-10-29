@@ -44,6 +44,24 @@ export function buildBusinessQueries(name) {
   ].map(query => ({ query, category: "general", reason: "business" }));
 }
 
+/**
+ * 受控扩搜查询（V1.1）：首搜有效来源 ≤2 时换引擎（SearXNG）重查一次。
+ * 精确名换引擎重查 + 线索组合变体；不生成泛查询。
+ */
+export function buildExpansionQueries({ name, school, company, city, focus }) {
+  const out = [];
+  const push = q => { if (q && !out.includes(q)) out.push(q); };
+
+  push(`"${name}"`);
+  if (school) push(`${name} ${school}`);
+  if (company) push(`${name} ${company}`);
+  if (city) push(`${name} ${city}`);
+  if (focus) push(`${name} ${focus}`);
+
+  return out.slice(0, CONFIG.EXPANSION_MAX_QUERIES)
+    .map(query => ({ query, category: "general", reason: "expansion" }));
+}
+
 export function researchQueryBudget() {
   return CONFIG.RESEARCH_MAX_QUERIES;
 }

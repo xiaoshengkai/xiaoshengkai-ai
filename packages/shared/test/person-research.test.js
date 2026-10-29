@@ -8,10 +8,11 @@ import { parkedStatusAfter, runNextStep } from "../../workflows/engine.js";
 import { DATA_DIR } from "../../workflows/lib/state.js";
 import { redactPhone, phoneTail, savePrivate, readPrivate, normalizePhone } from "../../workflows/templates/person-research/lib/privacy.js";
 import { initResearch, updateResearch, allocSourceIds, allocClaimIds, writeReport, loadSources, saveSource } from "../../workflows/templates/person-research/lib/store.js";
-import { buildDiscoveryQueries, buildBusinessQueries } from "../../workflows/templates/person-research/lib/queries.js";
+import { buildDiscoveryQueries, buildBusinessQueries, buildExpansionQueries } from "../../workflows/templates/person-research/lib/queries.js";
 import { canonicalUrl, sameSource, domainOf, domainClass } from "../../workflows/templates/person-research/lib/normalize.js";
 import { CONFIG } from "../../workflows/templates/person-research/lib/config.js";
-import { buildClusterPrompt, validateClusterOutput, validateIntentOutput, validateReportCitations, validateBusinessOutput, buildReportPrompt, validateCorrectionOutput } from "../../workflows/templates/person-research/lib/prompts.js";
+import { scoreSource, partitionSources, markLead } from "../../workflows/templates/person-research/lib/relevance.js";
+import { buildClusterPrompt, validateClusterOutput, validateIntentOutput, validateReportCitations, validateBusinessOutput, buildReportPrompt, validateCorrectionOutput, validateBoundaryReviewOutput } from "../../workflows/templates/person-research/lib/prompts.js";
 import { applyExtract, mergeBusinessRelations, recomputeBusinessStatus, applyCorrection } from "../../workflows/templates/person-research/lib/evidence.js";
 import { generateReport } from "../../workflows/templates/person-research/lib/report.js";
 import { applySelectInState, applyContinueInState } from "../../workflows/templates/person-research/lib/handlers.js";
@@ -373,6 +374,109 @@ test("applySelectInState: 选定触发商业调查轮；continue 商业意图检
   const career = makeResearchState();
   applyContinueInState(career, "继续查任职与公司关系");
   assert.equal(career.research.pendingRound.business, false);
+});
+
+test("applyContinueInState: 深挖意图检测", () => {
+  const deep = makeResearchState();
+  applyContinueInState(deep, "深挖更多相关线索");
+  assert.equal(deep.research.pendingRound.deep, true);
+  assert.equal(deep.research.pendingRound.business, false);
+
+  const normal = makeResearchState();
+  applyContinueInState(normal, "继续查教育经历");
+  assert.equal(normal.research.pendingRound.deep, false);
+});
+
+// ─── V1.1 相关性漏斗 ──────────────────────────────────────────────
+
+const RCTX = { name: "张三", phone: null, knownUrl: null, clues: { school: "某大学", company: "某公司", city: null } };
+
+test("scoreSource: 姓名/线索/锚点/来源等级计分，姓名取最高档不叠加", () => {
+  // 姓名在标题 +5，某大学 A 级 +2 → 7 直接保留
+  const a = scoreSource({ title: "张三的主页", url: "https://x.edu.cn/p", snippet: "教师简介" }, RCTX);
+  assert.equal(a.score, 7);
+  assert.ok(a.matchedSignals.includes("name-title"));
+
+  // 姓名标题(+5) 与摘要(+4) 同时出现 → 只取标题档
+  const b = scoreSource({ title: "张三的主页", url: "https://a.com/p", snippet: "张三的简介" }, RCTX);
+  assert.equal(b.score, 5);
+
+  // 无姓名，仅线索（公司）→ +3 边界
+  const c = scoreSource({ title: "某公司团队", url: "https://a.com/t", snippet: "某公司介绍" }, RCTX);
+  assert.equal(c.score, 3);
+  assert.ok(c.matchedSignals.includes("clue"));
+
+  // 无姓名无线索 → 0 丢弃
+  const d = scoreSource({ title: "泛财经列表", url: "https://a.com/l", snippet: "股东持股明细" }, RCTX);
+  assert.equal(d.score, 0);
+
+  // 手机号锚点 +8（叠加姓名标题 +5 = 13）
+  const e = scoreSource({ title: "张三的联系页", url: "https://a.com/c", snippet: "电话 13812345678" }, { ...RCTX, phone: "13812345678" });
+  assert.equal(e.score, 13);
+  assert.ok(e.matchedSignals.includes("phone"));
+
+  // 已知 URL 前缀命中 +8
+  const f = scoreSource({ title: "随便什么", url: "https://fb.com/xiaoshengkai/photos", snippet: "无姓名" }, { name: "张三", phone: null, knownUrl: "https://fb.com/xiaoshengkai", clues: {} });
+  assert.ok(f.matchedSignals.includes("known-url"));
+});
+
+test("partitionSources: ≥6 direct / 3~5 boundary / <3 dropped，携带 relevanceScore", () => {
+  const { direct, boundary, dropped } = partitionSources([
+    { title: "张三的主页", url: "https://x.edu.cn/p", snippet: "教师简介" },          // 7
+    { title: "张三的页面", url: "https://a.com/p", snippet: "张三简介" },             // 5
+    { title: "某公司团队", url: "https://a.com/t", snippet: "某公司介绍" },           // 3
+    { title: "泛财经列表", url: "https://a.com/l", snippet: "股东持股明细" },         // 0
+  ], RCTX);
+  assert.equal(direct.length, 1);
+  assert.equal(boundary.length, 2);
+  assert.equal(dropped.length, 1);
+  assert.equal(direct[0].relevanceScore, 7);
+  assert.ok(Array.isArray(direct[0].matchedSignals));
+});
+
+test("markLead: 聚合站线索标注 evidenceUse=lead_only", () => {
+  const lead = markLead({ title: "某投资企业 - 企查查", url: "https://m.qcc.com/firm/x", snippet: "股东信息" });
+  assert.equal(lead.evidenceUse, "lead_only");
+  assert.equal(lead.relevanceDecision, "lead");
+  assert.ok(lead.matchedSignals.includes("aggregator"));
+});
+
+test("buildExpansionQueries: 精确名换引擎 + 线索变体，无泛查询，≤上限", () => {
+  const qs = buildExpansionQueries({ name: "张三", school: "某大学", company: "某公司", city: null, focus: null });
+  const list = qs.map(q => q.query);
+  assert.equal(list[0], '"张三"');
+  assert.ok(list.some(q => q.includes("某大学")));
+  assert.ok(list.some(q => q.includes("某公司")));
+  assert.ok(qs.every(q => q.reason === "expansion"));
+  assert.ok(qs.length <= CONFIG.EXPANSION_MAX_QUERIES);
+
+  // 无任何线索：只剩精确名一条（仍有价值——换引擎重查）
+  const bare = buildExpansionQueries({ name: "张三" });
+  assert.deepEqual(bare.map(q => q.query), ['"张三"']);
+});
+
+test("validateBoundaryReviewOutput: 三态判定软校验，越界/重复/非法剔除", () => {
+  const sources = [
+    { id: "b-1", title: "张三 某大学", url: "https://a.com/1", snippet: "s" },
+    { id: "b-2", title: "张三的其他页面", url: "https://a.com/2", snippet: "s" },
+    { id: "b-3", title: "无关页", url: "https://a.com/3", snippet: "s" },
+  ];
+  const out = validateBoundaryReviewOutput({
+    reviews: [
+      { sourceId: "b-1", decision: "relevant", candidateKey: "某大学-某公司", matchedSignals: ["name", "school"], reason: "姓名学校吻合" },
+      { sourceId: "b-2", decision: "other_person", reason: "同名不同人" },
+      { sourceId: "b-3", decision: "irrelevant", reason: "泛列表" },
+      { sourceId: "b-99", decision: "relevant", reason: "越界剔除" },
+      { sourceId: "b-1", decision: "irrelevant", reason: "重复剔除" },
+      { sourceId: "b-2", decision: "unknown_state", reason: "非法枚举剔除" },
+    ],
+  }, sources);
+  assert.equal(out.length, 3);
+  assert.equal(out[0].decision, "relevant");
+  assert.equal(out[0].candidateKey, "某大学-某公司");
+  assert.equal(out[1].decision, "other_person");
+  assert.equal(out[2].decision, "irrelevant");
+  assert.deepEqual(validateBoundaryReviewOutput(null, sources), []);
 });
 
 // ─── 商业关系 ─────────────────────────────────────────────────────

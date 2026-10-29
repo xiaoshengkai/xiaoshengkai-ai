@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.55 (2026-10-29) — 户型确定性 3D 鸟瞰 + 效果图单图微调
+
+### 变更
+- **鸟瞰改确定性 SVG**：新增 `render-birdview.js`，纯代码从 structure/plans 渲染俯视鸟瞰（地面填充 + 墙厚粗线 + 门窗符号 + 家具投影/侧边高光/newRooms 标签），墙位/比例/门窗/家具位置 **100% 贴合数据**，根治 AI 图生图鸟瞰跑偏；产出 `birdview-pN.svg`（替换原 `birdview-pN.png`）。家具图元带风格地面色 + 类型配色。
+- **效果图单图微调**：新增 `lib/tweak.js`（复用 engine 级 `/execution/:id/tweak` 编排）：AI 微调（当前效果图作底图 + feedback 图生图局部修改，`rerun=false` 直接覆盖）+ 直接替换（上传图覆盖单张效果图）。`executor.loadTemplates` 据此标记模板 `tweak:true`。
+- `generate-render.js` 收敛为只出多视角效果图（`generateEffects`）；鸟瞰/clean 参考相关代码移除。
+- 前端 `FloorplanGallery` 每张效果图加「✏️ 微调」入口，tweak 对话框支持 floorplan（AI/替换切换，目标是单张效果图文件）。
+
+### 验证
+- e2e 自测：renderings 结构 = layout + birdview(svg) + effects×3，鸟瞰 SVG 含家具投影；test、typecheck、build 全绿。
+
 ## v0.11.54 (2026-10-29) — person-research V1.1 搜索质量：三级相关性漏斗
 
 ### 变更

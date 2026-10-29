@@ -12,7 +12,7 @@ import { areaM2 } from "./metrics.js";
  */
 
 // 风格一致性 seed：同 base + 方案/视角偏移
-const SEED_BASE = 42;
+export const SEED_BASE = 42;
 
 const STYLE_PROMPTS = {
   "现代简约": "现代简约风格，白灰基调，线条利落，极简家具，明亮通透，中性色配少量点缀",
@@ -115,7 +115,7 @@ function layoutDescription(structure, plan) {
   return parts.join("；");
 }
 
-function birdviewPrompt(structure, plan, styleDesc) {
+export function birdviewPrompt(structure, plan, styleDesc) {
   return `家居俯视鸟瞰效果图（3D 顶视图），正上方近似俯视，家具立体带侧面高度与阴影，真实材质与光影，白墙底平面。${styleDesc}。
 空间与家具布局（必须严格遵守）：${layoutDescription(structure, plan)}。
 严格依据参考平面布置图：墙体位置、房间比例、门窗位置与参考图完全一致，只把平面图元替换成对应真实材质 3D 家具，禁止新增/删除/移动家具，禁止输出任何文字标注。`;

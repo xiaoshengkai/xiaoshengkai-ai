@@ -502,8 +502,8 @@ export default function ExecutionDetailPage() {
             📋 脚本
           </button>
         )}
-        {isDone && supportsTweak && (
-          <button onClick={() => { setShowTweak(true); setTweakMode("ai"); if (isComic) setTweakPages([]); if (isFloorplan) setFpTweakFile(null); }}
+        {isDone && supportsTweak && !isFloorplan && (
+          <button onClick={() => { setShowTweak(true); setTweakMode("ai"); if (isComic) setTweakPages([]); }}
             disabled={isTweakRunning}
             className={`brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold ${isTweakRunning ? "bg-muted text-muted-foreground" : "bg-purple text-white"}`}>
             <Edit3 className="w-3 h-3" /> 微调
@@ -708,6 +708,9 @@ export default function ExecutionDetailPage() {
             <AlertDialogTitle className="font-extrabold text-lg text-foreground">
               {isComic ? "微调漫画" : isFloorplan ? "微调效果图" : "微调脚本"}
             </AlertDialogTitle>
+            {isFloorplan && fpTweakFile && (
+              <p className="text-xs text-muted-foreground mt-1">正在编辑：{fpTweakFile}</p>
+            )}
           </AlertDialogHeader>
           <div className="py-2 space-y-3">
             {(isComic || isFloorplan) && (
@@ -1022,7 +1025,12 @@ function FloorplanGallery({ step, executionId, onTweak }: { step: ExecutionStep;
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground mb-1">俯视平面图（鸟瞰）</p>
+              <div className="flex items-center justify-between mb-0.5">
+                <p className="text-xs text-muted-foreground">俯视平面图（鸟瞰）</p>
+                {r.birdview && !r.birdviewError && (
+                  <button onClick={() => onTweak(r.birdview)} className="text-[10px] font-bold text-purple hover:underline">✏️ 微调</button>
+                )}
+              </div>
               {img(r.birdview, "俯视平面图")}
               {r.birdviewError && <p className="text-[10px] text-amber-600 mt-1">⚠ AI 渲染失败，已用矢量图</p>}
             </div>

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.57 (2026-10-29) — 户型鸟瞰：确定性矢量锁布局 + AI 图生图
+
+### 变更
+- **鸟瞰 = 矢量锁布局 + AI 图生图**：`render-birdview.js` 加 `plain`/`noLabels` 模式（纯色家具块 + 轻木纹瓷砖 + 去文字，作 AI 参考，防复刻扁平）；`generate-render.js` 新增 `generateBirdview`（plain 参考图栅格化作 `image_url` + 文本布局锚定 + `seed` + `aspectRatio` 按户型比例匹配），产出 `birdview-pN.png`（AI 美图）。
+- 兜底：确定性 `birdview-pN.svg` 保留，AI 失败自动回退矢量图（前端提示「⚠ AI 渲染失败，已用矢量图」）。
+- 效果图加 `seed`（同 base + 方案/视角偏移），风格更统一。
+- 同批修正：拆墙孤儿化校验考虑「新墙重建覆盖≥80%」（拆墙+重建不再误废，治重试后只剩 1 套方案）；全部 SVG 输出加 `width`/`height` 属性（治 Safari 横滚）+ 画廊 `min-w-0`/`overflow-x-hidden` 加固；鸟瞰 v2 木纹/瓷砖/渐变/模糊投影材质。
+
+### 验证
+- e2e：AI 鸟瞰 + SVG 回退 + plain 参考 + aspectRatio 全通过；test 116、typecheck、build 全绿。
+
 ## v0.11.56 (2026-10-29) — 运行数据拉取 data-pull
 
 ### 变更

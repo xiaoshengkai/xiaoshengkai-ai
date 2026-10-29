@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.11.56 (2026-10-29) — 运行数据拉取 data-pull
+
+### 变更
+- **`sync.sh data-pull`**：server→Mac 拉运行数据（`--ignore-existing` 本地优先，只补服务器独有；排除 `chroma/` `chroma.mac-bak/` `bin/` `.lock/` `auth.json`），补齐工作流执行记录/资产、tasks、settings、static、exports、xhs-tasks、conversations 到本地 `data/`（此前只有 conv-pull 单拉对话、backup 拉备份副本 `data-backup/`）。conv-pull 保留为快速子集。
+
+### 验证
+- `bash -n scripts/sync.sh` 通过；实跑本地工作流执行记录 15 → 18（补进服务器独有 `4cd8fae19188`/`e04768ca18ba`/`eb01d34bad05`），本地同名 settings 文件 mtime 不变（零覆盖）。`eb01d34bad05` 因服务器该工作流仍在运行，`birdview-p1.svg` 竞态未拉全（exit 23 如实报部分失败），幂等重跑即补齐。
+
 ## v0.11.55 (2026-10-29) — 户型确定性 3D 鸟瞰 + 效果图单图微调
 
 ### 变更

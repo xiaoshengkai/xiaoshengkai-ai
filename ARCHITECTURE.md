@@ -41,7 +41,7 @@ ai-engineer-journey/
 │   ├── prod.sh / dev.sh / stop.sh / log.sh   # prod.sh：体检→门禁→stop→start→暴露自适应→自检（见「生产部署」）
 │   ├── deploy.sh             # Mac 侧发版编排（npm run deploy）：永远 master，pull origin 90s 超时→bundle 兜底→prod.sh→状态轮询→公网冒烟五连；`deploy:smoke` 前置短路=仅冒烟
 │   ├── deploy-common.sh      # deploy/sync/prod 共享解析：DEPLOY_TARGET/DEPLOY_PATH（env>.env）+ public_url 单源
-│   ├── sync.sh               # 部署同步：env / site(server→Mac 镜像) / site-push / migrate-data / backup(30min) / conv-pull(server→Mac 对话) / install-cron / uninstall-cron / harden
+│   ├── sync.sh               # 部署同步：env / site(server→Mac 镜像) / site-push / migrate-data / backup(30min) / conv-pull(server→Mac 对话) / data-pull(server→Mac 运行数据，本地优先) / install-cron / uninstall-cron / harden
 │   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
 │   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；默认回环、PROXY_BIND 可放开；静态服务带路径穿越防护）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs

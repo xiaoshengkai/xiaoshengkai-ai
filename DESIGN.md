@@ -415,6 +415,7 @@ scripts/sync.sh env            # Mac→server 同步 .env（远端自动备份�
 scripts/sync.sh migrate-data   # 一次性接班迁移 data/（两端停服）
 scripts/sync.sh backup         # server→Mac data-backup/（无 --delete；排除 chroma/bin）
 scripts/sync.sh conv-pull      # server→Mac 对话（本地优先 --ignore-existing，只补服务器独有；--with-uploads 连图片）
+scripts/sync.sh data-pull      # server→Mac 运行数据（本地优先 --ignore-existing；排除 chroma/chroma.mac-bak/bin/auth.json；含对话，conv-pull 为快速子集）
 scripts/sync.sh install-cron   # Mac LaunchDaemon 每 30min + 装即首跑 + wake 补跑
 scripts/sync.sh harden         # 服务器加固（见下）
 ```

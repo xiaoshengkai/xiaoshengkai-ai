@@ -5,9 +5,10 @@ import { parseJSON } from "@app/shared/llm/parse-json.js";
 import { renderPlan, readImg } from "./render.js";
 import { renderPlanMd } from "./render-md.js";
 import { renderArchitectural, renderLayout } from "./render-arch.js";
+import { renderBirdview } from "./render-birdview.js";
 import { loadWallMask, nearMask } from "./snap.js";
 import { resolvePlanSpecs, resolveFurniture } from "./anchors.js";
-import { generateRenderings } from "./generate-render.js";
+import { generateEffects } from "./generate-render.js";
 import { readState, writeState } from "../../../lib/state.js";
 import { areaM2, roomTypeByLabel } from "./metrics.js";
 
@@ -397,7 +398,7 @@ ${tierList}
     fs.writeFileSync(layoutOriginalPath, renderLayout(structure, null, originalFurniture));
   }
 
-  // 每套方案：平面布置图 + 多视角效果图 + 俯视平面图（图生失败降级不废方案）
+  // 每套方案：平面布置图 + 确定性俯视鸟瞰 + 多视角效果图（图生失败降级不废方案）
   const renderings = [];
   for (let i = 0; i < plans.length; i++) {
     const p = plans[i];
@@ -405,17 +406,17 @@ ${tierList}
     const furniture = resolveFurniture(p, structure).furniture;
     const layoutFile = `layout-p${idx}.svg`;
     fs.writeFileSync(path.join(executionDir, layoutFile), renderLayout(structure, p, furniture));
-    const layoutCleanFile = `layout-p${idx}-clean.svg`;
-    fs.writeFileSync(path.join(executionDir, layoutCleanFile), renderLayout(structure, p, furniture, { noLabels: true }));
-    updateProgress(executionDir, `生成渲染图 ${idx}/${plans.length}…`);
-    const r = await generateRenderings({ structure, plan: p, style, layoutCleanFile: path.join(executionDir, layoutCleanFile), executionDir, planIdx: idx, retryForce });
-    renderings.push({ planId: p.id, title: p.title, layout: layoutFile, ...r });
+    const birdviewFile = `birdview-p${idx}.svg`;
+    fs.writeFileSync(path.join(executionDir, birdviewFile), renderBirdview(structure, p, furniture, style));
+    updateProgress(executionDir, `生成效果图 ${idx}/${plans.length}…`);
+    const effects = await generateEffects({ structure, plan: p, style, executionDir, planIdx: idx, retryForce });
+    renderings.push({ planId: p.id, title: p.title, layout: layoutFile, birdview: birdviewFile, effects });
   }
 
-  const renderFailed = renderings.some(r => r.birdviewError || (r.effects || []).some(e => e.error));
+  const renderFailed = renderings.some(r => (r.effects || []).some(e => e.error));
   const output = plans.map(p => `【${p.tier}】${p.title}：${p.summary}`).join("\n") +
     (extraLines.length ? `\n${extraLines.join("；")}` : "") +
-    (renderFailed ? "\n部分渲染图生成失败（方案仍有效，可重试本步补图）" : "");
+    (renderFailed ? "\n部分效果图生成失败（方案仍有效，可重试本步补图）" : "");
   return { pages, mdFiles: plans.map((_, i) => `plan-p${i + 1}.md`), architecture, layoutOriginal, renderings, output };
 }
 

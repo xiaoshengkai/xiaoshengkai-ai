@@ -83,6 +83,7 @@ export default function ExecutionDetailPage() {
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; tweak?: boolean }[]>([]);
   const [tweakPages, setTweakPages] = useState<number[]>([]);
+  const [fpTweakFile, setFpTweakFile] = useState<string | null>(null);
   const [fpStructure, setFpStructure] = useState<any>(null);
   const [fpConfirmed, setFpConfirmed] = useState(false);
   const [fpConfirming, setFpConfirming] = useState(false);
@@ -390,6 +391,7 @@ export default function ExecutionDetailPage() {
     const imagePaths = tweakImages.map(i => i.path).filter(Boolean);
     if (tweakMode === "ai" && !tweakFeedback.trim()) { toast("🔴 请输入反馈"); return; }
     if (isComic && tweakPages.length !== 1) { toast("🔴 请选择要处理的一页"); return; }
+    if (isFloorplan && !fpTweakFile) { toast("🔴 请先选择要微调的图"); return; }
     if (tweakMode === "replace" && imagePaths.length !== 1) { toast("🔴 请上传或粘贴 1 张替换图"); return; }
     const uploading = tweakImages.filter(i => i.isUploading);
     if (uploading.length > 0) { toast("🔴 图片上传中，请稍候"); return; }
@@ -400,9 +402,10 @@ export default function ExecutionDetailPage() {
     setShowTweak(false);
 
     try {
+      const pages = isFloorplan ? (fpTweakFile ? [fpTweakFile] : []) : (isComic ? tweakPages : undefined);
       const res = await fetch(`${BASE}/api/workflows/execution/${id}/tweak`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: tweakMode, feedback: tweakFeedback, imagePaths, pages: isComic ? tweakPages : undefined }),
+        body: JSON.stringify({ mode: tweakMode, feedback: tweakFeedback, imagePaths, pages }),
       });
       const data = await res.json();
       clientLog(id, "INFO", `handleTweak response: ok=${data.ok} status=${data.status}`);
@@ -415,10 +418,16 @@ export default function ExecutionDetailPage() {
       }
     } catch { toast("🔴 请求失败"); }
     setTweaking(false);
-  }, [id, tweakFeedback, tweakImages, fetchExecution, isComic, tweakPages, tweakMode]);
+  }, [id, tweakFeedback, tweakImages, fetchExecution, isComic, isFloorplan, tweakPages, fpTweakFile, tweakMode]);
 
   const openTweakForPage = useCallback((page: number) => {
     setTweakPages([page]);
+    setShowTweak(true);
+  }, []);
+
+  const openFloorplanTweak = useCallback((file: string) => {
+    setFpTweakFile(file);
+    setTweakMode("ai");
     setShowTweak(true);
   }, []);
 
@@ -494,7 +503,7 @@ export default function ExecutionDetailPage() {
           </button>
         )}
         {isDone && supportsTweak && (
-          <button onClick={() => { setShowTweak(true); setTweakMode("ai"); if (isComic) setTweakPages([]); }}
+          <button onClick={() => { setShowTweak(true); setTweakMode("ai"); if (isComic) setTweakPages([]); if (isFloorplan) setFpTweakFile(null); }}
             disabled={isTweakRunning}
             className={`brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold ${isTweakRunning ? "bg-muted text-muted-foreground" : "bg-purple text-white"}`}>
             <Edit3 className="w-3 h-3" /> 微调
@@ -586,7 +595,7 @@ export default function ExecutionDetailPage() {
 
             // 优先级0.5：floorplan generate → 设计交付四视图画廊
             if (isFloorplan && activeStep.id === "generate" && activeStep.status === "completed") {
-              return <FloorplanGallery step={activeStep} executionId={execution.executionId} />;
+              return <FloorplanGallery step={activeStep} executionId={execution.executionId} onTweak={openFloorplanTweak} />;
             }
 
             // 优先级1：script step → JSON tabs
@@ -697,11 +706,11 @@ export default function ExecutionDetailPage() {
         >
           <AlertDialogHeader>
             <AlertDialogTitle className="font-extrabold text-lg text-foreground">
-              {isComic ? "微调漫画" : "微调脚本"}
+              {isComic ? "微调漫画" : isFloorplan ? "微调效果图" : "微调脚本"}
             </AlertDialogTitle>
           </AlertDialogHeader>
           <div className="py-2 space-y-3">
-            {isComic && (
+            {(isComic || isFloorplan) && (
               <div className="flex gap-2 text-xs">
                 <button onClick={() => setTweakMode("ai")} className={`px-2 py-1 border-2 border-border font-bold ${tweakMode === "ai" ? "bg-purple text-white" : "bg-card"}`}>AI 微调</button>
                 <button onClick={() => setTweakMode("replace")} className={`px-2 py-1 border-2 border-border font-bold ${tweakMode === "replace" ? "bg-purple text-white" : "bg-card"}`}>直接替换图片</button>
@@ -936,7 +945,7 @@ export default function ExecutionDetailPage() {
   }
 }
 
-function FloorplanGallery({ step, executionId }: { step: ExecutionStep; executionId: string }) {
+function FloorplanGallery({ step, executionId, onTweak }: { step: ExecutionStep; executionId: string; onTweak: (file: string) => void }) {
   const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
   const { register, open } = useImageViewer();
   let data: any = null;
@@ -1000,7 +1009,12 @@ function FloorplanGallery({ step, executionId }: { step: ExecutionStep; executio
               <div className="space-y-2">
                 {(r.effects || []).map((e: any) => (
                   <div key={e.file}>
-                    <p className="text-[10px] text-muted-foreground/70 mb-0.5">{e.label}</p>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <p className="text-[10px] text-muted-foreground/70">{e.label}</p>
+                      {!e.error && (
+                        <button onClick={() => onTweak(e.file)} className="text-[10px] font-bold text-purple hover:underline">✏️ 微调</button>
+                      )}
+                    </div>
                     {e.error ? placeholder(e.label, e.error) : img(e.file, e.label)}
                   </div>
                 ))}

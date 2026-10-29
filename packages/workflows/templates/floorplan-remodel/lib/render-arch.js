@@ -155,7 +155,7 @@ export function renderArchitectural(structure) {
 
 // ─── 家具俯视图元库 ──────────────────────────────────────────────
 
-const GLYPHS = {
+export const GLYPHS = {
   bed: (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="none"/><rect x="${x}" y="${y}" width="${w * 0.22}" height="${h}" fill="#bbb"/>`,
   sofa: (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="none"/><rect x="${x}" y="${y}" width="${w}" height="${h * 0.3}" fill="#bbb"/><rect x="${x}" y="${y}" width="${w * 0.12}" height="${h}" fill="#ccc"/><rect x="${x + w * 0.88}" y="${y}" width="${w * 0.12}" height="${h}" fill="#ccc"/>`,
   dining: (x, y, w, h) => {

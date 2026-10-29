@@ -1,14 +1,12 @@
 import fs from "node:fs";
-import sharp from "sharp";
 import { generateImage } from "@app/shared/llm/index.js";
 import { withTimeout } from "@app/shared/utils.js";
 import { areaM2 } from "./metrics.js";
 
 /**
- * 户型效果图（多视角人视点）+ 俯视平面图（鸟瞰渲染）生成：
- * - 效果图：每方案 N 个关键空间视角（客餐厅/主卧/厨卫），纯文本 prompt + 结构化家具描述
- * - 俯视平面图：以「去文字」的平面布置图 SVG 栅格化 PNG 作图生图参考 + 文本布局锚定
- * 幂等复用、单张失败降级（写 error 字段，不废方案）。
+ * 户型效果图（多视角人视点）生成：每方案 N 个关键空间视角（客餐厅/主卧/厨卫），
+ * 纯文本 prompt + 结构化家具描述。幂等复用、单张失败降级（写 error 字段，不废方案）。
+ * 俯视鸟瞰不在这里生成（改确定性 SVG，见 render-birdview.js）。
  */
 
 const STYLE_PROMPTS = {
@@ -56,7 +54,7 @@ function roomAreaSqM(room, structure) {
 }
 
 // 房间 id / newRooms 下标 → 家具类型数组（raw plan.furniture）
-function furnitureByRoom(plan) {
+export function furnitureByRoom(plan) {
   const map = {};
   for (const fr of plan?.furniture || []) {
     const key = fr?.roomId || (fr?.nr != null ? `nr:${fr.nr}` : null);
@@ -67,7 +65,7 @@ function furnitureByRoom(plan) {
 }
 
 // 效果图视角选择：客餐厅（缺则最大房间）/ 主卧 / 厨房（缺则卫生间）
-function pickEffectViews(structure, plan) {
+export function pickEffectViews(structure, plan) {
   const byRoom = furnitureByRoom(plan);
   const rooms = structure.rooms || [];
   const byArea = (a, b) => (roomAreaSqM(b, structure) || 0) - (roomAreaSqM(a, structure) || 0);
@@ -86,7 +84,7 @@ function pickEffectViews(structure, plan) {
   return views;
 }
 
-function effectPrompt(view, structure, styleDesc) {
+export function effectPrompt(view, structure, styleDesc) {
   const area = roomAreaSqM(view.room, structure);
   const furn = (view.furniture || []).map(t => FURN_ZH[t] || t).filter(Boolean);
   const furnText = furn.length ? furn.join("、") : "合理布置";
@@ -94,45 +92,13 @@ function effectPrompt(view, structure, styleDesc) {
   return `室内设计效果图，人视点透视（正对空间主立面，广角镜头）。空间：${view.label}${areaText ? `（${areaText}）` : ""}。${styleDesc}。家具布置：${furnText}。真实光影、材质细腻、高清渲染、画面干净无文字无水印。`;
 }
 
-// 结构化文字布局描述（鸟瞰的文本锚定，与参考图互补）
-function layoutDescription(structure, plan) {
-  const byRoom = furnitureByRoom(plan);
-  const parts = [];
-  for (const r of structure.rooms || []) {
-    const types = byRoom[r.id] || [];
-    parts.push(`${r.label}：${types.length ? types.map(t => FURN_ZH[t] || t).join("、") : "无家具"}`);
-  }
-  for (let i = 0; i < (plan.newRooms || []).length; i++) {
-    const nr = plan.newRooms[i];
-    const types = byRoom[`nr:${i}`] || [];
-    parts.push(`${nr.label}：${types.length ? types.map(t => FURN_ZH[t] || t).join("、") : "无家具"}`);
-  }
-  return parts.join("；");
-}
-
-function birdviewPrompt(structure, plan, styleDesc) {
-  return `家居俯视鸟瞰效果图（3D 顶视图），正上方近似俯视，家具立体带侧面高度与阴影，真实材质与光影，白墙底平面。${styleDesc}。
-空间与家具布局（必须严格遵守）：${layoutDescription(structure, plan)}。
-严格依据参考平面布置图：墙体位置、房间比例、门窗位置与参考图完全一致，只把线框图元替换成对应真实材质 3D 家具，禁止新增/删除/移动家具，禁止输出任何文字标注。`;
-}
-
-async function layoutPngBase64(layoutFile) {
-  const png = await sharp(fs.readFileSync(layoutFile)).png().toBuffer();
-  return `data:image/png;base64,${png.toString("base64")}`;
-}
-
 /**
- * 为单套方案生成多视角效果图 + 俯视平面图。
- * 返回 { effects:[{file,label,error?}], birdview, birdviewError }。
+ * 为单套方案生成多视角效果图。返回 [{file,label,error?}]。
  */
-export async function generateRenderings({ structure, plan, style, layoutCleanFile, executionDir, planIdx, retryForce }) {
+export async function generateEffects({ structure, plan, style, executionDir, planIdx, retryForce }) {
   const styleDesc = stylePrompt(style);
-  const birdviewFile = `birdview-p${planIdx}.png`;
-  const birdviewPath = `${executionDir}/${birdviewFile}`;
-  const result = { birdview: birdviewFile };
-
   const views = pickEffectViews(structure, plan);
-  const effects = await Promise.all(views.map(async (v) => {
+  return Promise.all(views.map(async (v) => {
     const file = `render-p${planIdx}-${v.key}.png`;
     const p = `${executionDir}/${file}`;
     if (!retryForce && fs.existsSync(p) && fs.statSync(p).size > 0) return { file, label: v.label };
@@ -145,19 +111,4 @@ export async function generateRenderings({ structure, plan, style, layoutCleanFi
       return { file, label: v.label, error: e instanceof Error ? e.message : String(e) };
     }
   }));
-
-  if (!retryForce && fs.existsSync(birdviewPath) && fs.statSync(birdviewPath).size > 0) {
-    result.birdviewError = null;
-  } else {
-    try {
-      const ref = await layoutPngBase64(layoutCleanFile);
-      const urls = await generateImage(birdviewPrompt(structure, plan, styleDesc), { aspectRatio: "16:9", image_url: ref });
-      if (!urls[0]) throw new Error("俯视平面图未生成");
-      await download(urls[0], birdviewPath);
-    } catch (e) {
-      result.birdviewError = e instanceof Error ? e.message : String(e);
-    }
-  }
-
-  return { effects, ...result };
 }

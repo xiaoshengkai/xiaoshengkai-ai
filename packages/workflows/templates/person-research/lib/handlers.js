@@ -126,6 +126,9 @@ export async function handleReport({ params }) {
     sources: loadSources(dir).map(s => ({
       id: s.id, url: s.url, title: s.title, domain: s.domain,
       domainClass: s.domainClass, scraped: s.scraped, snippet: (s.snippet || "").slice(0, 120),
+      relevanceScore: s.relevanceScore ?? null,
+      relevanceDecision: s.relevanceDecision ?? null,
+      evidenceUse: s.evidenceUse ?? null,
     })),
   };
 }

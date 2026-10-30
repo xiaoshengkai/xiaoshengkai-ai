@@ -1093,6 +1093,10 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
     ...structure,
     rooms: rooms.map(r => r.id === id ? { ...r, label } : r),
   });
+  const setRoomUsage = (id: string, usage: string) => onChange({
+    ...structure,
+    rooms: rooms.map(r => r.id === id ? { ...r, usage } : r),
+  });
   const toggleBearing = (id: string) => onChange({
     ...structure,
     walls: walls.map(w => w.id === id ? { ...w, bearing: !w.bearing } : w),
@@ -1184,7 +1188,7 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
       </div>
 
       <div className="border-2 border-border bg-card p-3 text-xs">
-        <label className="font-bold text-foreground block mb-1.5">🏠 房间名（{rooms.length}）</label>
+        <label className="font-bold text-foreground block mb-1.5">🏠 房间名（{rooms.length}）<span className="font-normal text-muted-foreground"> 用途影响家具尺寸与方案生成</span></label>
           <div className="space-y-1">
             {rooms.map(r => (
               <div
@@ -1200,6 +1204,13 @@ function FloorplanConfirmPanel({ structure, executionId, notice, onChange, onCon
                 onChange={(e) => setRoomLabel(r.id, e.target.value)}
                 className="flex-1 px-2 py-1 border-2 border-[var(--border)] rounded-none bg-card focus:outline-none"
               />
+              <select
+                value={r.usage ?? ""}
+                onChange={(e) => setRoomUsage(r.id, e.target.value)}
+                className="w-20 shrink-0 px-1 py-1 border-2 border-[var(--border)] rounded-none bg-card focus:outline-none"
+              >
+                {["主卧", "次卧", "书房", "厨房", "卫生间", "客厅", "餐厅", "阳台", "过道", "储藏", "多功能"].map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
             </div>
           ))}
         </div>

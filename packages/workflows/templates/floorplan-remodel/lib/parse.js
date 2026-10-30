@@ -33,7 +33,7 @@ function buildSystem(imgW, imgH, cv) {
 坐标系：原图像素坐标，x∈[0,${imgW}]，y∈[0,${imgH}]，y 向下。
 {
   "walls": [{ "id": "w1", "x1": <px>, "y1": <px>, "x2": <px>, "y2": <px>, "bearing": <true/false>, "confidence": <0-1> }],
-  "rooms": [{ "id": "r1", "label": "<图上房间名>", "center": [x, y], "area": "<图上标注面积，如 12㎡；无则 null>", "bbox": [x1, y1, x2, y2] }],
+  "rooms": [{ "id": "r1", "label": "<图上房间名>", "usage": "<主卧|次卧|书房|厨房|卫生间|客厅|餐厅|阳台|过道|储藏|多功能>", "center": [x, y], "area": "<图上标注面积，如 12㎡；无则 null>", "bbox": [x1, y1, x2, y2] }],
   "openings": [{ "id": "d1", "type": "door|window", "wallId": "<所属墙id>", "pos": <0-1 沿墙起点到终点比例> }],
   "dims": [{ "edge": "top|bottom|left|right", "values": [<该排尺寸标注的毫米数，按从左到右/从上到下顺序>], "x1": <该排标注覆盖的起点x>, "y1": <起点y>, "x2": <终点x>, "y2": <终点y> }],
   "entryDoorId": "<入户门 opening 的 id（最外侧一扇门），不确定写 null",
@@ -45,6 +45,7 @@ function buildSystem(imgW, imgH, cv) {
 ${wallRules}
 - 尺寸标注线（图外围带箭头和数字的细线）不是墙！坐标严禁参考标注线，必须落在墙体像素上
 - rooms.bbox 取房间墙线内边界矩形；center 取几何中心
+- rooms.usage 按房间功能判型：主卧/次卧/书房/厨房/卫生间/客厅/餐厅/阳台/过道/储藏/多功能；卧室优先从图上标注或面积判主卧（最大那间），不确定卧室用途就写"卧室"（下游按面积补分主卧/次卧）
 - wetRooms：所有厨房、卫生间、淋浴间等湿区的 room id 数组（这些房间有排水立管）
 - adjacency：输出相邻房间的 room id 对 [{a,b}]，每对两个房间共享一堵墙或有门相通
 - dims：只录图上清晰可见的尺寸标注排（如顶部 2670/3415/1070），values 按标注原文数字，x1y1x2y2 取该排尺寸线两端对应的墙体像素位置；看不清就不录`;
@@ -91,6 +92,7 @@ function normalize(structure, imgW, imgH, cvWalls) {
     rooms: (structure.rooms || []).map((r, i) => ({
       id: String(r.id || `r${i + 1}`),
       label: String(r.label || `房间${i + 1}`),
+      usage: String(r.usage || ""),
       center: Array.isArray(r.center) ? r.center.map(Number) : [500, 350],
       area: r.area ? String(r.area) : null,
       bbox: Array.isArray(r.bbox) && r.bbox.length === 4 ? r.bbox.map(v => Number(v) || 0) : null,
@@ -115,6 +117,40 @@ function normalize(structure, imgW, imgH, cvWalls) {
       : [],
     confirmed: false,
   };
+}
+
+// 房间用途分类：label 正则判型 + 卧室按面积补分主卧/次卧
+function inferUsageByLabel(label) {
+  const s = String(label || "");
+  if (/厨房/.test(s)) return "厨房";
+  if (/卫生间|淋浴|浴室|洗手|卫/.test(s)) return "卫生间";
+  if (/客厅|起居/.test(s)) return "客厅";
+  if (/餐厅/.test(s)) return "餐厅";
+  if (/阳台/.test(s)) return "阳台";
+  if (/过道|走廊|玄关|门厅/.test(s)) return "过道";
+  if (/书房|办公|电竞|多功能|学习|舱/.test(s)) return "书房";
+  if (/储藏|储物|衣帽/.test(s)) return "储藏";
+  if (/卧室|主卧|次卧|客房|儿童|睡|房间/.test(s)) return "卧室";
+  return "多功能";
+}
+
+function bboxAreaPx(b) {
+  if (!Array.isArray(b) || b.length !== 4) return 0;
+  return Math.max(0, Number(b[2]) - Number(b[0])) * Math.max(0, Number(b[3]) - Number(b[1]));
+}
+
+export function classifyUsages(normalized) {
+  const rooms = normalized.rooms || [];
+  for (const r of rooms) {
+    if (!r.usage) r.usage = inferUsageByLabel(r.label);
+  }
+  // 卧室补分：面积最大=主卧，其余=次卧（确定性，保证恰一个主卧）
+  const bed = rooms.filter(r => /卧室|主卧|次卧|客房|睡/.test(String(r.usage)));
+  if (bed.length) {
+    bed.sort((a, b) => bboxAreaPx(b.bbox) - bboxAreaPx(a.bbox));
+    bed[0].usage = "主卧";
+    for (let i = 1; i < bed.length; i++) bed[i].usage = "次卧";
+  }
 }
 
 function computeMmPerPx(normalized) {
@@ -289,6 +325,7 @@ export async function parseFloorPlan(imagePath, executionDir, areaM2) {
     snapStats = { snapped: normalized.walls.length * 2, missed: 0, extent: cvPre.extent, det: cvPre.det };
   }
   normalized.source = cv ? "cv" : "vision";
+  classifyUsages(normalized);
   reclassifyBearing(normalized, snapStats.extent);
   if (snapStats.det && snapStats.det.openings.length > 0) {
     normalized.openings = snapStats.det.openings

@@ -98,19 +98,47 @@ export function resolvePlanSpecs(p, structure) {
   return { build, newRooms, errors };
 }
 
+// 家具真实尺寸（mm）：w=主边(长)、d=深(宽)；卧室床按用途区分
+const FURN_SIZE = {
+  bed: { w: 2000, d: 1500 }, sofa: { w: 2800, d: 900 }, dining: { w: 1400, d: 850 },
+  toilet: { w: 700, d: 450 }, sink: { w: 900, d: 500 }, shower: { w: 900, d: 900 },
+  bathtub: { w: 1700, d: 800 }, kitchen: { w: 2000, d: 600 }, desk: { w: 1200, d: 600 },
+  wardrobe: { w: 1500, d: 600 }, tv: { w: 2000, d: 450 }, fridge: { w: 700, d: 700 },
+  washer: { w: 650, d: 650 }, table: { w: 1200, d: 600 }, stool: { w: 450, d: 450 },
+  storage: { w: 1000, d: 500 },
+};
+const BED_BY_USAGE = { "主卧": { w: 2000, d: 1800 }, "次卧": { w: 2000, d: 1500 }, "客房": { w: 2000, d: 1500 } };
+
+// 家具尺寸归一化：rel 框中心锚点保留，尺寸/长宽比按类型+用途钳到真实值（治 LLM 家具不成比例）
+function normalizeFurnitureBox(type, bbox, mmPerPx, usage) {
+  let size = FURN_SIZE[type];
+  if (!size || !mmPerPx) return bbox;
+  if (type === "bed" && usage && BED_BY_USAGE[usage]) size = BED_BY_USAGE[usage];
+  const wPx = size.w / mmPerPx;
+  const dPx = size.d / mmPerPx;
+  const cx = (bbox[0] + bbox[2]) / 2;
+  const cy = (bbox[1] + bbox[3]) / 2;
+  const horiz = (bbox[2] - bbox[0]) >= (bbox[3] - bbox[1]);
+  const w = horiz ? wPx : dPx;
+  const h = horiz ? dPx : wPx;
+  return [Math.round(cx - w / 2), Math.round(cy - h / 2), Math.round(cx + w / 2), Math.round(cy + h / 2)];
+}
+
 /**
  * 家具布置解析：{ roomId, items:[{type, rel:[0-1 x4]}] } → 房间 bbox 内像素矩形（确定性，治 LLM 像素 hallucinate）
- * 返回扁平 { type, bbox:[x1,y1,x2,y2] } 列表，renderLayout 直接绘制。
+ * 尺寸按类型+房间用途归一化到真实 mm 尺寸，返回扁平 { type, bbox:[x1,y1,x2,y2] } 列表。
  */
 export function resolveFurniture(p, structure) {
   const errors = [];
   const furniture = [];
   const newRooms = Array.isArray(p?.newRooms) ? p.newRooms : [];
+  const mmPerPx = structure.mmPerPx;
   for (const fr of (p?.furniture || [])) {
-    let box = null;
+    let box = null, usage = "";
     if (fr?.roomId) {
       const r = (structure.rooms || []).find(x => x.id === fr.roomId);
       box = r && Array.isArray(r.bbox) && r.bbox.length === 4 ? r.bbox : null;
+      usage = r?.usage || "";
       if (!box) { errors.push(`furniture.roomId ${fr.roomId} 不存在或无 bbox`); continue; }
     } else if (fr?.nr != null) {
       const nr = newRooms[Number(fr.nr)];
@@ -127,13 +155,21 @@ export function resolveFurniture(p, structure) {
         continue;
       }
       const [a, b, c, d] = it.rel.map(clamp01);
+      const raw = [
+        Math.round(x1 + (x2 - x1) * Math.min(a, c)),
+        Math.round(y1 + (y2 - y1) * Math.min(b, d)),
+        Math.round(x1 + (x2 - x1) * Math.max(a, c)),
+        Math.round(y1 + (y2 - y1) * Math.max(b, d)),
+      ];
+      const type = String(it.type || "storage");
+      const sized = normalizeFurnitureBox(type, raw, mmPerPx, usage);
       furniture.push({
-        type: String(it.type || "storage"),
+        type,
         bbox: [
-          Math.round(x1 + (x2 - x1) * Math.min(a, c)),
-          Math.round(y1 + (y2 - y1) * Math.min(b, d)),
-          Math.round(x1 + (x2 - x1) * Math.max(a, c)),
-          Math.round(y1 + (y2 - y1) * Math.max(b, d)),
+          Math.max(x1, Math.min(x2, sized[0])),
+          Math.max(y1, Math.min(y2, sized[1])),
+          Math.max(x1, Math.min(x2, sized[2])),
+          Math.max(y1, Math.min(y2, sized[3])),
         ],
       });
     }

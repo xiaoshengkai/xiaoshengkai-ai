@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 import { validatePlanWithRules, generatePlans } from "../../workflows/templates/floorplan-remodel/lib/generate.js";
-import { getImageSize } from "../../workflows/templates/floorplan-remodel/lib/parse.js";
+import { getImageSize, classifyUsages } from "../../workflows/templates/floorplan-remodel/lib/parse.js";
 import { extractWalls } from "../../workflows/templates/floorplan-remodel/lib/extract-walls.js";
 import { resolveAnchor, resolvePlanSpecs, resolveFurniture } from "../../workflows/templates/floorplan-remodel/lib/anchors.js";
 import { renderStructure } from "../../workflows/templates/floorplan-remodel/lib/render.js";
@@ -412,4 +412,46 @@ test("判型：细门扇线跨门洞=door，宽玻璃跨门洞=window（≥3 命
   const win = det.openings.find(o => o.pos > 0.5);
   assert.strictEqual(door?.type, "door", JSON.stringify(det.openings));
   assert.strictEqual(win?.type, "window", JSON.stringify(det.openings));
+});
+
+test("classifyUsages: 空用途按 label 判型，卧室最大=主卧其余=次卧", () => {
+  const s = { rooms: [
+    { id: "r1", label: "卧室A", usage: "", bbox: [0, 0, 300, 400] },
+    { id: "r2", label: "卧室B", usage: "", bbox: [0, 0, 200, 200] },
+    { id: "r3", label: "厨房", usage: "", bbox: [0, 0, 100, 100] },
+    { id: "r4", label: "多功能室", usage: "", bbox: [0, 0, 80, 80] },
+  ]};
+  classifyUsages(s);
+  assert.strictEqual(s.rooms.find(r => r.id === "r1").usage, "主卧");
+  assert.strictEqual(s.rooms.find(r => r.id === "r2").usage, "次卧");
+  assert.strictEqual(s.rooms.find(r => r.id === "r3").usage, "厨房");
+  assert.strictEqual(s.rooms.find(r => r.id === "r4").usage, "书房");
+});
+
+test("resolveFurniture: 家具尺寸按类型/用途归一化", () => {
+  const s = { mmPerPx: 10, rooms: [
+    { id: "r1", label: "主卧", usage: "主卧", bbox: [0, 0, 300, 400] },
+    { id: "r2", label: "次卧", usage: "次卧", bbox: [0, 0, 400, 300] },
+    { id: "r3", label: "客厅", usage: "客厅", bbox: [0, 0, 500, 500] },
+  ]};
+  const p = { furniture: [
+    { roomId: "r1", items: [{ type: "bed", rel: [0, 0, 1, 1] }] },
+    { roomId: "r2", items: [{ type: "bed", rel: [0, 0, 1, 1] }] },
+    { roomId: "r3", items: [{ type: "sofa", rel: [0.1, 0.1, 0.9, 0.5] }] },
+  ]};
+  const { furniture } = resolveFurniture(p, s);
+  const dims = b => {
+    const w = (b[2] - b[0]) * 10, h = (b[3] - b[1]) * 10;
+    return [Math.max(w, h), Math.min(w, h)];
+  };
+  assert.deepEqual(dims(furniture[0].bbox), [2000, 1800], "主卧床 2.0x1.8m");
+  assert.deepEqual(dims(furniture[1].bbox), [2000, 1500], "次卧床 2.0x1.5m");
+  assert.deepEqual(dims(furniture[2].bbox), [2800, 900], "沙发 2.8x0.9m");
+});
+
+test("resolveFurniture: 无比例尺不钳尺寸", () => {
+  const s = { mmPerPx: null, rooms: [{ id: "r1", label: "客厅", usage: "客厅", bbox: [0, 0, 500, 500] }] };
+  const p = { furniture: [{ roomId: "r1", items: [{ type: "sofa", rel: [0.1, 0.1, 0.9, 0.5] }] }] };
+  const { furniture } = resolveFurniture(p, s);
+  assert.deepEqual(furniture[0].bbox, [50, 50, 450, 250], JSON.stringify(furniture[0].bbox));
 });

@@ -277,10 +277,16 @@ async function execute(action, request, match, cliPath, getBody) {
     case "cli": {
       const args = await resolveArgs(action, match.params, getBody);
       if (action.detached) {
+        // stderr/stdout 落盘：detached 进程崩溃/未捕获异常时堆栈可见（治 auto/tweak 无痕卡死）
+        const executionId = args.executionId || "detached";
+        const logFile = path.join(process.cwd(), "..", "..", "logs", "workflows", `detached-${executionId}.log`);
+        let errFd = null;
+        try { errFd = fs.openSync(logFile, "a"); } catch { /* 目录不可写则退回 ignore */ }
         const child = spawn("node", [cliPath, action.command, JSON.stringify(args)], {
-          stdio: "ignore",
+          stdio: errFd == null ? "ignore" : ["ignore", errFd, errFd],
           detached: true,
         });
+        if (errFd != null) fs.closeSync(errFd);
         child.unref();
         return json(action.respond || { ok: true });
       }

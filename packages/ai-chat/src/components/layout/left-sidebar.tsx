@@ -63,6 +63,7 @@ export default function LeftSidebar({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   // 博客与 app 同 origin（proxy 同端口 serve / 博客 + /ai 应用）；挂载后取，SSR 用 "#" 占位防 hydration 失配
@@ -91,6 +92,11 @@ export default function LeftSidebar({
     const handler = () => setMenuOpen(null);
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
+  }, [menuOpen]);
+
+  // 菜单关闭时复位「确认删除」状态，避免残留
+  useEffect(() => {
+    if (!menuOpen) setConfirmDeleteId(null);
   }, [menuOpen]);
 
   const handleNewClick = () => {
@@ -219,11 +225,22 @@ export default function LeftSidebar({
                     <span>重命名</span>
                   </button>
                   <button
-                    onClick={() => handleDelete(conv.id)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono hover:bg-muted cursor-pointer w-full text-destructive"
+                    onClick={() => {
+                      if (confirmDeleteId === conv.id) {
+                        handleDelete(conv.id);
+                        setConfirmDeleteId(null);
+                      } else {
+                        setConfirmDeleteId(conv.id);
+                      }
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-mono cursor-pointer w-full ${
+                      confirmDeleteId === conv.id
+                        ? "bg-destructive text-white"
+                        : "text-destructive hover:bg-muted"
+                    }`}
                   >
                     <Trash2 className="size-3.5" />
-                    <span>删除</span>
+                    <span>{confirmDeleteId === conv.id ? "确认删除？" : "删除"}</span>
                   </button>
                 </div>
               )}

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { normalizeResults, CATEGORY_ENGINES, categoryFetchesContent } from "../lib/searxng.js";
 import { normalizeFirecrawlSearch } from "../lib/firecrawl.js";
+import { normalizeDeepSeekResults } from "../lib/deepseek.js";
 import { cleanResults, isGarbageResult } from "../lib/search.js";
 
 const GENERAL_ENGINES = CATEGORY_ENGINES.general;
@@ -87,6 +88,38 @@ test("normalizeFirecrawlSearch: 拍平 web/news/images + 字段映射", () => {
   assert.equal(results[1].thumbnail, "https://img/1.jpg");
   assert.equal(results[2].thumbnail, "https://img/2.jpg");
   assert.deepEqual(normalizeFirecrawlSearch(null), []);
+});
+
+test("normalizeDeepSeekResults: 字段映射 + 内联正文 + 过滤缺 title/url", () => {
+  const data = {
+    results: [
+      {
+        title: "A",
+        url: "https://a.com",
+        snippet: "短摘要",
+        summary: "长摘要",
+        content: "正文内容",
+        site_name: "站点A",
+        site_icon: "https://a.com/icon.png",
+        date: "2026-06-01T00:00:00Z",
+        authority: 3,
+      },
+      { title: "", url: "https://b.com", summary: "缺 title 应过滤" },
+      { title: "B", url: "", summary: "缺 url 应过滤" },
+      { title: "C", url: "https://c.com", snippet: "", summary: "snippet 空用 summary" },
+    ],
+  };
+  const results = normalizeDeepSeekResults(data);
+  assert.equal(results.length, 2);
+  assert.equal(results[0].snippet, "短摘要");
+  assert.equal(results[0].content, "正文内容");
+  assert.equal(results[0].siteName, "站点A");
+  assert.equal(results[0].authority, 3);
+  assert.equal(results[0].thumbnail, "https://a.com/icon.png");
+  assert.equal(results[0].publishedDate, "2026-06-01T00:00:00Z");
+  assert.deepEqual(results[0].engines, ["deepseek"]);
+  assert.equal(results[1].snippet, "snippet 空用 summary");
+  assert.deepEqual(normalizeDeepSeekResults(null), []);
 });
 
 // ─── 通用清洗（V1.1） ──────────────────────────────────────────────

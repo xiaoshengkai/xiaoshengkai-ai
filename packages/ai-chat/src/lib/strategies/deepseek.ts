@@ -5,7 +5,7 @@ import { getProviderConfig } from "@/lib/settings/dispatcher";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 // ponytail: DeepSeek 自动路由的 flash 档固定（分类 + 轻任务），pro 档读 chat 选择
-const DEEPSEEK_FLASH = "deepseek-v4-flash";
+const DEEPSEEK_FLASH = "deepseek-flash";
 
 export interface ClassifyResult {
   tier: "pro" | "flash";

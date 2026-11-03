@@ -32,3 +32,10 @@ export interface EgressConfig {
   /** 白名单：精确 host / .后缀 / CIDR */
   whitelist: string[];
 }
+
+/** 搜索后端：auto=DeepSeek 优先→Firecrawl→SearXNG；deepseek/firecrawl=强制单一主搜（仍兜底） */
+export type SearchProvider = 'auto' | 'deepseek' | 'firecrawl';
+
+export interface SearchSettings {
+  provider: SearchProvider;
+}

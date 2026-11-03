@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { search } from "./lib/search.js";
 import { scrapeUrl, mapWebsite, crawlWebsite, parseDocument } from "./lib/firecrawl.js";
+import { deepseekFetch } from "./lib/deepseek.js";
 import { CATEGORIES } from "./lib/searxng.js";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,18 @@ const HOST = network.hosts.local;
 
 const searxngBase = `http://${HOST}:${SEARXNG_PORT}`;
 const firecrawlApiKey = readEnv("FIRECRAWL_API_KEY");
+const deepseekApiKey = readEnv("DEEPSEEK_API_KEY");
+const deepseekBaseUrl = readEnv("DEEPSEEK_BASE_URL") || "https://api.deepseek.com/v1";
+
+// 搜索后端选择（fresh-read，设置页保存即生效、无需重启）：auto | deepseek | firecrawl
+function readSearchProvider() {
+  try {
+    const raw = fs.readFileSync(path.join(PROJECT_ROOT, "data", "settings", "search.json"), "utf-8");
+    const cfg = JSON.parse(raw);
+    if (cfg?.provider === "deepseek" || cfg?.provider === "firecrawl") return cfg.provider;
+  } catch { /* 缺文件/坏 JSON → auto */ }
+  return "auto";
+}
 
 function json(res, status, payload) {
   const body = JSON.stringify(payload);
@@ -64,6 +77,7 @@ async function handleSearch(url, res) {
   const result = await search({
     query, category, language, timeRange, page, strategy,
     maxResults, fetchContent, searxngBase, firecrawlApiKey,
+    provider: readSearchProvider(), deepseekApiKey, deepseekBaseUrl,
   });
   json(res, result.ok ? 200 : 502, result);
 }
@@ -72,7 +86,18 @@ async function handleScrape(url, res) {
   const target = requiredUrl(url.searchParams.get("url"));
   if (!target) return json(res, 400, { ok: false, error: "缺少合法的 http/https url 参数" });
   try {
-    const { markdown, metadata } = await scrapeUrl(target, firecrawlApiKey);
+    const useDeepSeek = readSearchProvider() !== "firecrawl" && deepseekApiKey;
+    let markdown, metadata;
+    if (useDeepSeek) {
+      try {
+        ({ markdown, metadata } = await deepseekFetch(target, deepseekApiKey, { baseUrl: deepseekBaseUrl }));
+      } catch (err) {
+        console.warn(`[search-service] DeepSeek Fetch 失败(${err.message})，兜底 Firecrawl`);
+        ({ markdown, metadata } = await scrapeUrl(target, firecrawlApiKey));
+      }
+    } else {
+      ({ markdown, metadata } = await scrapeUrl(target, firecrawlApiKey));
+    }
     json(res, 200, { ok: true, url: target, markdown, metadata });
   } catch (err) {
     json(res, 502, { ok: false, error: err.message });
@@ -139,6 +164,7 @@ const server = http.createServer(async (req, res) => {
       ok: true,
       searxngReady,
       firecrawlConfigured: !!firecrawlApiKey,
+      deepseekConfigured: !!deepseekApiKey,
       categories: CATEGORIES,
     });
   }

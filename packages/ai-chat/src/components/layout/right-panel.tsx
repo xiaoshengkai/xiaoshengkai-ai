@@ -85,7 +85,7 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
 
     const modelName = displayModel || "deepseek-v4-pro";
     const cost = calculateCost(modelName, totalInput, totalOutput)
-      + calculateCost("deepseek-v4-flash", classifyInput, classifyOutput);
+      + calculateCost("deepseek-flash", classifyInput, classifyOutput);
 
     return { totalTokens, cost, modelName, retrievedChunks };
   }, [messages]);

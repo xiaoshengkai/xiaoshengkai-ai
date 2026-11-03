@@ -5,6 +5,7 @@ import {
   categoryFetchesContent,
 } from "./searxng.js";
 import { scrapeUrl, searchWeb as firecrawlSearch } from "./firecrawl.js";
+import { deepseekSearch } from "./deepseek.js";
 
 const MAX_RESULTS = 10;
 const MAX_FETCH = 3;
@@ -83,30 +84,59 @@ export async function search({
   maxResults = 5,
   fetchContent = true,
   strategy = "auto",
+  provider = "auto",
   searxngBase,
   firecrawlApiKey,
+  deepseekApiKey,
+  deepseekBaseUrl,
 }) {
   const engines = CATEGORY_ENGINES[category] || CATEGORY_ENGINES.general;
   const limit = Math.min(Math.max(1, maxResults), MAX_RESULTS);
   const pageno = Math.min(Math.max(1, page || 1), MAX_PAGE);
-  // strategy: auto=现状（Firecrawl 主搜→SearXNG 兜底）；primary=仅 Firecrawl（0 结果即停，人物研究高精度首搜）；
+  // strategy: auto=主搜→SearXNG 兜底；primary=仅主搜（0 结果即停，人物研究高精度首搜）；
   //           expand=仅 SearXNG（受控扩搜换引擎重查）
+  // provider: auto/deepseek=DeepSeek 自研搜索优先（仅 general），firecrawl=维持现状；DeepSeek 内联正文省二次抓取
   const primary = strategy === "primary";
   const expand = strategy === "expand";
+  // DeepSeek 仅用于默认 auto 路径（chat 通用搜索），不干扰 primary/expand（人物研究专用）
+  const wantDeepSeek = category === "general" && provider !== "firecrawl" && strategy === "auto";
 
   let normalized = null;
   let perEngine = null;
-  let provider = "searxng";
+  let usedProvider = "searxng";
+  let inlineContent = false;
   let degraded = false;
   const errors = [];
 
-  if (pageno === 1 && !expand) {
+  if (pageno === 1 && wantDeepSeek) {
+    try {
+      const results = await deepseekSearch(query, deepseekApiKey, {
+        baseUrl: deepseekBaseUrl,
+        count: limit,
+        needContent: fetchContent,
+      });
+      if (results.length > 0) {
+        normalized = results;
+        perEngine = { deepseek: { status: "ok", resultCount: results.length } };
+        usedProvider = "deepseek";
+        inlineContent = fetchContent;
+      } else {
+        errors.push("deepseek: 0 结果");
+        degraded = true;
+      }
+    } catch (err) {
+      errors.push(`deepseek: ${err.message}`);
+      degraded = true;
+    }
+  }
+
+  if (!normalized && pageno === 1 && !expand) {
     try {
       const results = await firecrawlSearch(query, firecrawlApiKey, { category, timeRange, limit });
       if (results !== null && results.length > 0) {
         normalized = results;
         perEngine = { firecrawl: { status: "ok", resultCount: results.length } };
-        provider = "firecrawl";
+        usedProvider = "firecrawl";
       } else if (results !== null) {
         errors.push("firecrawl: 0 结果");
         degraded = true;
@@ -114,7 +144,7 @@ export async function search({
         if (primary) {
           normalized = [];
           perEngine = { firecrawl: { status: "ok", resultCount: 0 } };
-          provider = "firecrawl";
+          usedProvider = "firecrawl";
         }
       }
       // results === null（类别不支持）→ 落 SearXNG（primary 也落：Firecrawl 根本不服务该类别）
@@ -158,12 +188,13 @@ export async function search({
   const results = cleaned.results.slice(0, limit).map((r, i) => ({
     rank: i + 1,
     ...r,
-    content: null,
-    contentFetched: false,
+    // deepseek 已内联正文（inlineContent=true），其余 provider 留空等二次抓取
+    content: r.content ?? null,
+    contentFetched: !!r.content,
     contentError: null,
   }));
 
-  const shouldFetch = fetchContent && categoryFetchesContent(category);
+  const shouldFetch = fetchContent && categoryFetchesContent(category) && !inlineContent;
   const fetchCount = shouldFetch ? Math.min(MAX_FETCH, results.length) : 0;
   if (fetchCount > 0) {
     await Promise.all(
@@ -184,7 +215,7 @@ export async function search({
     query,
     category,
     page: pageno,
-    provider,
+    provider: usedProvider,
     strategy,
     results,
     degraded,

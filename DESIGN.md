@@ -134,6 +134,8 @@ flowchart TD
 
 **联网搜索（webSearch）**：输入框开关（默认关，每对话持久化到 `ConversationRecord.webSearch`）。`WEB_TOOLS` = `searchWeb` + Firecrawl 四件套（`scrapeWebPage`/`mapWebsite`/`crawlWebsite`/`parseDocument`）；关时 `filterWebTools` 剥离这 5 个工具且 `buildToolsSection` 不广告联网段（注入「联网搜索已关闭」提示），开时全量广告。
 
+**搜索后端（search.json）**：设置页「搜索后端」卡，`data/settings/search.json`（`{provider: auto|deepseek|firecrawl}`，默认 auto=DeepSeek 优先→Firecrawl→SearXNG 兜底）。search service 每次请求 fresh-read，保存即生效。DeepSeek Search 用 `need_content=true` 内联正文、跳过二次 Firecrawl scrape；`scrapeWebPage` 主走 DeepSeek Fetch、失败兜底 Firecrawl。**边界**：DeepSeek 只有通用网页搜索，images/videos/wechat 分类、PDF(`parseDocument`)/`map`/`crawl` 仍固定走 Firecrawl/SearXNG。`/ready` 返回 `deepseekConfigured`/`firecrawlConfigured`/`searxngReady` 供选择器画状态点。
+
 **小红书笔记（预览/持久化/下载）**：任务状态存 `data/xhs-tasks/<id>`（原 `os.tmpdir()`，重启即丢 → 改持久化；读侧保留 /tmp 回退）。聊天里的笔记预览：`markdown-components` 捕获 `/note/<id>`（含带 basePath/绝对地址/错端口）的 iframe → 改渲染 `NotePreviewCard`（同源 fetch，规避 iframe 的 basePath/端口问题，且修历史消息）；prompt 禁止模型手写 iframe。导出写 `data/exports/<id>`（每次重建、7 天清理），`exportXiaohongshuNote` 返回 `downloadUrl`（优先 `publicBase()` 绝对地址，便于复制到手机/浏览器）；`/api/exports/<id>` 用 `lib/zip.ts`（node:zlib 手写最小 zip，零依赖）打包流式下载。
 
 **处理流程**
@@ -145,6 +147,11 @@ flowchart TD
 6. `streamText` 按策略模式路由（deepseek / minimax / glm / qwen，DeepSeek 经 classifyTask 分 pro/flash）
 7. SSE 流式返回，图表/视频通过 iframe 预览
 
+**第三方 API 接入分级**（判断是否要做「提前查可用性 + 禁用 + 说明」）：
+1. **用户主动选择/触发**（搜索后端、图片/TTS 等模型能力）→ 必须做：查可用性、不可用则禁用 + 说明。模型类复用 `balance` 路由的状态点；非模型类用各自 `/ready` 配置位（如 `firecrawlConfigured`）。
+2. **后台定时任务**（PushPlus 推送等）→ 只需配置校验 + 明确失败日志，不做 UI 禁用。
+3. **抓取类数据源**（新浪/百度/抖音/eastmoney 等）→ 无 key/配额概念，失败靠 `isGarbageResult` 过滤 + 降级，不属「用不了」。
+
 ## 环境变量
 
 API Key 统一在项目根目录 `.env` 配置：
@@ -153,7 +160,7 @@ API Key 统一在项目根目录 `.env` 配置：
 DEEPSEEK_API_KEY=sk-xxx
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 DEEPSEEK_PRO_MODEL=deepseek-v4-pro
-DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
+DEEPSEEK_FLASH_MODEL=deepseek-flash
 GLM_API_KEY=xxx
 GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
 GLM_EMBEDDING_MODEL=embedding-3

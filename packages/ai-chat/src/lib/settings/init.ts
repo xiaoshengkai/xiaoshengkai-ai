@@ -39,7 +39,7 @@ const DEFAULT_SELECTION: Selection = {
   chat: { provider: "minimax", model: "MiniMax-M3" },
   media: { provider: "minimax", model: "image-01" },
   vector: { provider: "glm", model: "embedding-3" },
-  workflow: { provider: "deepseek", model: "deepseek-v4-pro", flashModel: "deepseek-v4-flash" },
+  workflow: { provider: "deepseek", model: "deepseek-v4-pro", flashModel: "deepseek-flash" },
   tts: { provider: "minimax", model: "speech-2.8-hd" },
   music: { provider: "qwen", model: "fun-music-v1" },
   vision: { provider: "qwen", model: "qwen3.8-max" },
@@ -82,4 +82,16 @@ export function initSettings() {
     }
   }
   if (upgraded) writeSelection(sel);
+
+  // ponytail: DeepSeek 旧 flash 模型名下线 → deepseek-flash（vision 的多模态模型 + workflow 轻量档）
+  let flashMigrated = false;
+  if (sel.vision?.model === "deepseek-v4-flash-vision-exp") {
+    sel.vision = { ...sel.vision, model: "deepseek-flash" };
+    flashMigrated = true;
+  }
+  if (sel.workflow?.flashModel === "deepseek-v4-flash") {
+    sel.workflow = { ...sel.workflow, flashModel: "deepseek-flash" };
+    flashMigrated = true;
+  }
+  if (flashMigrated) writeSelection(sel);
 }

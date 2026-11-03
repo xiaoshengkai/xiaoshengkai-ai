@@ -1,8 +1,9 @@
 // ponytail: hardcoded pricing, update when rates change
 // 默认按 USD 计价（最后乘 7.2 转 ¥）；cny: true 表示已是 ¥ 价，跳过换算
 const PRICING: Record<string, { input: number; output: number; cny?: boolean }> = {
-  "deepseek-v4-pro":  { input: 1.10, output: 4.40 },
-  "deepseek-v4-flash": { input: 0.27, output: 1.10 },
+  // DeepSeek 空闲时段·缓存未命中价（元/百万tokens），高峰×2、缓存命中更低，平铺估算取空闲
+  "deepseek-v4-pro":  { input: 4.5, output: 13.5, cny: true },
+  "deepseek-flash":   { input: 1, output: 4, cny: true },
   "MiniMax-M3":       { input: 0.55, output: 2.19 },
   "qwen3.8-max":      { input: 12, output: 36, cny: true },
   "qwen3.8-flash":    { input: 1, output: 3, cny: true },

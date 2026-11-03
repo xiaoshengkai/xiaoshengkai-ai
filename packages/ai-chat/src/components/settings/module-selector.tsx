@@ -39,7 +39,7 @@ const MODULE_OPTIONS: Record<string, { label: string; icon: string; providers: M
     icon: "👁️",
     providers: [
       { id: "minimax", label: "MiniMax M3", model: "MiniMax-M3", availability: "both" },
-      { id: "deepseek", label: "DeepSeek Flash Vision", model: "deepseek-v4-flash-vision-exp", availability: "both" },
+      { id: "deepseek", label: "DeepSeek Flash (多模态)", model: "deepseek-flash", availability: "both" },
       { id: "qwen", label: "Qwen3.8-Max", model: "qwen3.8-max", availability: "both" },
       { id: "qwen", label: "Qwen3.8-Flash", model: "qwen3.8-flash", availability: "both" },
       { id: "qwen", label: "Qwen3-VL-Flash", model: "qwen3-vl-flash", availability: "api" },

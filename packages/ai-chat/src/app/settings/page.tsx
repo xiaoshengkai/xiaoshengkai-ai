@@ -73,6 +73,7 @@ export default function SettingsPage() {
   const [egressTestUrl, setEgressTestUrl] = useState("https://yapi.cai-inc.com");
   const [egressTest, setEgressTest] = useState<{ ok: boolean; msg: string } | null>(null);
   const [egressTesting, setEgressTesting] = useState(false);
+  const [search, setSearch] = useState<{ provider: string; firecrawlConfigured: boolean } | null>(null);
   const [tab, setTab] = useState<"models" | "services" | "egress" | "security">("models");
 
   useEffect(() => {
@@ -80,10 +81,12 @@ export default function SettingsPage() {
       fetch(`${BASE}/api/settings/providers`).then((r) => r.json()),
       fetch(`${BASE}/api/settings/selection`).then((r) => r.json()),
       fetch(`${BASE}/api/settings/egress`).then((r) => r.json()),
-    ]).then(([p, s, e]) => {
+      fetch(`${BASE}/api/settings/search`).then((r) => r.json()),
+    ]).then(([p, s, e, sr]) => {
       setProviders(p);
       setSelection(s);
       setEgress(e);
+      setSearch(sr);
       savedEgressRef.current = JSON.stringify(e);
     });
   }, []);
@@ -188,6 +191,21 @@ export default function SettingsPage() {
     setDirtySel(true);
   }, []);
 
+  // 搜索后端：点击即保存（fresh-read，search service 下次请求生效）
+  const handleSearchChange = useCallback(async (provider: string) => {
+    setSearch((prev) => (prev ? { ...prev, provider } : prev));
+    try {
+      await fetch(`${BASE}/api/settings/search`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      });
+      toast("🟢 搜索后端已切换");
+    } catch {
+      toast("🔴 搜索后端保存失败");
+    }
+  }, []);
+
   const updateEgress = useCallback((patch: Partial<EgressConfig>) => {
     setEgress((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
@@ -261,7 +279,7 @@ export default function SettingsPage() {
     setSaving(false);
   }, [dirtyProv, dirtySel, providers, selection]);
 
-  if (!providers || !selection || !egress) {
+  if (!providers || !selection || !egress || !search) {
     return (
       <div className="flex items-center justify-center h-dvh">
         <p className="text-xs text-muted-foreground font-mono">加载中...</p>
@@ -375,6 +393,61 @@ export default function SettingsPage() {
           <ModuleSelector module="workflow" current={selection.workflow} onChange={handleSelectionChange} statusByProvider={status} />
           <ModuleSelector module="tts" current={selection.tts || { provider: "minimax", model: "speech-2.8-hd" }} onChange={handleSelectionChange} statusByProvider={status} />
           <ModuleSelector module="music" current={selection.music || { provider: "qwen", model: "fun-music-v1" }} onChange={handleSelectionChange} statusByProvider={status} />
+        </div>
+      </div>
+
+      {/* 搜索后端 */}
+      <div>
+        <h2 className="text-sm font-bold text-foreground mb-3 font-heading">🔍 搜索后端</h2>
+        <div className="brutal bg-card p-3 max-w-2xl">
+          <p className="text-xs text-muted-foreground mb-2 font-mono">
+            联网搜索与网页抓取的后端。images/videos/wechat 分类、PDF/map/crawl 仍走 Firecrawl/SearXNG。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {(() => {
+              const dsAvail = status?.deepseek?.available ?? null;
+              const fcAvail = search ? (search.firecrawlConfigured ? true : false) : null;
+              const opts: { id: string; label: string; available: boolean | null }[] = [
+                { id: "deepseek", label: "DeepSeek（自研）", available: dsAvail },
+                { id: "firecrawl", label: "Firecrawl", available: fcAvail },
+                { id: "auto", label: "自动（DeepSeek 优先）", available: dsAvail === true || fcAvail === true },
+              ];
+              return opts.map((opt) => {
+                const selected = search?.provider === opt.id;
+                const disabled = opt.available === false;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleSearchChange(opt.id)}
+                    disabled={disabled}
+                    className={`brutal-btn px-3 py-2 text-xs font-mono font-bold cursor-pointer border-2 ${
+                      selected
+                        ? "bg-primary text-white border-primary"
+                        : disabled
+                          ? "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                          : "bg-card text-foreground border-border hover:bg-muted"
+                    }`}
+                    title={disabled ? "当前不可用" : ""}
+                  >
+                    {opt.available === true ? "🟢" : opt.available === false ? "🔴" : "⚪"} {opt.label}
+                  </button>
+                );
+              });
+            })()}
+          </div>
+          {(() => {
+            const dsAvail = status?.deepseek?.available ?? null;
+            const fcMissing = search?.firecrawlConfigured === false;
+            if (dsAvail === false || fcMissing) {
+              return (
+                <p className="text-[10px] text-muted-foreground font-mono mt-2">
+                  {dsAvail === false && "DeepSeek 未启用或余额不足。 "}
+                  {fcMissing && "Firecrawl 未配置 FIRECRAWL_API_KEY。"}
+                </p>
+              );
+            }
+            return null;
+          })()}
         </div>
       </div>
       </>)}

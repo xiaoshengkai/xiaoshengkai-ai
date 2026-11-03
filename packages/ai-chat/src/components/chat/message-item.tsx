@@ -38,7 +38,7 @@ function MessageItem({
 
   const modelName = meta?.model || "deepseek-v4-pro";
   const modelDisplay = getModelDisplay(meta?.provider || "deepseek", modelName);
-  const classifyName = "deepseek-v4-flash";
+  const classifyName = "deepseek-flash";
 
   const deduplicatedParts = useMemo(() => {
     return msg.parts.filter((p, i) => {

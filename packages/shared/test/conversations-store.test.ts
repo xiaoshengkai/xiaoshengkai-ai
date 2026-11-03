@@ -39,3 +39,14 @@ test("mode 字段持久化，缺省默认 chat", () => {
   writeConversation("conv-m2", "标题", [{ role: "user" }]);
   assert.equal(readConversation("conv-m2")?.mode, "chat");
 });
+
+test("webSearch 字段持久化，缺省默认 false", () => {
+  writeConversation("conv-w1", "标题", [{ role: "user" }], "deepseek", "build", true);
+  assert.equal(readConversation("conv-w1")?.webSearch, true);
+
+  writeConversation("conv-w1", "标题2", [{ role: "user" }]);
+  assert.equal(readConversation("conv-w1")?.webSearch, true);
+
+  writeConversation("conv-w2", "标题", [{ role: "user" }]);
+  assert.equal(readConversation("conv-w2")?.webSearch, false);
+});

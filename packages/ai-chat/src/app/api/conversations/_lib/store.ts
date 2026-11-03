@@ -21,6 +21,7 @@ export interface ConversationRecord {
   titleLocked?: boolean;
   model?: string;
   mode?: string;
+  webSearch?: boolean;
   messages: unknown[];
 }
 
@@ -111,7 +112,7 @@ function restoreTrimmedOutputs(incoming: unknown[], stored: unknown[]): unknown[
   });
 }
 
-export function writeConversation(id: string, title: string, messages: unknown[], model?: string, mode?: string): ConversationRecord {
+export function writeConversation(id: string, title: string, messages: unknown[], model?: string, mode?: string, webSearch?: boolean): ConversationRecord {
   ensureDir();
   const p = filePath(id);
   const existing = existsSync(p) ? JSON.parse(readFileSync(p, "utf-8")) : null;
@@ -126,6 +127,7 @@ export function writeConversation(id: string, title: string, messages: unknown[]
     titleLocked: existing?.titleLocked ?? false,
     model: model || "deepseek",
     mode: mode || existing?.mode || "chat",
+    webSearch: webSearch ?? existing?.webSearch ?? false,
     messages: merged,
   };
   writeFileSync(p, JSON.stringify(record, null, 2));

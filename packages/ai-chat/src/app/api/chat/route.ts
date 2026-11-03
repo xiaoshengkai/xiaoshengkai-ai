@@ -24,7 +24,7 @@ import { getChatStrategy } from '@/lib/strategies/chat-strategy';
 import { getProviderConfig } from '@/lib/settings/dispatcher';
 import { getMCPClient, resetMCPClient } from '@/lib/mcp-client';
 import { processAttachments } from '@/lib/multimodal/pipeline';
-import { filterToolsByMode, buildToolsSection, MODE_INFO, type ChatMode } from '@/lib/modes';
+import { filterToolsByMode, filterWebTools, buildToolsSection, MODE_INFO, type ChatMode } from '@/lib/modes';
 import { toModelMessages } from './to-model-messages';
 
 // ─── Skill 列表（启动时扫描，注入 system prompt）───────────────────────
@@ -71,7 +71,7 @@ console.log('[SKILL_LIST]', SKILL_LIST || '(空)');
 
 export async function POST(req: Request) {
   try {
-    const { messages, mode = "chat" } = await req.json();
+    const { messages, mode = "chat", webSearch = false } = await req.json();
     const currentMode: ChatMode = mode === "build" || mode === "plan" ? mode : "chat";
 
     if (!messages || !Array.isArray(messages)) {
@@ -92,18 +92,23 @@ export async function POST(req: Request) {
 
     const modelMessages = toModelMessages(processedMessages);
 
-    const retrieved = await retrieveRelevantChunks(userText, 5);
+    // chat 模式纯对话：不注入知识库（0 副作用），plan/build 才做 RAG 检索
+    const retrieved = currentMode === "chat" ? [] : await retrieveRelevantChunks(userText, 5);
     const knowledgeContext = retrieved.length > 0
       ? '以下是从你的笔记中检索到的相关内容，如果与用户问题相关可以参考。\n' +
         retrieved.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n')
       : '';
 
-    const tools = filterToolsByMode(await loadMcpTools(), currentMode);
+    const tools = filterWebTools(
+      filterToolsByMode(await loadMcpTools(), currentMode),
+      webSearch,
+    );
 
     const systemPrompt = buildSystemPrompt({
       knowledgeContext,
       mode: currentMode,
       hasTools: Object.keys(tools).length > 0,
+      webSearch,
     });
 
     const chatConfig = getProviderConfig('chat');
@@ -158,18 +163,25 @@ function buildSystemPrompt({
   knowledgeContext,
   mode,
   hasTools,
+  webSearch,
 }: {
   knowledgeContext: string;
   mode: ChatMode;
   hasTools: boolean;
+  webSearch: boolean;
 }): string {
   const { label: modeLabel, instruction: modeInstruction } = MODE_INFO[mode];
-  const toolsSection = buildToolsSection(mode, hasTools);
+  const toolsSection = buildToolsSection(mode, hasTools, webSearch);
   // 每请求生成，模型据此推算周末/节假日/当季，不再反问用户日期
   const now = new Date().toLocaleString("zh-CN", {
     weekday: "long", year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hour12: false,
   });
+  // chat 纯对话：不注入技能清单与知识库；plan/build 保留技能规则
+  const skillBlock = mode === "chat"
+    ? ""
+    : `\n技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。\n${SKILL_LIST}`;
+  const knowledgeBlock = knowledgeContext ? `\n${knowledgeContext}` : "";
   return `你是小盛开AI，一个实用的编程助手，擅长代码编写、知识管理、图表生成和多媒体创作。用中文思考，所有思考过程必须用中文描述，不要使用英文。用通俗语言回答。参考知识库时自然融入答案，不标注来源。
 
 当前时间: ${now}
@@ -177,12 +189,10 @@ function buildSystemPrompt({
 当前模式: ${modeLabel}
 ${modeInstruction}
 
- 工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。
-
- 技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。
-        ${SKILL_LIST}
-        ${toolsSection}
-        ${knowledgeContext}`;
+工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。
+${skillBlock}
+${toolsSection}
+${knowledgeBlock}`;
 }
 
 /**

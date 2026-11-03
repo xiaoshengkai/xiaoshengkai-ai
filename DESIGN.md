@@ -117,6 +117,7 @@ flowchart TD
 ```json
 {
   "mode": "chat",
+  "webSearch": false,
   "messages": [
     {
       "id": "msg_1",
@@ -129,16 +130,18 @@ flowchart TD
 
 **响应** — SSE 流式返回，由 `@ai-sdk/react` 的 `useChat` 自动解析。
 
-**模式（mode）**：`chat`（自由对话，绿）/ `plan`（只读规划，橙）/ `build`（全权执行，蓝；默认缺省为 chat，每对话独立记忆）。单一真相源在 `lib/modes.ts`：`MODE_INFO`（每模式的 label/canWrite/行为指令）注入 system prompt 头部（`当前模式: <label>` + 行为约束），让模型明确所处状态与能干什么；`WRITE_TOOLS` + `filterToolsByMode` 剥离非 build 的写工具（exec + 文件写 6 + 知识库写 4）；`buildToolsSection(mode, hasTools)` 按模式拼工具清单——写入段仅 build 广告，非 build 追加「本模式无写/执行工具，勿调用，需执行请切 build」。三者（实际工具集 / 广告清单 / 行为指令）严格对齐，杜绝模型调用本模式不存在的工具。plan 为真规划模式：只读调研 → 输出结构化计划（目标/步骤/涉及文件/风险/待确认项）交用户确认，不执行。
+**模式（mode）**：`chat`（纯对话，绿）/ `plan`（只读规划，橙）/ `build`（全权执行，蓝；默认缺省为 chat，每对话独立记忆）。单一真相源在 `lib/modes.ts`：`MODE_INFO`（每模式的 label/canWrite/行为指令）注入 system prompt 头部（`当前模式: <label>` + 行为约束），让模型明确所处状态与能干什么；`WRITE_TOOLS` + `filterToolsByMode` 剥离非 build 的写/副作用工具（exec + 文件写 6 + 知识库写 4 + 笔记改/导出 2）；chat 额外经 `CHAT_DENY` 再剥 `loadSkill` + 整个小红书笔记能力（`generateXiaohongshuNote`/`checkXiaohongshuNoteProgress`），即「0 副作用」——可搜索/生成图片图表视频/只读知识，但不写、不执行、不加载技能、不产笔记，且**不注入** SKILL_LIST 与 RAG 知识块（纯对话）；`buildToolsSection(mode, hasTools, webSearch)` 按模式拼工具清单——写入段仅 build 广告，非 build 追加只读/无副作用说明，chat 不广告 skill 与笔记。三者（实际工具集 / 广告清单 / 行为指令）严格对齐，杜绝模型调用本模式不存在的工具。plan 为真规划模式：只读调研（含技能/知识注入）→ 输出结构化计划（目标/步骤/涉及文件/风险/待确认项）交用户确认，不执行。
+
+**联网搜索（webSearch）**：输入框开关（默认关，每对话持久化到 `ConversationRecord.webSearch`）。`WEB_TOOLS` = `searchWeb` + Firecrawl 四件套（`scrapeWebPage`/`mapWebsite`/`crawlWebsite`/`parseDocument`）；关时 `filterWebTools` 剥离这 5 个工具且 `buildToolsSection` 不广告联网段（注入「联网搜索已关闭」提示），开时全量广告。
 
 **小红书笔记（预览/持久化/下载）**：任务状态存 `data/xhs-tasks/<id>`（原 `os.tmpdir()`，重启即丢 → 改持久化；读侧保留 /tmp 回退）。聊天里的笔记预览：`markdown-components` 捕获 `/note/<id>`（含带 basePath/绝对地址/错端口）的 iframe → 改渲染 `NotePreviewCard`（同源 fetch，规避 iframe 的 basePath/端口问题，且修历史消息）；prompt 禁止模型手写 iframe。导出写 `data/exports/<id>`（每次重建、7 天清理），`exportXiaohongshuNote` 返回 `downloadUrl`（优先 `publicBase()` 绝对地址，便于复制到手机/浏览器）；`/api/exports/<id>` 用 `lib/zip.ts`（node:zlib 手写最小 zip，零依赖）打包流式下载。
 
 **处理流程**
-1. 提取最后一条用户消息 + mode
-2. 智谱 `embedding-3` 生成查询向量
-3. Chroma cosine 检索 Top-5 知识片段（动态多表：shared + chat 全部 collection）
-4. 注入 `knowledgeContext` + `SKILL_LIST` 到 system prompt
-5. 启动/复用 1 个 MCP client（stdio spawn `node ../mcp/index.js`，33 tools），按 mode 过滤写工具
+1. 提取最后一条用户消息 + mode + webSearch
+2. chat 模式跳过 RAG，plan/build 用智谱 `embedding-3` 生成查询向量
+3. Chroma cosine 检索 Top-5 知识片段（动态多表：shared + chat 全部 collection；仅 plan/build）
+4. 注入 `knowledgeContext`（非 chat）+ `SKILL_LIST`（非 chat）到 system prompt
+5. 启动/复用 1 个 MCP client（stdio spawn `node ../mcp/index.js`，33 tools），按 mode 过滤写/副作用工具，再按 webSearch 过滤联网工具
 6. `streamText` 按策略模式路由（deepseek / minimax / glm / qwen，DeepSeek 经 classifyTask 分 pro/flash）
 7. SSE 流式返回，图表/视频通过 iframe 预览
 

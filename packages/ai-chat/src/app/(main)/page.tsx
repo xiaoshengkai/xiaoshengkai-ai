@@ -71,20 +71,24 @@ export default function ChatPage() {
   const savingRef = useRef(false);
   const [mode, setMode] = useState<Mode>("chat");
   const modeRef = useRef<Mode>("chat");
+  const [webSearch, setWebSearch] = useState(false);
+  const webSearchRef = useRef(false);
 
   useEffect(() => {
     modeRef.current = mode;
-  }, [mode]);
+    webSearchRef.current = webSearch;
+  }, [mode, webSearch]);
 
   clearMessagesRef.current = () => {
     setMessages([]);
     convIdRef.current = null;
     setMode("chat");
+    setWebSearch(false);
   };
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: `${BASE}/api/chat`,
-    body: () => ({ mode: modeRef.current }),
+    body: () => ({ mode: modeRef.current, webSearch: webSearchRef.current }),
   }), []);
 
   const { messages, setMessages, sendMessage, status, stop } = useChat({
@@ -114,6 +118,7 @@ export default function ChatPage() {
           messages,
           model: "default",
           mode: modeRef.current,
+          webSearch: webSearchRef.current,
         }),
       });
       triggerRefresh();
@@ -136,6 +141,7 @@ export default function ChatPage() {
             const data = await res.json();
             setMessages(data.messages || []);
             setMode(data.mode === "plan" || data.mode === "build" ? data.mode : data.mode === "edit" ? "build" : "chat");
+            setWebSearch(data.webSearch === true);
             convIdRef.current = activeConversationId;
             setTimeout(() => {
               virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" });
@@ -150,6 +156,7 @@ export default function ChatPage() {
       // 新对话
       setMessages([]);
       setMode("chat");
+      setWebSearch(false);
       convIdRef.current = null;
     };
 
@@ -434,6 +441,14 @@ export default function ChatPage() {
                     title={`当前模式：${mode}（点击切换 chat→plan→build）`}
                   >
                     {mode}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWebSearch((v) => !v)}
+                    className={`brutal-btn px-2 py-0.5 text-xs font-mono font-bold cursor-pointer ${webSearch ? "bg-blue text-white" : "bg-card"}`}
+                    title={`联网搜索：${webSearch ? "开" : "关"}`}
+                  >
+                    联网{webSearch ? "·开" : "·关"}
                   </button>
                   <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                   <button

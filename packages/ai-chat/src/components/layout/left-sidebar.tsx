@@ -4,8 +4,9 @@
 import { BASE } from "@/lib/utils/utils";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useConversation } from "@/components/layout/conversation-context";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Logo from "@/components/ui/logo";
 import {
   Database,
@@ -63,8 +64,7 @@ export default function LeftSidebar({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   // 博客与 app 同 origin（proxy 同端口 serve / 博客 + /ai 应用）；挂载后取，SSR 用 "#" 占位防 hydration 失配
@@ -90,17 +90,9 @@ export default function LeftSidebar({
 
   useEffect(() => {
     if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current?.contains(e.target as Node)) return;
-      setMenuOpen(null);
-    };
+    const handler = () => setMenuOpen(null);
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
-  }, [menuOpen]);
-
-  // 菜单关闭时复位「确认删除」状态，避免残留
-  useEffect(() => {
-    if (!menuOpen) setConfirmDeleteId(null);
   }, [menuOpen]);
 
   const handleNewClick = () => {
@@ -210,7 +202,6 @@ export default function LeftSidebar({
               </button>
               {menuOpen === conv.id && (
                 <div
-                  ref={menuRef}
                   className="fixed z-50 brutal bg-card py-1 min-w-[100px]"
                   style={{ top: menuPos.top, left: menuPos.left }}
                   onClick={(e) => e.stopPropagation()}
@@ -231,21 +222,13 @@ export default function LeftSidebar({
                   </button>
                   <button
                     onClick={() => {
-                      if (confirmDeleteId === conv.id) {
-                        handleDelete(conv.id);
-                        setConfirmDeleteId(null);
-                      } else {
-                        setConfirmDeleteId(conv.id);
-                      }
+                      setMenuOpen(null);
+                      setDeleteTarget(conv);
                     }}
-                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-mono cursor-pointer w-full ${
-                      confirmDeleteId === conv.id
-                        ? "bg-destructive text-white"
-                        : "text-destructive hover:bg-muted"
-                    }`}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono hover:bg-muted cursor-pointer w-full text-destructive"
                   >
                     <Trash2 className="size-3.5" />
-                    <span>{confirmDeleteId === conv.id ? "确认删除？" : "删除"}</span>
+                    <span>删除</span>
                   </button>
                 </div>
               )}
@@ -279,6 +262,20 @@ export default function LeftSidebar({
       <div className="px-3 pb-3 text-[10px] text-muted-foreground font-mono text-center">
         © 2026 开盛
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="删除对话"
+        description={`将删除「${deleteTarget?.title ?? ""}」，此操作不可撤销。`}
+        confirmLabel="确认删除"
+        onConfirm={() => {
+          if (deleteTarget) {
+            handleDelete(deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+      />
     </aside>
   );
 }

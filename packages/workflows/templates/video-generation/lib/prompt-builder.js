@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
-import { validateScript, validateHTML, getScriptStats } from "./schema.js";
+import { validateScript, validateHTML, getScriptStats, checkScriptAgainstStoryboard } from "./schema.js";
 import { ERRORS } from "./errors.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,6 +20,11 @@ function loadDesignRules() {
   return files.map(f => fs.readFileSync(path.join(dir, f), "utf-8")).join("\n\n");
 }
 
+function loadVisualizationRules() {
+  const p = path.join(__dirname, "..", "narrative-rules", "02-visualization.md");
+  return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
+}
+
 function loadStyleGuide(style) {
   const name = style === "Neo-Brutalist" ? "neo-brutalist"
     : style === "奶油风" ? "cream"
@@ -29,19 +34,52 @@ function loadStyleGuide(style) {
   return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
 }
 
-export async function generateScript(title, content, style) {
+export async function generateScript(title, content, style, storyboardJson) {
   const startTime = Date.now();
   const rules = loadScriptRules();
   const designRules = loadDesignRules();
   const inputContent = content || title;
+
+  // 分镜表阶段产物（旧执行/降级时为空字符串 → 走原有自由生成路径）
+  let storyboard = null;
+  if (storyboardJson && storyboardJson.trim()) {
+    try {
+      storyboard = typeof storyboardJson === "string" ? JSON.parse(storyboardJson) : storyboardJson;
+    } catch {
+      console.warn("[prompt-builder] storyboard JSON 解析失败，降级为自由生成");
+    }
+  }
 
   const userPickedStyle = style && style !== "自动（AI 决定）";
   const styleSection = userPickedStyle
     ? `\n## 指定风格\n用户选择: ${style}\n严格遵循以下风格指南：\n\n${loadStyleGuide(style)}`
     : "\n## 风格\n根据内容主题自由选择最合适的视觉风格";
 
-  const systemPrompt = `${rules}\n\n${designRules}`;
-  const userPrompt = `${styleSection}
+  // 分镜表驱动：注入分镜表 + 讲解设计规则（句型→演法对照）
+  const storyboardSection = storyboard
+    ? `\n## 已确认分镜表（必须严格执行）
+
+以下分镜表已经用户确认。场景生成必须逐拍对应（第 i 个场景执行第 i 拍）：
+
+- **scenes 数量必须等于 beats 数量**，顺序一致
+- **每场景 narration 使用对应 beat 的 narration 原句**（一字不改）
+- **每场景 html 演出该 beat 的 onScreen 描述**：屏上出现的就是 onScreen 里的东西，发生的动作就是 presentAction 对应的演法
+- **每场景 data-duration 使用对应 beat 的 durationSec**（已按 TTS 语速公式算好）
+- sceneType 决定布局骨架（stat-card/process-step/data-viz/comparison/quote/list）
+
+分镜表:
+\`\`\`json
+${typeof storyboardJson === "string" ? storyboardJson : JSON.stringify(storyboard, null, 2)}
+\`\`\`
+
+bgm_prompt 需结合分镜表的情绪段落结构（bgm_outline）编写。`
+    : "";
+
+  const systemPrompt = storyboard
+    ? `${rules}\n\n${designRules}\n\n${loadVisualizationRules()}`
+    : `${rules}\n\n${designRules}`;
+
+  const userPrompt = `${styleSection}${storyboardSection}
 
 ## 本次任务
 
@@ -98,6 +136,12 @@ export async function generateScript(title, content, style) {
         if (!allErrors.includes(htmlResult.error)) allErrors.push(htmlResult.error);
         console.warn(`[prompt-builder] HTML 校验失败: ${htmlResult.error}`);
         continue;
+      }
+
+      // 分镜一致性软校验：只告警不否决
+      if (storyboard) {
+        const warnings = checkScriptAgainstStoryboard(schemaResult.script, storyboard);
+        for (const w of warnings) console.warn(`[prompt-builder] 分镜一致性: ${w}`);
       }
 
       if (userPickedStyle && style) {

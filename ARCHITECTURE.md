@@ -111,7 +111,7 @@ ai-engineer-journey/
         │   └── step-types/      # ai.js / script.js / tool.js
         └── templates/
             ├── tech-video/      # 科技风短视频（7 步：script/validate/tts-scenes/bgm/sfx-pick/render/concat）
-            ├── video-generation/# 视频生成（4 步：script/tts/bgm/render）
+            ├── video-generation/# 短视频生成（6 步：storyboard[awaitInput 确认]→script[按分镜]→tts→bgm→render→quality-check[拼图+vision 自检]；narrative-rules/ 叙事方法论文档）
             │   ├── actions.json # 模板级动作（generate-content/upload/tweak/switch-version）
             │   └── lib/         # prompt / generate-content / tweak / switch-version / script-version / tweak-builder / schema / render / tts / bgm / ...
             ├── comic-generation/# 漫画生成（2 步：script/generate-pages）
@@ -148,7 +148,7 @@ ai-chat 对 workflows/tasks 只保留 1 个 catch-all 挂载点（`app/api/{work
 **动作声明位置**：
 
 - `workflows/actions.json`：引擎级 18 动作（执行 10：templates / execute / executions / get / delete / file / next / auto / retry / skip；资产库 8：characters 列表/生成/保存/删除/文件流 + styles 列表/创建/删除）
-- `templates/<name>/actions.json`：模板特有动作；video-generation 声明 generate-content / upload / tweak / switch-version；comic-generation 声明 export / scene-group / generate-content；http.js 启动时扫描合并，method+path 重复即抛错
+- `templates/<name>/actions.json`：模板特有动作；video-generation 声明 storyboard-confirm / generate-content / upload / tweak / switch-version；comic-generation 声明 export / scene-group / generate-content；http.js 启动时扫描合并，method+path 重复即抛错
 - `tasks/actions.json`：list / run / edit / dashboard（handler 在 `tasks/lib/handlers.js`）
 
 **路径匹配**：`:name` 捕获段、尾部 `*` 捕获剩余段；`required` 对 undefined/null/"" 判缺（`version=0` 合法）。
@@ -244,7 +244,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 > 每个 `template.json` 可选 `available`（boolean，缺省视为可用）：工作流列表页据此显示「可用 / 不可用」徽章，不可用卡片加虚线边 + 灰图标标识，但仍可点击。
 
 - `templates/tech-video/`：科技风短视频（script.json 驱动 + 逐场景 TTS + BGM + SFX + 硬字幕 + SRT）
-- `templates/video-generation/`：视频生成（含微调/版本切换/内容生成等模板级动作）
+- `templates/video-generation/`：短视频生成（v0.11.60 三层升级：**storyboard 分镜表步骤**——LLM 按 narrative-rules/（结构纪律/讲解设计/文案规范/逐拍骨架，逆向自 vibe-knowledge-video 方法论）出分镜表并停靠 awaiting_input，StoryboardPanel 确认/带反馈重生成（storyboard-confirm 动作 rearm）；**script 按分镜执行**——prompt-builder 注入已确认分镜表（场景数/narration 原句/durationSec 硬绑定，含旧执行无分镜降级兼容），一致性软校验；**quality-check 质量门**——ffmpeg 16 帧拼图 + callMultimodalLLM 按毛病对照表看图出 issues，vision 失败降级不卡交付，issues 经「按问题微调」预填进既有 tweak 循环；tweak resetSteps 按 step.id 匹配并排除 storyboard 步骤）
 - `templates/comic-generation/`：漫画生成（故事→AI 分镜→每个 `sceneId` 生成无文字/无气泡锚点→逐页生成漫画图；`sceneId/scenePrompt` + 独立锚点锁连续场景且不继承成品页气泡；角色参考图锁人物一致性 + 风格库锁画风；分镜支持可选旁白 `narration`（灰底方框置顶）；每页生成后 `verifyPage` vision 质检气泡文字/尾巴指向、不通过带反馈重试一次；微调支持 AI 编辑或上传/粘贴图片直接替换指定页）
 - `templates/floorplan-remodel/`：户型改造（v6：几何换源——`parse` 由 `extract-walls.js` CV 像素提取轴对齐墙段（黑墙 mask→厚度滤波游程→共线合并[门洞断口同墙]→交点吸附→薄线剔除；墨量越界/墙段<6 回退 vision 墙），vision 降为语义层（房间 bbox/名称、dims、wetRooms、adjacency）+ `detectOpenings` 门窗像素检测 + `pickEntryDoor` + 墙厚定承重；`generate` 输出符号锚点（`anchors.js`：{wall,t}/{room,edge,t} → 确定性解析像素，治 LLM 像素 hallucinate；newRooms 用 {room,rel} 相对框），承重硬校验+可拆白名单+面积/邻湿区校验不变；双渲染：SVG 叠原图 + `render-md.js` MD 派生视图（ASCII 户型画+表格，execution 页 mdFiles 链接，聊天 AI 可读上下文）；可选参数 `areaM2` 在图无尺寸标注时按外围 extent 兜底比例尺（`mmPerPxFromArea`）；创建页 checkbox 多选 + floorplan 上传 + title；v4：确认底图硬门槛；v5：确认预览叠原图+ID 芯片，确认后作废 plans 强制重生成（含 plan-*.md）；v6：确认面板彩色徽章+列表↔图交互高亮、方案图去胶囊/新墙轴对齐；v7：rules.json 五段知识库（patterns/constructionNotes/hardRules）+ newRooms 围合真源自动补墙 + 围合/孤儿化/硬下限校验 + 无 source 老识别黄条防呆；v8：四视图交付——`render-arch.js` 产出原始建筑图（`structure-arch.svg` 干净矢量+尺寸标注链）与平面布置图（`layout-original.svg`/`layout-pN.svg` 全屋家具俯视图元库），`generate-render.js` 产出效果图（`render-pN.png` 人视点）+俯视平面图（`birdview-pN.png` 鸟瞰，以布置图 SVG 栅格化 PNG 作 `image_url` 图生图参考）；`anchors.js` `resolveFurniture` 家具 rel→像素；`generate` LLM 扩 `furniture` 输出、原户型现状布置单独轻量 LLM；参数 `style`（11 种装修风格）注入渲染 prompt；渲染幂等复用+失败降级（写 error 字段不废方案）；execution 页 `FloorplanGallery` 原户型卡+每方案卡；v9：效果图多视角——`generate-render.js` 按房间类型选 3 视角（客餐厅/主卧/厨卫，缺则回退最大房/卫生间）产出 `render-pN-{living,master,wet}.png`，各视角独立 prompt（家具清单+风格+面积）；`classifyGap` 判窗阈值 1 点→≥3 点命中（治入户门细门扇线误判窗）+ 入户门下拉框列全部开口可翻转类型；v10：鸟瞰改确定性——`render-birdview.js` 纯代码渲染 `birdview-pN.svg`（地面色+墙厚+门窗+家具投影/高光，100% 贴合数据），替代 AI 鸟瞰图生图；效果图单图微调——`lib/tweak.js`（AI 图生图局部改/上传替换，复用 engine tweak-auto 编排，`tweak:true`）+ `FloorplanGallery` 微调入口）
 - `templates/person-research/`：人物公开信息研究（V1，2026-10-28）：姓名+可选线索（手机号仅作公开页面匹配线索，normalizePhone 校验后存 `private.json` 与报告隔离，`redactPhone` 全量脱敏落盘）→ 多查询并发搜索 + URL 归一去重 + 域名分级（A 政府/B 媒体/C 平台/D 论坛）+ 同域名抓取限额 → LLM 聚类候选（同名消歧）+ 抽取主张（quote 逐字摘录软校验）→ `awaiting_input` 停靠，人工选定/排除/补充 → 多轮定向研究（意图 LLM 生成查询；证据归并：独立域名≥2 升 supported、冲突主张双向引用）→ 版本化 Markdown 报告（`[S#]` 引用校验剔除+重试、无主张走模板分支）。3 个 custom 动作（select/continue/report）经 http.js 注册；前端 execution 页 `PersonResearchPanel`（候选卡/证据/轮次/报告/继续输入框，创建后自动触发 discovery）。设计路线见模板目录 PLAN.md

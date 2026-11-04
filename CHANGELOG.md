@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.11.60 (2026-11-04) — video-generation 三层升级：分镜确认 + 叙事方法论 + 质量门
+
+### 变更
+- **背景**：借鉴 vibe-knowledge-video（抖音 Vibe知识大赏逆向仓，本地已装 skill v2.4.0）的方法论——「数据差距几乎全来自叙事，不来自画面精度」；现有 video-generation 只有排版规则（10 个 design-rules），缺叙事/讲解/文案纪律与成片质检。
+- **storyboard 分镜表步骤（awaitInput 停靠）**：`lib/storyboard.js` LLM 按 `narrative-rules/`（4 文档：结构纪律/讲解设计/文案规范/逐拍骨架，改写自 vibe 仓 structure-bible/visualization-design/copywriting-rules/beat-scaffold，适配竖屏+TTS）出分镜表（拍/role/narration/presentAction/onScreen/sceneType + 核心比喻/悬念计划/反转层数/bgm_outline）；`storyboard-confirm` 动作（http.js 注册）确认放行或带反馈 rearm 重生成；前端 `StoryboardPanel`（拍列表卡 + 反馈框 + 确认/重生成，person-research 同款模式）。
+- **script 按分镜执行**：`prompt-builder.js` 注入已确认分镜表（场景数=n 拍、narration 原句、durationSec 硬绑定、sceneType 对应布局、bgm_prompt 带 bgm_outline 段落结构）+ 演法对照规则；分阶段组装（storyboard 阶段不塞排版规则）；旧执行/无分镜降级为原自由生成路径；`schema.js` 加 StoryboardSchema + `checkScriptAgainstStoryboard` 软校验 + `estimateDurationSec` 语速公式（4.5 字/秒）。
+- **quality-check 质量门**：`lib/quality-gate.js` ffmpeg 16 帧拼图（4×4×270×480）→ `callMultimodalLLM`（selection.vision）按毛病对照表（主体太小/文字重叠/配图感/场景雷同/空幕/视觉崩溃/字号过小）出 issues；vision 失败降级不卡交付（拼图照出 + degraded）；前端 `QualityCheckPanel`（拼图 + issues 清单 + 「按问题微调」预填进既有 tweak 反馈框，人工确认闭环）；参数 `enable_quality_check` 可关。
+- **兼容修复**：`tweak.js` resetSteps 由索引对齐改为 **step.id 匹配**（模板加 storyboard/quality-check 步骤后旧执行索引错位的隐患）并排除 storyboard 步骤（微调只动 script 层，分镜骨架保持确认状态）。
+- **前端**：execution 页 `PreviewContent` 新增 `image` 类型（quality-check 拼图预览）；video-generation awaiting_input 态挂 StoryboardPanel；quality-check 完成态挂 QualityCheckPanel。
+- **模板 `available` 翻 true**（恢复可用，此前实验态灰卡）。
+
+### 验证
+- 单测 +8（StoryboardSchema/duration 公式/一致性软校验，`npm run test:video-vg`）；test:shared + test:mm + test:search 全绿；typecheck 通过（lint 因环境 eslint-config-next 缺 next 编译模块起不来，与本次改动无关）。
+- 真实冒烟：storyboard（选题「生日悖论」）20 拍——核心比喻/悬念埋解/六种呈现动作/口语数字拼读全部到位，durationSec 公式自动算对；quality-gate（历史成片）真查出 4 处黑场空幕 + 字号问题（该执行确有 clip 间隙黑帧），vision 检测质量可用。
+
 ## v0.11.59 (2026-10-29) — 户型房间用途 + 家具尺寸按用途归一化
 
 ### 变更

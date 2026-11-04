@@ -1,8 +1,8 @@
 {
   "name": "video-generation",
   "label": "短视频生成",
-  "description": "script.json 驱动 + TTS + BGM + 渲染",
-  "available": false,
+  "description": "分镜表确认驱动 + TTS + BGM + 渲染 + 质量自检",
+  "available": true,
   "params": [
     { "name": "title", "label": "视频标题", "type": "text", "required": true },
     { "name": "contentRequirement", "label": "内容要求（可选）", "type": "textarea", "required": false, "placeholder": "如：场景要反转、用emoji做SVG、每场景英文标题" },
@@ -12,18 +12,30 @@
     { "name": "voice_id", "label": "TTS音色", "type": "text", "default": "male-qn-qingse" },
     { "name": "enable_bgm", "label": "BGM 背景音乐", "type": "select", "options": ["yes", "no"], "default": "yes", "required": false },
     { "name": "bgm_volume", "label": "BGM音量", "type": "number", "default": 0.3 },
-    { "name": "bgm_file", "label": "BGM 音频（可选）", "type": "text", "required": false, "placeholder": "上传 mp3/wav 文件" }
+    { "name": "bgm_file", "label": "BGM 音频（可选）", "type": "text", "required": false, "placeholder": "上传 mp3/wav 文件" },
+    { "name": "enable_quality_check", "label": "成片质量自检（抽帧拼图+AI检查）", "type": "select", "options": ["yes", "no"], "default": "yes", "required": false }
   ],
   "steps": [
     {
+      "id": "storyboard",
+      "name": "AI 生成分镜表",
+      "type": "tool",
+      "previewType": "json",
+      "previewField": "storyboard",
+      "awaitInput": true,
+      "module": "./lib/storyboard.js",
+      "function": "generateStoryboard",
+      "args": ["{title}", "{content}", "{style}", "{contentRequirement}", "{executionDir}"]
+    },
+    {
       "id": "script",
-      "name": "AI 生成 script.json",
+      "name": "AI 生成 script.json（按分镜执行）",
       "type": "tool",
       "previewType": "json",
       "previewField": "script",
       "module": "./lib/prompt-builder.js",
       "function": "generateScript",
-      "args": ["{title}", "{content}", "{style}"]
+      "args": ["{title}", "{content}", "{style}", "{storyboard.storyboard}"]
     },
     {
       "id": "tts",
@@ -56,6 +68,17 @@
       "module": "./lib/render.js",
       "function": "renderMP4",
       "args": ["{executionDir}", "{script.allHtml}", "{script.css}", "{script.jsAnimation}", "{script.scenesJson}"]
+    },
+    {
+      "id": "quality-check",
+      "name": "成片质量自检（抽帧拼图 + AI 看图）",
+      "type": "tool",
+      "previewType": "image",
+      "previewField": "sheet",
+      "module": "./lib/quality-gate.js",
+      "function": "runQualityGate",
+      "args": ["{executionDir}", "{script.title}"],
+      "skipWhen": "enable_quality_check_no"
     }
   ]
 }

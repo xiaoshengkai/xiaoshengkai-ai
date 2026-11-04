@@ -11,13 +11,18 @@ import { evaluateSkipWhen } from "../../../lib/skip-when.js";
 import { initScriptHistory, writeScriptVersion, TWEAK_LIMIT } from "./script-version.js";
 import { tweakScript } from "./tweak-builder.js";
 
+// 微调只动 script 层：storyboard 是已确认的骨架，不随反馈重置
+const UPSTREAM_STEP_IDS = new Set(["script", "storyboard"]);
+
 function resetSteps(state, template, params) {
-  state.steps.forEach((step, i) => {
-    if (step.id === "script") return;
-    const shouldSkip = evaluateSkipWhen(template.steps[i]?.skipWhen, params);
+  state.steps.forEach((step) => {
+    if (UPSTREAM_STEP_IDS.has(step.id)) return;
+    // ponytail: 按 id 匹配 template step（索引对齐在模板加步骤后会错位，坑过旧执行）
+    const tStep = template.steps.find(s => s.id === step.id);
+    const shouldSkip = evaluateSkipWhen(tStep?.skipWhen, params);
     if (shouldSkip) {
       step.status = "skipped";
-      step.skipReason = template.steps[i].skipWhen;
+      step.skipReason = tStep?.skipWhen;
     } else {
       step.status = "pending";
       step.skipReason = null;

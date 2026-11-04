@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Root, Portal, Backdrop, Popup, Header, Title, Close } from "@/components/ui/drawer";
 import { ImageViewerProvider, useImageViewer } from "@/components/ui/image-viewer";
 import PersonResearchPanel from "@/components/workflow/person-research-panel";
+import StoryboardPanel from "@/components/workflow/storyboard-panel";
 
 interface ExecutionStep {
   id: string; name: string; type: string; previewType?: string; previewField?: string;
@@ -125,6 +126,7 @@ export default function ExecutionDetailPage() {
   const isComic = execution?.template === "comic-generation";
   const isFloorplan = execution?.template === "floorplan-remodel";
   const isPersonResearch = execution?.template === "person-research";
+  const isVideoGen = execution?.template === "video-generation";
   const comicPages: { page: number }[] = (() => {
     try {
       const g = execution?.steps?.find(s => s.id === "generate-pages");
@@ -387,6 +389,13 @@ export default function ExecutionDetailPage() {
     setTweakImages(prev => prev.filter(i => i.id !== id));
   }, []);
 
+  // 质量门「按问题微调」：把 issues 序列化预填进微调反馈框
+  const openTweakWithIssues = useCallback((fb: string) => {
+    setTweakMode("ai");
+    setTweakFeedback(fb);
+    setShowTweak(true);
+  }, []);
+
   const handleTweak = useCallback(async () => {
     const imagePaths = tweakImages.map(i => i.path).filter(Boolean);
     if (tweakMode === "ai" && !tweakFeedback.trim()) { toast("🔴 请输入反馈"); return; }
@@ -574,6 +583,12 @@ export default function ExecutionDetailPage() {
               );
             }
 
+            // 优先级-0.5：video-generation → 分镜表确认面板（storyboard 步骤停靠 awaiting_input）
+            if (isVideoGen && execution.status === "awaiting_input") {
+              const sbStep = execution.steps.find(s => s.id === "storyboard");
+              return <StoryboardPanel executionId={id} output={sbStep?.output ?? null} onRefresh={fetchExecution} />;
+            }
+
             // 优先级0：floorplan parse → 底图确认面板
             if (isFloorplan && activeStep.id === "parse" && parseStep?.status === "completed" && !floorplanConfirmed) {
               return (
@@ -663,6 +678,17 @@ export default function ExecutionDetailPage() {
                   executionId={execution.executionId}
                   manifest={(activeStep.output as Record<string, unknown>).manifest as { sceneId: string; templateId: string; actualDuration: number; alignmentDiff: number; warning: string | null }[]}
                   sceneList={sceneList}
+                />
+              );
+            }
+
+            // 优先级2.5：video-generation quality-check → 拼图 + 问题清单 + 按问题微调
+            if (isVideoGen && activeStep.id === "quality-check" && activeStep.status === "completed" && activeStep.output) {
+              return (
+                <QualityCheckPanel
+                  step={activeStep}
+                  executionId={execution.executionId}
+                  onTweakWithIssues={openTweakWithIssues}
                 />
               );
             }
@@ -946,6 +972,77 @@ export default function ExecutionDetailPage() {
       </div>
     );
   }
+}
+
+function QualityCheckPanel({ step, executionId, onTweakWithIssues }: { step: ExecutionStep; executionId: string; onTweakWithIssues: (fb: string) => void }) {
+  const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
+  const { register, open } = useImageViewer();
+
+  let out: { output?: string; sheet?: string | null; issues?: { severity: string; frame?: number; problem: string; fix?: string }[]; pass?: boolean | null; degraded?: boolean } = {};
+  try {
+    out = typeof step.output === "string" ? JSON.parse(step.output) : (step.output as unknown as typeof out) ?? {};
+  } catch { /* output 解析失败按空处理 */ }
+
+  const issues = Array.isArray(out.issues) ? out.issues : [];
+  const highCount = issues.filter(i => i.severity === "high").length;
+  const sheetSrc = out.sheet ? `${fileBase}/${out.sheet}` : null;
+
+  const issuesAsFeedback = () => {
+    const lines = issues.map(i =>
+      `- [${i.severity === "high" ? "高" : i.severity === "medium" ? "中" : "低"}]${i.frame ? `第 ${i.frame} 帧附近` : ""}: ${i.problem}${i.fix ? `（建议: ${i.fix}）` : ""}`
+    );
+    return `成片质检发现以下问题，请逐条修复：\n${lines.join("\n")}`;
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="brutal bg-card p-3" style={{ border: "3px solid var(--border)", boxShadow: "4px 4px 0 var(--border)" }}>
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: out.pass ? "#00a86b" : out.degraded ? "var(--muted-foreground)" : "#e94560" }}>
+            {out.pass ? "✓" : out.degraded ? "-" : "!"}
+          </span>
+          <h3 className="text-xs font-bold text-foreground">{step.name}</h3>
+          <span className="text-xs font-bold px-1.5 py-0.5 text-white" style={{ background: out.pass ? "#00a86b" : out.degraded ? "var(--muted-foreground)" : "#e94560" }}>
+            {out.degraded ? "降级（仅拼图）" : out.pass ? "质检通过" : `${highCount} 个严重问题`}
+          </span>
+        </div>
+        {sheetSrc && (
+          <div className="border-2 border-border bg-muted/20 overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={sheetSrc} alt="成片 16 帧总览" className="w-full max-w-full h-auto block cursor-zoom-in" onClick={() => { const idx = register(sheetSrc); open(idx); }} />
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground mt-1.5">16 帧等间隔总览（左→右、上→下为时间顺序）。人工看图对照：主体大小/文字重叠/场景雷同/空幕。</p>
+      </div>
+
+      {issues.length > 0 && (
+        <div className="brutal bg-card p-3" style={{ border: "3px solid var(--border)", boxShadow: "4px 4px 0 var(--border)" }}>
+          <h3 className="text-xs font-bold mb-2">AI 看图发现的问题（{issues.length} 条）</h3>
+          <div className="space-y-1.5 max-h-[40vh] overflow-auto">
+            {issues.map((i, idx) => (
+              <div key={idx} className="border-2 border-border p-2 text-xs bg-card">
+                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                  <span className="px-1.5 py-0.5 font-bold text-white" style={{ background: i.severity === "high" ? "#e94560" : i.severity === "medium" ? "#f5a623" : "var(--muted-foreground)" }}>
+                    {i.severity === "high" ? "高" : i.severity === "medium" ? "中" : "低"}
+                  </span>
+                  {i.frame ? <span className="font-bold">第 {i.frame} 帧附近</span> : null}
+                </div>
+                <p className="leading-snug">{i.problem}</p>
+                {i.fix ? <p className="text-muted-foreground mt-0.5">建议：{i.fix}</p> : null}
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => onTweakWithIssues(issuesAsFeedback())}
+            className="brutal-btn mt-3 px-4 py-1.5 text-xs font-bold cursor-pointer text-white"
+            style={{ border: "2px solid var(--border)", background: "var(--purple)", boxShadow: "2px 2px 0 var(--border)" }}
+          >
+            🔄 按问题微调脚本（自动重渲染）
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function FloorplanGallery({ step, executionId, onTweak }: { step: ExecutionStep; executionId: string; onTweak: (file: string) => void }) {
@@ -1491,7 +1588,7 @@ function PreviewPanel({ step, executionId, currentScriptVersion, imageVersion, o
   const pt = step.previewType || "text";
   const pf = step.previewField || "output";
   const value = getOutputValue(step.output, pf, pt);
-  const fileTypes = ["audio", "video", "iframe"];
+  const fileTypes = ["audio", "video", "iframe", "image"];
 
   return (
     <div className="space-y-3">
@@ -1644,7 +1741,7 @@ function PreviewContent({ type, value, src, executionId, onRetry, retrying }: { 
   if (type === "code" || type === "json" || type === "text") {
     if (!value) return <p className="text-xs text-muted-foreground/70">暂无输出</p>;
   }
-  if (type === "audio" || type === "video" || type === "iframe") {
+  if (type === "audio" || type === "video" || type === "iframe" || type === "image") {
     if (!src || !value) return <p className="text-xs text-muted-foreground/70">文件未生成</p>;
   }
 
@@ -1714,6 +1811,19 @@ function PreviewContent({ type, value, src, executionId, onRetry, retrying }: { 
             className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-3"
             style={{ border: "2px solid var(--border)", background: "var(--primary)", color: "var(--primary-foreground)", boxShadow: "2px 2px 0 var(--border)" }}>
             <Download className="w-3 h-3" />下载视频
+          </a>
+        </div>
+      );
+
+    case "image":
+      return (
+        <div className="flex flex-col items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt="预览图" className="w-full max-w-md border-2 border-border bg-muted/20 block" />
+          <a href={src} target="_blank" rel="noopener noreferrer"
+            className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold cursor-pointer mt-3"
+            style={{ border: "2px solid var(--border)", background: "var(--primary)", color: "var(--primary-foreground)", boxShadow: "2px 2px 0 var(--border)" }}>
+            原图打开
           </a>
         </div>
       );

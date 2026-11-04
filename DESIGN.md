@@ -360,6 +360,15 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 - **缺失一律降级注记**（`[图片已失效或无法读取，内容缺失]`）：本地文件缺失/超限、远程下载失败、vision 调用失败均不抛错——上传文件可能被运维清理/迁移丢失，硬抛错会令整条对话永久 500。`missingFileStrategy` 默认 `ignore` 同义覆盖 direct 分支。
 - 历史深度语义不变：深度外消息仍 strip 成 `[图片]` 不描述。
 
+## 短视频工作流：分镜确认 + 质量门（v0.11.60）
+
+- **方法论来源**：video-generation 升级借鉴 vibe-knowledge-video（抖音 Vibe知识大赏逆向工程仓）的叙事方法论文档（结构圣经/讲解设计/文案规范/逐拍骨架），改写为竖屏 + TTS 口语形态存 `narrative-rules/`；分阶段注入 prompt——storyboard 阶段只喂叙事规则（不塞排版规则省 token），script 阶段喂分镜表 + 设计规则 + 演法对照。
+- **两阶段生成 + 人工确认**：先 storyboard（叙事骨架+旁白句+呈现动作，廉价）停靠 `awaiting_input` 人工确认/带反馈重生成，确认后 script 按分镜逐拍执行（narration 原句、durationSec 硬绑定）——渲染前纠偏，比渲完再 tweak 省整轮渲染。确认动作 `storyboard-confirm`（rearm 模式，与 person-research select/continue 同构）。
+- **质量门是增益不是门禁**：quality-check 步骤 ffmpeg 16 帧拼图 + vision LLM（selection.vision）按毛病对照表出 issues；vision 失败/未配置一律降级（拼图照出、issues 空、步骤照常 completed）——不卡交付。修复走**人工确认闭环**：issues 预填进既有 tweak 反馈框（复用 tweak-auto 编排，不新造自动循环，零失控风险）。
+- **兼容**：旧执行 retry script 时 `{storyboard.storyboard}` 解析为空 → prompt-builder 降级为无分镜自由生成（旧路径不变）；tweak resetSteps 按 step.id 匹配 template step（索引对齐在模板加步骤后会错位）并排除 storyboard（微调只动 script 层，分镜骨架保持已确认状态）。
+- **音画对位公式**：`durationSec = max(2, ceil(字数/4.5) + 0.5)`——分镜表与场景 data-duration 两头对齐 TTS 语速，缓解 LLM 自报时长与实际配音漂移（逐场景 TTS 对齐是 tech-video 的解法，本次不引入）。
+- **模板恢复可用**：`available` 翻 true（此前实验态灰卡）。
+
 ## 已知问题
 
 | # | 问题 | 影响 | 解决方案 |

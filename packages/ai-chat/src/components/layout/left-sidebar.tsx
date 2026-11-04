@@ -4,7 +4,7 @@
 import { BASE } from "@/lib/utils/utils";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useConversation } from "@/components/layout/conversation-context";
 import Logo from "@/components/ui/logo";
 import {
@@ -64,6 +64,7 @@ export default function LeftSidebar({
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   // 博客与 app 同 origin（proxy 同端口 serve / 博客 + /ai 应用）；挂载后取，SSR 用 "#" 占位防 hydration 失配
@@ -89,7 +90,10 @@ export default function LeftSidebar({
 
   useEffect(() => {
     if (!menuOpen) return;
-    const handler = () => setMenuOpen(null);
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setMenuOpen(null);
+    };
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, [menuOpen]);
@@ -206,6 +210,7 @@ export default function LeftSidebar({
               </button>
               {menuOpen === conv.id && (
                 <div
+                  ref={menuRef}
                   className="fixed z-50 brutal bg-card py-1 min-w-[100px]"
                   style={{ top: menuPos.top, left: menuPos.left }}
                   onClick={(e) => e.stopPropagation()}

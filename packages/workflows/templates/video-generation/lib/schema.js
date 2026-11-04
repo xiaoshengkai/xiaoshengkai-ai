@@ -147,6 +147,11 @@ export function validateNoRemoteResources(html) {
   return null;
 }
 
+/** 无限循环 tween 是逐帧 seek 渲染的硬杀手（hyperframes 实测：Set maximum size exceeded/0 帧进度） */
+export function hasInfiniteRepeat(js) {
+  return Boolean(js && /repeat\s*:\s*-\s*1/.test(js));
+}
+
 export function validateHTML(script) {
   const errors = [];
   for (const scene of script.scenes) {
@@ -161,6 +166,15 @@ export function validateHTML(script) {
     if (remoteErr) {
       errors.push(`scene ${scene.id}: ${remoteErr}`);
     }
+    if (hasInfiniteRepeat(scene.jsAnimation)) {
+      errors.push(`scene ${scene.id}: jsAnimation 含 repeat:-1 无限循环（确定性渲染硬杀手），改用有限次数如 repeat: 4`);
+    }
+    if (/\bMath\.random\s*\(|\bDate\.now\s*\(/.test(scene.jsAnimation || "")) {
+      console.warn(`[schema] scene ${scene.id}: jsAnimation 含 Math.random/Date.now（非确定性，建议固定值）`);
+    }
+  }
+  if (hasInfiniteRepeat(script.jsAnimation)) {
+    errors.push("全局 jsAnimation 含 repeat:-1 无限循环，改用有限次数");
   }
   if (errors.length > 0) {
     return { ok: false, error: errors.join("; ") };

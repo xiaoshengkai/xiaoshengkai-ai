@@ -1,4 +1,4 @@
-import { validateScript, validateStoryboard, checkScriptAgainstStoryboard, estimateDurationSec } from "./lib/schema.js";
+import { validateScript, validateStoryboard, validateHTML, checkScriptAgainstStoryboard, estimateDurationSec, hasInfiniteRepeat } from "./lib/schema.js";
 import { chunkBeats, validateBatchScenes, BATCH_SIZE } from "./lib/prompt-builder.js";
 
 let passed = 0, failed = 0;
@@ -157,6 +157,34 @@ async function run() {
 
   await test("批内校验：非数组输出", () => {
     assertEq(validateBatchScenes({ scenes: [] }, [mkBeat(1, "a", 3)]).length, 1);
+  });
+
+  console.log("\n── 确定性渲染铁律 ──");
+
+  await test("hasInfiniteRepeat 检测", () => {
+    assertEq(hasInfiniteRepeat("gsap.to(x, {repeat:-1})"), true);
+    assertEq(hasInfiniteRepeat("gsap.to(x, {repeat: -1, yoyo:true})"), true);
+    assertEq(hasInfiniteRepeat("gsap.to(x, {repeat: - 1})"), true);
+    assertEq(hasInfiniteRepeat("gsap.to(x, {repeat: 4})"), false);
+    assertEq(hasInfiniteRepeat(""), false);
+    assertEq(hasInfiniteRepeat(null), false);
+  });
+
+  await test("批内校验：repeat:-1 拒绝（渲染硬杀手）", () => {
+    const beats = [mkBeat(1, "甲句", 4)];
+    const scenes = [{ ...mkScene(1, "甲句", 4), jsAnimation: "tl.to('.x', {opacity:0.5, yoyo:true, repeat:-1})" }];
+    const errs = validateBatchScenes(scenes, beats);
+    assert(errs.some(e => e.includes("repeat:-1")), JSON.stringify(errs));
+  });
+
+  await test("validateHTML：全局与场景 jsAnimation 的 repeat:-1 拒绝", () => {
+    const mkScript = (jsA) => ({ scenes: [{ id: "1", narration: "a", html: "<div class=\"clip\" id=\"clip-1\" data-duration=\"4\">x</div>", jsAnimation: jsA }] });
+    let r = validateHTML({ ...mkScript(null), jsAnimation: "var a=1; tl.to('.x',{repeat:-1})" });
+    assert(!r.ok && r.error.includes("全局 jsAnimation"));
+    r = validateHTML(mkScript("tl.to('.x',{repeat:-1})"));
+    assert(!r.ok && r.error.includes("repeat:-1"));
+    r = validateHTML(mkScript("tl.to('.x',{repeat:3})"));
+    assert(r.ok);
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

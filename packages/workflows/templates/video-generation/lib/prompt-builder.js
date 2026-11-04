@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { callLLM } from "@app/shared/llm/index.js";
 import { parseJSON } from "@app/shared/llm/parse-json.js";
-import { validateScript, validateHTML, getScriptStats, checkScriptAgainstStoryboard, validateNoRemoteResources } from "./schema.js";
+import { validateScript, validateHTML, getScriptStats, checkScriptAgainstStoryboard, validateNoRemoteResources, hasInfiniteRepeat } from "./schema.js";
 import { ERRORS } from "./errors.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -161,6 +161,7 @@ async function generateFrame({ storyboard, styleSection, systemPrompt }) {
 硬要求：
 - designTokens 必须填充实对象（palette 三色 + fonts 二字体）——每个场景批次都会拿到这份框架锁风格
 - 全片风格统一：配色/字体全片一套不换
+- 确定性渲染铁律：jsAnimation 禁止 repeat:-1（无限循环）、Math.random()、Date.now()
 - bgm_prompt 情绪参考：${storyboard.bgm_outline || "按内容自定"}
 
 分镜概要（${storyboard.beats.length} 拍）：${storyboard.thesis || ""} ${storyboard.coreMetaphor || ""} ${JSON.stringify(storyboard.beats.map(b => ({ role: b.role, sceneType: b.sceneType })))}
@@ -206,6 +207,7 @@ ${JSON.stringify(frame, null, 2)}
 - beat 的 note（若有）落进 html 小字（出处/示意标注），放不抢主体的角落
 - class/id 必须全片唯一（可用 b{拍id}- 前缀防跨批撞名）
 - 遵守全部设计规则与动画策略（每场景至少 1 个 GSAP 动画或声明式 data-animate 属性）
+- **确定性渲染铁律：禁止 jsAnimation 出现 repeat:-1（无限循环）、Math.random()、Date.now()——微动效用有限 repeat（如 repeat: 4），否则逐帧渲染引擎直接报废**
 
 本批 beats:
 ${JSON.stringify(beats, null, 2)}
@@ -284,6 +286,9 @@ export function validateBatchScenes(scenes, beats) {
       errors.push(`${prefix}: data-duration=${durMatch[1]} != ${beat.durationSec}`);
     }
     if (/<script/i.test(html)) errors.push(`${prefix}: html 含 script 标签`);
+    if (hasInfiniteRepeat(scene.jsAnimation)) {
+      errors.push(`${prefix}: jsAnimation 含 repeat:-1 无限循环（确定性渲染硬杀手），改用有限次数如 repeat: 4`);
+    }
     const remoteErr = validateNoRemoteResources(html);
     if (remoteErr) errors.push(`${prefix}: ${remoteErr}`);
   }

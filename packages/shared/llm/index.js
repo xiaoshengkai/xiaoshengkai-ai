@@ -35,7 +35,7 @@ export async function callLLM(params) {
   const caller = CALLERS[provider];
   if (!caller) throw new Error(`Unsupported workflow provider: ${provider}`);
   assertProviderEnabled(provider);
-  return withTimeout(caller({ ...params, model: params.model || model }), 300000, `${provider} 文本生成`);
+  return withTimeout(caller({ ...params, model: params.model || model }), 420000, `${provider} 文本生成`);
 }
 
 // ─── 多模态模型（视觉评估：selection.vision）───────────────────────────

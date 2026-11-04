@@ -369,6 +369,7 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 - **音画对位公式**：`durationSec = max(2, ceil(字数/4.5) + 0.5)`——分镜表与场景 data-duration 两头对齐 TTS 语速，缓解 LLM 自报时长与实际配音漂移（逐场景 TTS 对齐是 tech-video 的解法，本次不引入）。
 - **看图改图双层**（v0.11.61）：16 帧小格拼图（总览）+ beats 关键拍 5 张原尺寸静帧（细节）+ vision 问题帧自动补抽——小格看不清字号/重叠类细节，原尺寸层给人眼；对照 vibe 原片实践（sheet + `--stills`）。
 - **数字纪律的结构化载体**（v0.11.61）：分镜表 `note` 字段（数字出处或"示意"标注）+ `thesis`/`instrument`——LLM 没把握的数字在 note 里标"须核验"，确认面板人眼把关；不接联网核实（workflows 子进程接 search 另立项）。
+- **warning = 停靠人工重试，不级联**（v0.11.62）：引擎 auto 遇步骤 warning/failed 即停；`next` 遇上游「warning 且无 output」拒绝推进（warning-with-output = 部分成功例外可放行）。根因：script 超时后 auto 曾用空变量跑完 render/quality-check 出垃圾输出。**LLM 超时 420s 统一**（minimax/qwen chat 内层 + shared 外层）：16-20 拍 script 单次 16k+ token，provider 吞吐波动 3.5 倍，180s 只在快时够用；孤儿阈值随之 30→45min。升级路径：若 420s 仍频发超时，上分批生成（storyboard beats 天然分批，单批 4-5k token）。
 - **模板恢复可用**：`available` 翻 true（此前实验态灰卡）。
 
 ## 已知问题

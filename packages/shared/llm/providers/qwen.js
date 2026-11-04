@@ -26,7 +26,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
   if (format) body.response_format = { type: format };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 180000);
+  const timeout = setTimeout(() => controller.abort(), 420000);
 
   let res;
   let data;
@@ -42,7 +42,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
     });
     data = await res.json();
   } catch (err) {
-    if (err.name === "AbortError") throw new Error("Qwen 调用超时（180s）");
+    if (err.name === "AbortError") throw new Error("Qwen 调用超时（420s）");
     throw err;
   } finally {
     clearTimeout(timeout);

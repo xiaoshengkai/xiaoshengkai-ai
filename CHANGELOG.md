@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.62 (2026-11-04) — LLM 超时统一 420s + 引擎级联守卫（治 script 超时后 auto 空跑下游）
+
+### 变更
+- **根因**（真实执行 d8ac11690c00）：① 16-20 拍 script 单次输出 16k+ token，MiniMax 实测吞吐 68–240 tok/s 波动 3.5 倍，慢时 235s+ 必超 provider 内层 180s（切 qwen 同样超）；② 超时后步骤标 warning（无 output），但 `runAllSteps` 只看 `ok:true` 继续循环、`runNextStep` 的 `findIndex(pending)` 跳过 warning——**auto 级联用空变量跑完 render/quality-check**，产出 JSON parse 垃圾警告。
+- **超时统一 420s**：minimax.js（withTimeout）/ qwen.js（chat 的 AbortController + 硬编码报错文案）/ shared/llm/index.js 外层（原 300s）三处对齐；覆盖 16k token @ 40 tok/s 最坏吞吐。qwen.js:153 音乐生成接口的 180s 不动（不同 SLA）。
+- **孤儿阈值 30→45min**（engine.js）：单步最坏 5 次重试 × 420s = 35min，防慢重试链被误判孤儿自愈重置。
+- **级联守卫**（engine.js）：`runAllSteps` 收到 stepStatus 非 completed 即停（warning = 停靠人工重试）；`runNextStep` 前置守卫——上游存在「warning 且无 output」步骤时拒绝推进（"步骤 X 失败（无输出），请先重试或跳过"）；**warning-with-output（部分成功）保留可推进**；显式 skip 仍是用户主动跳过通道。
+- **善后路径**：`retryStep` 本身已重置下游（engine.js 既有逻辑），用户对报错执行点 script 重试即可全链重跑，无需删执行。
+
+### 验证
+- 合成 state 三态（真实引擎函数，零 LLM）：warning 无 output → next 拒绝且下游保持 pending；warning 有 output → 放行并完成瞬时步骤；步骤自身 warning（损坏 mp4）→ runAllSteps 停住返回 warning、二次 next 被守卫拦截。
+- test 171（shared 126 + mm 36 + search 9）+ video-vg 8 全绿；typecheck 通过。
+
 ## v0.11.61 (2026-11-04) — video-generation 增强：质量门原尺寸静帧 + 分镜表结构化字段
 
 ### 变更

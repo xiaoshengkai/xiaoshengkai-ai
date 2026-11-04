@@ -296,9 +296,9 @@ export async function runNextStep(executionId) {
   // 防止并发：检查是否有正在运行的步骤
   const running = state.steps.find(s => s.status === "running");
   if (running) {
-    // ponytail: 无心跳机制，running 超 30 分钟视为 worker 已死（合法步骤上限是 render 超时 5 分钟），下次动作自愈
+    // ponytail: 无心跳机制，running 超 45 分钟视为 worker 已死（LLM 单次上限 420s × prompt-builder 5 次重试 = 35min 极限），下次动作自愈
     const age = Date.now() - new Date(running.startedAt || 0).getTime();
-    if (running.startedAt && age > 30 * 60 * 1000) {
+    if (running.startedAt && age > 45 * 60 * 1000) {
       console.warn(`[engine] 孤儿 running 步骤 "${running.name}" (${Math.round(age / 60000)}min) 重置为 pending`);
       running.status = "pending";
       running.startedAt = null;
@@ -306,6 +306,13 @@ export async function runNextStep(executionId) {
     } else {
       return { ok: false, error: `步骤 "${running.name}" 正在执行中，请等待完成` };
     }
+  }
+
+  // 级联守卫：上游存在 warning 且无 output 的步骤时拒绝推进（防 auto/next 跳过失败步骤用空变量跑下游）
+  // warning-with-output = 部分成功，允许推进；显式 skip 命令仍是用户的主动跳过通道
+  const broken = state.steps.find(s => s.status === "warning" && !s.output);
+  if (broken) {
+    return { ok: false, error: `步骤 "${broken.name}" 失败（无输出），请先重试或跳过` };
   }
 
   const nextIdx = state.steps.findIndex(s => s.status === "pending");
@@ -414,6 +421,8 @@ export async function runAllSteps(executionId) {
   for (let i = 0; i < 100; i++) {
     const result = await runNextStep(executionId);
     if (!result.ok) return result;
+    // 级联守卫：warning/failed 步骤停靠等人工重试，auto 不再空变量级联下游
+    if (result.stepStatus && result.stepStatus !== "completed") return result;
     const state = getExecution(executionId);
     if (!state || TERMINAL_STATUSES.includes(state.status)) return result;
   }

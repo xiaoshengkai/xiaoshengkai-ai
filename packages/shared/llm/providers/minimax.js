@@ -33,7 +33,7 @@ export async function callLLM({ system, user, model, temperature = 0.7, maxToken
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
-  }), 180000, "MiniMax 请求");
+  }), 420000, "MiniMax 请求");
 
   const data = await withTimeout(res.json(), 30000, "MiniMax 响应解析");
   if (!res.ok) {

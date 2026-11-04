@@ -225,7 +225,7 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 
 ### 引擎与模板边界
 
-- `engine.js`：纯模板无关的步骤编排（创建/逐步/重试/跳过/终态），**无 video 概念**
+- `engine.js`：纯模板无关的步骤编排（创建/逐步/重试/跳过/终态），**无 video 概念**；级联守卫（v0.11.62）：`runAllSteps` 遇步骤 warning/failed 即停（停靠人工重试，不空变量级联下游），`runNextStep` 在上游存在「warning 且无 output」步骤时拒绝推进（warning-with-output 部分成功可推进；显式 skip 为用户主动通道）
 - 脚本版本 / 微调等 video 概念在 `templates/video-generation/lib/`：tweak.js / switch-version.js / script-version.js
 - **模板不 import engine.js**；cli 是子进程组合层，按 `state.template` 动态分发模板能力模块（如 `templates/<t>/lib/tweak.js`）
 - 引擎支持步骤声明 `awaitInput: true`：完成且非末步时停靠 `status="awaiting_input"`，`next`/`auto` 拒绝越权推进，由模板动作重臂步骤后恢复（person-research 的 select/continue 在用）；模板列表扫描跳过无 `template.json` 的目录（纯文档目录不炸列表）

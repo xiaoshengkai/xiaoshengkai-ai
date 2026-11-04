@@ -35,7 +35,25 @@ export async function callLLM(params) {
   const caller = CALLERS[provider];
   if (!caller) throw new Error(`Unsupported workflow provider: ${provider}`);
   assertProviderEnabled(provider);
-  return withTimeout(caller({ ...params, model: params.model || model }), 420000, `${provider} 文本生成`);
+  try {
+    return await withTimeout(caller({ ...params, model: params.model || model }), 420000, `${provider} 文本生成`);
+  } catch (e) {
+    logFetchCause(provider, e);
+    throw e;
+  }
+}
+
+// "fetch failed" 是 undici 的笼统包装，真因在 cause 链（ECONNRESET / 网关重置 / TLS）——打出来再抛
+function logFetchCause(provider, e) {
+  if (!/fetch failed|terminated|socket/i.test(e?.message || "")) return;
+  const cause = e.cause;
+  const parts = [
+    `provider=${provider}`,
+    cause?.code ? `code=${cause.code}` : "",
+    cause?.errno ? `errno=${cause.errno}` : "",
+    cause?.message ? `cause=${cause.message}` : "",
+  ].filter(Boolean).join(" ");
+  console.error(`[llm] 网络层失败: ${parts || "(cause 为空)"} | url-host=${cause?.host || ""}`);
 }
 
 // ─── 多模态模型（视觉评估：selection.vision）───────────────────────────
@@ -46,7 +64,12 @@ export function getMultimodalProvider() {
 
 export async function callMultimodalLLM(params) {
   const { provider, model } = getMultimodalProvider();
-  return CALLERS[provider]({ ...params, model: params.model || model });
+  try {
+    return await CALLERS[provider]({ ...params, model: params.model || model });
+  } catch (e) {
+    logFetchCause(provider, e);
+    throw e;
+  }
 }
 
 // ─── 模块选择读取器（media/tts/bgm）────────────────────────────────────

@@ -138,7 +138,7 @@ export function validateScript(json) {
   return { ok: true, script: result.data };
 }
 
-function validateNoRemoteResources(html) {
+export function validateNoRemoteResources(html) {
   if (/https:\/\/fonts\.googleapis\.com/i.test(html)) return "包含 Google Fonts 远程引用";
   if (/https:\/\/fonts\.gstatic\.com/i.test(html)) return "包含 Google Fonts 远程引用";
   if (/<link[^>]*rel=["']stylesheet["'][^>]*href=["']https?:\/\//i.test(html)) return "包含远程样式表";

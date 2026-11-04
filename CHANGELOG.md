@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.63 (2026-11-04) — script 分批生成 + fetch failed 诊断日志（治 16-20 拍脚本必超时）
+
+### 变更
+- **根因链**（d8ac11690c00 服务器实测）：① 16-20 拍 script 单次输出 16k+ token，截断线与连接时长双杀——qwen 32k 尝试 301s 后 `fetch failed`（网关掐长连接，任何超时数值救不了）；② `json_object` 模式强制顶层对象，裸数组输出会失败（分批冒烟撞见）。
+- **分批生成**（prompt-builder.js 重构，有分镜走新路径、无分镜保留旧单发）：① **frame 调用**（designTokens/全局 css/风格锚，后续每批共用锁风格统一）；② **beats 每 4 拍一批**（4-6k token/批，实测 25-100s/批，远离 16k 截断线与长连接死亡区）——同一 system prompt 常量复用（qwen prompt cache 命中）；③ 逐批校验（数量/id/旁白原句/clip 标记/data-duration/script 标签/远程资源，纯函数可测）+ 失败只重试该批 ≤3 次；④ **批次产物缓存** `script-batches/`：普通重试只重生成失败批（实测全缓存命中秒回），`{retryForce}` 全量失效；⑤ merge 后整体校验兜底，失败清缓存防死循环。
+- **缓存陈旧防护**：tweak.js / switch-version.js 直接替换 script 输出的路径补 `clearBatchCache`——防后续非 force 重试加载旧批产物冲掉微调/版本切换结果。
+- **fetch failed 诊断日志**（shared/llm/index.js，callLLM + callMultimodalLLM 统一）：网络层失败时打 `err.cause` 链（code/errno/cause message）——undici 的笼统包装从此有真因。
+- template.json script 步骤 args 加 `{executionDir}`；单测 +5（chunkBeats/批内校验四态）。
+
+### 验证
+- 本地冒烟（拉回服务器真实 20 拍分镜「堰塞湖」）：frame + 5 批全过；narration 20/20 原句一致、duration 20/20；批 3 的 script 标签违规被批内校验拦截并重试自愈；designTokens 风格锚生效（palette 三色）。
+- test 171 + video-vg 13 全绿；typecheck、build 通过。
+- 服务器自测见部署后验证（start→storyboard→confirm→script 全链）。
+
 ## v0.11.62 (2026-11-04) — LLM 超时统一 420s + 引擎级联守卫（治 script 超时后 auto 空跑下游）
 
 ### 变更

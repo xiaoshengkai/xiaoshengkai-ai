@@ -1,4 +1,5 @@
 import { validateScript, validateStoryboard, checkScriptAgainstStoryboard, estimateDurationSec } from "./lib/schema.js";
+import { chunkBeats, validateBatchScenes, BATCH_SIZE } from "./lib/prompt-builder.js";
 
 let passed = 0, failed = 0;
 
@@ -103,6 +104,59 @@ async function run() {
   await test("空输入安全", () => {
     assertEq(checkScriptAgainstStoryboard(null, null).length, 0);
     assertEq(checkScriptAgainstStoryboard({ scenes: [{ narration: "a" }] }, undefined).length, 0);
+  });
+
+  console.log("\n── 分批生成 ──");
+
+  await test("chunkBeats 切批", () => {
+    const beats = Array.from({ length: 10 }, (_, i) => ({ id: i + 1 }));
+    const chunks = chunkBeats(beats, 4);
+    assertEq(chunks.length, 3);
+    assertEq(chunks[0].length, 4);
+    assertEq(chunks[2].length, 2);
+    assertEq(BATCH_SIZE, 4);
+  });
+
+  const mkBeat = (id, narration, dur) => ({ id, role: "hook", narration, presentAction: "照句子演", onScreen: "x", sceneType: "stat-card", durationSec: dur });
+  const mkScene = (id, narration, dur, html) => ({
+    id: String(id), type: "hook", narration,
+    html: html ?? `<div class="clip" id="clip-${id}" data-duration="${dur}"><div class="title">x</div></div>`,
+    css: ".a{}", jsAnimation: "var tl=1;",
+  });
+
+  await test("批内校验：通过", () => {
+    const beats = [mkBeat(1, "甲句", 4), mkBeat(2, "乙句", 5.5)];
+    const scenes = [mkScene(1, "甲句", 4), mkScene(2, "乙句", 5.5)];
+    assertEq(validateBatchScenes(scenes, beats).length, 0);
+  });
+
+  await test("批内校验：数量/旁白/时长/clip 标记", () => {
+    const beats = [mkBeat(1, "甲句", 4), mkBeat(2, "乙句", 5.5)];
+    let errs = validateBatchScenes([mkScene(1, "甲句", 4)], beats);
+    assertEq(errs.length, 1);
+    assert(errs[0].includes("场景数 1"));
+
+    errs = validateBatchScenes([mkScene(1, "甲句改了", 4), mkScene(2, "乙句", 5.5)], beats);
+    assert(errs.some(e => e.includes("narration")));
+
+    errs = validateBatchScenes([mkScene(1, "甲句", 3), mkScene(2, "乙句", 5.5)], beats);
+    assert(errs.some(e => e.includes("data-duration=3 != 4")));
+
+    errs = validateBatchScenes([{ ...mkScene(1, "甲句", 4), html: `<div class="clip">no id</div>` }, mkScene(2, "乙句", 5.5)], beats);
+    assert(errs.some(e => e.includes("id=\"clip-1\"")));
+    assert(errs.some(e => e.includes("data-duration")));
+  });
+
+  await test("批内校验：script 标签与远程资源拒绝", () => {
+    const beats = [mkBeat(1, "甲句", 4)];
+    let errs = validateBatchScenes([{ ...mkScene(1, "甲句", 4), html: `<div class="clip" id="clip-1" data-duration="4"><script src="https://x.js"></script></div>` }], beats);
+    assert(errs.some(e => e.includes("script")));
+    errs = validateBatchScenes([{ ...mkScene(1, "甲句", 4), html: `<div class="clip" id="clip-1" data-duration="4"><link rel="stylesheet" href="https://x.css"></div>` }], beats);
+    assert(errs.some(e => e.includes("远程")));
+  });
+
+  await test("批内校验：非数组输出", () => {
+    assertEq(validateBatchScenes({ scenes: [] }, [mkBeat(1, "a", 3)]).length, 1);
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

@@ -4,12 +4,19 @@
  */
 
 import path from "node:path";
+import fs from "node:fs";
 import { createDateLogger } from "@app/shared/logger.js";
 import { DATA_DIR, LOG_DIR, readState, writeState } from "../../../lib/state.js";
 import { loadTemplate } from "../../../lib/executor.js";
 import { evaluateSkipWhen } from "../../../lib/skip-when.js";
 import { initScriptHistory, writeScriptVersion, TWEAK_LIMIT } from "./script-version.js";
 import { tweakScript } from "./tweak-builder.js";
+
+// ponytail: tweak 直接替换 script 输出（不走 generateScript），必须清批次缓存——
+// 否则后续非 force 重试会加载旧批产物，把微调结果冲掉
+function clearBatchCache(dir) {
+  fs.rmSync(path.join(dir, "script-batches"), { recursive: true, force: true });
+}
 
 // 微调只动 script 层：storyboard 是已确认的骨架，不随反馈重置
 const UPSTREAM_STEP_IDS = new Set(["script", "storyboard"]);
@@ -108,6 +115,7 @@ export async function tweak(executionId) {
       scenesJson: tweaked.scenesJson,
     };
     scriptStep.output = newOutput;
+    clearBatchCache(dir);
     scriptStep.status = "completed";
     logger.info("[tweak] 脚本已更新，scriptStep 状态恢复为 completed");
 

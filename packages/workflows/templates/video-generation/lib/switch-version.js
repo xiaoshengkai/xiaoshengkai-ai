@@ -54,6 +54,8 @@ export function switchVersion(executionId, version) {
       scenesJson: JSON.stringify(newScript.scenes || []),
     };
     scriptStep.output = newOutput;
+    // 版本切换直接替换 script 输出，清批次缓存防后续重试加载旧批产物
+    fs.rmSync(path.join(dir, "script-batches"), { recursive: true, force: true });
 
     state.currentScriptVersion = version;
     writeState(dir, state);

@@ -35,7 +35,7 @@
       "previewField": "script",
       "module": "./lib/prompt-builder.js",
       "function": "generateScript",
-      "args": ["{title}", "{content}", "{style}", "{storyboard.storyboard}"]
+      "args": ["{title}", "{content}", "{style}", "{storyboard.storyboard}", "{executionDir}"]
     },
     {
       "id": "tts",

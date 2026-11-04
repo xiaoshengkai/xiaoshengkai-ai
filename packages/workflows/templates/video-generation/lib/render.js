@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { cpus } from "node:os";
+import { cpus, totalmem } from "node:os";
 import { fileURLToPath } from "node:url";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import ffprobeInstaller from "@ffprobe-installer/ffprobe";
@@ -179,16 +179,21 @@ export async function renderMP4(workDir, allHtml, globalCss, globalJsAnimation, 
   logger.info(`[render] HTML 生成 (${((Date.now() - startTime) / 1000).toFixed(1)}s, ${html.length} 字节)`);
 
   const cpuCores = cpus().length;
+  // 低内存主机（如 1.6G VPS）：2k+ 帧并行截图会爆内存（Set maximum size exceeded 实测）
+  // → hyperframes 官方缓解：low-memory 模式 + 单 worker，超时同步放宽（渲染变慢是代价）
+  const lowMemory = totalmem() < 4 * 1024 ** 3;
+  const workers = lowMemory ? 1 : Math.min(cpuCores, 4);
+  const renderTimeout = lowMemory ? 900000 : RENDER_TIMEOUT_MS;
   const ffmpegDir = path.dirname(ffmpegInstaller.path);
   const ffprobeDir = path.dirname(ffprobeInstaller.path);
   const env = { ...process.env, PATH: `${ffmpegDir}:${ffprobeDir}:${process.env.PATH}` };
 
   const hfStart = Date.now();
   const silentPath = path.join(workDir, "output-silent.mp4");
-  const cmd = `"${HYPERFRAMES_BIN}" render "${workDir2}" --output "${silentPath}" --width 1080 --height 1920 --fps 24 --workers ${Math.min(cpuCores, 4)} --player-auto-start`;
-  logger.info("[render] HyperFrames 开始...");
+  const cmd = `"${HYPERFRAMES_BIN}" render "${workDir2}" --output "${silentPath}" --width 1080 --height 1920 --fps 24 --workers ${workers}${lowMemory ? " --low-memory-mode" : ""} --player-auto-start`;
+  logger.info(`[render] HyperFrames 开始 (workers=${workers}, lowMemory=${lowMemory})...`);
   try {
-    execSync(cmd, { stdio: ["inherit", "inherit", "pipe"], cwd: workDir2, env, timeout: RENDER_TIMEOUT_MS });
+    execSync(cmd, { stdio: ["inherit", "inherit", "pipe"], cwd: workDir2, env, timeout: renderTimeout });
   } catch (e) {
     const stderr = e.stderr?.toString() || "";
     throw new Error(`HyperFrames 渲染失败: ${stderr || e.message}`);

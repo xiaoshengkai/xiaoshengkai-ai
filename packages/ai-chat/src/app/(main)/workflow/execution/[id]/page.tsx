@@ -978,7 +978,7 @@ function QualityCheckPanel({ step, executionId, onTweakWithIssues }: { step: Exe
   const fileBase = `${BASE}/api/workflows/execution/${executionId}/file`;
   const { register, open } = useImageViewer();
 
-  let out: { output?: string; sheet?: string | null; issues?: { severity: string; frame?: number; problem: string; fix?: string }[]; pass?: boolean | null; degraded?: boolean } = {};
+  let out: { output?: string; sheet?: string | null; stills?: string[]; issues?: { severity: string; frame?: number; problem: string; fix?: string; still?: string }[]; pass?: boolean | null; degraded?: boolean } = {};
   try {
     out = typeof step.output === "string" ? JSON.parse(step.output) : (step.output as unknown as typeof out) ?? {};
   } catch { /* output 解析失败按空处理 */ }
@@ -986,6 +986,18 @@ function QualityCheckPanel({ step, executionId, onTweakWithIssues }: { step: Exe
   const issues = Array.isArray(out.issues) ? out.issues : [];
   const highCount = issues.filter(i => i.severity === "high").length;
   const sheetSrc = out.sheet ? `${fileBase}/${out.sheet}` : null;
+  const stills = Array.isArray(out.stills) ? out.stills : [];
+
+  const thumb = (file: string, key: string) => {
+    const src = `${fileBase}/${file}`;
+    const idx = register(src);
+    return (
+      <div key={key} className="border-2 border-border bg-muted/20 overflow-hidden shrink-0" style={{ width: "108px" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={file} loading="lazy" className="w-full h-auto block cursor-zoom-in" onClick={() => open(idx)} />
+      </div>
+    );
+  };
 
   const issuesAsFeedback = () => {
     const lines = issues.map(i =>
@@ -1015,20 +1027,33 @@ function QualityCheckPanel({ step, executionId, onTweakWithIssues }: { step: Exe
         <p className="text-xs text-muted-foreground mt-1.5">16 帧等间隔总览（左→右、上→下为时间顺序）。人工看图对照：主体大小/文字重叠/场景雷同/空幕。</p>
       </div>
 
+      {stills.length > 0 && (
+        <div className="brutal bg-card p-3" style={{ border: "3px solid var(--border)", boxShadow: "4px 4px 0 var(--border)" }}>
+          <h3 className="text-xs font-bold mb-2">关键拍原尺寸静帧（钩子/机制/揭晓/结尾）</h3>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {stills.map(f => thumb(f, f))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">小格拼图看不清细节时点开这些原尺寸帧核对（字号/重叠/排版）。</p>
+        </div>
+      )}
+
       {issues.length > 0 && (
         <div className="brutal bg-card p-3" style={{ border: "3px solid var(--border)", boxShadow: "4px 4px 0 var(--border)" }}>
           <h3 className="text-xs font-bold mb-2">AI 看图发现的问题（{issues.length} 条）</h3>
           <div className="space-y-1.5 max-h-[40vh] overflow-auto">
             {issues.map((i, idx) => (
-              <div key={idx} className="border-2 border-border p-2 text-xs bg-card">
-                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                  <span className="px-1.5 py-0.5 font-bold text-white" style={{ background: i.severity === "high" ? "#e94560" : i.severity === "medium" ? "#f5a623" : "var(--muted-foreground)" }}>
-                    {i.severity === "high" ? "高" : i.severity === "medium" ? "中" : "低"}
-                  </span>
-                  {i.frame ? <span className="font-bold">第 {i.frame} 帧附近</span> : null}
+              <div key={idx} className="border-2 border-border p-2 text-xs bg-card flex gap-2 items-start">
+                {i.still && <div className="shrink-0">{thumb(i.still, `issue-${idx}`)}</div>}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <span className="px-1.5 py-0.5 font-bold text-white" style={{ background: i.severity === "high" ? "#e94560" : i.severity === "medium" ? "#f5a623" : "var(--muted-foreground)" }}>
+                      {i.severity === "high" ? "高" : i.severity === "medium" ? "中" : "低"}
+                    </span>
+                    {i.frame ? <span className="font-bold">第 {i.frame} 帧附近</span> : null}
+                  </div>
+                  <p className="leading-snug">{i.problem}</p>
+                  {i.fix ? <p className="text-muted-foreground mt-0.5">建议：{i.fix}</p> : null}
                 </div>
-                <p className="leading-snug">{i.problem}</p>
-                {i.fix ? <p className="text-muted-foreground mt-0.5">建议：{i.fix}</p> : null}
               </div>
             ))}
           </div>

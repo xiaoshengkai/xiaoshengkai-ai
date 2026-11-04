@@ -27,11 +27,13 @@ async function run() {
   await test("valid storyboard parses + durationSec 自动补齐", () => {
     const sb = {
       schemaVersion: 1,
+      thesis: "不是A导致B，是B压低了A",
+      instrument: "右上角表盘：量当前比例",
       coreMetaphor: "365 格生日日历",
       beats: [
-        { id: 1, role: "hook", narration: "教室里坐了二十三个人", presentAction: "让观众动手", onScreen: "课桌逐个亮起", sceneType: "stat-card" },
+        { id: 1, role: "hook", narration: "教室里坐了二十三个人", presentAction: "让观众动手", onScreen: "课桌逐个亮起", sceneType: "stat-card", note: "示意", takeaway: "抛出直觉" },
         { id: 2, role: "reveal", narration: "答案接近一半", presentAction: "停住亮字", onScreen: "问号", sceneType: "quote" },
-        { id: 3, role: "outro", narration: "运气从此有了形状", presentAction: "回场", onScreen: "日历收拢", sceneType: "quote" },
+        { id: 3, role: "outro", narration: "运气从此有了形状", presentAction: "回场", onScreen: "日历收拢", sceneType: "quote", takeaway: "回扣主题" },
       ],
     };
     const r = validateStoryboard(sb);
@@ -40,6 +42,11 @@ async function run() {
     for (const b of r.storyboard.beats) {
       assert(b.durationSec != null && b.durationSec >= 2, `beat ${b.id} durationSec 未补齐`);
     }
+    assertEq(r.storyboard.thesis, "不是A导致B，是B压低了A");
+    assertEq(r.storyboard.instrument, "右上角表盘：量当前比例");
+    assertEq(r.storyboard.beats[0].note, "示意");
+    assertEq(r.storyboard.beats[1].note, undefined, "缺省 note 应保持 undefined（在途执行兼容）");
+    assertEq(r.storyboard.beats[2].takeaway, "回扣主题");
   });
 
   await test("storyboard JSON 字符串输入", () => {

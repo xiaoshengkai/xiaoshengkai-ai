@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.61 (2026-11-04) — video-generation 增强：质量门原尺寸静帧 + 分镜表结构化字段
+
+### 变更
+- **背景**：对照 vibe-knowledge-video 真实产物（`vibe-video-fertility-housing`，130s 成片全链）复盘，发现两个移植薄点：16 帧小格拼图看不清细节（原片实践是 sheet + 5 张原尺寸 `--stills` 双层）；分镜表七列中「屏上小字（出处/示意）」「观众明白了什么」与表前「一句话论点/常驻尺子」未结构化，数字纪律无落地载体。
+- **质量门 stills 层**：`quality-gate.js` 按 storyboard beats 关键拍（hook/title/model 中位/reveal/outro，按实际片长缩放；无分镜等分兜底）抽 5 张原尺寸静帧；vision 报出的问题帧号自动换算时刻补抽原尺寸帧（high/medium 优先、去近重、≤4 张，随 issue 返回 `still` 字段）；每次运行先清旧 `preview-*.jpg`（tweak 重渲染后防残留）。前端 `QualityCheckPanel` 加关键拍静帧行 + 问题卡内嵌缩略图（点开原尺寸）。
+- **分镜表结构化增强**（全部 zod optional，在途执行兼容）：全局 `thesis`（一句话论点）+ `instrument`（常驻读数计划：量什么/怎么变/哪几拍）；每拍 `note`（屏上小字：数字出处或"示意"标注——数字纪律的落地载体）+ `takeaway`（观众明白了什么）。`StoryboardPanel` 摘要卡与拍卡片对应渲染；script 阶段分镜指令加两条（note 落进场景 HTML 小字、instrument 以相同位置多场景复现）。
+- 砍掉 `emphasis`/`colorSemantics` 字段：TTS 形态旁白不上屏，强调落在场景大字设计；颜色语义 prompt 提示即可（YAGNI）。
+
+### 验证
+- 单测 8/8（含新字段 optional 兼容断言）；typecheck、build 全绿。
+- 冒烟①（质量门，历史成片+合成分镜）：beats 关键拍 5 张（按片长缩放）+ vision 问题帧 4 张自动补抽 + 去重封顶，全链通过。
+- 冒烟②（分镜 LLM，同题「房价与生育率」头对头 vibe 原片）：thesis/instrument 全填且 instrument 细于原片（水位杯计划到拍）；takeaway 20/20；note 11/20 仅数字拍填写；LLM 主动标注"须以论文原文核验值替换"——数字纪律生效，待核验项在确认面板人眼可见。
+
 ## v0.11.60 (2026-11-04) — video-generation 三层升级：分镜确认 + 叙事方法论 + 质量门
 
 ### 变更

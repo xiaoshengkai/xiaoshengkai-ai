@@ -77,7 +77,7 @@
       "previewField": "sheet",
       "module": "./lib/quality-gate.js",
       "function": "runQualityGate",
-      "args": ["{executionDir}", "{script.title}"],
+      "args": ["{executionDir}", "{script.title}", "{storyboard.storyboard}"],
       "skipWhen": "enable_quality_check_no"
     }
   ]

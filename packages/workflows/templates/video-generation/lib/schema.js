@@ -17,12 +17,16 @@ const Beat = z.object({
   onScreen: z.string().default(""),
   sceneType: z.string().default("body"),
   durationSec: z.number().optional(),
+  note: z.string().optional(),
+  takeaway: z.string().optional(),
 });
 
 export const StoryboardSchema = z.object({
   schemaVersion: z.union([z.literal(1), z.literal("1")]).transform(v => Number(v)),
   title: z.string().optional(),
+  thesis: z.string().optional(),
   coreMetaphor: z.string().optional(),
+  instrument: z.string().optional(),
   suspensePlan: z.string().optional(),
   reversals: z.union([z.number(), z.string()]).optional(),
   beats: z.array(Beat).min(3, { message: "至少需要 3 拍" }).max(20, { message: "最多 20 拍" }),

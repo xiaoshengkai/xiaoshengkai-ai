@@ -28,7 +28,9 @@ const OUTPUT_SPEC = `
 {
   "schemaVersion": 1,
   "title": "片名（2-5 字，是概念本身或一个意象）",
+  "thesis": "一句话论点（因果断言，如：不是A导致了B，是B压低了A）",
   "coreMetaphor": "全片唯一核心比喻，开场就能画出来的具体东西",
+  "instrument": "常驻读数计划：画面上挂什么仪器（表盘/进度条/计数），量什么、读数怎么随内容变化、出现在哪几拍",
   "suspensePlan": "悬念在第几拍埋、第几拍解，具体到一个数或一个答案",
   "reversals": 2,
   "bgm_outline": "按段落百分比描述情绪起伏，如：0-25% 平静铺垫；25-70% 渐强推进；70-85% 高潮揭晓；85-100% 收束回落",
@@ -39,6 +41,8 @@ const OUTPUT_SPEC = `
       "narration": "本拍旁白句（15-30 字，中文口语，数字拼读）",
       "presentAction": "六种呈现动作之一 / 停住 / 回场 / 合体",
       "onScreen": "屏上是什么、在干什么（一个日常的词 + 一个动词）",
+      "note": "屏上小字：本拍数字的出处（如：国家统计局 2022）或'示意'标注；无数字则留空",
+      "takeaway": "观众明白了什么（一句能与上一拍区分开的话）",
       "sceneType": "stat-card"
     }
   ]
@@ -55,7 +59,12 @@ const OUTPUT_SPEC = `
   - quote：大字金句 + 装饰
   - list：多项目列表（icon + 文字）
 - 不填 durationSec：系统按 4.5 字/秒语速公式自动计算
-- beats 数量即后续场景数量，8-20 拍，按逐拍骨架填空`;
+- beats 数量即后续场景数量，8-20 拍，按逐拍骨架填空
+
+数字纪律（每拍自查）：
+- 旁白/画面出现的每个数字，note 必须给出处（文献/公报/研究）或标"示意"
+- 查不到可靠出处的数字不写，宁可换例子
+- 模拟类数字（比例/概率/趋势）一律标"示意"`;
 
 export async function generateStoryboard(title, content, style, contentRequirement, executionDir) {
   const execId = path.basename(executionDir);
@@ -129,7 +138,9 @@ ${previousStoryboard}
         storyboard: JSON.stringify(sb, null, 2),
         beatCount: sb.beats.length,
         totalDurationSec: Math.round(totalSec),
+        thesis: sb.thesis || "",
         coreMetaphor: sb.coreMetaphor || "",
+        instrument: sb.instrument || "",
         suspensePlan: sb.suspensePlan || "",
         reversals: sb.reversals ?? 0,
         bgm_outline: sb.bgm_outline || "",

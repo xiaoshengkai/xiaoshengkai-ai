@@ -64,6 +64,8 @@ export async function generateScript(title, content, style, storyboardJson) {
 - **scenes 数量必须等于 beats 数量**，顺序一致
 - **每场景 narration 使用对应 beat 的 narration 原句**（一字不改）
 - **每场景 html 演出该 beat 的 onScreen 描述**：屏上出现的就是 onScreen 里的东西，发生的动作就是 presentAction 对应的演法
+- **beat 的 note 落进场景 HTML 小字**：数字出处或"示意"标注（如"国家统计局 2022""示意"），放在不抢主体的角落
+- **instrument 常驻读数**：若分镜表声明了仪器，相关场景以相同位置/相同样式复现该读数元素，读数随内容变化（"常驻"= 多场景同位复现）
 - **每场景 data-duration 使用对应 beat 的 durationSec**（已按 TTS 语速公式算好）
 - sceneType 决定布局骨架（stat-card/process-step/data-viz/comparison/quote/list）
 

@@ -22,10 +22,14 @@ interface Beat {
   onScreen: string;
   sceneType: string;
   durationSec?: number;
+  note?: string;
+  takeaway?: string;
 }
 
 interface Storyboard {
+  thesis?: string;
   coreMetaphor?: string;
+  instrument?: string;
   suspensePlan?: string;
   reversals?: number | string;
   beats: Beat[];
@@ -102,8 +106,14 @@ export default function StoryboardPanel({ executionId, output, onRefresh }: Stor
           <h2 className="text-sm font-extrabold">分镜表 · 等待确认</h2>
           <span className="text-xs text-muted-foreground">{storyboard.beats.length} 拍 / 约 {Math.round(totalSec)} 秒</span>
         </div>
+        {storyboard.thesis && (
+          <p className="text-xs mb-1"><span className="font-bold">论点：</span>{storyboard.thesis}</p>
+        )}
         {storyboard.coreMetaphor && (
           <p className="text-xs mb-1"><span className="font-bold">核心比喻：</span>{storyboard.coreMetaphor}</p>
+        )}
+        {storyboard.instrument && (
+          <p className="text-xs mb-1"><span className="font-bold">常驻读数：</span>{storyboard.instrument}</p>
         )}
         {storyboard.suspensePlan && (
           <p className="text-xs mb-1"><span className="font-bold">悬念设计：</span>{storyboard.suspensePlan}</p>
@@ -128,6 +138,8 @@ export default function StoryboardPanel({ executionId, output, onRefresh }: Stor
             </div>
             <p className="text-sm font-bold leading-snug">{b.narration}</p>
             {b.onScreen && <p className="text-xs text-muted-foreground mt-1">屏上：{b.onScreen}</p>}
+            {b.note && <p className="text-xs text-muted-foreground">小字：{b.note}</p>}
+            {b.takeaway && <p className="text-xs text-muted-foreground/70">明白：{b.takeaway}</p>}
           </div>
         ))}
       </div>

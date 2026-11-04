@@ -367,6 +367,8 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 - **质量门是增益不是门禁**：quality-check 步骤 ffmpeg 16 帧拼图 + vision LLM（selection.vision）按毛病对照表出 issues；vision 失败/未配置一律降级（拼图照出、issues 空、步骤照常 completed）——不卡交付。修复走**人工确认闭环**：issues 预填进既有 tweak 反馈框（复用 tweak-auto 编排，不新造自动循环，零失控风险）。
 - **兼容**：旧执行 retry script 时 `{storyboard.storyboard}` 解析为空 → prompt-builder 降级为无分镜自由生成（旧路径不变）；tweak resetSteps 按 step.id 匹配 template step（索引对齐在模板加步骤后会错位）并排除 storyboard（微调只动 script 层，分镜骨架保持已确认状态）。
 - **音画对位公式**：`durationSec = max(2, ceil(字数/4.5) + 0.5)`——分镜表与场景 data-duration 两头对齐 TTS 语速，缓解 LLM 自报时长与实际配音漂移（逐场景 TTS 对齐是 tech-video 的解法，本次不引入）。
+- **看图改图双层**（v0.11.61）：16 帧小格拼图（总览）+ beats 关键拍 5 张原尺寸静帧（细节）+ vision 问题帧自动补抽——小格看不清字号/重叠类细节，原尺寸层给人眼；对照 vibe 原片实践（sheet + `--stills`）。
+- **数字纪律的结构化载体**（v0.11.61）：分镜表 `note` 字段（数字出处或"示意"标注）+ `thesis`/`instrument`——LLM 没把握的数字在 note 里标"须核验"，确认面板人眼把关；不接联网核实（workflows 子进程接 search 另立项）。
 - **模板恢复可用**：`available` 翻 true（此前实验态灰卡）。
 
 ## 已知问题

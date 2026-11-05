@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.64 (2026-11-05) — beike-houses 定时任务：贝壳心仪房源跟踪（99万内三室+，日对比）
+
+### 变更
+- **新任务 `packages/tasks/tasks/beike-houses/`**：绍兴越城 东湖/皋埠/迪荡/两湖 二手房筛选跟踪，每日 9:30 抓取 sx.ke.com 并与上一快照对比（新上架/降价/涨价/下架独立模块展示），地区→小区二级分组表格（总价/单价/户型/面积/楼层/电梯/朝向/标签/关注天数/变价次数/贝壳链接），原生 HTML 仪表盘（Neo-Brutalism，`/api/tasks/beike-houses/dashboard`）。
+- **数据源**：原 beike-ai-platform CLI 因平台凭证签发故障（Issues #2~#15 自 2026-09 未修复）弃用，改 sx.ke.com Web 直抓。核心机制：① 列表 page1 可匿名+Cookie 访问，**pgN 分页被 CAPTCHA 系统性拦截**（真实浏览器+登录态同样）→ **自适应拆分查询**（户型 l3-l6 × 价格 p1-p2 × 面积 a1-a8 × 楼层 lc1-lc3 逐维细分压到单页 ≤30 条，筛选码空间完备分割保证数据不漏，实测救回 page2 的 2 套）；② c<id> 小区定向查询防板块错分漏抓，**0 结果时贝壳回退展示附近推荐** → 按 resblockId 过滤只留目标小区；③ 列表页「共找到 N 套」在筛选页是垃圾值 → 拆分触发只看「满页 30 条」。
+- **会话**：登录 Cookie 存 `data/beike-houses/cookies.json`（gitignored，从浏览器导出），每次响应合并 Set-Cookie 自动续期；登录墙/CAPTCHA 检测失败时报错不落盘（防误报下架）。
+- **守卫**：今日总数 < 昨日 50% 中止；查询失败不写快照；下架房源经详情页核查原因（涨出预算 vs 已下架/成交）；registry.json 累计索引（firstSeen/priceHistory/重新上架识别）。
+- 单测 13 个（parser 双模板 fixture / filter 边界 / diff 三态）；root script `test:beike-houses`。
+
+### 验证
+- 首跑 86 套（东湖 6 / 皋埠 60 / 迪荡 6 / 两湖 31），白名单小区（御景华庭各期/中天观樾诚品/卧龙银湖湾）与贝壳网页对数一致；两次独立运行结果集相同；请求 63 次/约 5.5 分钟（4-6.5s 礼貌间隔）。
+- test 126 + beike-houses 13 全绿；typecheck 通过。
+
 ## v0.11.63 (2026-11-04) — script 分批生成 + fetch failed 诊断日志（治 16-20 拍脚本必超时）
 
 ### 变更

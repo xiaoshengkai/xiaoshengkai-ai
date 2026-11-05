@@ -95,7 +95,8 @@ ai-engineer-journey/
     ├── services/                # 独立常驻服务（非 npm workspace 内聚目录）
     │   ├── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
     │   └── corp-egress/         # 内网出口隧道（Mac 侧常驻：本机 SOCKS5 + ssh -R 反投给服务器，见「内网出口」）
-    ├── tasks/                   # 定时任务（@app/tasks，详见「定时任务系统」）
+    ├── tasks/                   # 定时任务（@app/tasks，详见「定时任务系统」+「贝壳房源跟踪」）
+    │   └── tasks/beike-houses/  # 贝壳房源跟踪（config/fetcher/parser/filter/diff/store/generate-dashboard，全在包内自包含）
     └── workflows/               # 工作流引擎（@app/workflows，详见「工作流系统」）
         ├── package.json
         ├── actions.json         # 引擎级 HTTP 动作声明（18 个：执行 10 + 资产库 8）
@@ -338,6 +339,15 @@ logs/
 > `logs/app/app-*.log` 由 ai-chat（NEXT logger）、MCP 子进程、`/api/client-log` 三方共享，统一**追加写（时间正序）**；读取方（`/api/logs`、`scripts/log.sh`）取尾部再反转展示。禁止「读整文件 → 前插 → 重写」（多进程会互相覆盖）。`createDateLogger`（workflows/tasks/services）仍是每 item 独立文件 + 倒序。
 
 > **日志页**：侧栏「日志」→ `(main)/logs`。`/api/logs` 三种形态：`?list=1` 列分组文件、`?group&file&tail=N` 取尾部行（≤2000）、`?group&file&download=1` 附件流式下载；分组 app/tasks/services/workflows/backup，路径白名单防穿越。原 right-panel 的临时「运行日志」块已移除（集中到日志页）。
+
+## 贝壳房源跟踪（beike-houses 任务）
+
+`packages/tasks/tasks/beike-houses/`：绍兴越城 东湖/皋埠/迪荡/两湖 二手房筛选跟踪（≤99万 · ≥3室 · 小区白/黑名单），每日 9:30（cron `30 9 * * *`，经 `/schedule` 页或 data 状态设置）抓取 sx.ke.com，对比上一快照生成变化模块 + 地区→小区二级分组表格，原生 HTML 仪表盘（task.json 的 `html` 字段，`/api/tasks/beike-houses/dashboard`）。
+
+- **数据链路**：`run()` → fetcher（登录 Cookie + 自适应拆分查询）→ parser（双模板列表页解析）→ filter（本地精滤）→ 守卫（<50% 中止）→ store（`data/beike-houses/snapshots/YYYY-MM-DD.json` + `registry.json` 累计索引，留 90 天）→ diff（新上架/降价/涨价/下架 + 重新上架识别）→ generate-dashboard（数据内嵌静态页）
+- **贝壳反爬三坑与对策**：① pgN 分页 CAPTCHA 系统拦截 → 户型×价格×面积×楼层筛选码逐维拆分压到单页（完备分割不漏数据）；② c<id> 小区查询 0 结果回退附近推荐 → 按 resblockId 过滤；③ 筛选页「共找到 N 套」为垃圾值 → 拆分触发只认「满页 30 条」
+- **会话**：Cookie 从浏览器导出存 `data/beike-houses/cookies.json`（gitignored），响应 Set-Cookie 自动合并续期；登录墙/CAPTCHA → 报错不落盘（防误报下架）
+- **原方案** beike-ai-platform CLI 已弃用（平台凭证签发故障，Issues #2~#15）
 
 ## MCP 系统
 

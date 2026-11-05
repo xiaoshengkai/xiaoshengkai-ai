@@ -29,11 +29,19 @@ function jsonForScript(data) {
   return JSON.stringify(data).replace(/</g, "\\u003c").replace(/\u2028|\u2029/g, "");
 }
 
+function escapeHtmlText(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function fmt(n) {
   return n == null ? "—" : Number(n).toLocaleString("zh-CN");
 }
 
-function buildPayload({ date, fetchedAt, houses, changes, groupLabels, notes }) {
+function buildPayload({ date, fetchedAt, houses, changes, groupLabels }) {
   // 地区 → 小区 二级分组
   const groups = [];
   for (const [key, label] of Object.entries(groupLabels)) {
@@ -70,7 +78,7 @@ function buildPayload({ date, fetchedAt, houses, changes, groupLabels, notes }) 
   return {
     date,
     fetchedAt,
-    notes: notes || [],
+    summary: buildSummary(houses, changes),
     totals: {
       houses: houses.length,
       communities: groups.reduce((n, g) => n + g.communities.length, 0),
@@ -86,6 +94,25 @@ function buildPayload({ date, fetchedAt, houses, changes, groupLabels, notes }) 
         }
       : null,
   };
+}
+
+/** 每日结论：一行人话总结（页面给人看） */
+function buildSummary(houses, changes) {
+  const n = houses.length;
+  if (!houses.length) return "当前筛选条件下暂无在售房源";
+  const cheapest = [...houses].sort((a, b) => a.totalPrice - b.totalPrice)[0];
+  const low = `最低 ${cheapest.community} ${cheapest.totalPrice}万`;
+  if (!changes) return `开始跟踪：在跟 ${n} 套 · ${low}`;
+  const { added, priceDown, priceUp, removed } = changes;
+  if (!added.length && !priceDown.length && !priceUp.length && !removed.length) {
+    return `今日无变化 · 在跟 ${n} 套 · ${low}`;
+  }
+  const parts = [];
+  if (added.length) parts.push(`新增 ${added.length}`);
+  if (priceDown.length) parts.push(`降价 ${priceDown.length}`);
+  if (priceUp.length) parts.push(`涨价 ${priceUp.length}`);
+  if (removed.length) parts.push(`下架 ${removed.length}`);
+  return `今日${parts.join(" · ")} · 在跟 ${n} 套 · ${low}`;
 }
 
 function toChangeItem(h) {
@@ -136,9 +163,7 @@ function buildHtml(payload) {
   const stats = Object.entries(payload.totals.groups)
     .map(([label, n]) => `<div class="stat">${label} <b>${n}</b> 套</div>`)
     .join("");
-  const notes = payload.notes.length
-    ? `<div class="notes">${payload.notes.map((n) => `<div>⚠ ${n}</div>`).join("")}</div>`
-    : "";
+  const summary = `<div class="summary"><span class="s-label">每日结论</span><span class="s-text">${escapeHtmlText(payload.summary)}</span></div>`;
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -160,7 +185,10 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--ink);min-heig
 .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
 .stat{background:var(--bg);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);padding:8px 14px;font-family:var(--font-mono);font-size:12.5px;font-weight:700}
 .stat b{font-size:15px}
-.notes{max-width:1240px;margin:18px auto 0;font-family:var(--font-mono);font-size:12.5px;font-weight:700;border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);background:#FFF3D6;padding:10px 14px}
+.summary{max-width:1240px;margin:18px auto 0;display:flex;align-items:center;gap:14px;border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);background:var(--ink);padding:12px 18px;flex-wrap:wrap}
+.summary .s-label{font-family:var(--font-title);font-weight:800;font-size:13px;background:var(--yellow);border:2px solid var(--yellow);padding:2px 10px;color:var(--ink);flex-shrink:0}
+.summary .s-text{font-family:var(--font-mono);font-weight:700;font-size:14px;color:#fff;line-height:1.5}
+.summary .s-text b{color:var(--yellow);font-size:16px}
 .container{max-width:1240px;margin:0 auto;padding:26px 18px 60px}
 .sect-title{font-family:var(--font-title);font-weight:800;font-size:20px;margin:26px 0 14px;display:flex;align-items:center;gap:10px}
 .sect-title::before{content:"";width:14px;height:14px;background:var(--ink)}
@@ -215,7 +243,7 @@ td .title-link:hover{text-decoration:underline}
     ${stats}
     <div class="stat">在跟小区 <b>${payload.totals.communities}</b></div>
   </div>
-  ${notes}
+  ${summary}
 </div></div>
 <div class="container">
   <div class="sect-title">今日变化</div>
@@ -377,7 +405,7 @@ td .title-link:hover{text-decoration:underline}
 
 /**
  * 生成仪表盘
- * @param {object} args { date, fetchedAt, houses, changes, groupLabels, notes }
+ * @param {object} args { date, fetchedAt, houses, changes, groupLabels }
  */
 export function generateDashboard(args) {
   const payload = buildPayload(args);

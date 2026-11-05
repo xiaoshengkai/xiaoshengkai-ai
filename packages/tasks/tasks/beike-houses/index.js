@@ -89,7 +89,6 @@ export async function run() {
     let houses = applyFilters(raw, config);
     log(`过滤: 抓取 ${raw.length} 条 → 符合(≤${config.priceMax}万·≥${config.minRooms}室·小区规则) ${houses.length} 条`);
 
-    let notes = [];
 
     // 2.5 归属校验（白名单组）：贝壳 c 页会把同名小区/附近房源混挂目标小区（列表
     //     小区名+resblockId 都是被查小区），详情页的 区/小区 才是真实归属。
@@ -129,7 +128,6 @@ export async function run() {
     }
     if (rejected.length) {
       houses = houses.filter((h) => !rejected.includes(h.id));
-      notes.push(`已剔除混挂房源 ${rejected.length} 套（${[...new Set(rejectsByName)].join("、")}），如需跟踪请加 config`);
       log(`归属校验: 剔除 ${rejected.length} 套混挂房源`);
     }
     // 展示用权威小区名（比 c 页聚合标签更精确）
@@ -182,10 +180,8 @@ export async function run() {
         }
       }
       if (changes.removed.length > config.detailCheckLimit) {
-        notes.push(`下架房源 ${changes.removed.length} 套，仅核查前 ${config.detailCheckLimit} 套原因`);
       }
     } else {
-      notes.push(`首次运行：基线快照已建立，明日起展示每日变化`);
     }
 
     // 8. 生成页面 + 清理旧快照 + 推送线上
@@ -195,7 +191,6 @@ export async function run() {
       houses,
       changes,
       groupLabels,
-      notes,
     });
     pruneSnapshots();
     saveRegistry(newRegistry);

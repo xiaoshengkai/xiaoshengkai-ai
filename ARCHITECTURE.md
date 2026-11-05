@@ -345,8 +345,8 @@ logs/
 `packages/tasks/tasks/beike-houses/`：绍兴越城 东湖/皋埠/迪荡/两湖 二手房筛选跟踪（≤99万 · ≥3室 · 小区白/黑名单），对比上一快照生成变化模块 + 地区→小区二级分组表格，原生 HTML 仪表盘（task.json 的 `html` 字段，`/api/tasks/beike-houses/dashboard`）。
 
 - **运行拓扑**（云服务器 IP 被贝壳 CAPTCHA 盯得紧，约 30 请求即触发；住宅网络 Mac 60+ 请求稳定）：**任务只在 Mac 跑**（Mac scheduler cron `30 9 * * *` 主跑 + `30 20 * * *` 补跑，data/tasks/beike-houses/index.json），跑完 `index.js` 的 `pushDashboardToServer()` 把 dashboard.html `scp` 到服务器（`DEPLOY_TARGET`/`DEPLOY_PATH` env）；服务器侧 cron 已禁用、仅只读展示。dashboard.html git 里保持首版不再提交（Mac 推送会弄脏服务器工作树，未来部署勿触碰该文件）。
-- **数据链路**：`run()` → fetcher（登录 Cookie + 自适应拆分查询）→ parser（双模板列表页解析）→ filter（本地精滤）→ **归属校验**（详情页权威归属 区+真实小区，registry.verified 缓存摊销——治贝壳 c 页同名小区混挂）→ 守卫（<50% 中止）→ store（`data/beike-houses/snapshots/YYYY-MM-DD.json` + `registry.json` 累计索引，留 90 天）→ diff（新上架/降价/涨价/下架 + 重新上架识别）→ generate-dashboard（数据内嵌静态页）→ scp 推送
-- **贝壳反爬四坑与对策**：① pgN 分页 CAPTCHA 系统拦截 → 户型×价格×面积×楼层筛选码逐维拆分压到单页（完备分割不漏数据）；② c<id> 小区查询 0 结果回退附近推荐 → 按 resblockId 过滤；③ 筛选页「共找到 N 套」为垃圾值 → 拆分触发只认「满页 30 条」；④ **c 页聚合同名/附近房源且 resblock_id 同为被查小区** → 详情页 `<title>` 权威归属校验（区县 + 精确小区名集合）
+- **数据链路**：`run()` → fetcher（登录 Cookie + 自适应拆分查询）→ parser（双模板列表页解析）→ filter（本地精滤）→ **归属校验**（详情页权威归属 区+真实小区，registry.verified 缓存摊销——治贝壳 c 页同名小区混挂）→ 守卫（<50% 中止）→ store（`data/beike-houses/snapshots/YYYY-MM-DD.json` + `registry.json` 累计索引，留 90 天）→ diff（新上架/降价/涨价/下架 + 重新上架识别）→ generate-dashboard（数据内嵌静态页 + 顶部「每日结论」人话栏）→ scp 推送
+- **贝壳反爬四坑与对策**：① pgN 分页 CAPTCHA 系统拦截 → 户型×价格×面积×楼层筛选码逐维拆分压到单页（完备分割不漏数据）；② c<id> 小区查询 0 结果回退附近推荐 → 按 resblockId 过滤；③ 筛选页「共找到 N 套」为垃圾值 → 拆分触发只认「满页 30 条」；④ **c 页聚合同名/附近房源且 resblock_id 同为被查小区** → 详情页 `<title>` 权威归属校验（区县 + 精确小区名/名称模式集合，御景华庭一~五期模式全收）
 - **会话**：Cookie 从浏览器导出存 `data/beike-houses/cookies.json`（gitignored，仅 Mac），响应 Set-Cookie 自动合并续期；登录墙/CAPTCHA → 报错不落盘（防误报下架）；续期一键脚本 `export-cookies.js`（browser-harness CDP）
 - **原方案** beike-ai-platform CLI 已弃用（平台凭证签发故障，Issues #2~#15）
 

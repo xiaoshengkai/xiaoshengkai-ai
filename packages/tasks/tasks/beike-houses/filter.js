@@ -15,18 +15,19 @@ function matchAny(community, names) {
   });
 }
 
-/** 精确匹配（normalized 全等），白名单用（防同名小区/聚合混挂） */
-export function matchExact(community, names) {
+/** 精确匹配（normalized 全等），白名单用（防同名小区/聚合混挂）；支持 includePatterns 正则条目 */
+export function matchExact(community, names, patterns = []) {
   const c = normalizeName(community);
-  return names.some((n) => normalizeName(n) === c);
+  if (names.some((n) => normalizeName(n) === c)) return true;
+  return patterns.some((p) => new RegExp(p).test(c));
 }
 
-/** 归属校验：详情页权威归属 vs 白名单（区县 + 精确小区名） */
+/** 归属校验：详情页权威归属 vs 白名单（区县 + 精确小区名/模式） */
 export function verifyOwnership(house, verified, config) {
   const g = config.groups.find((x) => x.key === house.group);
   if (!g || !g.include) return true;
   if (verified.district !== config.district) return false;
-  return matchExact(verified.community, g.include);
+  return matchExact(verified.community, g.include, g.includePatterns);
 }
 
 /**
@@ -41,7 +42,7 @@ export function applyFilters(houses, config) {
     if (!g) return false;
     if (h.totalPrice <= 0 || h.totalPrice > config.priceMax) return false;
     if (h.rooms < config.minRooms) return false;
-    if (g.include && !matchExact(h.community, g.include)) return false;
+    if (g.include && !matchExact(h.community, g.include, g.includePatterns)) return false;
     if (g.exclude && matchAny(h.community, g.exclude)) return false;
     return true;
   });

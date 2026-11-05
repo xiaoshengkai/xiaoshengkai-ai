@@ -176,17 +176,25 @@ test("filter: 价格/户型边界", () => {
   assert.deepEqual(out, ["a", "d"]);
 });
 
-test("filter: 白名单精确匹配（防同名小区/聚合混挂）", () => {
-  const didangSet = config.groups.find((g) => g.key === "didang").include;
-  // 各期全名 ∈ 集合
-  assert.ok(matchExact("御景华庭三期", didangSet));
-  assert.ok(matchExact("御景华庭四期北区", didangSet));
-  assert.ok(matchExact("金地·蘭悦", didangSet));
-  assert.ok(matchExact("星尚·悦湖苑", didangSet));
-  // 同名他区/无关小区 ∉ 集合（contains 时代会误放行的案例）
-  assert.ok(!matchExact("崧厦御景华庭", didangSet));
-  assert.ok(!matchExact("世禾新村", didangSet));
-  // applyFilters 走 include 精确语义
+test("filter: 白名单精确匹配 + 期号模式（防同名小区/聚合混挂）", () => {
+  const didang = config.groups.find((g) => g.key === "didang");
+  const names = didang.include;
+  const patterns = didang.includePatterns;
+  // 各期全名：精确名 ∪ 模式命中
+  assert.ok(matchExact("金地·蘭悦", names));
+  assert.ok(matchExact("星尚·悦湖苑", names));
+  assert.ok(matchExact("御景华庭", names, patterns)); // 主
+  assert.ok(matchExact("御景华庭一期", names, patterns)); // 一~五期各变体
+  assert.ok(matchExact("御景华庭二期", names, patterns));
+  assert.ok(matchExact("御景华庭三期", names, patterns));
+  assert.ok(matchExact("御景华庭四期北区", names, patterns));
+  assert.ok(matchExact("御景华庭五期", names, patterns));
+  assert.ok(matchExact("御景华庭五期南区", names, patterns));
+  // 同名他区/无关小区不命中（contains 时代会误放行的案例）
+  assert.ok(!matchExact("崧厦御景华庭", names, patterns));
+  assert.ok(!matchExact("世禾新村", names, patterns));
+  assert.ok(!matchExact("御景华庭六期", names, patterns)); // 超出 1~5 期
+  // applyFilters 走 include+includePatterns 精确语义
   const ok = applyFilters(
     [mkHouse({ community: "御景华庭三期" }), mkHouse({ community: "金地·蘭悦" }), mkHouse({ community: "星尚·悦湖苑" })],
     config
@@ -197,6 +205,11 @@ test("filter: 白名单精确匹配（防同名小区/聚合混挂）", () => {
     config
   );
   assert.equal(bad.length, 0);
+});
+
+test("filter: 名爵府黑名单", () => {
+  const out = applyFilters([mkHouse({ group: "gaobu", community: "名爵府" }), mkHouse({ group: "gaobu", community: "凤鸣湾" })], config);
+  assert.deepEqual(out.map((h) => h.community), ["凤鸣湾"]);
 });
 
 test("filter: verifyOwnership 归属校验（区县 + 精确小区）", () => {

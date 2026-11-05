@@ -112,7 +112,7 @@ async function run() {
     assertEq(validateSceneBatch(good, ["scene0"]).length, 0);
     assert(validateSceneBatch(good, ["scene1"]).some(e => e.includes("scene1")));
     assert(validateSceneBatch("", ["scene0"]).length > 0, "空代码拒绝");
-    const syntaxErr = "function scene0(t){ var broken = ; }";
+    const syntaxErr = "function scene0(t){ var lt = t - 1; var broken = ; var also = lt + 1; }";
     assert(validateSceneBatch(syntaxErr, ["scene0"]).some(e => e.includes("语法错误")), "语法错误应被 new Function 抓到");
   });
 

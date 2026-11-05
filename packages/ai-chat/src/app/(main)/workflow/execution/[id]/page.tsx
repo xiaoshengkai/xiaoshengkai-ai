@@ -126,7 +126,7 @@ export default function ExecutionDetailPage() {
   const isComic = execution?.template === "comic-generation";
   const isFloorplan = execution?.template === "floorplan-remodel";
   const isPersonResearch = execution?.template === "person-research";
-  const isVideoGen = execution?.template === "video-generation";
+  const isVideoGen = execution?.template === "vibe-video";
   const comicPages: { page: number }[] = (() => {
     try {
       const g = execution?.steps?.find(s => s.id === "generate-pages");

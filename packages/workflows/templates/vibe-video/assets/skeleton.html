@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!--
+  vibe-video 标准骨架 (v1)
+  ========================
+  架构: 纯时间函数渲染。window.render(t) 画出第 t 秒的画面。
+  铁律:
+    1. 画面只由 t 决定——随机数只用骨架内置的固定种子 rnd，禁止 Math.random/Date.now/setTimeout/requestAnimationFrame 驱动内容
+    2. 画幅由 CFG.orientation 决定（横 1920x1080 / 竖 1080x1920），布局随 W/H/SC 自适应；场景函数禁止写死坐标，用 W/H/SC/T
+    3. 五区: 左上水印 / 顶标签 / 中央动画区(8%~65%) / y70% 注释带 / y84% 双语字幕带
+    4. 主题两套: vibe（深空蓝黑+金衬线+纸艺母题） / candy（纯白+电光黄+黑边硬阴影母题）——场景函数只允许用 T.* 取色和母题函数
+    5. 每句字幕 = 中文主句(「」内为强调词) + 英文斜体小字；停留 2.5~4.5s
+    6. 每章一个场景函数 sceneN(t)，只画自己时间窗内的画面；章与章重叠 0.5s 交叠淡入淡出
+  组装: html-builder 把代码区的 __DATA__ / __SCENES__ 两处注入标记替换为数据表与章节函数（标记只在代码区出现一次）。
+-->
+<title>vibe-video</title>
+<style>
+  @font-face{font-family:'Noto Sans SC';font-style:normal;font-weight:400;src:url('fonts/noto-sans-sc-chinese-simplified-400-normal.woff2') format('woff2');}
+  @font-face{font-family:'Noto Sans SC';font-style:normal;font-weight:500;src:url('fonts/noto-sans-sc-chinese-simplified-500-normal.woff2') format('woff2');}
+  @font-face{font-family:'Noto Sans SC';font-style:normal;font-weight:700;src:url('fonts/noto-sans-sc-chinese-simplified-700-normal.woff2') format('woff2');}
+  @font-face{font-family:'Noto Sans SC';font-style:normal;font-weight:900;src:url('fonts/noto-sans-sc-chinese-simplified-900-normal.woff2') format('woff2');}
+  @font-face{font-family:'Noto Serif SC';font-style:normal;font-weight:600;src:url('fonts/noto-serif-sc-chinese-simplified-600-normal.woff2') format('woff2');}
+  @font-face{font-family:'Noto Serif SC';font-style:normal;font-weight:900;src:url('fonts/noto-serif-sc-chinese-simplified-900-normal.woff2') format('woff2');}
+  @font-face{font-family:'Lora';font-style:italic;font-weight:400;src:url('fonts/lora-latin-400-italic.woff2') format('woff2');}
+  @font-face{font-family:'Archivo';font-style:normal;font-weight:500;src:url('fonts/archivo-latin-500-normal.woff2') format('woff2');}
+  @font-face{font-family:'Archivo';font-style:normal;font-weight:700;src:url('fonts/archivo-latin-700-normal.woff2') format('woff2');}
+  @font-face{font-family:'Archivo';font-style:normal;font-weight:900;src:url('fonts/archivo-latin-900-normal.woff2') format('woff2');}
+  @font-face{font-family:'Inter';font-style:normal;font-weight:400;src:url('fonts/inter-latin-400-normal.woff2') format('woff2');}
+  @font-face{font-family:'Inter';font-style:normal;font-weight:700;src:url('fonts/inter-latin-700-normal.woff2') format('woff2');}
+  @font-face{font-family:'Inter';font-style:normal;font-weight:900;src:url('fonts/inter-latin-900-normal.woff2') format('woff2');}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { overflow: hidden; background: #000; }
+  #stage { position: relative; overflow: hidden; }
+  .layer { position: absolute; inset: 0; }
+  #bg { z-index: 1; } #scene { z-index: 10; }
+  #watermark { position: absolute; z-index: 30; font-family: var(--ui-font); }
+  #toplabel { position: absolute; z-index: 30; text-align: center; font-family: var(--ui-font); letter-spacing: 0.4em; text-indent: 0.4em; }
+  #annotation { position: absolute; z-index: 30; text-align: center; font-family: var(--ui-font); }
+  #subtitle { position: absolute; z-index: 40; text-align: center; font-family: var(--sub-font); }
+  #subtitle em { font-style: normal; }
+  #subtitle-en { position: absolute; z-index: 40; text-align: center; font-family: var(--en-font); }
+  #titlecard { position: absolute; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; flex-direction: column; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="bg" class="layer"></canvas>
+  <canvas id="scene" class="layer"></canvas>
+  <div id="watermark"></div>
+  <div id="toplabel"></div>
+  <div id="annotation"></div>
+  <div id="subtitle"></div>
+  <div id="subtitle-en"></div>
+  <div id="titlecard"></div>
+</div>
+<script>
+/* ================= 数据区（html-builder 注入） ================= */
+/*__DATA__*/
+
+/* ================= 兜底（未注入数据时的骨架自检演示） ================= */
+var CFG = (typeof CFG === 'undefined') ? {
+  duration: 8, fps: 30, orientation: 'landscape', theme: 'vibe', topic: '骨架自检', watermark: '@demo',
+} : CFG;
+var SUBTITLES = (typeof SUBTITLES === 'undefined') ? [
+  [0.5, 3.5, '骨架自检模式：字幕系统正常', 'skeleton self-check'],
+] : SUBTITLES;
+var TITLE_CARD = (typeof TITLE_CARD === 'undefined') ? [3.5, 7, '《自检》', '骨架自检', 'Self Check'] : TITLE_CARD;
+var SECTIONS = (typeof SECTIONS === 'undefined') ? [[0, '', '骨架注释']] : SECTIONS;
+
+/* ================= 工具 ================= */
+var clamp = function (x, a, b) { return Math.max(a, Math.min(b, x)); };
+var lerp = function (a, b, t) { return a + (b - a) * t; };
+var easeInOut = function (t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+var easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
+var easeOutBack = function (t) { var c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+function mulberry32(seed) {
+  return function () {
+    var t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+var rnd = mulberry32(20261009);
+/* 出现-停留-消失包络：t 时刻、窗口 [a,b]、淡入淡出时长 */
+function fade(t, a, b, fin, fout) {
+  if (t < a || t >= b) return 0;
+  var kIn = easeInOut(clamp((t - a) / fin, 0, 1));
+  var kOut = 1 - easeInOut(clamp((t - (b - fout)) / fout, 0, 1));
+  return kIn * kOut;
+}
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+function txt(c, text, x, y, font, color, align, baseline) {
+  c.font = font; c.fillStyle = color;
+  c.textAlign = align || 'center';
+  c.textBaseline = baseline || 'middle';
+  c.fillText(text, x, y);
+}
+
+/* ================= 画幅与布局 ================= */
+var W = (CFG.orientation === 'portrait') ? 1080 : 1920;
+var H = (CFG.orientation === 'portrait') ? 1920 : 1080;
+/* 字号/尺寸比例尺：横竖屏取短边归一到 1080 */
+var SC = Math.min(W, H) / 1080;
+var stage = document.getElementById('stage');
+stage.style.width = W + 'px'; stage.style.height = H + 'px';
+var bg = document.getElementById('bg'), bgc = bg.getContext('2d');
+var sc = document.getElementById('scene'), scc = sc.getContext('2d');
+bg.width = W; bg.height = H; sc.width = W; sc.height = H;
+
+/* ================= 主题 ================= */
+var THEMES = {
+  vibe: {
+    bg: '#0A0A1E', bgTop: '#0E0E26', bgBottom: '#050510',
+    ink: '#EAEAF2', dim: '#8A8AA0', accent: '#C9A96A',
+    alert: '#B53A2F', paper: '#EDE4D3', paperInk: '#3A2E20',
+    uiFont: "'Noto Sans SC'", headFont: "'Noto Serif SC', serif",
+    subFont: "'Noto Sans SC'", subWeight: 700, subSize: 46, subColor: '#EAEAF2',
+    enFont: "'Lora', serif", enSize: 26, enColor: '#8A8AA0',
+    emMode: 'color', emColor: '#C9A96A',
+    titleBg: 'transparent', titleColor: '#C9A96A', titleShadow: '0 4px 40px rgba(201,169,106,.25)',
+    subTextShadow: '0 2px 24px rgba(0,0,0,.8)',
+    zoneColor: '#8A8AA0', watermarkColor: 'rgba(234,234,242,.45)',
+    card: { fill: '#EDE4D3', radius: 6, border: 'rgba(0,0,0,.08)', shadow: 'rgba(0,0,0,.5)', shadowBlur: 24, shadowOff: 8, ink: '#3A2E20' },
+    label: { fill: 'rgba(181,58,47,.85)', border: 'rgba(181,58,47,.9)', ink: '#fff', font: "'Noto Serif SC'", radius: 0 },
+  },
+  candy: {
+    bg: '#FFFFFF', bgTop: '#FFFFFF', bgBottom: '#F5F5F5',
+    ink: '#111111', dim: '#666666', accent: '#FFE135',
+    alert: '#FF5C5C', paper: '#FFFFFF', paperInk: '#111111',
+    uiFont: "'Inter', 'Noto Sans SC'", headFont: "'Archivo', 'Noto Sans SC'",
+    subFont: "'Noto Sans SC'", subWeight: 900, subSize: 44, subColor: '#111111',
+    enFont: "'Inter'", enSize: 25, enColor: '#666666',
+    emMode: 'block', emColor: '#FFE135',
+    titleBg: '#FFE135', titleColor: '#111111', titleShadow: '6px 6px 0 #111',
+    subTextShadow: '0 1px 0 rgba(255,255,255,.9)',
+    zoneColor: '#666666', watermarkColor: 'rgba(17,17,17,.4)',
+    card: { fill: '#FFFFFF', radius: 0, border: '#111111', borderWidth: 3, shadow: '#111111', shadowBlur: 0, shadowOff: 8, ink: '#111111' },
+    label: { fill: '#FFE135', border: '#111111', ink: '#111111', font: "'Archivo', 'Noto Sans SC'", radius: 0 },
+  },
+};
+var T = THEMES[CFG.theme] || THEMES.vibe;
+
+/* 五区布局（比例定位，横竖自适应） */
+var LAYOUT = {
+  watermark: { left: 0.03 * W, top: 0.037 * H },
+  toplabel: { top: 0.041 * H },
+  annotation: { top: 0.70 * H },
+  subtitle: { top: 0.82 * H },
+  subtitleEn: { top: 0.885 * H },
+  sceneTop: 0.08 * H, sceneBottom: 0.65 * H,
+};
+(function applyZoneStyles() {
+  var s = function (el, css) { for (var k in css) el.style[k] = css[k]; };
+  var wm = document.getElementById('watermark');
+  s(wm, { left: LAYOUT.watermark.left + 'px', top: LAYOUT.watermark.top + 'px', color: T.watermarkColor, fontSize: (26 * SC) + 'px', fontWeight: '500' });
+  wm.textContent = CFG.watermark || '';
+  var tl = document.getElementById('toplabel');
+  s(tl, { top: LAYOUT.toplabel.top + 'px', left: 0, right: 0, color: T.zoneColor, fontSize: (30 * SC) + 'px', fontWeight: '500' });
+  var an = document.getElementById('annotation');
+  s(an, { top: LAYOUT.annotation.top + 'px', left: 0.06 * W, right: 0.06 * W, color: T.zoneColor, fontSize: (27 * SC) + 'px', fontWeight: '400' });
+  var st = document.getElementById('subtitle');
+  s(st, { top: LAYOUT.subtitle.top + 'px', left: 0.04 * W, right: 0.04 * W, color: T.subColor, fontSize: (T.subSize * SC) + 'px', fontWeight: T.subWeight, letterSpacing: '1px', textShadow: T.subTextShadow, lineHeight: 1.35 });
+  var em = st.querySelector('em');
+  var stEn = document.getElementById('subtitle-en');
+  s(stEn, { top: LAYOUT.subtitleEn.top + 'px', left: 0.06 * W, right: 0.06 * W, color: T.enColor, fontSize: (T.enSize * SC) + 'px', fontStyle: 'italic' });
+  document.documentElement.style.setProperty('--ui-font', T.uiFont);
+  document.documentElement.style.setProperty('--sub-font', T.subFont);
+  document.documentElement.style.setProperty('--en-font', T.enFont);
+  var tc = document.getElementById('titlecard');
+  tc.innerHTML = '';
+  var series = document.createElement('div'); series.textContent = 'VIBE知识大赏';
+  var name = document.createElement('div'); name.className = 'tc-name';
+  var q = document.createElement('div'); q.className = 'tc-q';
+  var qen = document.createElement('div'); qen.className = 'tc-q-en';
+  tc.appendChild(series); tc.appendChild(name); tc.appendChild(q); tc.appendChild(qen);
+  s(series, { fontFamily: T.uiFont, fontSize: (24 * SC) + 'px', fontWeight: '500', letterSpacing: '14px', textIndent: '14px', color: (CFG.theme === 'candy' ? '#111' : 'rgba(201,169,106,.75)'), marginBottom: (26 * SC) + 'px' });
+  s(name, { fontFamily: T.headFont, fontSize: (110 * SC) + 'px', fontWeight: '900', color: T.titleColor, letterSpacing: '6px', textShadow: T.titleShadow, background: T.titleBg, padding: T.titleBg === 'transparent' ? '0' : ('16px ' + 40 * SC + 'px') });
+  s(q, { fontFamily: T.uiFont, fontSize: (34 * SC) + 'px', fontWeight: '500', color: T.ink, marginTop: (14 * SC) + 'px' });
+  s(qen, { fontFamily: T.enFont, fontSize: (26 * SC) + 'px', fontStyle: 'italic', color: T.dim, marginTop: (10 * SC) + 'px' });
+})();
+
+/* ================= 背景层（主题分派，纯 t 函数） ================= */
+var STARS = Array.from({ length: 90 }, function () { return { x: rnd() * W, y: rnd() * H, r: rnd() * 1.4 + .3, p: rnd() * Math.PI * 2 }; });
+var CANDY_BLOBS = Array.from({ length: 3 }, function (_, i) { return { c: ['#FFD6E0', '#C7E9FF', '#E7D6FF'][i], r: 260 + rnd() * 180, x: rnd() * W, y: rnd() * H, sp: 0.02 + rnd() * 0.03, ph: rnd() * 6.28 }; });
+function drawBG(t) {
+  if (CFG.theme === 'candy') {
+    bgc.fillStyle = T.bg; bgc.fillRect(0, 0, W, H);
+    /* 点阵网格底纹 */
+    bgc.fillStyle = 'rgba(17,17,17,.06)';
+    var gap = 42 * SC;
+    for (var gx = gap / 2; gx < W; gx += gap) for (var gy = gap / 2; gy < H; gy += gap) bgc.fillRect(gx - 1.5, gy - 1.5, 3, 3);
+    /* 柔色大块漂移 */
+    for (var i = 0; i < CANDY_BLOBS.length; i++) {
+      var b = CANDY_BLOBS[i];
+      var cx = b.x + Math.sin(t * b.sp + b.ph) * 60 * SC;
+      var cy = b.y + Math.cos(t * b.sp * 1.3 + b.ph) * 40 * SC;
+      var g = bgc.createRadialGradient(cx, cy, 0, cx, cy, b.r * SC);
+      g.addColorStop(0, b.c + '66'); g.addColorStop(1, b.c + '00');
+      bgc.fillStyle = g; bgc.fillRect(0, 0, W, H);
+    }
+  } else {
+    var breathe = 1 + 0.05 * Math.sin(t * 0.5);
+    var g = bgc.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, Math.max(W, H) * 0.62 * breathe);
+    g.addColorStop(0, T.bgTop); g.addColorStop(1, T.bgBottom);
+    bgc.fillStyle = g; bgc.fillRect(0, 0, W, H);
+    for (var j = 0; j < STARS.length; j++) {
+      var s = STARS[j];
+      var a = .25 + .35 * Math.abs(Math.sin(t * .7 + s.p));
+      bgc.fillStyle = 'rgba(234,234,242,' + a + ')';
+      bgc.fillRect(s.x, s.y, s.r * SC, s.r * SC);
+    }
+  }
+}
+
+/* ================= 母题库（主题参数化，场景函数请用这些而不是裸写） ================= */
+/* 纸艺/糖果卡片 */
+function drawCard(c, x, y, w, h, rot, t) {
+  w = w * SC; h = h * SC;
+  var k = T.card;
+  c.save(); c.translate(x, y); c.rotate(rot || 0);
+  if (k.shadowBlur > 0) {
+    c.shadowColor = k.shadow; c.shadowBlur = k.shadowBlur; c.shadowOffsetY = k.shadowOff;
+  } else {
+    c.shadowColor = k.shadow; c.shadowBlur = 0; c.shadowOffsetX = k.shadowOff; c.shadowOffsetY = k.shadowOff;
+  }
+  c.fillStyle = k.fill;
+  roundRect(c, -w / 2, -h / 2, w, h, k.radius); c.fill();
+  c.shadowColor = 'transparent'; c.shadowOffsetX = 0; c.shadowOffsetY = 0;
+  if (k.borderWidth) { c.strokeStyle = k.border; c.lineWidth = k.borderWidth; roundRect(c, -w / 2, -h / 2, w, h, k.radius); c.stroke(); }
+  c.restore();
+  return { w: w, h: h, ink: k.ink };
+}
+/* 印章（vibe 红印章 / candy 色块标签） */
+function drawSeal(c, x, y, text) {
+  var k = T.label;
+  c.save(); c.translate(x, y);
+  c.font = "700 " + (26 * SC) + "px " + k.font + ", 'Noto Sans SC'";
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  var w = c.measureText(text).width + 24 * SC;
+  c.fillStyle = k.fill;
+  roundRect(c, -w / 2, -21 * SC, w, 42 * SC, k.radius); c.fill();
+  if (k.border !== 'rgba(181,58,47,.9)') { c.strokeStyle = k.border; c.lineWidth = 2.5; roundRect(c, -w / 2, -21 * SC, w, 42 * SC, k.radius); c.stroke(); }
+  c.fillStyle = k.ink;
+  c.fillText(text, 0, 2 * SC);
+  c.restore();
+}
+/* 卡片上的大字 */
+function cardText(c, text, x, y, size, font, color) {
+  txt(c, text, x, y, "900 " + (size * SC) + "px " + (font || T.headFont) + ", 'Noto Sans SC'", color || T.card.ink);
+}
+/* 数字滚动：值 = target × easeOut(seg(t))，等宽数字 */
+function rollNumber(c, target, k, x, y, size, color, font) {
+  var v = target * easeOut(clamp(k, 0, 1));
+  txt(c, String(Math.round(v)), x, y, "900 " + (size * SC) + "px " + (font || T.headFont) + ", 'Noto Sans SC'", color || T.accent);
+  return v;
+}
+/* 进度/量尺：底槽 + 填充 + 刻度 */
+function drawGauge(c, x, y, w, h, frac, label) {
+  w = w * SC; h = h * SC;
+  c.save(); c.translate(x, y);
+  c.fillStyle = 'rgba(128,128,128,.25)';
+  roundRect(c, -w / 2, -h / 2, w, h, 3); c.fill();
+  var fw = w * clamp(frac, 0, 1);
+  c.fillStyle = T.accent;
+  roundRect(c, -w / 2, -h / 2, Math.max(fw, 1), h, 3); c.fill();
+  if (CFG.theme === 'candy') { c.strokeStyle = '#111'; c.lineWidth = 2; roundRect(c, -w / 2, -h / 2, w, h, 3); c.stroke(); }
+  c.restore();
+  if (label) txt(c, label, x, y + h / 2 + 22 * SC, "500 " + (24 * SC) + "px " + T.uiFont + ", 'Noto Sans SC'", T.dim);
+}
+/* 晾衣绳卡片串：cards=[{n, revealed}] */
+function drawClothesline(c, t, cards) {
+  var y0 = H * 0.32;
+  c.save();
+  c.strokeStyle = T.alert; c.lineWidth = 3 * SC;
+  c.beginPath(); c.moveTo(0, y0);
+  c.quadraticCurveTo(W / 2, y0 + 30 * SC, W, y0); c.stroke();
+  var n = cards.length, gap = 150 * SC, x0 = W / 2 - (n - 1) * gap / 2;
+  cards.forEach(function (card, i) {
+    var sway = Math.sin(t * .8 + i * 1.3) * .04;
+    var x = x0 + i * gap;
+    c.save(); c.translate(x, y0); c.rotate(sway);
+    if (CFG.theme !== 'candy') { c.fillStyle = '#8B7355'; c.fillRect(-4 * SC, 0, 8 * SC, 18 * SC); }
+    var box = drawCard(c, 0, 78 * SC, 92, 118, sway * .5, t);
+    cardText(c, card.n, 0, 78 * SC, card.revealed ? 52 : 42, null, card.revealed ? null : 'rgba(0,0,0,.35)');
+    c.restore();
+  });
+  c.restore();
+}
+
+/* ================= 场景层 ================= */
+/*__SCENES__*/
+/* 章节表由 __SCENES__ 注入；空时跑演示场景 */
+function drawScene(t) {
+  scc.clearRect(0, 0, W, H);
+  var chapters = (typeof CHAPTERS !== 'undefined') ? CHAPTERS : [];
+  for (var i = 0; i < chapters.length; i++) {
+    var ch = chapters[i];
+    if (t >= ch.start && t < ch.end && typeof ch.fn === 'function') {
+      try { ch.fn(t); } catch (e) { if (console) console.warn('[scene ' + i + '] ' + e.message); }
+    }
+  }
+  if (chapters.length === 0) demoScene(t);
+}
+function demoScene(t) {
+  var k = easeInOut(clamp((t - 0.5) / 1.2, 0, 1));
+  scc.globalAlpha = k;
+  drawCard(scc, W / 2, H * 0.36, 260, 140, 0, t);
+  cardText(scc, CFG.topic, W / 2, H * 0.36, 54);
+  scc.globalAlpha = 1;
+}
+
+/* ================= 覆盖层 ================= */
+var $id = function (id) { return document.getElementById(id); };
+function drawOverlay(t) {
+  var inTitle = t >= TITLE_CARD[0] && t < TITLE_CARD[1];
+  var sub = null;
+  for (var i = 0; i < SUBTITLES.length; i++) {
+    var s = SUBTITLES[i];
+    if (t >= s[0] && t < s[1]) { sub = s; break; }
+  }
+  var el = $id('subtitle'), elEn = $id('subtitle-en');
+  if (sub && !inTitle) {
+    var a = sub[0], b = sub[1];
+    var kIn = easeInOut(clamp((t - a) / 0.45, 0, 1));
+    var kOut = 1 - easeInOut(clamp((t - (b - 0.4)) / 0.4, 0, 1));
+    el.style.opacity = kIn * kOut;
+    el.style.transform = 'translateY(' + lerp(8, 0, kIn) + 'px)';
+    var zh = sub[2];
+    if (T.emMode === 'block') {
+      el.innerHTML = zh; /* em 由数据层包 <em>；CSS 块高亮 */
+      var ems = el.querySelectorAll('em');
+      for (var e = 0; e < ems.length; e++) {
+        ems[e].style.background = T.emColor;
+        ems[e].style.color = '#111';
+        ems[e].style.padding = '0 ' + (8 * SC) + 'px';
+      }
+    } else {
+      el.innerHTML = zh;
+      var ems2 = el.querySelectorAll('em');
+      for (var e2 = 0; e2 < ems2.length; e2++) ems2[e2].style.color = T.emColor;
+    }
+    elEn.textContent = sub[3] || '';
+    elEn.style.opacity = kIn * kOut * .9;
+  } else { el.innerHTML = ''; elEn.textContent = ''; }
+  var tc = $id('titlecard');
+  if (inTitle) {
+    tc.style.display = 'flex';
+    var k = easeInOut(clamp((t - TITLE_CARD[0]) / 1.2, 0, 1));
+    tc.style.opacity = k;
+    tc.querySelector('.tc-name').textContent = TITLE_CARD[2];
+    tc.querySelector('.tc-q').textContent = TITLE_CARD[3];
+    tc.querySelector('.tc-q-en').textContent = TITLE_CARD[4];
+    tc.querySelector('.tc-name').style.transform = 'scale(' + lerp(.92, 1, easeOut(k)) + ')';
+  } else tc.style.display = 'none';
+  var sec = SECTIONS[0] || [0, '', ''];
+  for (var j = 0; j < SECTIONS.length; j++) if (t >= SECTIONS[j][0]) sec = SECTIONS[j];
+  $id('toplabel').textContent = sec[1] ? ((CFG.topic ? CFG.topic + '　' : '') + sec[1]) : (CFG.topic || '');
+  $id('annotation').textContent = sec[2] || '';
+}
+
+/* ================= 帧入口 ================= */
+window.render = function (t) { drawBG(t); drawScene(t); drawOverlay(t); };
+window.getRenderMeta = function () { return { W: W, H: H, duration: CFG.duration, fps: CFG.fps, theme: CFG.theme, chapters: (typeof CHAPTERS !== 'undefined') ? CHAPTERS.length : 0 }; };
+/* 浏览器实时预览（渲染器置 __RENDER_MODE__ 后停止，画面只由 render(t) 决定） */
+var t0 = performance.now();
+(function loop() {
+  if (window.__RENDER_MODE__) return;
+  window.render((performance.now() - t0) / 1000 % (CFG.duration || 60));
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

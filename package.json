@@ -24,8 +24,7 @@
     "test:search:live": "node --test packages/services/search/test/live.test.js",
     "test:beike-houses": "node --test packages/tasks/tasks/beike-houses/test.js",
     "typecheck": "npm exec -w packages/ai-chat tsc -- --noEmit --incremental false",
-    "test:video-v2": "node packages/workflows/templates/tech-video/test.js",
-    "test:video-vg": "node packages/workflows/templates/video-generation/test.js"
+    "test:vibe-video": "node packages/workflows/templates/vibe-video/test.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.110",

@@ -296,9 +296,9 @@ export async function runNextStep(executionId) {
   // 防止并发：检查是否有正在运行的步骤
   const running = state.steps.find(s => s.status === "running");
   if (running) {
-    // ponytail: 无心跳机制，running 超 45 分钟视为 worker 已死（LLM 单次上限 420s × prompt-builder 5 次重试 = 35min 极限），下次动作自愈
+    // ponytail: 无心跳机制，running 超 90 分钟视为 worker 已死（vibe-video 逐帧渲染一条最长 ~60 分钟 + 重试余量），下次动作自愈
     const age = Date.now() - new Date(running.startedAt || 0).getTime();
-    if (running.startedAt && age > 45 * 60 * 1000) {
+    if (running.startedAt && age > 90 * 60 * 1000) {
       console.warn(`[engine] 孤儿 running 步骤 "${running.name}" (${Math.round(age / 60000)}min) 重置为 pending`);
       running.status = "pending";
       running.startedAt = null;

@@ -1,0 +1,59 @@
+{
+  "name": "vibe-video",
+  "label": "知识视频生成（双语字幕大片）",
+  "description": "分镜表确认驱动 + 纯时间函数 Canvas 渲染 + 双语字幕 + 质量自检（无配音）",
+  "available": true,
+  "params": [
+    { "name": "title", "label": "视频标题", "type": "text", "required": true },
+    { "name": "content", "label": "内容描述（可选）", "type": "textarea", "required": false, "placeholder": "详细描述视频知识内容（可选，不填则用标题生成）" },
+    { "name": "contentRequirement", "label": "内容要求（可选）", "type": "textarea", "required": false, "placeholder": "如：反转要两层、多用模拟演示、结尾给三条小行动" },
+    { "name": "orientation", "label": "画幅", "type": "select", "options": ["横屏 1920×1080", "竖屏 1080×1920"], "default": "横屏 1920×1080" },
+    { "name": "style", "label": "视觉主题", "type": "select", "options": ["Vibe 深空金", "糖果色 Neo-Brutalism"], "default": "Vibe 深空金" },
+    { "name": "watermark", "label": "署名水印", "type": "text", "default": "@小盛开AI" },
+    { "name": "enable_quality_check", "label": "成片质量自检（抽帧拼图+AI检查）", "type": "select", "options": ["yes", "no"], "default": "yes", "required": false }
+  ],
+  "steps": [
+    {
+      "id": "storyboard",
+      "name": "AI 生成分镜表（双语字幕）",
+      "type": "tool",
+      "previewType": "json",
+      "previewField": "storyboard",
+      "awaitInput": true,
+      "module": "./lib/storyboard.js",
+      "function": "generateStoryboard",
+      "args": ["{title}", "{content}", "{contentRequirement}", "{style}", "{orientation}", "{executionDir}"]
+    },
+    {
+      "id": "html",
+      "name": "生成 index.html（骨架填充 + 冒烟校验）",
+      "type": "tool",
+      "previewType": "iframe",
+      "previewField": "htmlFile",
+      "module": "./lib/html-builder.js",
+      "function": "generateHtml",
+      "args": ["{executionDir}", "{title}", "{style}", "{orientation}", "{watermark}", "{storyboard.storyboard}"]
+    },
+    {
+      "id": "render",
+      "name": "逐帧渲染 MP4（约 10-40 分钟）",
+      "type": "tool",
+      "previewType": "video",
+      "previewField": "videoFile",
+      "module": "./lib/render.js",
+      "function": "renderVideo",
+      "args": ["{executionDir}", "{html.htmlFile}"]
+    },
+    {
+      "id": "quality-check",
+      "name": "成片质量自检（抽帧拼图 + AI 看图）",
+      "type": "tool",
+      "previewType": "image",
+      "previewField": "sheet",
+      "module": "./lib/quality-gate.js",
+      "function": "runQualityGate",
+      "args": ["{executionDir}", "{storyboard.title}", "{storyboard.storyboard}"],
+      "skipWhen": "enable_quality_check_no"
+    }
+  ]
+}

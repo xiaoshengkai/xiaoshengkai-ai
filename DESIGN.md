@@ -373,6 +373,16 @@ MiniMax 返回的图片链接包含三个绑定校验的参数：
 - **script 分批生成**（v0.11.63）：有分镜走 frame + 4 拍/批；无分镜保留单发。动因：16-20 拍 = 16k+ token 输出，单发贴截断线且长连接被网关掐（fetch failed @301s 实测）——"把调用变小"是根因解。批次缓存 + retryForce 语义对齐 render.js 的 clip 缓存惯例；tweak/switch-version 替换 script 输出必须清缓存（防旧批产物回灌）。json_object 模式要求顶层对象：批输出约定 `{"scenes":[...]}`。
 - **模板恢复可用**：`available` 翻 true（此前实验态灰卡）。
 
+## 知识视频：vibe-video 架构（v0.11.64，替换 video-generation/tech-video）
+
+- **废弃卡片风 GSAP 路线的根因**：LLM 生成「GSAP timeline + 私有引擎 API + HyperFrames seek」三方耦合代码，每个幻觉 API/时序错误都是黑屏级故障（实测：幻觉 `getClipStartTime` → 时间线中断 → 15/16 帧纯黑）。render(t) 纯时间函数契约无状态无时序坑，被 vibe-knowledge-video 实测验证 LLM 能写好。
+- **骨架填充而非从零生成**：skeleton.html 内置五区布局/双语字幕系统/标题卡/母题库/缓动/固定种子——LLM 只填数据表（确定性组装，零 LLM）+ 每章一个场景函数（分批生成、缓存按主题×画幅隔离）；场景契约 lint 禁非确定性 API/硬编码色与画幅；**冒烟校验**（加载页面跑采样时刻）让坏代码活不到 30 分钟渲染。
+- **渲染 = 逐帧 seek + ffmpeg 管道**：puppeteer `__RENDER_MODE__` + `render(t)` 逐帧截图 → ffmpeg stdin 直写 MP4（无 PNG 序列，1.6G VPS 友好）；Mac 实测 18 帧/s，服务器预估 12-40 分钟/条——`/next` 超时 3600s、孤儿阈值 90min 配套。
+- **主题/画幅是骨架参数**：vibe 深空金 / 糖糖 Neo-Brutalism（本项目 UI 移植）×横竖屏，创建时选择；场景函数强制用 `T.*`/`W/H/SC`，主题一致性由骨架锁死。`--disable-gpu` 会让糖果主题页 networkidle0 挂死（实测），已从 launch 参数移除。
+- **内容质量 = 方法论 + 字幕系统内置**：分镜表走 narrative-rules（结构纪律/讲解设计/双语字幕文体/逐拍骨架），双语字幕/停留节奏由骨架 drawOverlay 确定性渲染——用户验证过的方式锁死，不依赖 LLM 发挥。美术上限靠看图改图循环迭代（v1 已收敛 high 6→2，余「主体太小」为已知 LLM 天花板）。
+- **v1 明确不做**：TTS（字幕形态）、BGM（服务器音乐 API 不可用；后续可 Node 合成）、tweak 微调（后续按反馈重生成 html 步骤即可部分替代）。
+- 旧执行记录（video-generation/tech-video 模板已删）只读保留，不可重跑（loadTemplate 会 404）。
+
 ## 已知问题
 
 | # | 问题 | 影响 | 解决方案 |

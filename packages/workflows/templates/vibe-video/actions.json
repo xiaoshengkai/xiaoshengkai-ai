@@ -1,0 +1,4 @@
+[
+  { "type": "custom", "method": "POST", "path": "/execution/:id/storyboard-confirm", "handler": "vibe-storyboard-confirm" },
+  { "type": "custom", "method": "POST", "path": "/generate-content", "handler": "vibe-generate-content" }
+]

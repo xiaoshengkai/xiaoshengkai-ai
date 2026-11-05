@@ -6,8 +6,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createCapabilityHandler, loadActions } from "@app/shared/capability.js";
-import { handle as generateContent } from "./templates/video-generation/lib/generate-content.js";
-import { handleStoryboardConfirm } from "./templates/video-generation/lib/storyboard.js";
+import { handle as generateContent } from "./templates/vibe-video/lib/generate-content.js";
+import { handleStoryboardConfirm } from "./templates/vibe-video/lib/storyboard.js";
 import { handle as floorplanConfirm } from "./templates/floorplan-remodel/lib/confirm.js";
 import { handle as comicExport } from "./templates/comic-generation/lib/export.js";
 import { handle as comicGenerateContent } from "./templates/comic-generation/lib/generate-content.js";
@@ -30,8 +30,8 @@ const ROOT = path.join(PROJECT_ROOT, "packages", "workflows");
 const CLI_PATH = path.join(ROOT, "cli.js");
 
 const CUSTOM_HANDLERS = {
-  "generate-content": generateContent,
-  "storyboard-confirm": handleStoryboardConfirm,
+  "vibe-generate-content": generateContent,
+  "vibe-storyboard-confirm": handleStoryboardConfirm,
   "comic-export": comicExport,
   "comic-generate-content": comicGenerateContent,
   "comic-scene-group": comicSceneGroup,

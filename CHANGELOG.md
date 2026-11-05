@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.11.70 (2026-11-05) — vibe-video：知识视频工作流重建（render(t) 架构替换卡片风 GSAP 路线）
+
+### 变更
+- **废弃与重建动因**：线上实测 video-generation 成片 15/16 帧纯黑——根因是 LLM 幻觉引擎 API（`getClipStartTime is not a function`）致 GSAP 时间线构建中断；加上此前的 repeat:-1、from-tween 时序坑，**「LLM 写三方耦合动画代码」的故障模式全是黑屏级**，架构性不可修。对照 vibe-knowledge-video 真实产物（用户验证：内容✓字幕✓，仅美术一般）与 render(t) 纯函数契约的可写性，重建模板内核。
+- **vibe-video 新模板**（4 步：storyboard[停靠确认]→html[骨架填充+冒烟]→render[逐帧]→quality-check）：
+  - **双语字幕分镜表**：beats 携 zh/en/章节/呈现动作/note 出处标注，narrative-rules 四文档（结构/讲解设计/双语字幕文体/逐拍骨架）驱动；StoryboardPanel 双语展示 + 确认/反馈重生成。
+  - **skeleton.html 骨架**：五区布局（水印/顶标签/中央动画/注释带/双语字幕带）+ 母题库（drawCard/drawSeal/rollNumber/drawGauge/drawClothesline 主题参数化）+ 缓动/固定种子 + 本地字体（补下载 Noto Serif SC 600/900）；**双主题**（Vibe 深空金 / 糖果 Neo-Brutalism 本项目 UI 移植）×**双画幅**（横 1920×1080 / 竖 1080×1920，创建时选择）全部参数化，场景函数禁硬编码色与画幅。
+  - **html 步骤**：数据表（CFG/SUBTITLES/TITLE_CARD/SECTIONS/CHAPTERS）从分镜确定性组装（零 LLM）；章节场景函数每章一 LLM 调用（批内 lint：禁 Math.random/Date/定时器/hex 色/画幅数字；缓存按 主题+画幅 隔离；retryForce 全失效）；组装后 **puppeteer 冒烟校验**——加载页面跑采样时刻，坏代码活不到渲染。
+  - **render 步骤**：puppeteer `__RENDER_MODE__` + `window.render(t)` 逐帧截图 → ffmpeg stdin 管道直写 MP4（无 PNG 序列）；Chromium 发现（~/.cache/puppeteer 递归 + env 覆盖）。
+  - **quality-check**：质量门原样迁入（16 帧拼图 + beats 关键拍静帧 + vision 问题帧补抽 + 降级不卡交付）。
+  - **iframe 实时预览**：html 步骤产出页面自带 rAF 播放循环，出片前可实时预览。
+- **删除**：`templates/tech-video/`、`templates/video-generation/` 整目录（git 历史可溯），package.json 两个旧测试脚本。旧执行记录只读保留。
+- **引擎配套**：`/next` HTTP 超时 900s→3600s（长渲染）、孤儿阈值 45→90min；http.js handler 切到 vibe-video 路径。
+- **踩坑记录**：`--disable-gpu` 会让糖果主题页面 networkidle0 永久挂起（已从 launch 参数移除，`--disable-dev-shm-usage` 保留）；@ffprobe-installer 二进制本机无执行权限（media-utils 改 PATH 优先）；骨架头部注释含注入标记原文致 replace 只换到注释（改措辞）。
+
+### 验证
+- 单测 9/9（字幕节奏公式/双语 schema/数据组装「」→em·片名卡·章节时间轴/场景 lint/整页校验）；test 171 全绿；typecheck、build 通过。
+- **Mac 全链冒烟 ×2**：vibe 横屏（36 拍/4 章/139s，分镜 en 36/36、note 26/36）→ 4161 帧渲染 3.8min → 质检发现真实问题（主体小/字幕裁切→布局已修）；糖果竖屏（1080×1920）→ 3.4min 渲染 → 两轮契约收紧（主体密度 + 竖屏构图边界）high 问题 6→2，余「主体太小」为已知 LLM 美术天花板（后续看图改图循环素材）。
+- 引擎接线：start→awaitInput 停靠→confirm 放行→next 推进 html→校验拒绝非法数据，全链正确。
+
 ## v0.11.69 (2026-11-05) — beike-houses 浏览器通道 IPC 化 + 执行进度日志（治慢）
 
 ### 变更

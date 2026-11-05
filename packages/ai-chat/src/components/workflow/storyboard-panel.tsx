@@ -17,10 +17,11 @@ export interface StoryboardPanelProps {
 interface Beat {
   id: string;
   role: string;
-  narration: string;
+  chapter?: number;
+  zh: string;
+  en?: string;
   presentAction: string;
   onScreen: string;
-  sceneType: string;
   durationSec?: number;
   note?: string;
   takeaway?: string;
@@ -32,6 +33,7 @@ interface Storyboard {
   instrument?: string;
   suspensePlan?: string;
   reversals?: number | string;
+  chapters?: { label: string; note?: string }[];
   beats: Beat[];
 }
 
@@ -133,10 +135,15 @@ export default function StoryboardPanel({ executionId, output, onRefresh }: Stor
                 {ROLE_LABELS[b.role] || b.role}
               </span>
               <span className="text-xs px-1.5 py-0.5 border-2 border-border bg-muted font-bold">{b.presentAction}</span>
-              <span className="text-xs px-1.5 py-0.5 border-2 border-border bg-blue-soft font-bold">{b.sceneType}</span>
+              {storyboard.chapters?.length && b.chapter != null ? (
+                <span className="text-xs px-1.5 py-0.5 border-2 border-border bg-purple-soft font-bold">
+                  {storyboard.chapters[b.chapter]?.label || `章${b.chapter + 1}`}
+                </span>
+              ) : null}
               <span className="text-xs text-muted-foreground ml-auto">{b.durationSec != null ? `${b.durationSec}s` : ""}</span>
             </div>
-            <p className="text-sm font-bold leading-snug">{b.narration}</p>
+            <p className="text-sm font-bold leading-snug">{b.zh}</p>
+            {b.en && <p className="text-xs italic text-muted-foreground">{b.en}</p>}
             {b.onScreen && <p className="text-xs text-muted-foreground mt-1">屏上：{b.onScreen}</p>}
             {b.note && <p className="text-xs text-muted-foreground">小字：{b.note}</p>}
             {b.takeaway && <p className="text-xs text-muted-foreground/70">明白：{b.takeaway}</p>}

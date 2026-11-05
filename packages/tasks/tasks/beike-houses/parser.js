@@ -91,15 +91,26 @@ export function parseListPage(html) {
 }
 
 /**
- * 解析房源详情页（下架原因核查用）
- * @returns {{online: boolean, totalPrice: number|null}} online=仍在售（涨出预算），否则已下架/成交
+ * 解析房源详情页（权威归属 + 在售状态）
+ *
+ * 详情页 <title> 格式（实测稳定）：
+ *   绍兴{区县}{商圈}{房源标题}_{真实小区名}二手房{户型}{面积}…-绍兴贝壳
+ *   例：绍兴上虞区崧厦商圈崧厦御景华庭，小套顶楼复式楼，精装修_御景华庭二手房…
+ *       绍兴越城区东湖自住精装…_迪東公寓二手房…
+ * c 列表页会把同名/附近小区的房源混挂目标小区（resblock_id 同为被查小区），
+ * 详情页的 区/小区 才是真实归属 → 用于归属校验。
+ *
+ * @returns {{online: boolean, totalPrice: number|null, district: string, community: string}}
  */
 export function parseDetailPage(html) {
+  const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] || "";
+  const district = /绍兴(越城区|上虞区|柯桥区|诸暨市|嵊州市|新昌县)/.exec(title)?.[1] || "";
+  const community = (/_([^_]+?)二手房/.exec(title)?.[1] || "").trim();
   const total = /class="total"[^>]*>\s*([\d.]+)\s*</.exec(html)?.[1];
   const off = /已下架|已成交|房源不存在|找不到了/.test(html);
   // 在售判定：有总价数字且无下架标记
-  if (total && !off) return { online: true, totalPrice: Number(total) };
-  return { online: false, totalPrice: null };
+  if (total && !off) return { online: true, totalPrice: Number(total), district, community };
+  return { online: false, totalPrice: null, district, community };
 }
 
 /** 电梯推断：国标 7 层及以上应设电梯 */

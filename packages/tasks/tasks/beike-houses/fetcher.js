@@ -37,7 +37,7 @@ async function politeDelay() {
 export function loadCookieHeader() {
   if (!fs.existsSync(COOKIE_FILE)) {
     throw new FetchError(
-      `缺少 ${COOKIE_FILE}：请在浏览器登录 sx.ke.com 后导出 Cookie 写入该文件（JSON 对象 {"name":"value",...} 或单行 "a=b; c=d" 格式）`,
+      `缺少 ${COOKIE_FILE}。本任务仅在 Mac 侧运行（云服务器 IP 被贝壳 CAPTCHA 限制，线上页面由 Mac 每日推送更新）。续期方法：Chrome 登录 sx.ke.com 后运行 node packages/tasks/tasks/beike-houses/export-cookies.js 导出 Cookie`,
       "NO_COOKIE"
     );
   }
@@ -200,13 +200,14 @@ export async function fetchQueryAll(query, jar, { log = () => {} } = {}) {
   );
 }
 
-/** 详情页核查（下架原因判断），失败不抛错返回 null */
+/** 详情页核查（归属 + 在售状态），失败不抛错返回 null（附带原因日志） */
 export async function fetchDetailStatus(houseUrl, jar) {
   try {
     const html = await httpGet(houseUrl, jar);
     await politeDelay();
     return parseDetailPage(html);
-  } catch {
+  } catch (err) {
+    console.error(`[beike-houses] 详情页失败 ${houseUrl}: ${err.code || ""} ${err.message}`);
     return null;
   }
 }

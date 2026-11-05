@@ -1,7 +1,8 @@
 /**
  * 贝壳房源跟踪主入口
  * 流程: Cookie 加载 → 逐组抓取(自适应拆分,单页) → 本地精滤(≤99万·≥3室·白/黑名单)
- *      → 完整性守卫 → 快照落盘 → registry 累计索引 → 对比昨日 → 下架原因核查 → 生成页面
+ *      → 归属校验(详情页权威归属+registry缓存,治贝壳c页同名小区混挂) → 完整性守卫
+ *      → 快照落盘 → registry 累计索引 → 对比昨日(下架原因核查) → 生成页面 → 推送线上
  */
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
@@ -15,7 +16,7 @@ import {
   FetchError,
   requestStats,
 } from "./fetcher.js";
-import { applyFilters, isSuspiciousShrink } from "./filter.js";
+import { applyFilters, isSuspiciousShrink, verifyOwnership } from "./filter.js";
 import { diffSnapshots, updateRegistry } from "./diff.js";
 import {
   todayKey,
@@ -85,8 +86,57 @@ export async function run() {
     saveCookieJar(jar); // 保存续期后的会话
 
     // 2. 本地精滤
-    const houses = applyFilters(raw, config);
+    let houses = applyFilters(raw, config);
     log(`过滤: 抓取 ${raw.length} 条 → 符合(≤${config.priceMax}万·≥${config.minRooms}室·小区规则) ${houses.length} 条`);
+
+    let notes = [];
+
+    // 2.5 归属校验（白名单组）：贝壳 c 页会把同名小区/附近房源混挂目标小区（列表
+    //     小区名+resblockId 都是被查小区），详情页的 区/小区 才是真实归属。
+    //     registry.verified 缓存校验结果（归属不变，一次校验终身复用 → 日常近零成本）
+    const registry = loadRegistry();
+    const verifyGroups = new Set(config.groups.filter((g) => g.verify).map((g) => g.key));
+    const pending = houses.filter((h) => verifyGroups.has(h.group) && !registry[h.id]?.verified);
+    if (pending.length) log(`归属校验: ${pending.length} 套无缓存，需详情页核验`);
+    const rejected = [];
+    const rejectsByName = [];
+    for (const h of pending) {
+      const detail = await fetchDetailStatus(h.url, jar);
+      if (!detail) {
+        log(`[WARN] ${h.id} 详情页获取失败，本次保留未校验（下次重试）`);
+        continue;
+      }
+      registry[h.id] = registry[h.id] || { firstSeen: null, lastSeen: null, offSince: null, priceHistory: [] };
+      registry[h.id].verified = {
+        district: detail.district,
+        community: detail.community,
+        checkedAt: new Date().toISOString(),
+      };
+      if (!verifyOwnership(h, detail, config)) {
+        rejected.push(h.id);
+        rejectsByName.push(`${detail.district}·${detail.community || "?"}`);
+        log(`[剔除] ${h.id} 列表标签「${h.community}」→ 实际归属 ${detail.district}·${detail.community}`);
+      }
+    }
+    // 已有缓存的房源也按缓存校验（含历史遗留脏数据）
+    for (const h of houses) {
+      if (rejected.includes(h.id) || !verifyGroups.has(h.group)) continue;
+      const v = registry[h.id]?.verified;
+      if (v && !verifyOwnership(h, v, config)) {
+        rejected.push(h.id);
+        log(`[剔除] ${h.id}「${h.community}」缓存归属 ${v.district}·${v.community} 不在白名单`);
+      }
+    }
+    if (rejected.length) {
+      houses = houses.filter((h) => !rejected.includes(h.id));
+      notes.push(`已剔除混挂房源 ${rejected.length} 套（${[...new Set(rejectsByName)].join("、")}），如需跟踪请加 config`);
+      log(`归属校验: 剔除 ${rejected.length} 套混挂房源`);
+    }
+    // 展示用权威小区名（比 c 页聚合标签更精确）
+    for (const h of houses) {
+      const v = registry[h.id]?.verified;
+      if (v?.community && verifyGroups.has(h.group)) h.community = v.community;
+    }
 
     // 3. 完整性守卫
     const prevSnapshot = loadPreviousSnapshot(date);
@@ -98,7 +148,6 @@ export async function run() {
     }
 
     // 4. registry 累计索引（firstSeen / 变价次数 / 重新上架）
-    const registry = loadRegistry();
     const newRegistry = updateRegistry(registry, houses, date);
     for (const h of houses) {
       const reg = newRegistry[h.id];
@@ -111,16 +160,21 @@ export async function run() {
 
     // 6. 对比上一份快照
     let changes = null;
-    let notes = [];
     if (prevSnapshot) {
       changes = diffSnapshots(prevHouses, houses, registry);
       log(
         `对比 ${prevSnapshot.date}: 新上架 ${changes.added.length} · 降价 ${changes.priceDown.length} · 涨价 ${changes.priceUp.length} · 下架 ${changes.removed.length}`
       );
 
-      // 7. 下架原因核查（详情页：涨出预算 vs 已下架/成交）
+      // 7. 下架原因核查（详情页：涨出预算 vs 已下架/成交）+ 权威小区名修正
+      //    （下架卡点开链接显示真实归属、卡片标签却可能来自 c 页聚合错标 → 统一用权威名）
+      for (const h of changes.removed) {
+        const v = registry[h.id]?.verified;
+        if (v?.community) h.community = v.community;
+      }
       for (const h of changes.removed.slice(0, config.detailCheckLimit)) {
         const status = await fetchDetailStatus(h.url, jar);
+        if (status?.community) h.community = status.community;
         if (status?.online && status.totalPrice) {
           h.removedReason = `调价 ${status.totalPrice}万 超出预算`;
         } else if (status) {

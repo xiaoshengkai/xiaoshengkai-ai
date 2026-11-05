@@ -64,7 +64,7 @@ function buildPayload({ date, fetchedAt, houses, changes, groupLabels, notes }) 
     const communities = [...byCommunity.entries()]
       .map(([name, list]) => ({ name, houses: list.sort((a, b) => a.totalPrice - b.totalPrice) }))
       .sort((a, b) => a.houses[0]?.totalPrice - b.houses[0]?.totalPrice);
-    if (communities.length) groups.push({ key, label, communities, count: gh.length });
+    groups.push({ key, label, communities, count: gh.length });
   }
 
   return {
@@ -115,8 +115,8 @@ function render(changes) {
       .map((h) => {
         const price =
           h.prevTotal != null
-            ? `${fmt(h.prevTotal)} → <b>${fmt(h.totalPrice)}</b>万 <span class="delta">${h.delta > 0 ? "+" : ""}${h.delta}</span>`
-            : `<b>${fmt(h.totalPrice)}</b>万`;
+            ? `${fmt(h.prevTotal)} → <span class="chg-badge">${fmt(h.totalPrice)}</span>万 <span class="delta">${h.delta > 0 ? "+" : ""}${h.delta}</span>`
+            : `<span class="chg-badge">${fmt(h.totalPrice)}</span>万`;
         const badge = h.reappeared ? '<span class="re-badge">重新上架</span>' : "";
         const reason = h.removedReason ? `<span class="reason">${h.removedReason}</span>` : "";
         return `<a class="chg-item" href="${h.url}" target="_blank" rel="noopener">
@@ -172,8 +172,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--ink);min-heig
 .chg-item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 14px;border-bottom:2px dashed #ddd;text-decoration:none;color:var(--ink);font-size:13px}
 .chg-item:hover{background:var(--muted)}
 .chg-addr{font-weight:600}
-.chg-price{font-family:var(--font-mono);font-weight:700;font-size:12.5px;white-space:nowrap}
-.chg-price b{font-size:14px}
+.chg-price{font-family:var(--font-mono);font-weight:700;font-size:13px;white-space:nowrap}
+.chg-price b{font-size:16px;font-weight:800}
+.chg-price .chg-badge{background:var(--yellow);border:2px solid var(--ink);padding:0 6px;font-size:14px;font-weight:800}
 .delta{background:var(--cc);color:#fff;padding:1px 6px;font-weight:800}
 .re-badge{background:var(--yellow);border:2px solid var(--ink);padding:0 6px;font-size:11px;font-weight:800;margin-left:6px}
 .reason{color:#666;font-size:11px;margin-left:6px}
@@ -193,7 +194,8 @@ th .arrow{font-size:9px}
 td{padding:7px 8px;border-bottom:1px solid #e8e8e8;vertical-align:middle}
 tbody tr:hover{background:#FFFBE8}
 td.num{font-family:var(--font-mono);font-weight:700;white-space:nowrap}
-td.num .total{font-size:14px}
+td.num .total{font-family:var(--font-mono);font-weight:800;font-size:16px;background:var(--yellow);border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);padding:1px 8px;display:inline-block}
+td.num .unit{font-size:12px}
 td .title-link{color:var(--ink);text-decoration:none;font-weight:600;display:block;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 td .title-link:hover{text-decoration:underline}
 .tagchip{display:inline-block;border:1.5px solid var(--ink);background:var(--muted);padding:0 5px;font-size:10.5px;font-weight:700;margin:1px 2px 1px 0;white-space:nowrap}
@@ -241,6 +243,9 @@ td .title-link:hover{text-decoration:underline}
     head.innerHTML = '<span class="g-label">' + esc(g.label) + '</span><span class="g-n">' + g.count + ' 套 · ' + g.communities.length + ' 个小区</span><span style="margin-left:auto;font-size:12px">点击折叠</span>';
     var body = document.createElement("div");
     head.onclick = function(){ body.style.display = body.style.display === "none" ? "" : "none"; };
+    if (!g.communities.length) {
+      body.innerHTML = '<div style="padding:22px;font-family:var(--font-mono);font-size:13px;color:#999;text-align:center">当前筛选条件下暂无在售房源</div>';
+    }
     g.communities.forEach(function(c){
       var comm = document.createElement("div");
       comm.className = "community";

@@ -59,7 +59,8 @@ export function updateRegistry(prevRegistry, curr, date) {
     if (reg) {
       reg.lastSeen = date;
       reg.offSince = null;
-      const last = reg.priceHistory?.[reg.priceHistory.length - 1];
+      if (!Array.isArray(reg.priceHistory)) reg.priceHistory = [];
+      const last = reg.priceHistory[reg.priceHistory.length - 1];
       if (!last || last.total !== h.totalPrice || last.unit !== h.unitPrice) {
         reg.priceHistory.push({ date, total: h.totalPrice, unit: h.unitPrice });
       }

@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseLi, parseListPage, parseDetailPage, elevatorText } from "./parser.js";
-import { applyFilters, isSuspiciousShrink, normalizeName } from "./filter.js";
+import { applyFilters, isSuspiciousShrink, normalizeName, matchExact, verifyOwnership } from "./filter.js";
 import { diffSnapshots, updateRegistry } from "./diff.js";
 import { config } from "./config.js";
 
@@ -125,12 +125,32 @@ test("parser: 电梯推断（7 层界）", () => {
   assert.equal(elevatorText(0), "—");
 });
 
-test("parser: 详情页在售/下架判定", () => {
-  assert.deepEqual(parseDetailPage('<div class="price"><span class="total">135</span>'), {
+test("parser: 详情页权威归属解析 + 在售/下架判定", () => {
+  // 实测详情页 title：贝壳 c 页把上虞崧厦御景华庭混挂进越城御景华庭的查询结果
+  const shangyu = `<title>绍兴上虞区崧厦商圈崧厦御景华庭，小套顶楼复式楼，精装修_御景华庭二手房3室2厅74.62平米二手房出售-绍兴贝壳</title><div class="price"><span class="total">68</span>`;
+  assert.deepEqual(parseDetailPage(shangyu), {
     online: true,
-    totalPrice: 135,
+    totalPrice: 68,
+    district: "上虞区",
+    community: "御景华庭",
   });
-  assert.deepEqual(parseDetailPage("<html>房源已下架</html>"), { online: false, totalPrice: null });
+  // 东湖的房混挂在卧龙银湖湾 c 页（同名/附近聚合）
+  const donghu = `<title>绍兴越城区东湖自住精装，复式实际使用面积高，采光充足，交通便利_迪東公寓二手房3室2厅123.2平米二手房出售-绍兴贝壳</title><div class="price"><span class="total">80</span>`;
+  assert.deepEqual(parseDetailPage(donghu), {
+    online: true,
+    totalPrice: 80,
+    district: "越城区",
+    community: "迪東公寓",
+  });
+  // 真实御景华庭四期北区（迪荡）
+  const real = `<title>绍兴越城区迪荡房东诚心出售，楼层好阳光充足，精装拎包入住_御景华庭四期北区二手房3室2厅118.19平米二手房出售-绍兴贝壳</title><div class="price"><span class="total">135</span>`;
+  const r = parseDetailPage(real);
+  assert.equal(r.district, "越城区");
+  assert.equal(r.community, "御景华庭四期北区");
+  // 已下架
+  const off = parseDetailPage("<html><title>绍兴越城区迪荡X_御景华庭二手房</title>房源已下架</html>");
+  assert.equal(off.online, false);
+  assert.equal(off.totalPrice, null);
 });
 
 const mkHouse = (over = {}) => ({
@@ -156,14 +176,41 @@ test("filter: 价格/户型边界", () => {
   assert.deepEqual(out, ["a", "d"]);
 });
 
-test("filter: 白名单（包含匹配，容错各期/别名）", () => {
+test("filter: 白名单精确匹配（防同名小区/聚合混挂）", () => {
+  const didangSet = config.groups.find((g) => g.key === "didang").include;
+  // 各期全名 ∈ 集合
+  assert.ok(matchExact("御景华庭三期", didangSet));
+  assert.ok(matchExact("御景华庭四期北区", didangSet));
+  assert.ok(matchExact("金地·蘭悦", didangSet));
+  assert.ok(matchExact("星尚·悦湖苑", didangSet));
+  // 同名他区/无关小区 ∉ 集合（contains 时代会误放行的案例）
+  assert.ok(!matchExact("崧厦御景华庭", didangSet));
+  assert.ok(!matchExact("世禾新村", didangSet));
+  // applyFilters 走 include 精确语义
   const ok = applyFilters(
     [mkHouse({ community: "御景华庭三期" }), mkHouse({ community: "金地·蘭悦" }), mkHouse({ community: "星尚·悦湖苑" })],
     config
   );
   assert.equal(ok.length, 3);
-  const bad = applyFilters([mkHouse({ community: "世禾新村" })], config);
+  const bad = applyFilters(
+    [mkHouse({ community: "世禾新村" }), mkHouse({ community: "崧厦御景华庭" })],
+    config
+  );
   assert.equal(bad.length, 0);
+});
+
+test("filter: verifyOwnership 归属校验（区县 + 精确小区）", () => {
+  const didangHouse = mkHouse({ group: "didang", community: "御景华庭" });
+  // 上虞崧厦御景华庭 → 区县不符，剔除
+  assert.equal(verifyOwnership(didangHouse, { district: "上虞区", community: "御景华庭" }, config), false);
+  // 越城真实御景华庭 → 通过
+  assert.equal(verifyOwnership(didangHouse, { district: "越城区", community: "御景华庭" }, config), true);
+  // 越城但小区不在集合（迪東公寓混挂卧龙银湖湾 c 页）→ 剔除
+  const lianghuHouse = mkHouse({ group: "lianghu", community: "卧龙银湖湾" });
+  assert.equal(verifyOwnership(lianghuHouse, { district: "越城区", community: "迪東公寓" }, config), false);
+  assert.equal(verifyOwnership(lianghuHouse, { district: "越城区", community: "卧龙银湖湾" }, config), true);
+  // 黑名单组（无 include）不校验
+  assert.equal(verifyOwnership(mkHouse({ group: "gaobu" }), { district: "上虞区", community: "X" }, config), true);
 });
 
 test("filter: 黑名单（陶堰街道小区）", () => {

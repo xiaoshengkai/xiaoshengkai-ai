@@ -63,14 +63,19 @@ export async function run() {
   const jar = loadCookieHeader();
 
   try {
-    // 1. 逐组抓取（组内多查询去重）
+    // 1. 逐组抓取（组内多查询去重；string = 三室+ 粗筛，{q, rooms:2} = 二室+ 轨道粗筛含 l2）
     const groupMap = new Map(config.groups.map((g) => [g.key, g]));
     const raw = [];
     for (const g of config.groups) {
       const seen = new Set();
       const groupHouses = [];
-      for (const query of g.queries) {
-        const houses = await fetchQueryAll(query, jar, { log });
+      for (const entry of g.queries) {
+        const query = typeof entry === "string" ? entry : entry.q;
+        const roomCodes =
+          typeof entry === "object" && entry.rooms === 2
+            ? ["l2", ...config.baseFilter.rooms]
+            : config.baseFilter.rooms;
+        const houses = await fetchQueryAll(query, jar, { log, roomCodes });
         let hit = 0;
         for (const h of houses) {
           if (!seen.has(h.id)) {
@@ -135,6 +140,8 @@ export async function run() {
       const v = registry[h.id]?.verified;
       if (v?.community && verifyGroups.has(h.group)) h.community = v.community;
     }
+    // 归属校验缓存即刻落盘（防后续步骤失败丢缓存，下轮续跑累积）
+    saveRegistry(registry);
 
     // 3. 完整性守卫
     const prevSnapshot = loadPreviousSnapshot(date);

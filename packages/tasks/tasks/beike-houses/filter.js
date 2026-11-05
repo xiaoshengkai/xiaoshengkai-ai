@@ -30,18 +30,30 @@ export function verifyOwnership(house, verified, config) {
   return matchExact(verified.community, g.include, g.includePatterns);
 }
 
+/** 二室+ 轨道判定（仅迪荡·御景华庭一~五期，≥2室） */
+export function isTrack2(house, config) {
+  const r = config.room2;
+  if (!r || house.group !== r.group || house.rooms < 2) return false;
+  return new RegExp(r.pattern).test(normalizeName(house.community));
+}
+
 /**
+ * 双轨道过滤（≤99万，满足其一即跟踪）：
+ * - 三室+ 轨道：≥3室 且各组小区规则（白/黑名单）
+ * - 二室+ 轨道：≥2室 且 迪荡·御景华庭名称模式
  * @param {object[]} houses 已带 group 字段的房源
  * @param {object} config
- * @returns {object[]} 过滤后房源
+ * @returns {object[]} 过滤后房源（附带 track2 标记）
  */
 export function applyFilters(houses, config) {
   const groupMap = new Map(config.groups.map((g) => [g.key, g]));
   return houses.filter((h) => {
-    const g = groupMap.get(h.group);
-    if (!g) return false;
     if (h.totalPrice <= 0 || h.totalPrice > config.priceMax) return false;
-    if (h.rooms < config.minRooms) return false;
+    const track2 = isTrack2(h, config);
+    h.track2 = track2;
+    if (track2) return true;
+    const g = groupMap.get(h.group);
+    if (!g || h.rooms < config.minRooms) return false;
     if (g.include && !matchExact(h.community, g.include, g.includePatterns)) return false;
     if (g.exclude && matchAny(h.community, g.exclude)) return false;
     return true;

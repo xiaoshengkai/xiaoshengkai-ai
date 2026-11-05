@@ -42,38 +42,45 @@ function fmt(n) {
 }
 
 function buildPayload({ date, fetchedAt, houses, changes, groupLabels }) {
-  // 地区 → 小区 二级分组
-  const groups = [];
-  for (const [key, label] of Object.entries(groupLabels)) {
-    const gh = houses.filter((h) => h.group === key);
-    const byCommunity = new Map();
-    for (const h of gh) {
-      if (!byCommunity.has(h.community)) byCommunity.set(h.community, []);
-      byCommunity.get(h.community).push({
-        id: h.id,
-        title: h.title,
-        url: h.url,
-        layout: h.layout,
-        size: h.size,
-        floorLevel: h.floorLevel,
-        totalFloors: h.totalFloors,
-        elevator: elevatorText(h.totalFloors),
-        orientation: h.orientation || "—",
-        totalPrice: h.totalPrice,
-        unitPrice: h.unitPrice,
-        follows: h.follows,
-        publishText: h.publishText,
-        tags: h.tags || [],
-        days: h.firstSeen ? Math.max(0, daysBetween(h.firstSeen, date)) : null,
-        priceChanges: h.priceChanges || 0,
-        reappeared: Boolean(h.reappeared),
-      });
+  // 街道 → 小区 二级分组（给定房源子集）
+  const buildGroups = (list) => {
+    const out = [];
+    for (const [key, label] of Object.entries(groupLabels)) {
+      const gh = list.filter((h) => h.group === key);
+      const byCommunity = new Map();
+      for (const h of gh) {
+        if (!byCommunity.has(h.community)) byCommunity.set(h.community, []);
+        byCommunity.get(h.community).push({
+          id: h.id,
+          title: h.title,
+          url: h.url,
+          layout: h.layout,
+          size: h.size,
+          floorLevel: h.floorLevel,
+          totalFloors: h.totalFloors,
+          elevator: elevatorText(h.totalFloors),
+          orientation: h.orientation || "—",
+          totalPrice: h.totalPrice,
+          unitPrice: h.unitPrice,
+          follows: h.follows,
+          publishText: h.publishText,
+          tags: h.tags || [],
+          days: h.firstSeen ? Math.max(0, daysBetween(h.firstSeen, date)) : null,
+          priceChanges: h.priceChanges || 0,
+          reappeared: Boolean(h.reappeared),
+        });
+      }
+      const communities = [...byCommunity.entries()]
+        .map(([name, houses]) => ({ name, houses: houses.sort((a, b) => a.totalPrice - b.totalPrice) }))
+        .sort((a, b) => a.houses[0]?.totalPrice - b.houses[0]?.totalPrice);
+      if (communities.length) out.push({ key, label, communities, count: gh.length });
     }
-    const communities = [...byCommunity.entries()]
-      .map(([name, list]) => ({ name, houses: list.sort((a, b) => a.totalPrice - b.totalPrice) }))
-      .sort((a, b) => a.houses[0]?.totalPrice - b.houses[0]?.totalPrice);
-    groups.push({ key, label, communities, count: gh.length });
-  }
+    return out;
+  };
+
+  // 双区块：三室+（≥3室 全域）/ 二室+（≥2室 · 御景华庭一~五期，track2 标记）
+  const groups = buildGroups(houses.filter((h) => h.rooms >= 3));
+  const groups2 = buildGroups(houses.filter((h) => h.track2));
 
   return {
     date,
@@ -85,6 +92,7 @@ function buildPayload({ date, fetchedAt, houses, changes, groupLabels }) {
       groups: Object.fromEntries(groups.map((g) => [g.label, g.count])),
     },
     groups,
+    groups2,
     changes: changes
       ? {
           added: changes.added.map(toChangeItem),
@@ -250,18 +258,22 @@ td .title-link:hover{text-decoration:underline}
   <div class="chg-grid">${render(payload.changes)}</div>
   <div class="sect-title">在售房源（99万内 · 三室+）</div>
   <div id="groups"></div>
+  <div class="sect-title">在售房源（99万内 · 二室+ · 御景华庭一~五期）</div>
+  <div id="groups2"></div>
 </div>
 <div class="footer">数据来源 sx.ke.com（贝壳）· 每日 9:30 更新 · 电梯按总层数≥7 推断 · 单位：总价 万 / 单价 元/㎡<br>更新时间 ${payload.fetchedAt} · 本页数据为抓取时点快照，房源状态以贝壳为准</div>
 <script id="payload" type="application/json">${jsonForScript(payload)}</script>
 <script>
 (function(){
   var payload = JSON.parse(document.getElementById("payload").textContent);
-  var groupsEl = document.getElementById("groups");
-  if (!payload.groups.length) {
-    groupsEl.innerHTML = '<div class="empty-all">当前筛选条件下暂无在售房源</div>';
-    return;
-  }
-  payload.groups.forEach(function(g){
+
+  function renderGroups(containerId, groups) {
+    var el = document.getElementById(containerId);
+    if (!groups.length) {
+      el.innerHTML = '<div class="empty-all">当前筛选条件下暂无在售房源</div>';
+      return;
+    }
+    groups.forEach(function(g){
     var div = document.createElement("div");
     div.className = "group";
     div.style.setProperty("--gc", theme(g.key).color);
@@ -289,8 +301,12 @@ td .title-link:hover{text-decoration:underline}
     });
     div.appendChild(head);
     div.appendChild(body);
-    groupsEl.appendChild(div);
-  });
+    el.appendChild(div);
+    });
+  }
+
+  renderGroups("groups", payload.groups);
+  renderGroups("groups2", payload.groups2);
   function buildTable(houses){
     var cols = [
       ["房源", "title", null],

@@ -151,10 +151,10 @@ function buildPrefix(query, parts) {
  *
  * @param {string} query 板块 slug 或 c<resblockId>
  * @param {object} jar Cookie
- * @param {object} opts { log }
+ * @param {object} opts { log, roomCodes }——roomCodes 传 ["l2",...] 时为二室+ 轨道查询
  * @returns {Promise<object[]>}
  */
-export async function fetchQueryAll(query, jar, { log = () => {} } = {}) {
+export async function fetchQueryAll(query, jar, { log = () => {}, roomCodes = config.baseFilter.rooms } = {}) {
   const resblockId = query.startsWith("c") ? query.slice(1) : null;
 
   async function collect(parts, splitIdx) {
@@ -179,10 +179,12 @@ export async function fetchQueryAll(query, jar, { log = () => {} } = {}) {
       return items;
     }
     const dim = SPLIT_DIMS[splitIdx];
+    // 户型维的拆分码用本查询的 roomCodes（二室+ 查询含 l2）
+    const codes = splitIdx === 0 ? roomCodes : dim.codes;
     log(`[SPLIT] ${prefix} 满页 ${items.length} 条（显示total=${total}不可信），按 ${dim.key} 拆分`);
     let merged = [];
     const seen = new Set();
-    for (const code of dim.codes) {
+    for (const code of codes) {
       const child = { ...parts, [dim.key]: [code] };
       for (const h of await collect(child, splitIdx + 1)) {
         if (!seen.has(h.id)) {
@@ -195,7 +197,7 @@ export async function fetchQueryAll(query, jar, { log = () => {} } = {}) {
   }
 
   return collect(
-    { rooms: [...config.baseFilter.rooms], price: [...config.baseFilter.price], area: [], floor: [] },
+    { rooms: [...roomCodes], price: [...config.baseFilter.price], area: [], floor: [] },
     0
   );
 }

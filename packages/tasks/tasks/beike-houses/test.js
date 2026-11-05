@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseLi, parseListPage, parseDetailPage, elevatorText } from "./parser.js";
-import { applyFilters, isSuspiciousShrink, normalizeName, matchExact, verifyOwnership } from "./filter.js";
+import { applyFilters, isSuspiciousShrink, normalizeName, matchExact, verifyOwnership, isTrack2 } from "./filter.js";
 import { diffSnapshots, updateRegistry } from "./diff.js";
 import { config } from "./config.js";
 
@@ -169,11 +169,38 @@ test("filter: 价格/户型边界", () => {
   const houses = [
     mkHouse({ id: "a", totalPrice: 99, rooms: 3 }),
     mkHouse({ id: "b", totalPrice: 99.5, rooms: 3 }), // 超预算
-    mkHouse({ id: "c", totalPrice: 50, rooms: 2 }), // 户型不足
+    mkHouse({ id: "c", group: "gaobu", community: "凤鸣湾", totalPrice: 50, rooms: 2 }), // 非御景华庭 2室
     mkHouse({ id: "d", totalPrice: 30, rooms: 4 }),
   ];
   const out = applyFilters(houses, config).map((h) => h.id);
   assert.deepEqual(out, ["a", "d"]);
+});
+
+test("filter: 二室+ 轨道（仅御景华庭一~五期）", () => {
+  // 2室 御景华庭 → 收（track2）
+  assert.ok(isTrack2(mkHouse({ rooms: 2, community: "御景华庭三期" }), config));
+  assert.ok(isTrack2(mkHouse({ rooms: 2, community: "御景华庭四期南区" }), config));
+  assert.ok(isTrack2(mkHouse({ rooms: 2, community: "御景华庭" }), config));
+  // 2室 非御景华庭 → 弃
+  assert.ok(!isTrack2(mkHouse({ rooms: 2, community: "金地·蘭悦" }), config));
+  assert.ok(!isTrack2(mkHouse({ group: "gaobu", rooms: 2, community: "凤鸣湾" }), config));
+  assert.ok(!isTrack2(mkHouse({ rooms: 2, community: "崧厦御景华庭" }), config));
+  // applyFilters：2室御景华庭保留且带 track2 标记；2室其他小区丢弃
+  const out = applyFilters(
+    [
+      mkHouse({ rooms: 2, community: "御景华庭五期南区", totalPrice: 99 }),
+      mkHouse({ rooms: 2, community: "世禾新村", totalPrice: 80 }),
+      mkHouse({ rooms: 2, community: "中天观樾诚品", group: "lianghu", totalPrice: 80 }),
+    ],
+    config
+  );
+  assert.equal(out.length, 1);
+  assert.equal(out[0].community, "御景华庭五期南区");
+  assert.equal(out[0].track2, true);
+  // 3室 御景华庭 → 双轨道命中（保留，track2 也为 true，页面两区块都显示）
+  const out2 = applyFilters([mkHouse({ rooms: 3, community: "御景华庭三期" })], config);
+  assert.equal(out2.length, 1);
+  assert.equal(out2[0].track2, true);
 });
 
 test("filter: 白名单精确匹配 + 期号模式（防同名小区/聚合混挂）", () => {
@@ -205,6 +232,32 @@ test("filter: 白名单精确匹配 + 期号模式（防同名小区/聚合混�
     config
   );
   assert.equal(bad.length, 0);
+});
+
+test("filter: 两湖白名单（宝龙世家双写法 + 悦隽府）", () => {
+  const lianghuSet = config.groups.find((g) => g.key === "lianghu").include;
+  assert.ok(matchExact("宝龙世家(越城区)", lianghuSet));
+  assert.ok(matchExact("宝龙世家", lianghuSet));
+  assert.ok(matchExact("悦隽府", lianghuSet));
+  // 诸暨同名盘（详情页归属区县拦截在 verifyOwnership，此处名单层不含其他写法）
+  const ok = applyFilters(
+    [
+      mkHouse({ group: "lianghu", community: "宝龙世家(越城区)" }),
+      mkHouse({ group: "lianghu", community: "悦隽府" }),
+      mkHouse({ group: "lianghu", community: "中冶梧桐园" }),
+    ],
+    config
+  );
+  assert.equal(ok.length, 2);
+  // 区县校验：诸暨宝龙世家被拒
+  assert.equal(
+    verifyOwnership(
+      mkHouse({ group: "lianghu", community: "宝龙世家(越城区)" }),
+      { district: "诸暨市", community: "宝龙世家" },
+      config
+    ),
+    false
+  );
 });
 
 test("filter: 名爵府黑名单", () => {

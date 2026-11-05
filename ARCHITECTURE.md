@@ -342,10 +342,10 @@ logs/
 
 ## 贝壳房源跟踪（beike-houses 任务）
 
-`packages/tasks/tasks/beike-houses/`：绍兴越城 东湖/皋埠/迪荡/两湖 二手房筛选跟踪（≤99万 · ≥3室 · 小区白/黑名单），对比上一快照生成变化模块 + 地区→小区二级分组表格，原生 HTML 仪表盘（task.json 的 `html` 字段，公开页面路由 `/ai/tasks/beike-houses` 免登录）。
+`packages/tasks/tasks/beike-houses/`：绍兴越城 东湖/皋埠/迪荡/两湖 二手房筛选跟踪（≤99万；三室+全域白名单 + 二室+仅御景华庭一~五期），对比上一快照生成变化模块 + 地区→小区二级分组表格，原生 HTML 仪表盘（task.json 的 `html` 字段，公开页面路由 `/ai/tasks/beike-houses` 免登录）。
 
 - **运行拓扑**（云服务器 IP 被贝壳 CAPTCHA 盯得紧，约 30 请求即触发；住宅网络 Mac 100 请求稳定）：**任务只在 Mac 跑**——由 **LaunchAgent `com.xiaoshengkai.beike-houses`**（`install-cron.sh` 装/卸，仿 sync.sh backup 惯例）每日 **9:30 主跑 + 20:30 补跑**直调 `node --env-file=.env index.js`（launchd 开机自启 + 睡眠唤醒补跑；日志 `logs/tasks/beike-houses-cron.log`；**Mac 无常驻 scheduler**，勿配 data/tasks cron 防双跑），跑完 `pushDashboardToServer()` 把 dashboard.html `scp` 到服务器（`DEPLOY_TARGET`/`DEPLOY_PATH` env）；服务器侧任务已暂停（handleRun 403 带描述自解释）、仅只读展示。dashboard.html gitignored（Mac 推送产物，勿提交防脏工作树卡部署）。
-- **数据链路**：`run()` → fetcher（登录 Cookie + 自适应拆分查询）→ parser（双模板列表页解析）→ filter（本地精滤）→ **归属校验**（详情页权威归属 区+真实小区，registry.verified 缓存摊销——治贝壳 c 页同名小区混挂）→ 守卫（<50% 中止）→ store（`data/beike-houses/snapshots/YYYY-MM-DD.json` + `registry.json` 累计索引，留 90 天）→ diff（新上架/降价/涨价/下架 + 重新上架识别）→ generate-dashboard（数据内嵌静态页 + 顶部「每日结论」人话栏）→ scp 推送
+- **数据链路**：`run()` → fetcher（登录 Cookie + 自适应拆分查询；二室+ 轨道查询粗筛含 l2，拆分树户型维随 roomCodes）→ parser（双模板列表页解析）→ filter（**双轨道**：≥3室+各组规则 或 ≥2室+迪荡·御景华庭一~五期，≤99万，快照存并集）→ **归属校验**（详情页权威归属 区+真实小区，registry.verified 缓存摊销且中途落盘——治贝壳 c 页同名小区混挂）→ 守卫（<50% 中止）→ store（`data/beike-houses/snapshots/YYYY-MM-DD.json` + `registry.json` 累计索引，留 90 天）→ diff（新上架/降价/涨价/下架 + 重新上架识别）→ generate-dashboard（双区块：三室+ 全域 / 二室+ 御景华庭一~五期，顶部「每日结论」人话栏）→ scp 推送
 - **贝壳反爬四坑与对策**：① pgN 分页 CAPTCHA 系统拦截 → 户型×价格×面积×楼层筛选码逐维拆分压到单页（完备分割不漏数据）；② c<id> 小区查询 0 结果回退附近推荐 → 按 resblockId 过滤；③ 筛选页「共找到 N 套」为垃圾值 → 拆分触发只认「满页 30 条」；④ **c 页聚合同名/附近房源且 resblock_id 同为被查小区** → 详情页 `<title>` 权威归属校验（区县 + 精确小区名/名称模式集合，御景华庭一~五期模式全收）
 - **会话**：Cookie 从浏览器导出存 `data/beike-houses/cookies.json`（gitignored，仅 Mac），响应 Set-Cookie 自动合并续期；登录墙/CAPTCHA → 报错不落盘（防误报下架）；续期一键脚本 `export-cookies.js`（browser-harness CDP）
 - **原方案** beike-ai-platform CLI 已弃用（平台凭证签发故障，Issues #2~#15）

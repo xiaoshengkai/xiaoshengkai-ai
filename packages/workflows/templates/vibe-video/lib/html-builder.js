@@ -202,15 +202,21 @@ async function smokeValidate(htmlPath, duration, logger) {
     }
     await page.evaluate(() => document.fonts.ready);
     const samples = Math.min(20, Math.max(8, Math.ceil(duration / 5)));
-    const result = await page.evaluate((n) => {
-      const meta = window.getRenderMeta();
-      const errs = [];
-      for (let i = 0; i <= n; i++) {
-        const t = (meta.duration * i) / n;
-        try { window.render(t); } catch (e) { errs.push(`t=${t.toFixed(1)}s: ${e.message}`); }
-      }
-      return { meta, errs };
-    }, samples);
+    let result;
+    try {
+      result = await page.evaluate((n) => {
+        if (typeof window.getRenderMeta !== "function") return { meta: null, errs: ["页面脚本未执行完（window.getRenderMeta 缺失——注入代码可能有语法错误）"] };
+        const meta = window.getRenderMeta();
+        const errs = [];
+        for (let i = 0; i <= n; i++) {
+          const t = (meta.duration * i) / n;
+          try { window.render(t); } catch (e) { errs.push(`t=${t.toFixed(1)}s: ${e.message}`); }
+        }
+        return { meta, errs };
+      }, samples);
+    } catch (e) {
+      return { ok: false, errors: [`页面执行失败: ${e.message.slice(0, 150)}`] };
+    }
     const allErrors = [...pageErrors, ...result.errs];
     if (allErrors.length > 0) {
       logger.warn(`[html] 冒烟失败: ${allErrors.slice(0, 5).join(" | ")}`);

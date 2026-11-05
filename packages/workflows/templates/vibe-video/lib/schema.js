@@ -102,6 +102,12 @@ export function validateSceneBatch(code, expectedFnNames) {
   for (const { re, msg } of FORBIDDEN_SCENE_PATTERNS) {
     if (re.test(code)) errors.push(msg);
   }
+  /* 语法解析（正则 lint 抓不到语法错误，new Function 编译一遍） */
+  try {
+    new Function(code);
+  } catch (e) {
+    errors.push(`场景代码语法错误: ${e.message}`);
+  }
   for (const name of expectedFnNames) {
     if (!new RegExp(`function\\s+${name}\\s*\\(`).test(code)) {
       errors.push(`缺少函数 ${name}(t)`);

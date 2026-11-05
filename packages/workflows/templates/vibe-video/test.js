@@ -107,11 +107,13 @@ async function run() {
     }
   });
 
-  await test("合法场景函数通过 + 缺函数拒绝", () => {
+  await test("合法场景函数通过 + 缺函数拒绝 + 语法错误拒绝", () => {
     const good = `function scene0(t){ var lt=t-10; var k=easeInOut(clamp(lt/1.5,0,1)); scc.globalAlpha=k; drawCard(scc, W/2, H*0.35, 320, 180, 0, t); cardText(scc, '词', W/2, H*0.35, 64); scc.globalAlpha=1; }`;
     assertEq(validateSceneBatch(good, ["scene0"]).length, 0);
     assert(validateSceneBatch(good, ["scene1"]).some(e => e.includes("scene1")));
     assert(validateSceneBatch("", ["scene0"]).length > 0, "空代码拒绝");
+    const syntaxErr = "function scene0(t){ var broken = ; }";
+    assert(validateSceneBatch(syntaxErr, ["scene0"]).some(e => e.includes("语法错误")), "语法错误应被 new Function 抓到");
   });
 
   await test("markdown 围栏剔除由调用方负责（lint 只看内容）", () => {

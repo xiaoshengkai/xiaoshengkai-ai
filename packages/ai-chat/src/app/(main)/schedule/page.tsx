@@ -183,7 +183,7 @@ export default function SchedulePage() {
                   </button>
                   {task.html && (
                     <a
-                      href={`${BASE}/api/tasks/${task.name}/dashboard`}
+                      href={`${BASE}/tasks/${task.name}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold bg-primary text-primary-foreground"

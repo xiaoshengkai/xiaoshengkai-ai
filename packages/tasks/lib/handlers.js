@@ -90,10 +90,11 @@ export async function handleRun({ request }) {
     return Response.json({ ok: false, error: "task not found" }, { status: 404 });
   }
 
-  // 已暂停的任务拒绝手动执行（如 beike-houses：仅 Mac 侧运行，服务器只读展示）
+  // 已暂停的任务拒绝手动执行（如 beike-houses：仅 Mac 侧运行，服务器只读展示——错误带描述自解释）
   const state = readData(name);
   if (state.enabled === false) {
-    return Response.json({ ok: false, error: "任务已暂停，如需执行请先在列表中启用" }, { status: 403 });
+    const reason = state.description ? `：${state.description}` : "，如需执行请在编辑中启用";
+    return Response.json({ ok: false, error: `任务已暂停${reason}` }, { status: 403 });
   }
 
   const lockPath = getLockPath(name);

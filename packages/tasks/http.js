@@ -5,13 +5,12 @@
 
 import path from "node:path";
 import { createCapabilityHandler, loadActions } from "@app/shared/capability.js";
-import { handleList, handleRun, handleEdit, handleDashboard } from "./lib/handlers.js";
+import { handleList, handleRun, handleEdit } from "./lib/handlers.js";
 
 const CUSTOM_HANDLERS = {
   list: handleList,
   run: handleRun,
   edit: handleEdit,
-  dashboard: handleDashboard,
 };
 
 // ponytail: 本文件被 Next webpack 打包，沿用 process.cwd() = packages/ai-chat 约定

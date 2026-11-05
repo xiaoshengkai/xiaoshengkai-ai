@@ -2,7 +2,8 @@
  * 全局鉴权卡口（Next 16 proxy，middleware 继任者，Node runtime）
  * ============================================================================
  * 所有页面 + API 路由经过此处：
- *   - 放行：/login、/api/auth/*（登录/登出/改密自带密码验证）、字体豁免路径、_next 静态资源
+ *   - 放行：/login、/api/auth/*（登录/登出/改密自带密码验证）、字体豁免路径、
+ *     /tasks/*（任务仪表盘公开页——非敏感数据、给人看/分享用），_next 静态资源
  *   - 有效 ai_session Cookie → 放行；否则页面 307→/login、API 401
  *   - AUTH_PASSWORD 未配置：生产 fail-closed（全拒），dev 放行
  * 字体豁免：MCP document 工具用 Chrome 渲染 PDF 时经 /api/uploads 取 CJK 字体，
@@ -19,7 +20,12 @@ const BASE_PATH = process.env.NODE_ENV === "production" ? "/ai" : "";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl; // 不含 basePath
 
-  if (pathname === "/login" || pathname.startsWith("/api/auth/") || pathname === FONT_PATH) {
+  if (
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth/") ||
+    pathname === FONT_PATH ||
+    pathname.startsWith("/tasks/")
+  ) {
     return NextResponse.next();
   }
 

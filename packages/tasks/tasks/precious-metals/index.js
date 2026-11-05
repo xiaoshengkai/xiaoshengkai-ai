@@ -8,7 +8,7 @@ import { exec } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { publicBase } from "@app/shared/public-base.js";
 
-const DASHBOARD_URL = `${publicBase()}/ai/api/tasks/precious-metals/dashboard`;
+const DASHBOARD_URL = `${publicBase()}/ai/tasks/precious-metals`;
 
 export async function run() {
   validate();

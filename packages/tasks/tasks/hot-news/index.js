@@ -13,7 +13,7 @@ import { config } from "./config.js";
 import { publicBase } from "@app/shared/public-base.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DASHBOARD_URL = `${publicBase()}/ai/api/tasks/hot-news/dashboard`;
+const DASHBOARD_URL = `${publicBase()}/ai/tasks/hot-news`;
 
 export async function run() {
   console.log("=== 每日热点新闻聚合开始 ===");

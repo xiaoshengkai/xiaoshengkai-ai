@@ -159,6 +159,7 @@ ${JSON.stringify(chapter.beats, null, 2)}
         system: systemPrompt,
         user: userPrompt + retryHint,
         maxTokens: 8000,
+        format: null, /* 场景函数是裸 JS 代码，不走 json_object 模式 */
       });
       let code = String(text).trim();
       code = code.replace(/^```(?:js|javascript)?\s*/i, "").replace(/```\s*$/i, "").trim();

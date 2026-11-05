@@ -150,7 +150,7 @@ ai-chat 对 workflows/tasks 只保留 1 个 catch-all 挂载点（`app/api/{work
 
 - `workflows/actions.json`：引擎级 18 动作（执行 10：templates / execute / executions / get / delete / file / next / auto / retry / skip；资产库 8：characters 列表/生成/保存/删除/文件流 + styles 列表/创建/删除）
 - `templates/<name>/actions.json`：模板特有动作；video-generation 声明 storyboard-confirm / generate-content / upload / tweak / switch-version；comic-generation 声明 export / scene-group / generate-content；http.js 启动时扫描合并，method+path 重复即抛错
-- `tasks/actions.json`：list / run / edit / dashboard（handler 在 `tasks/lib/handlers.js`）
+- `tasks/actions.json`：list / run / edit（handler 在 `tasks/lib/handlers.js`）；仪表盘已移出 API——`app/tasks/[name]/route.ts` 页面路由直连 handleDashboard，`/ai/tasks/<name>` 免登录公开
 
 **路径匹配**：`:name` 捕获段、尾部 `*` 捕获剩余段；`required` 对 undefined/null/"" 判缺（`version=0` 合法）。
 
@@ -281,7 +281,7 @@ data/workflows/
   ├─ /schedule 页面               │
   │   ├─ 查看任务列表（GET /api/tasks）     │
   │   ├─ 立即执行（POST /api/tasks）       │
-  │   └─ 仪表盘（GET /api/tasks/[name]/dashboard）│
+  │   └─ 仪表盘页（GET /ai/tasks/<name>，免登录）│
   │                                │
   └─ 手动重启                       │
        │                           │
@@ -342,9 +342,9 @@ logs/
 
 ## 贝壳房源跟踪（beike-houses 任务）
 
-`packages/tasks/tasks/beike-houses/`：绍兴越城 东湖/皋埠/迪荡/两湖 二手房筛选跟踪（≤99万 · ≥3室 · 小区白/黑名单），对比上一快照生成变化模块 + 地区→小区二级分组表格，原生 HTML 仪表盘（task.json 的 `html` 字段，`/api/tasks/beike-houses/dashboard`）。
+`packages/tasks/tasks/beike-houses/`：绍兴越城 东湖/皋埠/迪荡/两湖 二手房筛选跟踪（≤99万 · ≥3室 · 小区白/黑名单），对比上一快照生成变化模块 + 地区→小区二级分组表格，原生 HTML 仪表盘（task.json 的 `html` 字段，公开页面路由 `/ai/tasks/beike-houses` 免登录）。
 
-- **运行拓扑**（云服务器 IP 被贝壳 CAPTCHA 盯得紧，约 30 请求即触发；住宅网络 Mac 60+ 请求稳定）：**任务只在 Mac 跑**（Mac scheduler cron `30 9 * * *` 主跑 + `30 20 * * *` 补跑，data/tasks/beike-houses/index.json），跑完 `index.js` 的 `pushDashboardToServer()` 把 dashboard.html `scp` 到服务器（`DEPLOY_TARGET`/`DEPLOY_PATH` env）；服务器侧 cron 已禁用、仅只读展示。dashboard.html git 里保持首版不再提交（Mac 推送会弄脏服务器工作树，未来部署勿触碰该文件）。
+- **运行拓扑**（云服务器 IP 被贝壳 CAPTCHA 盯得紧，约 30 请求即触发；住宅网络 Mac 100 请求稳定）：**任务只在 Mac 跑**——由 **LaunchAgent `com.xiaoshengkai.beike-houses`**（`install-cron.sh` 装/卸，仿 sync.sh backup 惯例）每日 **9:30 主跑 + 20:30 补跑**直调 `node --env-file=.env index.js`（launchd 开机自启 + 睡眠唤醒补跑；日志 `logs/tasks/beike-houses-cron.log`；**Mac 无常驻 scheduler**，勿配 data/tasks cron 防双跑），跑完 `pushDashboardToServer()` 把 dashboard.html `scp` 到服务器（`DEPLOY_TARGET`/`DEPLOY_PATH` env）；服务器侧任务已暂停（handleRun 403 带描述自解释）、仅只读展示。dashboard.html gitignored（Mac 推送产物，勿提交防脏工作树卡部署）。
 - **数据链路**：`run()` → fetcher（登录 Cookie + 自适应拆分查询）→ parser（双模板列表页解析）→ filter（本地精滤）→ **归属校验**（详情页权威归属 区+真实小区，registry.verified 缓存摊销——治贝壳 c 页同名小区混挂）→ 守卫（<50% 中止）→ store（`data/beike-houses/snapshots/YYYY-MM-DD.json` + `registry.json` 累计索引，留 90 天）→ diff（新上架/降价/涨价/下架 + 重新上架识别）→ generate-dashboard（数据内嵌静态页 + 顶部「每日结论」人话栏）→ scp 推送
 - **贝壳反爬四坑与对策**：① pgN 分页 CAPTCHA 系统拦截 → 户型×价格×面积×楼层筛选码逐维拆分压到单页（完备分割不漏数据）；② c<id> 小区查询 0 结果回退附近推荐 → 按 resblockId 过滤；③ 筛选页「共找到 N 套」为垃圾值 → 拆分触发只认「满页 30 条」；④ **c 页聚合同名/附近房源且 resblock_id 同为被查小区** → 详情页 `<title>` 权威归属校验（区县 + 精确小区名/名称模式集合，御景华庭一~五期模式全收）
 - **会话**：Cookie 从浏览器导出存 `data/beike-houses/cookies.json`（gitignored，仅 Mac），响应 Set-Cookie 自动合并续期；登录墙/CAPTCHA → 报错不落盘（防误报下架）；续期一键脚本 `export-cookies.js`（browser-harness CDP）
@@ -458,7 +458,7 @@ corp-egress 服务                             @app/shared/egress.js
 
 - **模型**：单人应用，无用户名；生效密码 = `data/auth.json` 的 passwordHash（settings 页改密写入，gitignored）优先，根 `.env` `AUTH_PASSWORD` 兜底。
 - **token**：`过期时间.密码指纹8位.HMAC-SHA256(AUTH_SECRET)`，Cookie `ai_session`（httpOnly / SameSite=Lax / prod Secure / 30 天）。指纹掺入 → 改密后所有旧会话立即失效。
-- **卡口规则**（proxy.ts）：放行 `/login`、`/api/auth/*`（自带密码验证）、字体豁免路径（MCP document 工具经 Chrome 取 `/api/uploads/NotoSansCJKsc-Regular.otf`，字体加载带不了 Cookie，开源字体无泄漏风险）、`_next/*` 静态资源；未登录页面 307→login、API 401。
+- **卡口规则**（proxy.ts）：放行 `/login`、`/api/auth/*`（自带密码验证）、`/tasks/*`（任务仪表盘公开页——非敏感数据，分享用）、字体豁免路径（MCP document 工具经 Chrome 取 `/api/uploads/NotoSansCJKsc-Regular.otf`，字体加载带不了 Cookie，开源字体无泄漏风险）、`_next/*` 静态资源；未登录页面 307→login、API 401。
 - **fail-closed**：`AUTH_PASSWORD` 未配置时生产全拒（login 接口报 `auth_not_configured`）、dev 放行。
 - **防爆破**：login 与 change-password 共用内存计数，同 IP 连错 `AUTH_MAX_FAILS`(5) 次锁 `AUTH_LOCK_SECS`(600) 秒；重启进程清零。
 - **matcher 坑**：basePath 根路径 `/ai`（裸路径，无尾斜杠）只有 isRoot matcher `'/'` 能覆盖，普通 `'/((?!_next...).*)'` 前缀化后要求子路径，`/ai` 会被静态缓存直出绕过鉴权（Next 16 实测）。故 matcher = `['/', '/((?!_next/static|_next/image|favicon.ico).*)']`。

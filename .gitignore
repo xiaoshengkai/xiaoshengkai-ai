@@ -45,3 +45,6 @@ nohup.out
 .superpowers/
 data-backup/
 .env.bak-*
+
+# beike-houses 仪表盘为 Mac 侧推送产物（勿提交，防服务器脏工作树卡部署）
+packages/tasks/tasks/beike-houses/dashboard.html

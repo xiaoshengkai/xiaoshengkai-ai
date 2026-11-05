@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.11.67 (2026-11-05) — 仪表盘页面路由公开化 + Mac LaunchAgent 定时（治 beike-houses 不会自动跑）
+
+### 变更
+- **根**：Mac 本地无 scheduler 进程（此前误判——看到的「进程」实为 ssh 隧道命令字样）→ beike-houses 的 cron 配置无人执行，明早 9:30 两端都不会跑（服务器=暂停、Mac=无进程）。
+- **LaunchAgent**（`install-cron.sh`，仿 sync.sh backup 惯例）：`com.xiaoshengkai.beike-houses` 每日 9:30+20:30 直调 `node --env-file=.env index.js`；launchd 开机自启 + 睡眠错过的日历点唤醒后补跑；日志 `logs/tasks/beike-houses-cron.log`。Mac data/tasks 的无效 cron 配置已清（防将来双跑）。
+- **仪表盘页面路由**：`app/tasks/[name]/route.ts`（直连 handleDashboard）→ **`/ai/tasks/<name>` 免登录公开**（proxy 放行 `/tasks/`；给人看/分享用）。老 `/api/tasks/:name/dashboard` action **删除**（引用全量检索后更新：schedule 页/hot-news/precious-metals 的 DASHBOARD_URL 三处）。`/ai/api/tasks` 列表接口仍需登录。
+- **handleRun 403 带任务描述**（「任务已暂停：云IP被贝壳CAPTCHA限制…」自解释，不再误导启用）。服务器 beike-houses 重新暂停（用户误启用后手动执行报 NO_COOKIE）。
+- 云 IP 限制实证（用户质询后复核）：服务器带 Cookie 实跑 ~30 请求触发 CAPTCHA（任务需 ~100）；Mac 住宅 IP 同任务 100 请求完成、当日累计 350+ 才偶发。
+
+### 验证
+- typecheck / test 186 全绿 / build 通过；LaunchAgent 装载 gui/501 域 print 确认；线上四件套见部署后验证。
+
 ## v0.11.66 (2026-11-05) — beike-houses 体验修正：每日结论栏 / 名爵府黑名单 / 御景华庭一~五期全收
 
 ### 变更

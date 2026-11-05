@@ -4,6 +4,8 @@
  *      → 完整性守卫 → 快照落盘 → registry 累计索引 → 对比昨日 → 下架原因核查 → 生成页面
  */
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { config } from "./config.js";
 import {
   loadCookieHeader,
@@ -26,6 +28,27 @@ import {
 import { generateDashboard, writePlaceholder } from "./generate-dashboard.js";
 
 const groupLabels = Object.fromEntries(config.groups.map((g) => [g.key, g.label]));
+const execFileAsync = promisify(execFile);
+
+/**
+ * 推送仪表盘到服务器（云服务器 IP 被贝壳 CAPTCHA 盯得紧，任务只在住宅网络的 Mac 跑，
+ * 服务器仅作只读展示：Mac 跑完把页面 scp 过去）
+ */
+async function pushDashboardToServer(dashboardFile) {
+  const target = process.env.DEPLOY_TARGET;
+  if (!target) {
+    log("[SKIP] 未配置 DEPLOY_TARGET，跳过线上推送（本地开发模式）");
+    return;
+  }
+  const deployPath = process.env.DEPLOY_PATH || "/root/xiaoshengkai-ai";
+  const remote = `${target}:${deployPath}/packages/tasks/tasks/beike-houses/dashboard.html`;
+  try {
+    await execFileAsync("scp", ["-q", dashboardFile, remote], { timeout: 60000 });
+    log(`已推送仪表盘 → ${target}`);
+  } catch (err) {
+    console.error(`[beike-houses] 推送失败（不影响本地数据）: ${err.message}`);
+  }
+}
 
 function log(...args) {
   console.log("[beike-houses]", ...args);
@@ -111,11 +134,19 @@ export async function run() {
       notes.push(`首次运行：基线快照已建立，明日起展示每日变化`);
     }
 
-    // 8. 生成页面 + 清理旧快照
-    generateDashboard({ date, fetchedAt: new Date().toISOString(), houses, changes, groupLabels, notes });
+    // 8. 生成页面 + 清理旧快照 + 推送线上
+    const dashboardFile = generateDashboard({
+      date,
+      fetchedAt: new Date().toISOString(),
+      houses,
+      changes,
+      groupLabels,
+      notes,
+    });
     pruneSnapshots();
     saveRegistry(newRegistry);
     saveCookieJar(jar);
+    await pushDashboardToServer(dashboardFile);
 
     log(`=== 完成：${houses.length} 套在跟 · 请求 ${requestStats().count} 次 · 页面已更新 ===`);
     return { ok: true, houses: houses.length, requests: requestStats().count };

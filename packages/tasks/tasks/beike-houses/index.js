@@ -13,6 +13,7 @@ import {
   saveCookieJar,
   fetchQueryAll,
   fetchDetailStatus,
+  closeBrowserTransport,
   FetchError,
   requestStats,
 } from "./fetcher.js";
@@ -104,8 +105,10 @@ export async function run() {
     if (pending.length) log(`归属校验: ${pending.length} 套无缓存，需详情页核验`);
     const rejected = [];
     const rejectsByName = [];
-    for (const h of pending) {
+    for (let i = 0; i < pending.length; i++) {
+      const h = pending[i];
       const detail = await fetchDetailStatus(h.url, jar);
+      log(`[进度 ${String(requestStats().count).padStart(3)}] 归属校验 ${i + 1}/${pending.length} ${h.community} ${h.id}`);
       if (!detail) {
         log(`[WARN] ${h.id} 详情页获取失败，本次保留未校验（下次重试）`);
         continue;
@@ -213,6 +216,8 @@ export async function run() {
     }
     console.error("[beike-houses] 执行失败:", err.message);
     throw err;
+  } finally {
+    await closeBrowserTransport(); // 关闭浏览器通道专属标签页（若启用）
   }
 }
 

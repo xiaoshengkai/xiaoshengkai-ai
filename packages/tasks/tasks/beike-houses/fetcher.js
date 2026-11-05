@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { parseListPage, parseDetailPage } from "./parser.js";
 import { config } from "./config.js";
 
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DATA_DIR = path.resolve(__dirname, "..", "..", "..", "..", "data", "beike-houses");
 const COOKIE_FILE = path.join(DATA_DIR, "cookies.json");
@@ -29,7 +30,11 @@ export class FetchError extends Error {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function politeDelay() {
-  await sleep(config.requestIntervalMs + Math.random() * config.requestJitterMs);
+  // 浏览器通道用真实浏览节奏（2-4s）；节点直连保持保守间隔
+  const ms = browserMode
+    ? 1200 + Math.random() * 1300
+    : config.requestIntervalMs + Math.random() * config.requestJitterMs;
+  await sleep(ms);
 }
 
 // ---------- Cookie 管理 ----------
@@ -79,12 +84,52 @@ function mergeSetCookies(res, jar) {
 
 let requestCount = 0;
 
-/** 单页 GET（手动跟随重定向以精确识别登录墙/CAPTCHA） */
+// 浏览器通道降级（贝壳按 IP+客户端指纹风控：node fetch 被拒时真实 Chrome 常仍通行）
+let browserMode = false;
+let cdp = null;
+
+/** 经 CDP 直连本机 Chrome 抓页面（要求 Chrome 已登录 sx.ke.com；持久连接零 spawn 开销） */
+async function httpGetViaBrowser(url) {
+  if (!cdp) cdp = new (await import("./browser-ipc.js")).BrowserIPC();
+  const info = await cdp.fetchPage(url);
+  if (info.url && info.url.includes("clogin")) {
+    throw new FetchError("浏览器通道登录态失效：请在 Chrome 登录 sx.ke.com", "LOGIN_WALL");
+  }
+  if (/<title>\s*CAPTCHA/i.test(info.html) || (info.title || "").includes("CAPTCHA")) {
+    throw new FetchError(`浏览器通道也触发 CAPTCHA: ${url}`, "CAPTCHA");
+  }
+  return info.html;
+}
+
+/** 运行结束时关闭浏览器专属标签页 */
+export async function closeBrowserTransport() {
+  if (cdp) {
+    await cdp.close().catch(() => {});
+    cdp = null;
+  }
+}
+
+/** 单页 GET：默认 node fetch；触发 CAPTCHA 后本运行整体降级浏览器通道 */
 async function httpGet(url, jar) {
   if (requestCount >= config.maxRequests) {
     throw new FetchError(`请求数超上限 ${config.maxRequests}（防反爬熔断）`, "HTTP");
   }
   requestCount++;
+  if (browserMode) return httpGetViaBrowser(url);
+  try {
+    return await httpGetViaNode(url, jar);
+  } catch (err) {
+    if (err instanceof FetchError && err.code === "CAPTCHA") {
+      console.error(`[beike-houses] 节点请求被 CAPTCHA（${url}）→ 本运行降级浏览器通道`);
+      browserMode = true;
+      return httpGetViaBrowser(url);
+    }
+    throw err;
+  }
+}
+
+/** node fetch 直连（手动跟随重定向以精确识别登录墙/CAPTCHA） */
+async function httpGetViaNode(url, jar) {
   const headers = {
     "User-Agent": UA,
     Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -167,6 +212,7 @@ export async function fetchQueryAll(query, jar, { log = () => {}, roomCodes = co
       await politeDelay();
     }
     const { total, houses } = parseListPage(html);
+    log(`[进度 ${String(requestStats().count).padStart(3)}] ${prefix} → ${houses.length} 条`);
     const items = resblockId ? houses.filter((h) => h.resblockId === resblockId) : houses;
     if (resblockId && houses.length && !items.length) {
       log(`${prefix}: 目标小区无匹配（页面 ${houses.length} 条均为附近推荐回退，已丢弃）`);

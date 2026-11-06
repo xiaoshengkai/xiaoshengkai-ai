@@ -30,7 +30,7 @@ import {
   saveRegistry,
   pruneSnapshots,
 } from "./store.js";
-import { generateDashboard, writePlaceholder } from "./generate-dashboard.js";
+import { generateDashboard } from "./generate-dashboard.js";
 
 const groupLabels = Object.fromEntries(config.groups.map((g) => [g.key, g.label]));
 const execFileAsync = promisify(execFile);

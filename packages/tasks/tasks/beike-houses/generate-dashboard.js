@@ -429,13 +429,3 @@ export function generateDashboard(args) {
   fs.writeFileSync(DASHBOARD_FILE, buildHtml(payload), "utf-8");
   return DASHBOARD_FILE;
 }
-
-/** 占位首页（首次生成前） */
-export function writePlaceholder() {
-  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>贝壳房源跟踪</title>
-<style>body{font-family:-apple-system,'PingFang SC',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#F5F5F5}
-.box{border:3px solid #000;box-shadow:8px 8px 0 #000;background:#fff;padding:40px 60px;text-align:center}
-h1{font-size:22px;margin-bottom:10px}p{color:#666;font-size:14px}</style></head>
-<body><div class="box"><h1>🏠 贝壳房源跟踪 · 绍兴越城</h1><p>尚未生成数据，首次执行任务后此处展示房源清单</p></div></body></html>`;
-  fs.writeFileSync(DASHBOARD_FILE, html, "utf-8");
-}

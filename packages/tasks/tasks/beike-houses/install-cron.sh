@@ -16,6 +16,11 @@ LOG="$ROOT/logs/tasks/beike-houses-cron.log"
 ACTION="${1:-install}"
 
 if [ "$(uname -s)" != "Darwin" ]; then echo "仅 macOS（本任务只在 Mac 侧运行）"; exit 1; fi
+# root 防呆：root 的 launchctl load 会把用户 agent 装进 system 域 → 与 gui 域双注册双跑
+if [ "$(id -u)" = "0" ]; then
+  echo "✗ 请以普通用户（zcy）运行本脚本；root 会把 LaunchAgent 装进 system 域导致双跑"
+  exit 1
+fi
 
 uninstall() {
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true

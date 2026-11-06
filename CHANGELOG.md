@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.71 (2026-11-06) — beike-houses 双跑修复：launchd 单注册 + 运行锁 + root 防呆
+
+### 变更
+- **根因**：装 LaunchAgent 时 root 身份的 legacy `launchctl load` 把 agent 装进了 **system 域**，与后来的 gui/501 注册双份 → 9:30/20:30 每个触发点**双进程并发**（抢浏览器标签页串页、竞写快照、root 实例写坏文件属主、日志逐行双写）。
+- 修复：`launchctl bootout system` 域（已执行，gui/501 单注册保留）；`install-cron.sh` root 防呆（exit 1）；**index.js 运行锁**（`.run.lock`，30 分钟内活跃锁直接退出 exit 1——防任何未来双触发/手动+定时撞车）。
+- 审计结论：今晨双跑数据侥幸干净（191 套 = 昨日 190 + 1 真实新上架，零小区-组漂移，**每日变化机制首次产出真实信号**）——不重建基线。
+
+### 验证
+- system 域移除 + gui/501 单注册（idle 待 20:30）；锁实测 exit 1 即退；root 防呆 exit 1；17 单测 + typecheck 全绿；本地/服务器/公网页面数据一致（2026-11-06 · 191 套 · 今日新增 1）。
+
 ## v0.11.70 (2026-11-05) — vibe-video：知识视频工作流重建（render(t) 架构替换卡片风 GSAP 路线）
 
 ### 变更

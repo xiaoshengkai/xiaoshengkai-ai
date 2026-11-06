@@ -5,10 +5,13 @@
  *      → 快照落盘 → registry 累计索引 → 对比昨日(下架原因核查) → 生成页面 → 推送线上
  */
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { config } from "./config.js";
 import {
+  DATA_DIR,
   loadCookieHeader,
   saveCookieJar,
   fetchQueryAll,
@@ -31,6 +34,30 @@ import { generateDashboard, writePlaceholder } from "./generate-dashboard.js";
 
 const groupLabels = Object.fromEntries(config.groups.map((g) => [g.key, g.label]));
 const execFileAsync = promisify(execFile);
+
+// ── 运行锁（防调度双触发/手动+定时撞车导致双进程抢浏览器标签页串页） ──
+const LOCK_FILE = path.join(DATA_DIR, ".run.lock");
+const LOCK_STALE_MS = 30 * 60 * 1000;
+
+function acquireRunLock() {
+  try {
+    const stat = fs.statSync(LOCK_FILE);
+    if (Date.now() - stat.mtimeMs < LOCK_STALE_MS) {
+      throw new Error(
+        `检测到活跃运行锁（${LOCK_FILE}，${Math.round((Date.now() - stat.mtimeMs) / 60000)} 分钟前），疑似并发双跑，本次退出`
+      );
+    }
+    console.log(`[beike-houses] 运行锁已过期（>30 分钟），接管并重写`);
+  } catch (e) {
+    if (e.code !== "ENOENT") throw e;
+  }
+  fs.mkdirSync(path.dirname(LOCK_FILE), { recursive: true });
+  fs.writeFileSync(LOCK_FILE, String(process.pid));
+}
+
+function releaseRunLock() {
+  try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
+}
 
 /**
  * 推送仪表盘到服务器（云服务器 IP 被贝壳 CAPTCHA 盯得紧，任务只在住宅网络的 Mac 跑，
@@ -58,6 +85,7 @@ function log(...args) {
 
 export async function run() {
   const date = todayKey();
+  acquireRunLock();
   log(`=== ${date} 贝壳房源抓取开始 ===`);
 
   // 0. Cookie
@@ -217,7 +245,8 @@ export async function run() {
     console.error("[beike-houses] 执行失败:", err.message);
     throw err;
   } finally {
-    await closeBrowserTransport(); // 关闭浏览器通道专属标签页（若启用）
+    await closeBrowserTransport(); // 关闭浏览器通道资源（若启用）
+    releaseRunLock();
   }
 }
 

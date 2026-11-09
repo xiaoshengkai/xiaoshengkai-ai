@@ -290,6 +290,12 @@ async function runOnce(date) {
 export async function run() {
   const date = todayKey();
   acquireRunLock();
+  // 当日已成功 → 跳过（快照只在成功路径落盘，存在即代表今日成功；多时段仅作失败兜底）
+  const todaySnap = loadTodaySnapshot(date);
+  if (todaySnap) {
+    log(`今日（${date}）已成功更新（在跟 ${todaySnap.houses.length} 套），本次跳过`);
+    return { ok: true, skipped: true, houses: todaySnap.houses.length };
+  }
   log(`=== ${date} 贝壳房源抓取开始 ===`);
   writeStatus({ lastRun: date, running: true, lastOk: null });
 
@@ -307,7 +313,7 @@ export async function run() {
           log(
             `第 ${attempt}/${maxAttempts} 次失败：${err.message} → ${Math.round(retryDelayMs / 60000)} 分钟后自动重试`
           );
-          writeStatus({ lastRun: date, running: true, lastOk: false, lastError: err.message });
+          writeStatus({ lastRun: date, running: false, lastOk: false, lastError: err.message });
           await new Promise((r) => setTimeout(r, retryDelayMs));
         }
       }

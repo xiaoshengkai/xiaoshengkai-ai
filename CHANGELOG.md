@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.72 (2026-11-09) — beike-houses 断档修复：通道降级 / 失败可见 / 自动重试
+
+### 变更
+- **根因（11-06~11-08 连续 5 次触发点全断档）**：贝壳对被识别的 node 客户端既可能回 CAPTCHA 页、也可能**直接重置连接**（undici 报 `fetch failed`）。原降级逻辑只认 CAPTCHA → 网络层失败直接抛 → 整轮失败 → 无快照 → 页面停在 11-06。
+- **P0 治本**：`httpGet` 对 node 通道**任何失败**（fetch failed / CAPTCHA / 5xx）一律降级浏览器通道重试并整体切通道；失败日志打 undici `err.cause` 链（code/errno/cause message），真因可追溯。
+- **P1 通道自举**：浏览器通道 socket 不存在时自动拉起 browser-harness 守护进程并等待就绪（≤30s），失败给出「Chrome 需运行 + chrome://inspect 点 Allow」指引；node 请求头拟浏览器化（sec-ch-ua / sec-fetch-* 等）降低被 WAF 重置概率。
+- **P2 可见性**：新增 `data/beike-houses/status.json`（lastRun/lastOk/lastError/dataDate/baselineDate）；**失败也生成页面**（保留上一份数据 + 红色失败横幅 + 原因）并推送线上；变化区块标注**对比基线日期**（「今日变化（对比 2026-11-06）」），缺口不再被当成当日变化。
+- **P3 自动兜底**：整轮失败后 30 分钟自动重试 1 次（BEIKE_MAX_ATTEMPTS/BEIKE_RETRY_DELAY_MS 可调）；LaunchAgent 触发时段 9:30 → 9:30/12:30/20:30。
+- **放弃专用 headless Chrome 方案**（P4）：实现中暴露无限递归 + 复杂度高不稳定，已回退为 browser-harness 守护进程 IPC 通道（已验证可靠）。
+
+### 验证
+- 真实全链路：187 套 / 108 请求 / 14 分钟，status.json 正确写入，线上页面显示「数据日期 2026-11-09 · 今日变化（对比 2026-11-06）」；期间 node 通道 2 次失败自动降级浏览器通道成功续跑。
+- 17 单测全绿；typecheck 通过。
+
 ## v0.11.71 (2026-11-06) — beike-houses 双跑修复：launchd 单注册 + 运行锁 + root 防呆
 
 ### 变更

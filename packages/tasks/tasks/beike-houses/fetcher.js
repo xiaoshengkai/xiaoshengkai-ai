@@ -86,14 +86,16 @@ let requestCount = 0;
 
 // 浏览器通道降级（贝壳按 IP+客户端指纹风控：node fetch 被拒时真实 Chrome 常仍通行）
 let browserMode = false;
-let cdp = null;
 
-/** 经 CDP 直连本机 Chrome 抓页面（要求 Chrome 已登录 sx.ke.com；持久连接零 spawn 开销） */
+/** 经浏览器通道抓页面（专用 headless Chrome → browser-harness 守护进程，自动选路） */
 async function httpGetViaBrowser(url) {
-  if (!cdp) cdp = new (await import("./browser-ipc.js")).BrowserIPC();
-  const info = await cdp.fetchPage(url);
+  const { fetchPage } = await import("./browser-ipc.js");
+  const info = await fetchPage(url);
   if (info.url && info.url.includes("clogin")) {
-    throw new FetchError("浏览器通道登录态失效：请在 Chrome 登录 sx.ke.com", "LOGIN_WALL");
+    throw new FetchError(
+      "浏览器通道登录态失效：请在 Chrome 登录 sx.ke.com（专用通道需在 data/beike-houses/chrome-profile 里扫码登录一次）",
+      "LOGIN_WALL"
+    );
   }
   if (/<title>\s*CAPTCHA/i.test(info.html) || (info.title || "").includes("CAPTCHA")) {
     throw new FetchError(`浏览器通道也触发 CAPTCHA: ${url}`, "CAPTCHA");
@@ -101,15 +103,30 @@ async function httpGetViaBrowser(url) {
   return info.html;
 }
 
-/** 运行结束时关闭浏览器专属标签页 */
+/** 运行结束时释放浏览器通道资源 */
 export async function closeBrowserTransport() {
-  if (cdp) {
-    await cdp.close().catch(() => {});
-    cdp = null;
-  }
+  const mod = await import("./browser-ipc.js");
+  await mod.closeBrowserTransport().catch(() => {});
 }
 
-/** 单页 GET：默认 node fetch；触发 CAPTCHA 后本运行整体降级浏览器通道 */
+/** 诊断网络层失败真因（undici 的 "fetch failed" 是笼统包装） */
+function describeCause(err) {
+  const parts = [];
+  let e = err;
+  for (let i = 0; e && i < 4; i++) {
+    if (e.code) parts.push(e.code);
+    if (e.errno) parts.push("errno=" + e.errno);
+    if (e.message && e.message !== "fetch failed") parts.push(e.message);
+    e = e.cause;
+  }
+  return parts.length ? parts.join(" / ") : err?.message || String(err);
+}
+
+/**
+ * 单页 GET：默认 node fetch；node 通道任何失败都降级浏览器通道重试
+ * （贝壳对被识别的 node 客户端既可能回 CAPTCHA 页，也可能直接重置连接 → fetch failed，
+ *   之前只认 CAPTCHA，导致夜间/清晨无人值守时整个任务失败、数据断档）
+ */
 async function httpGet(url, jar) {
   if (requestCount >= config.maxRequests) {
     throw new FetchError(`请求数超上限 ${config.maxRequests}（防反爬熔断）`, "HTTP");
@@ -119,21 +136,28 @@ async function httpGet(url, jar) {
   try {
     return await httpGetViaNode(url, jar);
   } catch (err) {
-    if (err instanceof FetchError && err.code === "CAPTCHA") {
-      console.error(`[beike-houses] 节点请求被 CAPTCHA（${url}）→ 本运行降级浏览器通道`);
-      browserMode = true;
-      return httpGetViaBrowser(url);
-    }
-    throw err;
+    const reason = err instanceof FetchError ? `${err.code}: ${err.message}` : describeCause(err);
+    console.error(`[beike-houses] node 通道失败（${reason}）→ 降级浏览器通道重试：${url}`);
+    browserMode = true;
+    return httpGetViaBrowser(url);
   }
 }
 
 /** node fetch 直连（手动跟随重定向以精确识别登录墙/CAPTCHA） */
 async function httpGetViaNode(url, jar) {
+  // 拟浏览器请求头（降低贝壳 WAF 识别 node 客户端 → 连接重置的概率）
   const headers = {
     "User-Agent": UA,
-    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "zh-CN,zh;q=0.9",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Sec-Ch-Ua": '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="24"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"macOS"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
     Referer: "https://sx.ke.com/ershoufang/",
     Cookie: Object.entries(jar)
       .map(([k, v]) => `${k}=${v}`)

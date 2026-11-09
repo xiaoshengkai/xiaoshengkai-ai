@@ -41,7 +41,7 @@ function fmt(n) {
   return n == null ? "—" : Number(n).toLocaleString("zh-CN");
 }
 
-function buildPayload({ date, fetchedAt, houses, changes, groupLabels }) {
+function buildPayload({ date, fetchedAt, houses, changes, groupLabels, baselineDate, status }) {
   // 街道 → 小区 二级分组（给定房源子集）
   const buildGroups = (list) => {
     const out = [];
@@ -85,6 +85,8 @@ function buildPayload({ date, fetchedAt, houses, changes, groupLabels }) {
   return {
     date,
     fetchedAt,
+    baselineDate: baselineDate || null,
+    status: status || { ok: true, at: null, error: null },
     summary: buildSummary(houses, changes),
     totals: {
       houses: houses.length,
@@ -172,6 +174,12 @@ function buildHtml(payload) {
     .map(([label, n]) => `<div class="stat">${label} <b>${n}</b> 套</div>`)
     .join("");
   const summary = `<div class="summary"><span class="s-label">每日结论</span><span class="s-text">${escapeHtmlText(payload.summary)}</span></div>`;
+  const banner = payload.status && payload.status.ok === false
+    ? `<div class="banner-fail"><b>⚠ 上次更新失败</b>（${escapeHtmlText(payload.status.at || "")}）<span>${escapeHtmlText(payload.status.error || "")}</span><span class="banner-tip">本页保留最近一次成功数据（${escapeHtmlText(payload.date)}）</span></div>`
+    : "";
+  const changesTitle = payload.baselineDate
+    ? `今日变化（对比 ${escapeHtmlText(payload.baselineDate)}）`
+    : "今日变化";
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -197,6 +205,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--ink);min-heig
 .summary .s-label{font-family:var(--font-title);font-weight:800;font-size:13px;background:var(--yellow);border:2px solid var(--yellow);padding:2px 10px;color:var(--ink);flex-shrink:0}
 .summary .s-text{font-family:var(--font-mono);font-weight:700;font-size:14px;color:#fff;line-height:1.5}
 .summary .s-text b{color:var(--yellow);font-size:16px}
+.banner-fail{max-width:1240px;margin:18px auto 0;border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);background:#FF5C8A;color:#fff;padding:12px 18px;font-family:var(--font-mono);font-size:13px;font-weight:700;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.banner-fail b{font-size:14px}
+.banner-fail .banner-tip{color:#fff;opacity:.85;font-weight:600}
 .container{max-width:1240px;margin:0 auto;padding:26px 18px 60px}
 .sect-title{font-family:var(--font-title);font-weight:800;font-size:20px;margin:26px 0 14px;display:flex;align-items:center;gap:10px}
 .sect-title::before{content:"";width:14px;height:14px;background:var(--ink)}
@@ -254,7 +265,8 @@ td .title-link:hover{text-decoration:underline}
   ${summary}
 </div></div>
 <div class="container">
-  <div class="sect-title">今日变化</div>
+  ${banner}
+  <div class="sect-title">${changesTitle}</div>
   <div class="chg-grid">${render(payload.changes)}</div>
   <div class="sect-title">在售房源（99万内 · 三室+）</div>
   <div id="groups"></div>
@@ -421,7 +433,7 @@ td .title-link:hover{text-decoration:underline}
 
 /**
  * 生成仪表盘
- * @param {object} args { date, fetchedAt, houses, changes, groupLabels }
+ * @param {object} args { date, fetchedAt, houses, changes, groupLabels, baselineDate, status }
  */
 export function generateDashboard(args) {
   const payload = buildPayload(args);

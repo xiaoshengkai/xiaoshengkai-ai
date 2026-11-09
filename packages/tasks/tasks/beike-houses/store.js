@@ -70,3 +70,22 @@ export function pruneSnapshots() {
     }
   }
 }
+
+// ---------- 运行状态（页面可见性：成功/失败/原因/数据截至日） ----------
+
+const STATUS_FILE = path.join(DATA_DIR, "status.json");
+
+export function readStatus() {
+  try {
+    return JSON.parse(fs.readFileSync(STATUS_FILE, "utf-8"));
+  } catch {
+    return { lastRun: null, lastOk: null, lastError: null, dataDate: null, baselineDate: null };
+  }
+}
+
+export function writeStatus(patch) {
+  const next = { ...readStatus(), ...patch, updatedAt: new Date().toISOString() };
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(STATUS_FILE, JSON.stringify(next, null, 2), "utf-8");
+  return next;
+}

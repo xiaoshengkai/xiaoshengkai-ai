@@ -29,6 +29,8 @@ import {
   loadRegistry,
   saveRegistry,
   pruneSnapshots,
+  readStatus,
+  writeStatus,
 } from "./store.js";
 import { generateDashboard, writePlaceholder } from "./generate-dashboard.js";
 
@@ -83,11 +85,8 @@ function log(...args) {
   console.log("[beike-houses]", ...args);
 }
 
-export async function run() {
-  const date = todayKey();
-  acquireRunLock();
-  log(`=== ${date} 贝壳房源抓取开始 ===`);
-
+/** 单次抓取（失败抛错，由 run() 决定是否重试） */
+async function runOnce(date) {
   // 0. Cookie
   const jar = loadCookieHeader();
 
@@ -223,16 +222,20 @@ export async function run() {
     }
 
     // 8. 生成页面 + 清理旧快照 + 推送线上
+    const baselineDate = prevSnapshot?.date || null;
     const dashboardFile = generateDashboard({
       date,
       fetchedAt: new Date().toISOString(),
       houses,
       changes,
       groupLabels,
+      baselineDate,
+      status: { ok: true, at: new Date().toISOString(), error: null },
     });
     pruneSnapshots();
     saveRegistry(newRegistry);
     saveCookieJar(jar);
+    writeStatus({ lastRun: date, running: false, lastOk: true, lastError: null, dataDate: date, baselineDate });
     await pushDashboardToServer(dashboardFile);
 
     log(`=== 完成：${houses.length} 套在跟 · 请求 ${requestStats().count} 次 · 页面已更新 ===`);
@@ -243,9 +246,72 @@ export async function run() {
       saveCookieJar(jar);
     }
     console.error("[beike-houses] 执行失败:", err.message);
+    // 失败也要让页面可见：保留上一份数据 + 顶部红色失败横幅（用户不必翻日志）
+    try {
+      const prev = loadPreviousSnapshot(date);
+      if (prev) {
+        const file = generateDashboard({
+          date: prev.date,
+          fetchedAt: prev.fetchedAt,
+          houses: prev.houses,
+          changes: null,
+          groupLabels,
+          baselineDate: null,
+          status: { ok: false, at: new Date().toISOString(), error: err.message },
+        });
+        writeStatus({
+          lastRun: date,
+          running: false,
+          lastOk: false,
+          lastError: err.message,
+          dataDate: prev.date,
+          baselineDate: null,
+        });
+        await pushDashboardToServer(file);
+        log("已生成失败提示页（保留上一份数据）并推送线上");
+      } else {
+        writeStatus({ lastRun: date, running: false, lastOk: false, lastError: err.message, dataDate: null });
+      }
+    } catch (e2) {
+      console.error("[beike-houses] 失败提示页生成也失败:", e2.message);
+    }
     throw err;
   } finally {
-    await closeBrowserTransport(); // 关闭浏览器通道资源（若启用）
+    await closeBrowserTransport(); // 释放浏览器通道资源（若启用）
+  }
+}
+
+/**
+ * 任务入口：失败自动重试（默认 30 分钟后重试 1 次）
+ * 断档防护：风控/网络抖动的失败不留在页面上（页面显示失败横幅），并自动补跑
+ */
+export async function run() {
+  const date = todayKey();
+  acquireRunLock();
+  log(`=== ${date} 贝壳房源抓取开始 ===`);
+  writeStatus({ lastRun: date, running: true, lastOk: null });
+
+  const maxAttempts = Number(process.env.BEIKE_MAX_ATTEMPTS || 2);
+  const retryDelayMs = Number(process.env.BEIKE_RETRY_DELAY_MS || 30 * 60 * 1000);
+  let lastErr = null;
+
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await runOnce(date);
+      } catch (err) {
+        lastErr = err;
+        if (attempt < maxAttempts) {
+          log(
+            `第 ${attempt}/${maxAttempts} 次失败：${err.message} → ${Math.round(retryDelayMs / 60000)} 分钟后自动重试`
+          );
+          writeStatus({ lastRun: date, running: true, lastOk: false, lastError: err.message });
+          await new Promise((r) => setTimeout(r, retryDelayMs));
+        }
+      }
+    }
+    throw lastErr;
+  } finally {
     releaseRunLock();
   }
 }

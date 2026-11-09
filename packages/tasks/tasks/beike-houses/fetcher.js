@@ -132,6 +132,14 @@ async function httpGet(url, jar) {
     throw new FetchError(`请求数超上限 ${config.maxRequests}（防反爬熔断）`, "HTTP");
   }
   requestCount++;
+  // 演练开关：强制走浏览器通道（验证「node 全挂 → 浏览器接管」兜底链路）
+  if (process.env.BEIKE_FORCE_BROWSER === "1") {
+    if (!browserMode) {
+      browserMode = true;
+      console.error("[beike-houses] 强制浏览器通道（BEIKE_FORCE_BROWSER=1 演练模式）");
+    }
+    return httpGetViaBrowser(url);
+  }
   if (browserMode) return httpGetViaBrowser(url);
   try {
     return await httpGetViaNode(url, jar);

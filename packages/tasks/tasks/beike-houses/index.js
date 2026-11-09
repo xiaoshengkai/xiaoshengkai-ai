@@ -25,6 +25,7 @@ import { diffSnapshots, updateRegistry } from "./diff.js";
 import {
   todayKey,
   saveSnapshot,
+  loadTodaySnapshot,
   loadPreviousSnapshot,
   loadRegistry,
   saveRegistry,
@@ -248,7 +249,8 @@ async function runOnce(date) {
     console.error("[beike-houses] 执行失败:", err.message);
     // 失败也要让页面可见：保留上一份数据 + 顶部红色失败横幅（用户不必翻日志）
     try {
-      const prev = loadPreviousSnapshot(date);
+      // 失败页展示「最新成功快照」：今天早先跑成功过就用今天的，否则用上一天的
+      const prev = loadTodaySnapshot(date) || loadPreviousSnapshot(date);
       if (prev) {
         const file = generateDashboard({
           date: prev.date,

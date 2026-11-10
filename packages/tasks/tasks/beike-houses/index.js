@@ -30,7 +30,6 @@ import {
   loadRegistry,
   saveRegistry,
   pruneSnapshots,
-  readStatus,
   writeStatus,
 } from "./store.js";
 import { generateDashboard, writePlaceholder } from "./generate-dashboard.js";
@@ -50,7 +49,10 @@ function acquireRunLock() {
         `检测到活跃运行锁（${LOCK_FILE}，${Math.round((Date.now() - stat.mtimeMs) / 60000)} 分钟前），疑似并发双跑，本次退出`
       );
     }
+    // 过期锁：删除后重建（unlink 权限在目录上 → 属主是 root 的旧锁也能删掉；
+    // 直接覆盖写会 EACCES 卡死任务）
     console.log(`[beike-houses] 运行锁已过期（>30 分钟），接管并重写`);
+    fs.rmSync(LOCK_FILE, { force: true });
   } catch (e) {
     if (e.code !== "ENOENT") throw e;
   }

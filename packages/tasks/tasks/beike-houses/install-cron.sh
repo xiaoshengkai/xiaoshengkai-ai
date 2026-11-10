@@ -44,7 +44,7 @@ install_agent() {
   </array>
   <key>StartCalendarInterval</key>
   <array>
-    <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>30</integer></dict>
     <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>30</integer></dict>
     <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>30</integer></dict>
   </array>
@@ -55,7 +55,7 @@ install_agent() {
 EOF
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
   launchctl bootstrap "gui/$(id -u)" "$PLIST"
-  echo "✅ ${LABEL} 已装载（每日 9:30 + 12:30 + 20:30，日志 ${LOG}）"
+  echo "✅ ${LABEL} 已装载（每日 7:30 + 12:30 + 20:30，日志 ${LOG}）"
   echo "   手动触发验证：launchctl kickstart gui/$(id -u)/$LABEL"
 }
 

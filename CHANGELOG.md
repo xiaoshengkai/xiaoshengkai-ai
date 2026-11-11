@@ -7,7 +7,7 @@
 - **公开媒体路由** `GET /m/<token>`：token 查表 → Range 流式（206/416/Accept-Ranges），`Cache-Control: public, max-age=31536000, immutable`；`proxy.ts` 豁免 `/m/*`，`proxy.cjs` 转发 `/m/`。
 - **工具菜单**（薄框架）：侧边栏「工具」→ `/tools` 列表页（扫 `packages/tools/*/tool.json` 自发现）+ 各工具独立 page/api 路由。
 - **视频转二维码工具**（`packages/tools/video-qr`）：上传（≤200M，mp4/mov/webm/avi/mkv）→ ffmpeg 转 H.264（`libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -movflags +faststart`）→ 入库 → 前端 `window.location.origin` 生成二维码；列表/复制/下载二维码/删除（删除即 404）。
-- **服务器依赖**：OpenCloudOS 9 仓库无 libx264，已装静态 ffmpeg（含 libx264）到 `/usr/local/bin/ffmpeg`（需 vulkan-loader 已装）。
+- **服务器 ffmpeg**：复用 prod.sh 自动维护的 `data/bin/ffmpeg`（7.0.2-static，含 libx264，PATH 前置），转码直接可用，无需新增系统依赖。
 
 ### 验证
 - 新增 `packages/shared/test/media.test.js` 6 测（token 唯一/非法 token 拒绝/增删查/持久化/标题截断）；132 shared + 36 mm + typecheck + build 全绿。

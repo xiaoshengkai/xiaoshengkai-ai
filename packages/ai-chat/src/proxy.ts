@@ -24,7 +24,8 @@ export function proxy(request: NextRequest) {
     pathname === "/login" ||
     pathname.startsWith("/api/auth/") ||
     pathname === FONT_PATH ||
-    pathname.startsWith("/tasks/")
+    pathname.startsWith("/tasks/") ||
+    pathname.startsWith("/m/")
   ) {
     return NextResponse.next();
   }

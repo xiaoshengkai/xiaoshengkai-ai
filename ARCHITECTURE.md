@@ -55,10 +55,11 @@ ai-engineer-journey/
     │   ├── image-preview.js    # 图片预览压缩：sharp 长边1600+JPEG q85、伴生 .preview.jpg 缓存（预览用，导出用原图）
     │   ├── auth.js             # 登录鉴权：密码校验（data/auth.json 优先，.env 兜底）/ HMAC token 签发校验（含密码指纹）/ 防爆破计数
     │   ├── egress.js           # 内网出口层：白名单域名走反向隧道（SOCKS），其余直连；installEgress 补丁 globalThis.fetch
+    │   ├── media.js            # 媒体库：data/media/<token> + index.json（原子写）；128-bit 随机 token（base64url），addMedia/getMedia/listMedia/deleteMedia
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir / withTimeout（网络调用硬超时兜底）
-    │   ├── test/               # 共享测试（auth / capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store / image-preview）
+    │   ├── test/               # 共享测试（auth / capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store / image-preview / media）
     │   └── llm/                # LLM 共享封装
     │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
     │       ├── config.js       # providers.json / selection.json fresh-read（真源，env 兜底）
@@ -82,16 +83,20 @@ ai-engineer-journey/
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）/ logs（日志页）
     │   │       ├── login/       # 登录页（(main) 组外，Neo-Brutalism 居中卡片）
-    │   │       ├── api/         # chat / memory / settings / services / conversations / logs / note / exports / auth(login·logout·change-password) ... + workflows、tasks 仅 catch-all 挂载点
+    │   │       ├── api/         # chat / memory / settings / services / conversations / logs / note / exports / auth(login·logout·change-password) / tools(video-qr) ... + workflows、tasks 仅 catch-all 挂载点
     │   │       ├── note/[taskId]/page.tsx
     │   │       ├── logs/page.tsx        # 日志页：分组（app/tasks/services/workflows/backup）+ 文件选择 + tail 自动刷新 + 下载
     │   │       ├── preview/[taskId]/route.ts
+    │   │       ├── m/[token]/route.ts   # 公开媒体服务（token 查表 → Range 流式；proxy.ts 豁免 /m/*）
+    │   │       ├── tools/               # 工具菜单：page.tsx（列表，扫 packages/tools/*/tool.json）+ video-qr/page.tsx
     │   │       ├── settings/page.tsx
     │   │       └── layout.tsx / globals.css
     │   ├── scripts/             # generate-embeddings / verify-migration
     │   └── package.json
     ├── mcp/                     # MCP 工具服务（36 tools，详见「MCP 系统」）
     ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
+    ├── tools/                   # 工具菜单（薄框架：每工具自包含 tool.json 元数据 + ai-chat 里独立 page/api 路由）
+    │   └── video-qr/            # 视频转二维码：上传 → ffmpeg 转 H.264 → 媒体库 → 二维码（tool.json + ai-chat 内 page/route）
     ├── services/                # 独立常驻服务（非 npm workspace 内聚目录）
     │   ├── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
     │   └── corp-egress/         # 内网出口隧道（Mac 侧常驻：本机 SOCKS5 + ssh -R 反投给服务器，见「内网出口」）
@@ -200,6 +205,21 @@ MCP    = 执行（How）    ← 工具函数，执行具体操作
 ```
 
 目录：`packages/skills/` 下 image-styles（73 种图片风格）/ blog / github-gem-seeker / xiaohongshu-note / task，每个含 `SKILL.md`。
+
+## 工具系统与媒体库
+
+```
+工具菜单（薄框架）                    媒体库（公开分享资产）
+packages/tools/<id>/tool.json        data/media/<token> + index.json（原子写）
+  → /tools 列表页扫 tool.json         token = 128-bit 随机 → base64url（约 22 字符）
+  → /tools/<id> 各工具独立 page        URL 无目录/扩展名/原名，mime 服务端查表
+  → /api/tools/<id> 各工具独立 route   GET /m/<token> 公开服务（Range 流式）
+```
+
+- **媒体库** `@app/shared/media.js`：`generateToken`（`crypto.randomBytes(16).toString("base64url")`，不可猜测）/ `addMedia`（copyFile + 写索引，token 撞车重生成）/ `getMedia`（isValidToken `^[A-Za-z0-9_-]{16,64}$` 拒绝穿越/注入）/ `listMedia` / `deleteMedia`（硬删文件+索引条目，链接即刻 404）。`MEDIA_DIR` env 可覆盖存储根（测试用）。定位同 capability：webpack cwd=packages/ai-chat（上两级=仓库根）。
+- **公开路由** `GET /m/<token>`（`app/m/[token]/route.ts`）：token 查表 → Range 流式（`206`/`416`/`Accept-Ranges`），`Cache-Control: public, max-age=31536000, immutable`。`proxy.ts` 豁免 `pathname.startsWith("/m/")`（公开，同 `/tasks/*`）；`proxy.cjs` 转发 `req.url.startsWith('/m/')`（否则落到 site/ 静态 404）。
+- **工具边界**：工具是「确定性单步操作」（上传→转码→二维码），无 AI、无状态机，区别于工作流（AI 驱动多步骤有执行状态）。工具菜单是薄框架——列表页扫 `packages/tools/*/tool.json` 自发现，但每个工具的 page/api 是 ai-chat 里独立静态路由（不做运行时动态 import，保持类型安全）。加工具 = 丢一个 tool.json + 一个 page + 一个 api route。
+- **video-qr 工具**：`/api/tools/video-qr`（POST multipart：≤200M + 格式白名单 mp4/mov/webm/avi/mkv → `execFile` ffmpeg `libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -movflags +faststart` → addMedia → 返 `{token,url}`；GET 列表；DELETE 删）。前端 `/tools/video-qr` 用 `window.location.origin` 拼 `/m/<token>` 并用 `qrcode` 生成二维码（不落盘，确定性可重生成）。临时文件转码后即删。**服务器 ffmpeg**：OpenCloudOS 9 仓库无 libx264，装静态 ffmpeg（含 libx264）到 `/usr/local/bin/ffmpeg`。
 
 ## 工作流系统
 
@@ -460,7 +480,7 @@ corp-egress 服务                             @app/shared/egress.js
 
 - **模型**：单人应用，无用户名；生效密码 = `data/auth.json` 的 passwordHash（settings 页改密写入，gitignored）优先，根 `.env` `AUTH_PASSWORD` 兜底。
 - **token**：`过期时间.密码指纹8位.HMAC-SHA256(AUTH_SECRET)`，Cookie `ai_session`（httpOnly / SameSite=Lax / prod Secure / 30 天）。指纹掺入 → 改密后所有旧会话立即失效。
-- **卡口规则**（proxy.ts）：放行 `/login`、`/api/auth/*`（自带密码验证）、`/tasks/*`（任务仪表盘公开页——非敏感数据，分享用）、字体豁免路径（MCP document 工具经 Chrome 取 `/api/uploads/NotoSansCJKsc-Regular.otf`，字体加载带不了 Cookie，开源字体无泄漏风险）、`_next/*` 静态资源；未登录页面 307→login、API 401。
+- **卡口规则**（proxy.ts）：放行 `/login`、`/api/auth/*`（自带密码验证）、`/tasks/*`（任务仪表盘公开页——非敏感数据，分享用）、`/m/*`（公开媒体服务——token 不可猜测的分享资产）、字体豁免路径（MCP document 工具经 Chrome 取 `/api/uploads/NotoSansCJKsc-Regular.otf`，字体加载带不了 Cookie，开源字体无泄漏风险）、`_next/*` 静态资源；未登录页面 307→login、API 401。
 - **fail-closed**：`AUTH_PASSWORD` 未配置时生产全拒（login 接口报 `auth_not_configured`）、dev 放行。
 - **防爆破**：login 与 change-password 共用内存计数，同 IP 连错 `AUTH_MAX_FAILS`(5) 次锁 `AUTH_LOCK_SECS`(600) 秒；重启进程清零。
 - **matcher 坑**：basePath 根路径 `/ai`（裸路径，无尾斜杠）只有 isRoot matcher `'/'` 能覆盖，普通 `'/((?!_next...).*)'` 前缀化后要求子路径，`/ai` 会被静态缓存直出绕过鉴权（Next 16 实测）。故 matcher = `['/', '/((?!_next/static|_next/image|favicon.ico).*)']`。

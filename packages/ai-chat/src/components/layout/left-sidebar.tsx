@@ -20,6 +20,7 @@ import {
   Pin,
   Trash2,
   Pencil,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +42,7 @@ const menuItems: { href: string; label: string; icon: LucideIcon; disabled?: boo
   { href: "/memory", label: "记忆库", icon: Database },
   { href: "/workflow", label: "工作流", icon: GitBranch },
   { href: "/schedule", label: "定时任务", icon: Clock },
+  { href: "/tools", label: "工具", icon: Wrench },
   { href: "#", label: "博客", icon: FileText, blog: true },
   { href: "/settings", label: "设置", icon: Settings },
   { href: "/logs", label: "日志", icon: ScrollText },

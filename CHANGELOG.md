@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.11.79 (2026-11-11) — server-status 布局重构 + 新增指标
+
+### 变更
+- **bento 分层布局**：3 张 hero 大卡（CPU/内存/磁盘，`text-4xl` 数字 + 厚进度条 + 每核竖条）+ 5 张次卡（网络/负载/运行时长/Swap/Node 内存）+ 整行系统信息；桌面端铺满、移动端滚动。
+- **新增指标**：每核 CPU 占用（`os.cpus()` 每核差值）、Swap 使用（`/proc/meminfo`，非 Linux 隐藏）、Node 进程 RSS。
+
+### 验证
+- typecheck + build 全绿。
+
 ## v0.11.78 (2026-11-11) — 工具：服务器状态监控
 
 ### 变更

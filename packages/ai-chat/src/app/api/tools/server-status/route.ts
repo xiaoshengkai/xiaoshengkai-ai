@@ -1,9 +1,9 @@
 /**
  * 服务器状态工具 API
  * ============================================================================
- * GET → 采集 CPU / 内存 / 磁盘 / 负载 / 网络 / 系统信息。
- * 纯 Node 实现（os + fs.statfs + /proc/net/dev），零外部命令、零依赖。
- * 网络吞吐仅在 Linux 可用（/proc/net/dev），非 Linux 返回 null（前端自动隐藏）。
+ * GET → 采集 CPU(总+每核) / 内存 / 磁盘(含 inode) / Swap / 负载 / 网络吞吐 / Node 进程内存 / 系统信息。
+ * 纯 Node 实现（os + fs.statfs + /proc/*），零外部命令、零依赖。
+ * 网络吞吐 / Swap 仅在 Linux 可用，非 Linux 返回 null（前端自动隐藏）。
  */
 import { NextResponse } from "next/server";
 import os from "node:os";
@@ -12,14 +12,10 @@ import fs from "node:fs";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function sampleCpu() {
-  let idle = 0;
-  let total = 0;
-  for (const c of os.cpus()) {
+  return os.cpus().map((c) => {
     const t = c.times;
-    idle += t.idle;
-    total += t.user + t.nice + t.sys + t.idle + t.irq;
-  }
-  return { idle, total };
+    return { idle: t.idle, total: t.user + t.nice + t.sys + t.idle + t.irq };
+  });
 }
 
 function sampleNet() {
@@ -64,6 +60,30 @@ function diskInfo() {
   }
 }
 
+function swapInfo() {
+  try {
+    const data = fs.readFileSync("/proc/meminfo", "utf-8");
+    let total = 0;
+    let free = 0;
+    for (const line of data.split("\n")) {
+      const m = line.match(/^(SwapTotal|SwapFree):\s+(\d+)\s*kB/);
+      if (!m) continue;
+      if (m[1] === "SwapTotal") total = Number(m[2]) * 1024;
+      else if (m[1] === "SwapFree") free = Number(m[2]) * 1024;
+    }
+    if (total <= 0) return null;
+    const used = total - free;
+    return {
+      total,
+      free,
+      used,
+      usage: Number(((used / total) * 100).toFixed(1)),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   const cpuA = sampleCpu();
   const netA = sampleNet();
@@ -71,10 +91,18 @@ export async function GET() {
   const cpuB = sampleCpu();
   const netB = sampleNet();
 
-  const cpuIdleDelta = cpuB.idle - cpuA.idle;
-  const cpuTotalDelta = cpuB.total - cpuA.total;
-  const cpuUsage = cpuTotalDelta > 0
-    ? Math.max(0, Math.min(100, ((cpuTotalDelta - cpuIdleDelta) / cpuTotalDelta) * 100))
+  const perCorePct = cpuA.map((a, i) => {
+    const b = cpuB[i];
+    if (!b) return 0;
+    const idleDelta = b.idle - a.idle;
+    const totalDelta = b.total - a.total;
+    return totalDelta > 0 ? Number(Math.max(0, Math.min(100, ((totalDelta - idleDelta) / totalDelta) * 100)).toFixed(1)) : 0;
+  });
+
+  const totalA = cpuA.reduce((s, c) => ({ idle: s.idle + c.idle, total: s.total + c.total }), { idle: 0, total: 0 });
+  const totalB = cpuB.reduce((s, c) => ({ idle: s.idle + c.idle, total: s.total + c.total }), { idle: 0, total: 0 });
+  const cpuUsage = totalB.total - totalA.total > 0
+    ? Number(Math.max(0, Math.min(100, (((totalB.total - totalA.total) - (totalB.idle - totalA.idle)) / (totalB.total - totalA.total)) * 100)).toFixed(1))
     : 0;
 
   let net = null;
@@ -100,7 +128,8 @@ export async function GET() {
     cpu: {
       model: os.cpus()[0]?.model || "",
       cores: os.cpus().length,
-      usage: Number(cpuUsage.toFixed(1)),
+      usage: cpuUsage,
+      perCore: perCorePct,
     },
     memory: {
       total: totalMem,
@@ -109,6 +138,8 @@ export async function GET() {
       usage: Number(((usedMem / totalMem) * 100).toFixed(1)),
     },
     disk: diskInfo(),
+    swap: swapInfo(),
+    nodeRss: process.memoryUsage().rss,
     net,
   });
 }

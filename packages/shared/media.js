@@ -97,6 +97,28 @@ export function addMedia({ filePath, mime, title = "", kind = "file" }) {
   return token;
 }
 
+/**
+ * 加入一条「链接」条目（无文件）：QR 直接编码 targetUrl，不经过 /m/。
+ * token 仍作为记录 id 用于管理（列表/删除）。
+ */
+export function addLink({ targetUrl, title = "" }) {
+  const dir = mediaRoot();
+  fs.mkdirSync(dir, { recursive: true });
+  const idx = readIndex();
+  let token;
+  do {
+    token = generateToken();
+  } while (idx[token]);
+  idx[token] = {
+    kind: "url",
+    targetUrl: String(targetUrl || ""),
+    title: String(title || "").slice(0, 100),
+    createdAt: Date.now(),
+  };
+  writeIndex(idx);
+  return token;
+}
+
 /** 按 token 取媒体：{ meta, filePath } 或 null */
 export function getMedia(token) {
   if (!isValidToken(token)) return null;

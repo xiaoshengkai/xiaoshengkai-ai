@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.11.76 (2026-11-11) — 工具升级：文件转二维码（通用文件 + URL）+ 列表/弹窗两层重构
+
+### 变更
+- **video-qr → file-qr 通用化**：工具从「视频转二维码」升级为「文件转二维码」，`kind` 分四类——`video`（转码 H.264）/ `image`（直存）/ `pdf`（直存）/ `url`（只存 targetUrl，QR 直接编码目标链接，不经 /m/）。
+- **media.js 增加 `addLink`**：链接条目只写索引不落文件（token 仅作记录 id），`deleteMedia` 已兼容（unlink 有 try/catch）。
+- **格式白名单**：图片 png/jpg/jpeg/gif/webp（≤20M，不含 SVG——防内嵌脚本 XSS）· 视频 mp4/mov/webm/avi/mkv（≤200M，转码）· PDF（≤50M）；MIME 由扩展名查表，不信任客户端 content-type。
+- **后端 `/api/tools/file-qr`**：POST 按 content-type 分流（multipart 文件 / json 链接，`new URL` 校验 http/https）。
+- **前端两层重构**：列表为入口（类型徽章 + 标题 + 大小 + 时间 + 操作），右上角「新建二维码」按钮 → 弹窗（tab 上传文件/粘贴链接），层次分明；UI 对齐 Neo-Brutalism 主题。
+
+### 验证
+- `media.test.js` 增 `addLink` 用例（7 测）；133 shared + 36 mm + typecheck + build 全绿。
+
 ## v0.11.75 (2026-11-11) — 工具菜单 + 媒体库 + 视频转二维码
 
 ### 变更

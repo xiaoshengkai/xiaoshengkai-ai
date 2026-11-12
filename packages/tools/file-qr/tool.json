@@ -1,0 +1,7 @@
+{
+  "id": "file-qr",
+  "name": "文件转二维码",
+  "description": "上传视频/图片/PDF 或粘贴链接，生成可分享的公开二维码，可管理（列表/删除）。",
+  "icon": "qr-code",
+  "accent": "blue"
+}

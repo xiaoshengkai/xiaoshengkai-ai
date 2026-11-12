@@ -12,6 +12,7 @@ const {
   generateToken,
   isValidToken,
   addMedia,
+  addLink,
   getMedia,
   listMedia,
   deleteMedia,
@@ -83,6 +84,21 @@ test("title is truncated to 100 chars", () => {
   const token = addMedia({ filePath: src, mime: "video/mp4", title: "长".repeat(200) });
   assert.equal(getMedia(token).meta.title.length, 100);
   deleteMedia(token);
+});
+
+test("addLink stores url entry with no file, deletable", () => {
+  const token = addLink({ targetUrl: "https://example.com/x", title: "外链" });
+  const list = listMedia().find((m) => m.token === token);
+  assert.ok(list);
+  assert.equal(list.kind, "url");
+  assert.equal(list.targetUrl, "https://example.com/x");
+  assert.equal(list.title, "外链");
+
+  // 无文件：getMedia 返回 null（/m/ 不该服务 url 类）
+  assert.equal(getMedia(token), null);
+
+  assert.equal(deleteMedia(token), true);
+  assert.equal(deleteMedia(token), false);
 });
 
 test.after(() => {

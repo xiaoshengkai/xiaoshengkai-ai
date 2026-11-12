@@ -55,7 +55,7 @@ ai-engineer-journey/
     │   ├── image-preview.js    # 图片预览压缩：sharp 长边1600+JPEG q85、伴生 .preview.jpg 缓存（预览用，导出用原图）
     │   ├── auth.js             # 登录鉴权：密码校验（data/auth.json 优先，.env 兜底）/ HMAC token 签发校验（含密码指纹）/ 防爆破计数
     │   ├── egress.js           # 内网出口层：白名单域名走反向隧道（SOCKS），其余直连；installEgress 补丁 globalThis.fetch
-    │   ├── media.js            # 媒体库：data/media/<token> + index.json（原子写）；128-bit 随机 token（base64url），addMedia/getMedia/listMedia/deleteMedia
+    │   ├── media.js            # 媒体库：data/media/<token> + index.json（原子写）；128-bit 随机 token（base64url），addMedia/addLink/getMedia/listMedia/deleteMedia
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir / withTimeout（网络调用硬超时兜底）
@@ -83,12 +83,12 @@ ai-engineer-journey/
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）/ logs（日志页）
     │   │       ├── login/       # 登录页（(main) 组外，Neo-Brutalism 居中卡片）
-    │   │       ├── api/         # chat / memory / settings / services / conversations / logs / note / exports / auth(login·logout·change-password) / tools(video-qr) ... + workflows、tasks 仅 catch-all 挂载点
+    │   │       ├── api/         # chat / memory / settings / services / conversations / logs / note / exports / auth(login·logout·change-password) / tools(file-qr) ... + workflows、tasks 仅 catch-all 挂载点
     │   │       ├── note/[taskId]/page.tsx
     │   │       ├── logs/page.tsx        # 日志页：分组（app/tasks/services/workflows/backup）+ 文件选择 + tail 自动刷新 + 下载
     │   │       ├── preview/[taskId]/route.ts
     │   │       ├── m/[token]/route.ts   # 公开媒体服务（token 查表 → Range 流式；proxy.ts 豁免 /m/*）
-    │   │       ├── tools/               # 工具菜单：page.tsx（列表，扫 packages/tools/*/tool.json）+ video-qr/page.tsx
+    │   │       ├── tools/               # 工具菜单：page.tsx（列表，扫 packages/tools/*/tool.json）+ file-qr/page.tsx
     │   │       ├── settings/page.tsx
     │   │       └── layout.tsx / globals.css
     │   ├── scripts/             # generate-embeddings / verify-migration
@@ -96,7 +96,7 @@ ai-engineer-journey/
     ├── mcp/                     # MCP 工具服务（36 tools，详见「MCP 系统」）
     ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
     ├── tools/                   # 工具菜单（薄框架：每工具自包含 tool.json 元数据 + ai-chat 里独立 page/api 路由）
-    │   └── video-qr/            # 视频转二维码：上传 → ffmpeg 转 H.264 → 媒体库 → 二维码（tool.json + ai-chat 内 page/route）
+    │       └── file-qr/               # 文件转二维码：上传(视频转码/图片·PDF 直存)或粘贴链接 → 媒体库 → 二维码（tool.json + ai-chat 内 page/route）
     ├── services/                # 独立常驻服务（非 npm workspace 内聚目录）
     │   ├── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
     │   └── corp-egress/         # 内网出口隧道（Mac 侧常驻：本机 SOCKS5 + ssh -R 反投给服务器，见「内网出口」）
@@ -216,10 +216,10 @@ packages/tools/<id>/tool.json        data/media/<token> + index.json（原子写
   → /api/tools/<id> 各工具独立 route   GET /m/<token> 公开服务（Range 流式）
 ```
 
-- **媒体库** `@app/shared/media.js`：`generateToken`（`crypto.randomBytes(16).toString("base64url")`，不可猜测）/ `addMedia`（copyFile + 写索引，token 撞车重生成）/ `getMedia`（isValidToken `^[A-Za-z0-9_-]{16,64}$` 拒绝穿越/注入）/ `listMedia` / `deleteMedia`（硬删文件+索引条目，链接即刻 404）。`MEDIA_DIR` env 可覆盖存储根（测试用）。定位同 capability：webpack cwd=packages/ai-chat（上两级=仓库根）。
+- **媒体库** `@app/shared/media.js`：`generateToken`（`crypto.randomBytes(16).toString("base64url")`，不可猜测）/ `addMedia`（copyFile + 写索引，token 撞车重生成）/ `addLink`（链接条目：只写索引不落文件，`kind:"url"`+`targetUrl`）/ `getMedia`（isValidToken `^[A-Za-z0-9_-]{16,64}$` 拒绝穿越/注入）/ `listMedia` / `deleteMedia`（硬删文件+索引条目，链接即刻 404；url 类无文件仅删记录）。`MEDIA_DIR` env 可覆盖存储根（测试用）。定位同 capability：webpack cwd=packages/ai-chat（上两级=仓库根）。
 - **公开路由** `GET /m/<token>`（`app/m/[token]/route.ts`）：token 查表 → Range 流式（`206`/`416`/`Accept-Ranges`），`Cache-Control: public, max-age=31536000, immutable`。`proxy.ts` 豁免 `pathname.startsWith("/m/")`（公开，同 `/tasks/*`）；`proxy.cjs` 转发 `req.url.startsWith('/m/')`（否则落到 site/ 静态 404）。
 - **工具边界**：工具是「确定性单步操作」（上传→转码→二维码），无 AI、无状态机，区别于工作流（AI 驱动多步骤有执行状态）。工具菜单是薄框架——列表页扫 `packages/tools/*/tool.json` 自发现，但每个工具的 page/api 是 ai-chat 里独立静态路由（不做运行时动态 import，保持类型安全）。加工具 = 丢一个 tool.json + 一个 page + 一个 api route。
-- **video-qr 工具**：`/api/tools/video-qr`（POST multipart：≤200M + 格式白名单 mp4/mov/webm/avi/mkv → `execFile` ffmpeg `libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -movflags +faststart` → addMedia → 返 `{token,url}`；GET 列表；DELETE 删）。前端 `/tools/video-qr` 用 `window.location.origin` 拼 `/m/<token>` 并用 `qrcode` 生成二维码（不落盘，确定性可重生成）。临时文件转码后即删。**服务器 ffmpeg**：复用 prod.sh 自动维护的 `data/bin/ffmpeg`（7.0.2-static，含 libx264，PATH 前置），转码直接可用。
+- **file-qr 工具**：`/api/tools/file-qr`（POST 按 content-type 分流：multipart → 按扩展名分流 `视频(mp4/mov/webm/avi/mkv)→ffmpeg 转 H.264 libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -movflags +faststart`、`图片(png/jpg/jpeg/gif/webp)≤20M`、`PDF≤50M` 直存，MIME 由扩展名查表不信任客户端 content-type；json `{url,title}` → `new URL` 校验 http/https → addLink。返回 `{token,url,title,kind}`，文件类 `url=/m/<token>`、链接类 `url=targetUrl`；GET 列表；DELETE 删）。前端 `/tools/file-qr` 列表入口 + 「新建二维码」弹窗（tab 上传文件/粘贴链接），`window.location.origin` 拼 `/m/<token>`（链接类直接用 targetUrl）并用 `qrcode` 生成二维码（不落盘，确定性可重生成）。临时文件转码后即删。**服务器 ffmpeg**：复用 prod.sh 自动维护的 `data/bin/ffmpeg`（7.0.2-static，含 libx264，PATH 前置），转码直接可用。
 
 ## 工作流系统
 

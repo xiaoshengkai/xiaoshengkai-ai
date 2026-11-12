@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.11.78 (2026-11-11) — 工具：服务器状态监控
+
+### 变更
+- **server-status 工具**（工具菜单第二个工具）：监控服务器 CPU / 内存 / 磁盘（含 inode）/ 负载 / 网络吞吐（实时上下行）/ 系统信息。后端 `/api/tools/server-status` 纯 Node 实现（`os` + `fs.statfs` + Linux `/proc/net/dev`，零外部命令零依赖；网络非 Linux 返回 null）。前端 `/tools/server-status` 轮询 5s + 手动刷新，Neo-Brutalist 卡片 + 进度条（<60% 绿 / 60-85% 黄 / ≥85% 红）。
+
+### 验证
+- typecheck + 133 shared + 36 mm + build 全绿。
+
 ## v0.11.77 (2026-11-11) — 访问控制配置化 + 返回按钮统一 + PDF 后缀 Range
 
 ### 变更

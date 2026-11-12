@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Link from "next/link";
-import { ArrowRight, QrCode, Sparkles, type LucideIcon } from "lucide-react";
+import { ArrowRight, QrCode, Activity, Sparkles, type LucideIcon } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,7 @@ interface ToolMeta {
 
 const ICONS: Record<string, LucideIcon> = {
   "qr-code": QrCode,
+  activity: Activity,
 };
 
 const ACCENTS: Record<string, string> = {

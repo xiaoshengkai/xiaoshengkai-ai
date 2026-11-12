@@ -1,0 +1,7 @@
+{
+  "id": "server-status",
+  "name": "服务器状态",
+  "description": "监控服务器 CPU / 内存 / 磁盘 / 负载 / 网络等实时状态。",
+  "icon": "activity",
+  "accent": "lime"
+}

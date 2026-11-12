@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BASE } from "@/lib/utils/utils";
 import { toast } from "sonner";
 import QRCode from "qrcode";
-import { Upload, Copy, Trash2, ExternalLink, Loader2, QrCode } from "lucide-react";
+import { ArrowLeft, Upload, Copy, Trash2, ExternalLink, Loader2, QrCode } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface MediaItem {
   token: string;
@@ -26,6 +28,7 @@ const fmtSize = (n: number) => `${(n / 1024 / 1024).toFixed(1)}MB`;
 const fmtTime = (t: number) => new Date(t).toLocaleString("zh-CN", { hour12: false });
 
 export default function VideoQrTool() {
+  const router = useRouter();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -33,6 +36,7 @@ export default function VideoQrTool() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [qrMap, setQrMap] = useState<Record<string, string>>({});
   const [qrLoading, setQrLoading] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchItems = useCallback(async () => {
@@ -80,8 +84,10 @@ export default function VideoQrTool() {
     }
   };
 
-  const handleDelete = async (token: string) => {
-    if (!confirm("删除后链接立即失效，确定删除？")) return;
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
+    const token = deleteTarget;
+    setDeleteTarget(null);
     try {
       const res = await fetch(`${BASE}/api/tools/video-qr`, {
         method: "DELETE",
@@ -98,7 +104,7 @@ export default function VideoQrTool() {
     } catch {
       toast("🔴 请求失败");
     }
-  };
+  }, [deleteTarget, fetchItems]);
 
   const copy = async (text: string) => {
     try {
@@ -138,25 +144,52 @@ export default function VideoQrTool() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border">
-        <h2 className="text-lg font-bold text-foreground font-heading">视频转二维码</h2>
+      {/* 头部：与其他页面统一 */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-border">
+        <button
+          onClick={() => router.push("/tools")}
+          className="text-muted-foreground/70 hover:text-muted-foreground"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg font-bold text-foreground font-heading">视频转二维码</h2>
+          <p className="text-xs text-muted-foreground">上传视频，转码 H.264 并生成公开短链二维码</p>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-6">
         {/* 上传区 */}
         <div className="brutal bg-card p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Upload className="w-4 h-4" />
+            <div className="w-6 h-6 shrink-0 border-2 border-border bg-blue-soft flex items-center justify-center">
+              <Upload className="w-3.5 h-3.5" />
+            </div>
             <span className="text-sm font-bold text-foreground">上传视频</span>
           </div>
+
           <div className="flex flex-col gap-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".mp4,.mov,.webm,.avi,.mkv,video/mp4,video/quicktime,video/webm"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="text-xs font-mono"
-            />
+            <div className="flex gap-2 items-center">
+              <label
+                className={`brutal-btn inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold shrink-0 ${
+                  file ? "bg-lime text-white" : "bg-card text-foreground"
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {file ? "已选择" : "选择视频文件"}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".mp4,.mov,.webm,.avi,.mkv,video/mp4,video/quicktime,video/webm"
+                  className="hidden"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              <span className="flex-1 min-w-0 text-xs font-mono text-muted-foreground truncate">
+                {file ? file.name : "未选择文件"}
+              </span>
+            </div>
+
             <input
               type="text"
               value={title}
@@ -164,6 +197,7 @@ export default function VideoQrTool() {
               placeholder="标题（可选）"
               className="w-full px-2 py-1.5 text-sm border-2 border-border"
             />
+
             <button
               onClick={handleUpload}
               disabled={!file || uploading}
@@ -177,19 +211,21 @@ export default function VideoQrTool() {
                 </>
               ) : (
                 <>
-                  <Upload className="w-3.5 h-3.5" /> 生成二维码
+                  <QrCode className="w-3.5 h-3.5" /> 生成二维码
                 </>
               )}
             </button>
-            <p className="text-[10px] text-muted-foreground">支持 mp4/mov/webm/avi/mkv，≤200MB，将自动转码为 H.264</p>
+            <p className="text-[10px] text-muted-foreground">
+              支持 mp4/mov/webm/avi/mkv，≤200MB，将自动转码为 H.264
+            </p>
           </div>
         </div>
 
         {/* 结果区 */}
         {result && (
-          <div className="brutal bg-card p-4 flex flex-col items-center gap-3">
-            <span className="text-sm font-bold text-foreground">扫码观看</span>
-            <img src={result.qrDataUrl} alt="二维码" className="w-48 h-48 border-2 border-border" />
+          <div className="brutal bg-card p-5 flex flex-col items-center gap-3">
+            <span className="brutal-chip px-2 py-0.5 text-[11px] bg-lime-soft">扫码观看</span>
+            <img src={result.qrDataUrl} alt="二维码" className="w-52 h-52 border-2 border-border" />
             <div className="flex items-center gap-2 w-full max-w-md">
               <code className="flex-1 min-w-0 truncate text-xs font-mono px-2 py-1 border-2 border-border bg-muted/50">
                 {result.url}
@@ -202,7 +238,7 @@ export default function VideoQrTool() {
               </button>
               <button
                 onClick={() => downloadQr(result.qrDataUrl, result.token)}
-                className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-card text-foreground"
+                className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-primary text-primary-foreground"
               >
                 下载
               </button>
@@ -213,28 +249,38 @@ export default function VideoQrTool() {
         {/* 列表区 */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <QrCode className="w-4 h-4" />
+            <div className="w-6 h-6 shrink-0 border-2 border-border bg-yellow-soft flex items-center justify-center">
+              <QrCode className="w-3.5 h-3.5" />
+            </div>
             <span className="text-sm font-bold text-foreground">已生成（{items.length}）</span>
           </div>
+
           {items.length === 0 ? (
-            <p className="text-xs text-muted-foreground">暂无记录</p>
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
+              <span className="text-3xl">🎬</span>
+              <p className="text-sm">暂无记录</p>
+              <p className="text-xs text-muted-foreground/60">上传一个视频开始</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {items.map((item) => (
                 <div key={item.token} className="brutal bg-card p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="text-sm font-bold text-foreground truncate block">
+                      <span className="text-sm font-black text-foreground truncate block">
                         {item.title || item.token.slice(0, 10) + "…"}
                       </span>
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        {fmtSize(item.size)} · {fmtTime(item.createdAt)}
-                      </span>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="brutal-chip px-1.5 py-0 text-[10px] bg-muted text-muted-foreground">
+                          {fmtSize(item.size)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground/70 font-mono">{fmtTime(item.createdAt)}</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => copy(publicUrl(item.token))}
-                        className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-card text-foreground"
+                        className="brutal-sm bg-card text-foreground px-2 py-0.5 text-xs font-bold inline-flex items-center gap-1"
                       >
                         <Copy className="w-3 h-3" /> 复制
                       </button>
@@ -242,20 +288,20 @@ export default function VideoQrTool() {
                         href={publicUrl(item.token)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-card text-foreground"
+                        className="brutal-sm bg-card text-foreground px-2 py-0.5 text-xs font-bold inline-flex items-center gap-1"
                       >
                         <ExternalLink className="w-3 h-3" /> 打开
                       </a>
                       <button
                         onClick={() => toggleQr(item.token)}
-                        className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-card text-foreground"
+                        className="brutal-sm bg-card text-foreground px-2 py-0.5 text-xs font-bold inline-flex items-center gap-1"
                       >
                         <QrCode className="w-3 h-3" />
                         {qrLoading === item.token ? "…" : qrMap[item.token] ? "收起" : "二维码"}
                       </button>
                       <button
-                        onClick={() => handleDelete(item.token)}
-                        className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-card text-destructive"
+                        onClick={() => setDeleteTarget(item.token)}
+                        className="brutal-sm bg-destructive text-white px-2 py-0.5 text-xs font-bold inline-flex items-center gap-1"
                       >
                         <Trash2 className="w-3 h-3" /> 删除
                       </button>
@@ -266,7 +312,7 @@ export default function VideoQrTool() {
                       <img src={qrMap[item.token]} alt="二维码" className="w-20 h-20 border-2 border-border" />
                       <button
                         onClick={() => downloadQr(qrMap[item.token], item.token)}
-                        className="brutal-btn px-2 py-1 text-xs font-bold bg-card text-foreground"
+                        className="brutal-btn px-2 py-1 text-xs font-bold bg-primary text-primary-foreground"
                       >
                         下载二维码
                       </button>
@@ -278,6 +324,14 @@ export default function VideoQrTool() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="删除视频二维码"
+        description="删除后链接立即失效，确定删除？此操作不可撤销。"
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }

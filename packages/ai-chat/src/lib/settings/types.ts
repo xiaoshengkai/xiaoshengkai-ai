@@ -39,3 +39,8 @@ export type SearchProvider = 'auto' | 'deepseek' | 'firecrawl';
 export interface SearchSettings {
   provider: SearchProvider;
 }
+
+/** 访问控制：需要登录的博客路径前缀（proxy.cjs 强制执行；App 侧 /ai 仍由 proxy.ts 硬编码） */
+export interface AuthPathsConfig {
+  protected: string[];
+}

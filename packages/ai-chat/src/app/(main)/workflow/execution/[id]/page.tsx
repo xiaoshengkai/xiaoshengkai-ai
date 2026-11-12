@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
-import { Play, ChevronRight, ArrowLeft, RefreshCw, Download, ChevronDown, ChevronUp, Edit3, History } from "lucide-react";
+import { Play, ChevronRight, RefreshCw, Download, ChevronDown, ChevronUp, Edit3, History } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogContent, AlertDialogFooter,
@@ -498,13 +498,16 @@ export default function ExecutionDetailPage() {
     <ImageViewerProvider>
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-4 py-3 border-b-2 border-border shrink-0">
-        <a href={`/workflow/type/${execution.template}`} className="text-muted-foreground/70 hover:text-muted-foreground"><ArrowLeft className="w-4 h-4" /></a>
         <div className="flex items-center gap-2 flex-1">
           <h2 className="text-sm font-bold text-foreground">{execution.template}</h2>
           {isV2 && sceneList.length > 0 && (
             <span className="text-xs text-muted-foreground/70">{sceneList.length} 场景</span>
           )}
         </div>
+        <a href={`/workflow/type/${execution.template}`}
+          className="brutal-btn inline-flex items-center gap-1 px-3 py-1 text-xs font-bold bg-card text-foreground">
+          返回
+        </a>
         {isV2 && sceneList.length > 0 && (
           <button onClick={() => setShowScriptPanel(true)}
             className="brutal-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-yellow text-foreground">

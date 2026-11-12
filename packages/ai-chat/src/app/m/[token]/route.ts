@@ -26,10 +26,23 @@ export async function GET(
 
   const range = req.headers.get("range");
   if (range) {
-    const m = range.match(/bytes=(\d+)-(\d*)/);
-    if (m) {
-      const start = parseInt(m[1], 10);
-      const end = m[2] ? parseInt(m[2], 10) : fileSize - 1;
+    // 支持 bytes=start-end / bytes=start- / bytes=-suffix（浏览器 PDF 查看器会发后缀 Range）
+    const m = range.match(/bytes=(\d*)-(\d*)/);
+    if (m && (m[1] !== "" || m[2] !== "")) {
+      let start: number;
+      let end: number;
+      if (m[1] === "") {
+        // 后缀：bytes=-N → 最后 N 字节
+        const suffix = parseInt(m[2], 10);
+        if (suffix <= 0) {
+          return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${fileSize}` } });
+        }
+        start = Math.max(0, fileSize - suffix);
+        end = fileSize - 1;
+      } else {
+        start = parseInt(m[1], 10);
+        end = m[2] !== "" ? parseInt(m[2], 10) : fileSize - 1;
+      }
       if (start >= fileSize || end >= fileSize || start > end) {
         return new Response(null, {
           status: 416,

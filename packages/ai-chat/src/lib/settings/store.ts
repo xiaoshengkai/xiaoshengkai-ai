@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Providers, Selection, EgressConfig, SearchSettings } from "./types";
+import type { Providers, Selection, EgressConfig, SearchSettings, AuthPathsConfig } from "./types";
 
 const DATA_DIR = path.resolve(process.cwd(), "..", "..", "data");
 const SETTINGS_DIR = path.join(DATA_DIR, "settings");
@@ -8,6 +8,7 @@ const PROVIDERS_FILE = path.join(SETTINGS_DIR, "providers.json");
 const SELECTION_FILE = path.join(SETTINGS_DIR, "selection.json");
 const EGRESS_FILE = path.join(SETTINGS_DIR, "egress.json");
 const SEARCH_FILE = path.join(SETTINGS_DIR, "search.json");
+const AUTH_PATHS_FILE = path.join(SETTINGS_DIR, "auth-paths.json");
 
 export const DEFAULT_EGRESS: EgressConfig = {
   enabled: false,
@@ -17,6 +18,10 @@ export const DEFAULT_EGRESS: EgressConfig = {
 
 export const DEFAULT_SEARCH: SearchSettings = {
   provider: "auto",
+};
+
+export const DEFAULT_AUTH_PATHS: AuthPathsConfig = {
+  protected: [],
 };
 
 function ensureDir() {
@@ -83,4 +88,24 @@ export function readSearchSettings(): SearchSettings {
 export function writeSearchSettings(data: SearchSettings) {
   ensureDir();
   fs.writeFileSync(SEARCH_FILE, JSON.stringify(data, null, 2));
+}
+
+export function readAuthPaths(): AuthPathsConfig {
+  ensureDir();
+  if (!fs.existsSync(AUTH_PATHS_FILE)) return { ...DEFAULT_AUTH_PATHS };
+  try {
+    const parsed = JSON.parse(fs.readFileSync(AUTH_PATHS_FILE, "utf-8"));
+    return {
+      protected: Array.isArray(parsed?.protected)
+        ? parsed.protected.map((s: unknown) => String(s).trim()).filter(Boolean)
+        : [],
+    };
+  } catch {
+    return { ...DEFAULT_AUTH_PATHS };
+  }
+}
+
+export function writeAuthPaths(data: AuthPathsConfig) {
+  ensureDir();
+  fs.writeFileSync(AUTH_PATHS_FILE, JSON.stringify(data, null, 2));
 }

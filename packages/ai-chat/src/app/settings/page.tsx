@@ -74,6 +74,8 @@ export default function SettingsPage() {
   const [egressTest, setEgressTest] = useState<{ ok: boolean; msg: string } | null>(null);
   const [egressTesting, setEgressTesting] = useState(false);
   const [search, setSearch] = useState<{ provider: string; firecrawlConfigured: boolean } | null>(null);
+  const [authPaths, setAuthPaths] = useState<string[]>([]);
+  const [authPathInput, setAuthPathInput] = useState("");
   const [tab, setTab] = useState<"models" | "services" | "egress" | "security">("models");
 
   useEffect(() => {
@@ -82,11 +84,13 @@ export default function SettingsPage() {
       fetch(`${BASE}/api/settings/selection`).then((r) => r.json()),
       fetch(`${BASE}/api/settings/egress`).then((r) => r.json()),
       fetch(`${BASE}/api/settings/search`).then((r) => r.json()),
-    ]).then(([p, s, e, sr]) => {
+      fetch(`${BASE}/api/settings/auth-paths`).then((r) => r.json()),
+    ]).then(([p, s, e, sr, ap]) => {
       setProviders(p);
       setSelection(s);
       setEgress(e);
       setSearch(sr);
+      setAuthPaths(Array.isArray(ap?.protected) ? ap.protected : []);
       savedEgressRef.current = JSON.stringify(e);
     });
   }, []);
@@ -278,6 +282,34 @@ export default function SettingsPage() {
     }
     setSaving(false);
   }, [dirtyProv, dirtySel, providers, selection]);
+
+  const saveAuthPaths = useCallback(async (next: string[]) => {
+    try {
+      const r = await fetch(`${BASE}/api/settings/auth-paths`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ protected: next }),
+      });
+      if (!r.ok) throw new Error("save failed");
+      setAuthPaths(next);
+    } catch {
+      toast("🔴 保存失败");
+    }
+  }, []);
+
+  const addAuthPath = useCallback(() => {
+    let p = authPathInput.trim();
+    if (!p) return;
+    if (!p.startsWith("/")) p = "/" + p;
+    p = p.replace(/\/+$/, "");
+    if (!p || authPaths.includes(p)) return;
+    saveAuthPaths([...authPaths, p]);
+    setAuthPathInput("");
+  }, [authPathInput, authPaths, saveAuthPaths]);
+
+  const removeAuthPath = useCallback((p: string) => {
+    saveAuthPaths(authPaths.filter((x) => x !== p));
+  }, [authPaths, saveAuthPaths]);
 
   if (!providers || !selection || !egress || !search) {
     return (
@@ -658,6 +690,59 @@ export default function SettingsPage() {
           >
             {pwdBusy ? "提交中..." : "修改密码"}
           </button>
+        </div>
+
+        {/* 访问控制 */}
+        <div className="mt-6">
+          <h2 className="text-sm font-bold text-foreground font-heading mb-3">🔒 访问控制</h2>
+
+          <div className="brutal bg-card p-4 mb-4 max-w-lg text-xs">
+            <div className="text-muted-foreground text-[10px] mb-2">内置规则（由代码控制，不可修改）</div>
+            <ul className="space-y-1 font-mono text-muted-foreground">
+              <li>· AI 工作台全部页面需登录（对话 / 记忆 / 工作流 / 定时任务 / 设置 / 日志 / 工具 / API）</li>
+              <li>· 公开豁免：登录页、鉴权接口、任务仪表盘 /tasks/*、媒体分享 /m/*</li>
+            </ul>
+          </div>
+
+          <div className="text-muted-foreground text-[10px] mb-2">
+            博客页面保护（需登录访问的路径，前缀匹配，如 /life/）
+          </div>
+          <div className="brutal bg-card p-4 max-w-lg space-y-2">
+            {authPaths.length === 0 ? (
+              <div className="text-xs text-muted-foreground">暂无保护路径，博客全公开</div>
+            ) : (
+              <div className="space-y-1.5">
+                {authPaths.map((p) => (
+                  <div key={p} className="flex items-center justify-between gap-2">
+                    <code className="text-xs font-mono">{p}</code>
+                    <button
+                      onClick={() => removeAuthPath(p)}
+                      className="brutal-sm bg-destructive text-white px-2 py-0.5 text-xs font-bold"
+                    >
+                      删除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 items-center pt-1">
+              <input
+                type="text"
+                value={authPathInput}
+                onChange={(e) => setAuthPathInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addAuthPath(); }}
+                placeholder="/life/"
+                className="flex-1 px-2 py-1 border-2 border-border bg-card text-xs font-mono focus:outline-none"
+              />
+              <button
+                onClick={addAuthPath}
+                disabled={!authPathInput.trim()}
+                className="brutal-btn px-3 py-1 text-xs font-bold bg-primary text-foreground disabled:opacity-40"
+              >
+                添加
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       )}

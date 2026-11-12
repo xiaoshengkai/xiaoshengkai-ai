@@ -67,6 +67,9 @@ export default function ToolsPage() {
               {tools.length} 个工具
             </span>
           )}
+          <Link href="/" className="brutal-btn px-3 py-1.5 text-xs font-bold bg-card text-foreground">
+            返回聊天
+          </Link>
         </div>
       </div>
 

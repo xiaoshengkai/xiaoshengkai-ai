@@ -3,6 +3,9 @@ const httpProxy = require('http-proxy');
 const fs = require('fs');
 const path = require('path');
 
+// 加载根 .env（AUTH_SECRET 等；dotenv 不覆盖已存在的 env）
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
 const config = require('../config/network.json');
 const LOCAL = config.hosts.local;
 const PROD_DIRECT = config.ports.aiChat.prodDirect;
@@ -25,6 +28,60 @@ proxy.on('error', (err, req, res) => {
 });
 
 const SITE_DIR = path.join(__dirname, '..', 'site');
+
+// ── 访问控制：读 data/settings/auth-paths.json（2s 缓存，fresh-read）──
+let _authPathsCache = { at: 0, val: [] };
+function readProtectedPaths() {
+  const now = Date.now();
+  if (now - _authPathsCache.at < 2000) return _authPathsCache.val;
+  let list = [];
+  try {
+    const p = path.join(__dirname, '..', 'data', 'settings', 'auth-paths.json');
+    if (fs.existsSync(p)) {
+      const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'));
+      if (Array.isArray(parsed && parsed.protected)) {
+        list = parsed.protected.map((s) => String(s).trim()).filter(Boolean);
+      }
+    }
+  } catch {
+    /* 读取失败 → 不保护任何路径 */
+  }
+  _authPathsCache = { at: now, val: list };
+  return list;
+}
+
+function normalizePrefix(s) {
+  let p = String(s || '').trim();
+  if (!p.startsWith('/')) p = '/' + p;
+  return p.replace(/\/+$/, '');
+}
+
+function isProtectedPath(urlPath) {
+  for (const raw of readProtectedPaths()) {
+    const prefix = normalizePrefix(raw);
+    if (!prefix) continue;
+    if (urlPath === prefix || urlPath.startsWith(prefix + '/')) return true;
+  }
+  return false;
+}
+
+// ── 鉴权：动态 import @app/shared/auth.js（ESM）──
+let authPromise = null;
+function loadAuth() {
+  if (!authPromise) {
+    authPromise = import(path.join(__dirname, '..', 'packages', 'shared', 'auth.js')).catch((err) => {
+      console.error('[proxy] auth.js 加载失败:', err && err.message);
+      return null;
+    });
+  }
+  return authPromise;
+}
+
+function parseCookie(header, name) {
+  if (!header) return '';
+  const m = header.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
+  return m ? m[1] : '';
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -71,15 +128,34 @@ function serveStatic(req, res) {
   }
 }
 
-const server = http.createServer((req, res) => {
-  if (req.url.startsWith('/ai') || req.url.startsWith('/note/') || req.url.startsWith('/preview/') || req.url.startsWith('/api/') || req.url.startsWith('/workflow') || req.url.startsWith('/memory') || req.url.startsWith('/schedule') || req.url.startsWith('/logs') || req.url.startsWith('/settings') || req.url.startsWith('/m/')) {
+const PROXY_PREFIXES = ['/ai', '/note/', '/preview/', '/api/', '/workflow', '/memory', '/schedule', '/logs', '/settings', '/m/'];
+
+function isProxyPath(url) {
+  return PROXY_PREFIXES.some((p) => url.startsWith(p));
+}
+
+const server = http.createServer(async (req, res) => {
+  if (isProxyPath(req.url)) {
     if (!req.url.startsWith('/ai')) {
       req.url = '/ai' + req.url;
     }
     proxy.web(req, res);
-  } else {
-    serveStatic(req, res);
+    return;
   }
+
+  // 博客侧：命中「需登录路径」→ 校验 Cookie，无效跳登录（带 next 回跳）
+  if (isProtectedPath(req.url.split('?')[0])) {
+    const auth = await loadAuth();
+    if (auth && auth.isAuthConfigured()) {
+      const token = parseCookie(req.headers.cookie, 'ai_session');
+      if (!auth.verifyToken(token, process.env.AUTH_SECRET || '')) {
+        res.writeHead(302, { Location: '/ai/login?next=' + encodeURIComponent(req.url) });
+        return res.end();
+      }
+    }
+  }
+
+  serveStatic(req, res);
 });
 
 // 默认只绑回环（funnel 经 tailscaled 本机转发）；直连公网部署用 PROXY_BIND=0.0.0.0 启动

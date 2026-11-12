@@ -6,17 +6,13 @@ import { BASE } from "@/lib/utils/utils";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import {
-  ArrowLeft,
   Plus,
   Upload,
-  Copy,
   Trash2,
   ExternalLink,
   Loader2,
   QrCode,
   Link as LinkIcon,
-  FileImage,
-  FileText,
   X,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -164,15 +160,6 @@ export default function FileQrTool() {
     }
   }, [deleteTarget, fetchItems]);
 
-  const copy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast("已复制");
-    } catch {
-      toast("复制失败");
-    }
-  };
-
   const toggleQr = async (item: MediaItem) => {
     if (qrMap[item.token]) {
       setQrMap((prev) => {
@@ -203,23 +190,25 @@ export default function FileQrTool() {
   return (
     <div className="flex flex-col h-full">
       {/* 头部 */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-border">
-        <button
-          onClick={() => router.push("/tools")}
-          className="text-muted-foreground/70 hover:text-muted-foreground"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border">
+        <div>
           <h2 className="text-lg font-bold text-foreground font-heading">文件转二维码</h2>
           <p className="text-xs text-muted-foreground">上传文件或粘贴链接，生成可分享的公开二维码</p>
         </div>
-        <button
-          onClick={openModal}
-          className="brutal-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground"
-        >
-          <Plus className="w-3.5 h-3.5" /> 新建二维码
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push("/tools")}
+            className="brutal-btn px-3 py-1.5 text-xs font-bold bg-card text-foreground"
+          >
+            返回
+          </button>
+          <button
+            onClick={openModal}
+            className="brutal-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground"
+          >
+            <Plus className="w-3.5 h-3.5" /> 新建二维码
+          </button>
+        </div>
       </div>
 
       {/* 列表 */}
@@ -255,12 +244,6 @@ export default function FileQrTool() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => copy(url)}
-                        className="brutal-sm bg-card text-foreground px-2 py-0.5 text-xs font-bold inline-flex items-center gap-1"
-                      >
-                        <Copy className="w-3 h-3" /> 复制
-                      </button>
                       <a
                         href={url}
                         target="_blank"

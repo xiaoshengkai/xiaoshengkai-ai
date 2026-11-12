@@ -36,8 +36,13 @@ export default function LoginPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok) {
-        router.replace("/");
-        router.refresh();
+        const next = new URLSearchParams(window.location.search).get("next");
+        if (next && next.startsWith("/") && !next.startsWith("//")) {
+          window.location.href = next;
+        } else {
+          router.replace("/");
+          router.refresh();
+        }
       } else {
         setError(data.error || `登录失败 (${res.status})`);
         setLoading(false);

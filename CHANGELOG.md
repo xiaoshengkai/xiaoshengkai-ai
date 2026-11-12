@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.77 (2026-11-11) — 访问控制配置化 + 返回按钮统一 + PDF 后缀 Range
+
+### 变更
+- **访问控制配置化**：博客 `site/` 默认全公开，`data/settings/auth-paths.json` 的 `protected` 列表（路径前缀，如 `/life/`）命中 → `proxy.cjs` 校验 `ai_session` Cookie，无效 `302 → /ai/login?next=<原路径>`；登录页读 `next` 回跳原页。设置页「安全」tab「访问控制」区块（内置锁定规则灰显 + 可增删博客保护路径），API `/api/settings/auth-paths`。App 侧 `/ai` 仍由 `proxy.ts` 硬编码 fail-closed，不可配置。`proxy.cjs` 补 dotenv（AUTH_SECRET）+ 动态 import auth.js。
+- **返回按钮统一**：详情页（file-qr / workflow 类型 / workflow 执行）左上角裸箭头统一改为右上角「返回」按钮（右侧按钮组最左）；`tools/page.tsx` 加「返回聊天」。
+- **移除复制按钮**：file-qr 列表项删「复制」（HTTP 下 navigator.clipboard 不可用、且与二维码/打开冗余）。
+- **PDF 后缀 Range**：`/m/[token]` 修正 Range 解析，支持 `bytes=-suffix`（浏览器 PDF 查看器拿 xref 尾部），首屏边下边渲染。
+
+### 验证
+- typecheck + 133 shared + 36 mm + build 全绿。
+
 ## v0.11.76 (2026-11-11) — 工具升级：文件转二维码（通用文件 + URL）+ 列表/弹窗两层重构
 
 ### 变更

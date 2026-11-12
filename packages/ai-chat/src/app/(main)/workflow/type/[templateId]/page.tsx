@@ -3,7 +3,7 @@
 import { BASE } from "@/lib/utils/utils";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Play, Plus, Upload, ImagePlus, Users, Palette, ArrowLeft } from "lucide-react";
+import { Play, Plus, Upload, ImagePlus, Users, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Root, Popup, Header, Title, Close } from "@/components/ui/drawer";
@@ -336,12 +336,12 @@ export default function WorkflowTypePage() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-border">
-        <button onClick={() => router.push("/workflow")}
-          className="text-muted-foreground/70 hover:text-muted-foreground">
-          <ArrowLeft className="w-4 h-4" />
-        </button>
         <h2 className="text-lg font-bold text-foreground font-heading flex-1">{template?.label || "..."}</h2>
         <div className="flex gap-2">
+          <button onClick={() => router.push("/workflow")}
+            className="brutal-btn px-3 py-1 text-xs font-bold bg-card text-foreground">
+            返回
+          </button>
           {templateId === "comic-generation" && (
             <>
               <button onClick={() => { setShowCharacters(true); fetchCharacters(); }}

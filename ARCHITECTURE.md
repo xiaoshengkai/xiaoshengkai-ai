@@ -43,7 +43,7 @@ ai-engineer-journey/
 │   ├── deploy-common.sh      # deploy/sync/prod 共享解析：DEPLOY_TARGET/DEPLOY_PATH（env>.env）+ public_url 单源
 │   ├── sync.sh               # 部署同步：env / site(server→Mac 镜像) / site-push / migrate-data / backup(30min) / conv-pull(server→Mac 对话) / data-pull(server→Mac 运行数据，本地优先) / install-cron / uninstall-cron / harden
 │   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
-│   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；默认回环、PROXY_BIND 可放开；静态服务带路径穿越防护）
+│   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；默认回环、PROXY_BIND 可放开；静态服务带路径穿越防护；博客「需登录路径」按 data/settings/auth-paths.json 校验 Cookie）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs
 ├── data/                       # 运行时数据（chroma / tasks / settings / static / workflows / xhs-tasks / exports）
 ├── logs/                       # 日志（app/ + tasks/ + services/ + workflows/）
@@ -217,7 +217,7 @@ packages/tools/<id>/tool.json        data/media/<token> + index.json（原子写
 ```
 
 - **媒体库** `@app/shared/media.js`：`generateToken`（`crypto.randomBytes(16).toString("base64url")`，不可猜测）/ `addMedia`（copyFile + 写索引，token 撞车重生成）/ `addLink`（链接条目：只写索引不落文件，`kind:"url"`+`targetUrl`）/ `getMedia`（isValidToken `^[A-Za-z0-9_-]{16,64}$` 拒绝穿越/注入）/ `listMedia` / `deleteMedia`（硬删文件+索引条目，链接即刻 404；url 类无文件仅删记录）。`MEDIA_DIR` env 可覆盖存储根（测试用）。定位同 capability：webpack cwd=packages/ai-chat（上两级=仓库根）。
-- **公开路由** `GET /m/<token>`（`app/m/[token]/route.ts`）：token 查表 → Range 流式（`206`/`416`/`Accept-Ranges`），`Cache-Control: public, max-age=31536000, immutable`。`proxy.ts` 豁免 `pathname.startsWith("/m/")`（公开，同 `/tasks/*`）；`proxy.cjs` 转发 `req.url.startsWith('/m/')`（否则落到 site/ 静态 404）。
+- **公开路由** `GET /m/<token>`（`app/m/[token]/route.ts`）：token 查表 → Range 流式（`206`/`416`/`Accept-Ranges`，支持 `bytes=start-end`/`start-`/`-suffix` 后缀 Range——浏览器 PDF 查看器依赖后缀 Range 拿 xref 尾部）、`Cache-Control: public, max-age=31536000, immutable`。`proxy.ts` 豁免 `pathname.startsWith("/m/")`（公开，同 `/tasks/*`）；`proxy.cjs` 转发 `req.url.startsWith('/m/')`（否则落到 site/ 静态 404）。
 - **工具边界**：工具是「确定性单步操作」（上传→转码→二维码），无 AI、无状态机，区别于工作流（AI 驱动多步骤有执行状态）。工具菜单是薄框架——列表页扫 `packages/tools/*/tool.json` 自发现，但每个工具的 page/api 是 ai-chat 里独立静态路由（不做运行时动态 import，保持类型安全）。加工具 = 丢一个 tool.json + 一个 page + 一个 api route。
 - **file-qr 工具**：`/api/tools/file-qr`（POST 按 content-type 分流：multipart → 按扩展名分流 `视频(mp4/mov/webm/avi/mkv)→ffmpeg 转 H.264 libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -movflags +faststart`、`图片(png/jpg/jpeg/gif/webp)≤20M`、`PDF≤50M` 直存，MIME 由扩展名查表不信任客户端 content-type；json `{url,title}` → `new URL` 校验 http/https → addLink。返回 `{token,url,title,kind}`，文件类 `url=/m/<token>`、链接类 `url=targetUrl`；GET 列表；DELETE 删）。前端 `/tools/file-qr` 列表入口 + 「新建二维码」弹窗（tab 上传文件/粘贴链接），`window.location.origin` 拼 `/m/<token>`（链接类直接用 targetUrl）并用 `qrcode` 生成二维码（不落盘，确定性可重生成）。临时文件转码后即删。**服务器 ffmpeg**：复用 prod.sh 自动维护的 `data/bin/ffmpeg`（7.0.2-static，含 libx264，PATH 前置），转码直接可用。
 
@@ -481,6 +481,7 @@ corp-egress 服务                             @app/shared/egress.js
 - **模型**：单人应用，无用户名；生效密码 = `data/auth.json` 的 passwordHash（settings 页改密写入，gitignored）优先，根 `.env` `AUTH_PASSWORD` 兜底。
 - **token**：`过期时间.密码指纹8位.HMAC-SHA256(AUTH_SECRET)`，Cookie `ai_session`（httpOnly / SameSite=Lax / prod Secure / 30 天）。指纹掺入 → 改密后所有旧会话立即失效。
 - **卡口规则**（proxy.ts）：放行 `/login`、`/api/auth/*`（自带密码验证）、`/tasks/*`（任务仪表盘公开页——非敏感数据，分享用）、`/m/*`（公开媒体服务——token 不可猜测的分享资产）、字体豁免路径（MCP document 工具经 Chrome 取 `/api/uploads/NotoSansCJKsc-Regular.otf`，字体加载带不了 Cookie，开源字体无泄漏风险）、`_next/*` 静态资源；未登录页面 307→login、API 401。
+- **博客访问控制**（proxy.cjs）：博客 `site/` 默认全公开；`data/settings/auth-paths.json` 的 `protected` 列表（路径前缀，如 `/life/`）命中 → 校验 `ai_session` Cookie，无效 `302 → /ai/login?next=<原路径>`（登录页读 `next` 回跳原页）。设置页「安全」tab「访问控制」区块增删（API `/api/settings/auth-paths`，仿 egress）。App 侧 /ai 仍由 proxy.ts 硬编码 fail-closed，不可配置。
 - **fail-closed**：`AUTH_PASSWORD` 未配置时生产全拒（login 接口报 `auth_not_configured`）、dev 放行。
 - **防爆破**：login 与 change-password 共用内存计数，同 IP 连错 `AUTH_MAX_FAILS`(5) 次锁 `AUTH_LOCK_SECS`(600) 秒；重启进程清零。
 - **matcher 坑**：basePath 根路径 `/ai`（裸路径，无尾斜杠）只有 isRoot matcher `'/'` 能覆盖，普通 `'/((?!_next...).*)'` 前缀化后要求子路径，`/ai` 会被静态缓存直出绕过鉴权（Next 16 实测）。故 matcher = `['/', '/((?!_next/static|_next/image|favicon.ico).*)']`。
@@ -488,7 +489,7 @@ corp-egress 服务                             @app/shared/egress.js
 - **Cookie Secure 自动探测**：`x-forwarded-proto || nextUrl.protocol === https`——裸 IP HTTP 部署自动降级（否则浏览器拒发 Cookie），反向代理 TLS 下自动恢复 Secure。
 - **安全响应头**（next.config.ts headers()）：nosniff / X-Frame-Options DENY / Referrer-Policy / HSTS；CSP 跳过（与 Next 内联脚本冲突）。
 
-涉及文件：`packages/shared/auth.js`（+ test/auth.test.js）、`ai-chat src/proxy.ts`、`api/auth/{login,logout,change-password}/route.ts`、`app/login/page.tsx`、settings 页「密码管理」区块、`scripts/proxy.cjs`、`scripts/{prod,dev}.sh`、根 `.env`（AUTH_*）。
+涉及文件：`packages/shared/auth.js`（+ test/auth.test.js）、`ai-chat src/proxy.ts`、`api/auth/{login,logout,change-password}/route.ts`、`app/login/page.tsx`、settings 页「密码管理 + 访问控制」区块、`api/settings/auth-paths`、`scripts/proxy.cjs`、`scripts/{prod,dev}.sh`、根 `.env`（AUTH_*）。
 
 ## 服务监控系统
 

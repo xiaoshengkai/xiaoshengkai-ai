@@ -378,6 +378,8 @@ logs/
 
 统一 MCP 服务器（`packages/mcp/`，stdio 协议），由 ai-chat 的 `lib/mcp-client.ts` spawn `node ../mcp/index.js` 拉起，进程内 `shared/llm` 每次调用 fresh-read 配置（改配置无需重建客户端）。客户端单例缓存 Promise，子进程死亡后由 `loadMcpTools` 调 `resetMCPClient()` 重连。
 
+**第三方 MCP（远程 streamable HTTP）**：`mcp-client.ts` 另持高德地图客户端（`StreamableHTTPClientTransport` → `https://mcp.amap.com/mcp?key=AMAP_MCP_KEY`，key 在根 `.env`），`getAmapMCPClient`/`resetAmapMCPClient` 与本地客户端同款单例/自愈。`route.ts` `loadMcpTools` 拆 `loadLocalMcpTools`（原有重试）+ `loadAmapMcpTools`（失败返回空对象，不拖垮本地工具），合并返回；高德工具只读、对三模式开放。新增三方 MCP 时在此加客户端并在 `loadMcpTools` 合并。
+
 ```
 packages/mcp/
 ├── index.js                 # 统一入口（注册全部工具模块）

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.11.80 (2026-11-17) — 接入第三方 MCP：高德地图
+
+### 变更
+- **高德地图 MCP（远程 streamable HTTP）**：`mcp-client.ts` 新增独立 `StreamableHTTPClientTransport` 客户端（`getAmapMCPClient`/`resetAmapMCPClient`，URL `https://mcp.amap.com/mcp?key=...`），与本地 stdio 客户端并存。`route.ts` `loadMcpTools` 拆成本地 + 高德两段，合并返回；高德失败只记日志返回空对象，不拖垮本地 36 工具。
+- key 存根 `.env` 的 `AMAP_MCP_KEY`（gitignored，不入库）；`.env.example` 加占位符。高德工具（`maps_direction_*`/`maps_geo`/`maps_distance` 等 ~10 个）为只读查询，自动对 chat/plan/build 三模式开放。
+
+### 验证
+- typecheck + test + build 全绿；高德端点 initialize/tools/list 实测 200。
+
 ## v0.11.79 (2026-11-11) — server-status 布局重构 + 新增指标
 
 ### 变更

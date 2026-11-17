@@ -22,7 +22,7 @@ import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
 
 import { getChatStrategy } from '@/lib/strategies/chat-strategy';
 import { getProviderConfig } from '@/lib/settings/dispatcher';
-import { getMCPClient, resetMCPClient } from '@/lib/mcp-client';
+import { getMCPClient, resetMCPClient, getAmapMCPClient, resetAmapMCPClient } from '@/lib/mcp-client';
 import { processAttachments } from '@/lib/multimodal/pipeline';
 import { filterToolsByMode, filterWebTools, buildToolsSection, MODE_INFO, type ChatMode } from '@/lib/modes';
 import { toModelMessages } from './to-model-messages';
@@ -199,6 +199,12 @@ ${knowledgeBlock}`;
  * 加载 MCP 工具（带缓存）
  */
 async function loadMcpTools(): Promise<Record<string, unknown>> {
+  const local = await loadLocalMcpTools();
+  const amap = await loadAmapMcpTools();
+  return { ...local, ...amap };
+}
+
+async function loadLocalMcpTools(): Promise<Record<string, unknown>> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const client = await getMCPClient();
@@ -211,4 +217,18 @@ async function loadMcpTools(): Promise<Record<string, unknown>> {
     }
   }
   return {};
+}
+
+// 高德地图工具：失败只记日志返回空对象，不拖垮本地工具
+async function loadAmapMcpTools(): Promise<Record<string, unknown>> {
+  try {
+    const client = await getAmapMCPClient();
+    const t = await client.tools();
+    console.log(`[amap-mcp] loaded (${Object.keys(t).length} tools)`);
+    return t;
+  } catch (err) {
+    console.error(`[amap-mcp] FAILED - ${(err as Error).message}`);
+    resetAmapMCPClient();
+    return {};
+  }
 }

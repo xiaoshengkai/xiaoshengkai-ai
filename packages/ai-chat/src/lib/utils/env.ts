@@ -27,5 +27,7 @@ export const env = {
   VOLCENGINE_API_KEY: process.env.VOLCENGINE_API_KEY || '',
   VOLCENGINE_IMAGE_MODEL: process.env.VOLCENGINE_IMAGE_MODEL || 'doubao-seedream-5-0-lite-260128',
 
+  AMAP_MCP_KEY: process.env.AMAP_MCP_KEY || '',
+
   CHROMA_URL: `http://${NET_CONFIG.hosts.local}:${NET_CONFIG.ports.chroma}`,
 } as const;

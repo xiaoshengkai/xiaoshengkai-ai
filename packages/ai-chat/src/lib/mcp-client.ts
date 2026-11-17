@@ -1,9 +1,43 @@
 import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { env } from "@/lib/utils/env";
 
 // ponytail: MCP 子进程内 shared/llm 每次调用 fresh-read providers.json，无需重建客户端
 // 缓存 Promise（而非实例）：避免并发首次请求 spawn 多个子进程
 let mcpClientPromise: Promise<MCPClient> | null = null;
+
+// 高德地图 MCP（远程 streamable HTTP），独立于本地 stdio 客户端
+let amapClientPromise: Promise<MCPClient> | null = null;
+
+function createAmapMCPClient(): Promise<MCPClient> {
+  if (!env.AMAP_MCP_KEY) return Promise.reject(new Error("AMAP_MCP_KEY 未配置"));
+  const transport = new StreamableHTTPClientTransport(
+    new URL(`https://mcp.amap.com/mcp?key=${env.AMAP_MCP_KEY}`),
+  );
+  return createMCPClient({
+    transport,
+    clientName: "amap-mcp-client",
+    onUncaughtError: (error) =>
+      console.error(`[amap-mcp] client error - ${(error as Error)?.message ?? String(error)}`),
+  });
+}
+
+export function getAmapMCPClient(): Promise<MCPClient> {
+  if (!amapClientPromise) {
+    amapClientPromise = createAmapMCPClient().catch((err) => {
+      amapClientPromise = null;
+      throw err;
+    });
+  }
+  return amapClientPromise;
+}
+
+export function resetAmapMCPClient(): void {
+  const pending = amapClientPromise;
+  amapClientPromise = null;
+  pending?.then((c) => c.close().catch(() => {})).catch(() => {});
+}
 
 function createMCPClientInstance(): Promise<MCPClient> {
   const transport = new StdioClientTransport({

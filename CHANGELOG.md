@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.82 (2026-11-23) — PWA：手机加主屏全屏（去浏览器壳）
+
+### 变更
+- **PWA 元数据**：`public/manifest.json`（`name 小盛开AI` / `start_url /ai/` / `scope /ai/` / `display standalone` / `theme_color #FFE135`）+ `public/icons/icon-{180,192,512}.png`（品牌「开」字 Neo-Brutalism 图标，`scripts/generate-pwa-icons.mjs` 用 sharp 栅格化生成）。
+- **根 `layout.tsx`**：`metadata.manifest`、`appleWebApp`（`capable:true` / `statusBarStyle:black-translucent`）、`icons.apple`（apple-touch-icon）、`viewport.themeColor`。
+- **鉴权豁免**（`proxy.ts`）：`/manifest.json`、`/icons/` 放行——否则 iOS「添加到主屏幕」拉图标/清单被 307 到登录页取不到。
+- **safe-area**：聊天页手机顶栏 `padding-top: calc(env(safe-area-inset-top)+…)`、输入区 `padding-bottom: calc(env(safe-area-inset-bottom)+…)`，配合 `viewportFit: cover` 避免 standalone 全屏下刘海/底部 home 条遮挡。
+
+### 使用
+iOS：Safari 打开 `http://118.89.25.12:4321/ai/` → 分享 → 添加到主屏幕 → 全屏无浏览器壳。
+
+### 验证
+- typecheck + test + build 全绿。
+
 ## v0.11.81 (2026-11-23) — 聊天主页手机端适配
 
 ### 变更

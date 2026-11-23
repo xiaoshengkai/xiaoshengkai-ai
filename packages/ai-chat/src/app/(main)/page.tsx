@@ -354,7 +354,7 @@ export default function ChatPage() {
     <ImageViewerProvider>
       <div className="flex h-full flex-col md:flex-row">
         {/* 手机端顶栏 */}
-        <header className="md:hidden flex items-center gap-2 border-b-2 border-border bg-card px-3 py-2 shrink-0">
+        <header className="md:hidden flex items-center gap-2 border-b-2 border-border bg-card px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
             className="brutal-btn p-1.5 cursor-pointer"
@@ -410,7 +410,7 @@ export default function ChatPage() {
             }}
           />
 
-          <div className="p-4">
+          <div className="px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
             <div className="max-w-3xl mx-auto relative">
               {!isAtBottom && messages.length > 5 && (
                 <button

@@ -14,11 +14,22 @@ import { Toaster } from "sonner";
 export const metadata: Metadata = {
   title: "小盛开AI",
   description: "小盛开AI - 像素风 AI 对话助手",
+  applicationName: "小盛开AI",
+  manifest: "/ai/manifest.json",
+  icons: {
+    apple: "/ai/icons/icon-180.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "小盛开AI",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
+  themeColor: "#FFE135",
 };
 
 export default function RootLayout({

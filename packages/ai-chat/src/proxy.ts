@@ -25,7 +25,9 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/api/auth/") ||
     pathname === FONT_PATH ||
     pathname.startsWith("/tasks/") ||
-    pathname.startsWith("/m/")
+    pathname.startsWith("/m/") ||
+    pathname === "/manifest.json" ||
+    pathname.startsWith("/icons/")
   ) {
     return NextResponse.next();
   }

@@ -91,7 +91,7 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
   }, [messages]);
 
   return (
-    <aside className="w-[280px] shrink-0 h-full flex flex-col overflow-hidden border-l-2 border-border bg-card">
+    <div className="h-full flex flex-col overflow-hidden">
       <div className="px-3 py-2 text-sm font-bold font-mono text-white bg-ink border-b-2 border-border">
         状态面板
       </div>
@@ -174,6 +174,6 @@ export default function RightPanel({ messages, isLoading }: { messages: UIMessag
           </div>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

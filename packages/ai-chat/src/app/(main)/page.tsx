@@ -6,7 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
-import { Send, ChevronDown, Image as ImageIcon, Square } from "lucide-react";
+import { Send, ChevronDown, Image as ImageIcon, Square, Menu, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import MessageItem from "@/components/chat/message-item";
 import { ImageViewerProvider } from "@/components/ui/image-viewer";
@@ -66,18 +66,28 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<AttachedFile[]>([]);
   const [uploading, setUploading] = useState(false);
-  const { activeConversationId, setActiveConversationId, clearMessagesRef, triggerRefresh, newIdsRef } = useConversation();
+  const { activeConversationId, setActiveConversationId, clearMessagesRef, triggerRefresh, newIdsRef, setSidebarOpen } = useConversation();
   const convIdRef = useRef<string | null>(null);
   const savingRef = useRef(false);
   const [mode, setMode] = useState<Mode>("chat");
   const modeRef = useRef<Mode>("chat");
   const [webSearch, setWebSearch] = useState(false);
   const webSearchRef = useRef(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   useEffect(() => {
     modeRef.current = mode;
     webSearchRef.current = webSearch;
   }, [mode, webSearch]);
+
+  useEffect(() => {
+    if (!statsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setStatsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [statsOpen]);
 
   clearMessagesRef.current = () => {
     setMessages([]);
@@ -342,7 +352,27 @@ export default function ChatPage() {
 
   return (
     <ImageViewerProvider>
-      <div className="flex h-full">
+      <div className="flex h-full flex-col md:flex-row">
+        {/* 手机端顶栏 */}
+        <header className="md:hidden flex items-center gap-2 border-b-2 border-border bg-card px-3 py-2 shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="brutal-btn p-1.5 cursor-pointer"
+            aria-label="打开侧边栏"
+          >
+            <Menu className="size-4" />
+          </button>
+          <Logo size={8} />
+          <span className="text-sm font-bold font-heading tracking-wider">小盛开AI</span>
+          <button
+            onClick={() => setStatsOpen((v) => !v)}
+            className="brutal-btn p-1.5 cursor-pointer ml-auto"
+            aria-label="状态面板"
+          >
+            <BarChart3 className="size-4" />
+          </button>
+        </header>
+
         {/* 聊天区 */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Virtuoso
@@ -420,7 +450,7 @@ export default function ChatPage() {
                 rows={1}
                 placeholder="输入消息..."
                 disabled={isLoading}
-                className="w-full min-h-10 max-h-80 px-3 py-2 text-sm outline-none resize-none overflow-y-auto placeholder:text-muted-foreground/50 bg-transparent"
+                className="w-full min-h-10 max-h-80 px-3 py-2 text-base md:text-sm outline-none resize-none overflow-y-auto placeholder:text-muted-foreground/50 bg-transparent"
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
                 onInput={handleInput}
@@ -432,8 +462,8 @@ export default function ChatPage() {
                   }
                 }}
               />
-              <div className="flex items-center justify-between px-3 pt-1 pb-2">
-                <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-between gap-y-1 px-3 pt-1 pb-2">
+                <div className="flex flex-wrap items-center gap-1">
                   <button
                     type="button"
                     onClick={cycleMode}
@@ -491,10 +521,19 @@ export default function ChatPage() {
         </div>
 
         {/* 右侧状态面板 */}
-        <RightPanel
-          messages={messages}
-          isLoading={isLoading}
-        />
+        {statsOpen && (
+          <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setStatsOpen(false)} />
+        )}
+        <div
+          className={`fixed inset-y-0 right-0 z-50 w-[280px] bg-card border-l-2 border-border transition-transform md:static md:translate-x-0 ${
+            statsOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <RightPanel
+            messages={messages}
+            isLoading={isLoading}
+          />
+        </div>
       </div>
     </ImageViewerProvider>
   );

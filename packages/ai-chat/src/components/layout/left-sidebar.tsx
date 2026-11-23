@@ -36,6 +36,7 @@ interface LeftSidebarProps {
   activeConversationId: string | null;
   onNewConversation: () => string;
   onSelectConversation: (id: string) => void;
+  onNavigate?: () => void;
 }
 
 const menuItems: { href: string; label: string; icon: LucideIcon; disabled?: boolean; blog?: boolean }[] = [
@@ -60,6 +61,7 @@ export default function LeftSidebar({
   activeConversationId,
   onNewConversation,
   onSelectConversation,
+  onNavigate,
 }: LeftSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -102,6 +104,7 @@ export default function LeftSidebar({
     const now = Date.now();
     setConversations(prev => [{ id, title: "新对话", createdAt: now, updatedAt: now }, ...prev]);
     if (pathname !== "/") router.push("/");
+    onNavigate?.();
   };
 
   const handleDelete = async (id: string) => {
@@ -143,7 +146,7 @@ export default function LeftSidebar({
   };
 
   return (
-    <aside className="w-[240px] shrink-0 h-dvh flex flex-col bg-card border-r-2 border-border">
+    <aside className="w-full h-dvh flex flex-col bg-card border-r-2 border-border">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-3 px-4 py-4 border-b-2 border-border">
         <Logo size={10} />
@@ -171,6 +174,7 @@ export default function LeftSidebar({
               onClick={() => {
                 onSelectConversation(conv.id);
                 if (pathname !== "/") router.push("/");
+                onNavigate?.();
               }}
               className={`group flex items-center gap-2 px-2 py-1.5 cursor-pointer text-sm font-mono border-2 relative
                 ${activeConversationId === conv.id ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
@@ -198,7 +202,7 @@ export default function LeftSidebar({
                   setMenuPos({ top: rect.bottom, left: rect.right + 4 });
                   setMenuOpen(menuOpen === conv.id ? null : conv.id);
                 }}
-                className={`shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer ${activeConversationId === conv.id ? "text-foreground/70 hover:text-foreground" : "text-muted-foreground/50 hover:text-foreground"}`}
+                className={`shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 cursor-pointer ${activeConversationId === conv.id ? "text-foreground/70 hover:text-foreground" : "text-muted-foreground/50 hover:text-foreground"}`}
               >
                 <MoreHorizontal className="size-4" />
               </button>
@@ -251,7 +255,10 @@ export default function LeftSidebar({
               target={isExternal ? "_blank" : undefined}
               className={`flex items-center gap-3 px-3 py-2 text-sm font-mono transition-colors
                 ${isDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-muted"}`}
-              onClick={(e) => isDisabled && e.preventDefault()}
+              onClick={(e) => {
+                if (isDisabled) { e.preventDefault(); return; }
+                onNavigate?.();
+              }}
             >
               <item.icon className="size-4" />
               <span>{item.label}</span>

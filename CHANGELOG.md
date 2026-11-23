@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.11.81 (2026-11-23) — 聊天主页手机端适配
+
+### 变更
+- **聊天主页响应式化**：三栏布局（左侧栏 + 聊天区 + 右侧状态面板）在手机端（<768px）改为「顶部栏 + 单栏聊天 + 两个抽屉」——左侧栏（对话列表/菜单）变左滑抽屉（汉堡按钮打开），右侧状态面板（模型/token/检索记忆）变右滑抽屉（统计按钮打开）；桌面端布局不变。
+- **顶部栏（`md:hidden`）**：汉堡按钮 + 标题 + 统计按钮；侧栏抽屉开合状态走 `ConversationContext`（`sidebarOpen`），统计抽屉用页面本地 state。
+- **抽屉机制**：纯 CSS `fixed + translate` 单实例响应式切换（桌面 `md:static` 常驻、手机 `fixed` 抽屉），backdrop 点击关闭 + `Escape` 关闭；不引新依赖。`RightPanel` 剥掉 `aside` 外壳（尺寸/边框交页面容器）。
+- **触屏优化**：输入 textarea `text-base`（防 iOS 聚焦自动放大）；工具条 `flex-wrap` 防溢出；消息气泡手机端 `w-full` 放宽（桌面仍 `w-[80%]`）；对话列表「…」菜单手机端常显（原 `group-hover` 触屏不可达）。
+- **根 layout 导出 `viewport`**：`viewportFit: cover` + `interactiveWidget: resizes-content`，改善 iOS 弹键盘遮挡输入框。
+
+### 验证
+- typecheck + test + build 全绿。
+
 ## v0.11.80 (2026-11-17) — 接入第三方 MCP：高德地图
 
 ### 变更

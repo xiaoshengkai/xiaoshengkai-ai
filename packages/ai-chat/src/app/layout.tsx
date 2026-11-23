@@ -5,7 +5,7 @@
  * Next.js App Router 要求必须有 RootLayout。
  */
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { cn } from "@/lib/utils/utils";
 import { Toaster } from "sonner";
@@ -14,6 +14,11 @@ import { Toaster } from "sonner";
 export const metadata: Metadata = {
   title: "小盛开AI",
   description: "小盛开AI - 像素风 AI 对话助手",
+};
+
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

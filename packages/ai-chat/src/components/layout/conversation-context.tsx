@@ -14,6 +14,8 @@ interface ConversationContextType {
   newConversation: () => string;
   clearMessagesRef: { current: (() => void) | null };
   newIdsRef: { current: Set<string> };
+  sidebarOpen: boolean;
+  setSidebarOpen: (v: boolean) => void;
 }
 
 const ConversationContext = createContext<ConversationContextType>({
@@ -24,6 +26,8 @@ const ConversationContext = createContext<ConversationContextType>({
   newConversation: () => "",
   clearMessagesRef: { current: null },
   newIdsRef: { current: new Set() },
+  sidebarOpen: false,
+  setSidebarOpen: () => {},
 });
 
 export function useConversation() {
@@ -35,6 +39,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const clearMessagesRef = useRef<(() => void) | null>(null);
   const newIdsRef = useRef<Set<string>>(new Set());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const triggerRefresh = useCallback(() => {
     setRefreshKey(k => k + 1);
@@ -48,7 +53,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ConversationContext.Provider value={{ activeConversationId, setActiveConversationId, refreshKey, triggerRefresh, newConversation, clearMessagesRef, newIdsRef }}>
+    <ConversationContext.Provider value={{ activeConversationId, setActiveConversationId, refreshKey, triggerRefresh, newConversation, clearMessagesRef, newIdsRef, sidebarOpen, setSidebarOpen }}>
       {children}
     </ConversationContext.Provider>
   );

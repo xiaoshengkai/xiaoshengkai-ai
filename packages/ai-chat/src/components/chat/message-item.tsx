@@ -107,7 +107,7 @@ toast.error("保存失败，请重试", {
             AI
           </div>
         )}
-        <div className={msg.role === "user" ? "max-w-[80%] min-w-0" : "w-[80%]"}>
+        <div className={msg.role === "user" ? "max-w-[80%] min-w-0" : "w-full md:w-[80%]"}>
           <div
             className={cn("px-4 py-2.5 text-sm border-[3px]", msg.role === "user" ? "bg-ink text-white border-ink" : "bg-card text-foreground shadow-md")}
             style={msg.role === "user" ? { boxShadow: "5px 5px 0 var(--yellow)" } : undefined}

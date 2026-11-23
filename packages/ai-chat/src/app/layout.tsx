@@ -24,6 +24,9 @@ export const metadata: Metadata = {
     title: "小盛开AI",
     statusBarStyle: "black-translucent",
   },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
 };
 
 export const viewport: Viewport = {

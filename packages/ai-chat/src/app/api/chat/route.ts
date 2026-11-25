@@ -15,7 +15,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { streamText, stepCountIs } from 'ai';
+import { streamText, stepCountIs, type ModelMessage } from 'ai';
 
 import { env } from '@/lib/utils/env';
 import { retrieveRelevantChunks } from '@/lib/rag/retrieve';
@@ -105,11 +105,13 @@ export async function POST(req: Request) {
     );
 
     const systemPrompt = buildSystemPrompt({
-      knowledgeContext,
       mode: currentMode,
       hasTools: Object.keys(tools).length > 0,
       webSearch,
     });
+
+    // 动态上下文（日期 + RAG）prepend 到最后一条 user 消息，保持 system 静态以命中 DeepSeek 前缀缓存
+    prependToLastUserMessage(modelMessages, buildDynamicContext(knowledgeContext));
 
     const chatConfig = getProviderConfig('chat');
     const model = strategy.createModel(actualModel, chatConfig);
@@ -157,42 +159,55 @@ export async function POST(req: Request) {
 // ─── 辅助函数 ──────────────────────────────────────────────────────
 
 /**
- * 构建 system prompt
+ * 构建 system prompt（静态：不含时间/RAG，二者由 buildDynamicContext 注入最后一条 user 消息，
+ * 以保持 system 前缀稳定，命中 DeepSeek 上下文缓存）
  */
 function buildSystemPrompt({
-  knowledgeContext,
   mode,
   hasTools,
   webSearch,
 }: {
-  knowledgeContext: string;
   mode: ChatMode;
   hasTools: boolean;
   webSearch: boolean;
 }): string {
   const { label: modeLabel, instruction: modeInstruction } = MODE_INFO[mode];
   const toolsSection = buildToolsSection(mode, hasTools, webSearch);
-  // 每请求生成，模型据此推算周末/节假日/当季，不再反问用户日期
-  const now = new Date().toLocaleString("zh-CN", {
-    weekday: "long", year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hour12: false,
-  });
-  // chat 纯对话：不注入技能清单与知识库；plan/build 保留技能规则
+  // chat 纯对话：不注入技能清单；plan/build 保留技能规则
   const skillBlock = mode === "chat"
     ? ""
     : `\n技能规则: 涉及专业领域先检查 <available_skills>，有匹配则加载执行。\n${SKILL_LIST}`;
-  const knowledgeBlock = knowledgeContext ? `\n${knowledgeContext}` : "";
   return `你是小盛开AI，一个实用的编程助手，擅长代码编写、知识管理、图表生成和多媒体创作。用中文思考，所有思考过程必须用中文描述，不要使用英文。用通俗语言回答。参考知识库时自然融入答案，不标注来源。
-
-当前时间: ${now}
 
 当前模式: ${modeLabel}
 ${modeInstruction}
 
 工具规则: 每轮评估信息是否足够，够则立即回答；工具失败可重试1次，仍失败则告知用户。
 ${skillBlock}
-${toolsSection}
-${knowledgeBlock}`;
+${toolsSection}`;
+}
+
+/**
+ * 动态上下文：当前日期（日期+星期，无时分，模型据此推算周末/节假日/当季）+ RAG 检索结果。
+ * 随请求变化的内容放最后一条 user 消息，避免破坏 system 前缀缓存。
+ */
+function buildDynamicContext(knowledgeContext: string): string {
+  const now = new Date().toLocaleString("zh-CN", {
+    weekday: "long", year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const knowledgeBlock = knowledgeContext ? `\n\n${knowledgeContext}` : "";
+  return `当前日期: ${now}${knowledgeBlock}`;
+}
+
+/** 将动态上下文插入最后一条 user 消息内容开头 */
+function prependToLastUserMessage(messages: ModelMessage[], text: string): void {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "user") return;
+  if (Array.isArray(last.content)) {
+    last.content.unshift({ type: "text", text });
+  } else if (typeof last.content === "string") {
+    last.content = `${text}\n\n${last.content}`;
+  }
 }
 
 /**

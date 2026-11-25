@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.11.84 (2026-11-25) — DeepSeek 成本优化：命中上下文缓存
+
+### 变更
+- **system prompt 静态化**：`当前时间`（分钟级变化）和 RAG 知识库上下文从 system 移除，改为 `buildDynamicContext` + `prependToLastUserMessage` prepend 到最后一条 user 消息——保持 system 前缀稳定，命中 DeepSeek 前缀缓存（此前时间戳每分钟变化，142 条历史消息每次按 cache miss 全价重算，约 10 倍成本）。
+- **图片描述缓存**：`preprocess.ts` 的 vision 描述按图片 `dataUrl` 进程内缓存，同一张图只描述一次（此前每次请求重描）。
+- 时间粒度从「时分」降到「日期+星期」（模型推算周末/节假日只需日期）。
+
+### 验证
+- typecheck + test:mm（37/37）全绿。
+
+## v0.11.83 (2026-11-25) — 修复 tool-* 静态 part 导致 AI_InvalidPromptError
+
+### 变更
+- `toModelMessages` 对 `tool-${name}` 静态工具 part（AI SDK 在工具被模式过滤但模型仍调用时产出，工具名在 `type` 而非 `toolName` 字段、出错态 input 在 `rawInput`）派生工具名 + 兜底 input，避免 `toolName: undefined` 触发校验失败。
+
+### 验证
+- typecheck + test:mm 全绿；线上复现路径 200。
+
 ## v0.11.82 (2026-11-23) — PWA：手机加主屏全屏（去浏览器壳）
 
 ### 变更

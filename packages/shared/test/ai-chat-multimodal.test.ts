@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { processAttachments } from "../../ai-chat/src/lib/multimodal/pipeline";
+import { clearDescriptionCache } from "../../ai-chat/src/lib/multimodal/preprocess";
 import { IMAGE_MISSING_NOTE } from "../../ai-chat/src/lib/multimodal/attachment";
 import type { Message } from "../../ai-chat/src/lib/utils/types";
 
@@ -15,6 +16,10 @@ const largeImagePath = path.join(root, "data", "static", "images", largeImage);
 test.before(() => {
   mkdirSync(path.dirname(imagePath), { recursive: true });
   writeFileSync(imagePath, Buffer.from("image fixture"));
+});
+
+test.beforeEach(() => {
+  clearDescriptionCache();
 });
 
 test.after(() => {

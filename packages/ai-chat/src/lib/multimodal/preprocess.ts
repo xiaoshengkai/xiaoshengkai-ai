@@ -29,7 +29,20 @@ function localData(filename: string): string {
   return `data:${mime};base64,${fs.readFileSync(filePath).toString("base64")}`;
 }
 
+// ponytail: 跨请求缓存图片描述（dataUrl → 描述文本），同一张图只 vision 一次；进程内缓存，重启失效
+const descriptionCache = new Map<string, string>();
+
+/** 清空图片描述缓存（测试隔离用） */
+export function clearDescriptionCache(): void {
+  descriptionCache.clear();
+}
+
 async function describeImage(dataUrl: string): Promise<string | null> {
+  const cached = descriptionCache.get(dataUrl);
+  if (cached !== undefined) {
+    console.log(`[preprocess] 描述命中缓存 len=${cached.length}`);
+    return cached;
+  }
   try {
     const { text } = await callMultimodalLLM({
       system: VISION_SYSTEM,
@@ -38,7 +51,9 @@ async function describeImage(dataUrl: string): Promise<string | null> {
       format: null,
     });
     console.log(`[preprocess] 描述 len=${text.length}`);
-    return text ? wrapDescription(text) : null;
+    const wrapped = text ? wrapDescription(text) : null;
+    if (wrapped) descriptionCache.set(dataUrl, wrapped);
+    return wrapped;
   } catch (e) {
     console.warn(`[preprocess] vision 调用失败: ${(e as Error).message}`);
     return null;

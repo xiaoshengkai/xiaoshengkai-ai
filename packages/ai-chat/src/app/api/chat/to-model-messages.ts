@@ -24,6 +24,7 @@ type UIPart = {
   toolName?: string;
   state?: string;
   input?: unknown;
+  rawInput?: unknown;
   output?: unknown;
   errorText?: string;
 };
@@ -60,12 +61,13 @@ export function toModelMessages(messages: UIMessageLike[]): AISDKModelMessage[] 
         } else if (p.type === "text") {
           content.push({ type: "text", text: p.text ?? "" });
         } else if (p.type === "dynamic-tool" || p.type.startsWith("tool-")) {
+          const toolName = p.type === "dynamic-tool" ? p.toolName : p.type.slice("tool-".length);
           if (p.state === "output-available") {
-            content.push({ type: "tool-call", toolCallId: p.toolCallId, toolName: p.toolName, input: p.input });
-            toolResults.push({ type: "tool-result", toolCallId: p.toolCallId, toolName: p.toolName, output: wrapToolOutput(p.output) });
+            content.push({ type: "tool-call", toolCallId: p.toolCallId, toolName, input: p.input });
+            toolResults.push({ type: "tool-result", toolCallId: p.toolCallId, toolName, output: wrapToolOutput(p.output) });
           } else if (p.state === "output-error") {
-            content.push({ type: "tool-call", toolCallId: p.toolCallId, toolName: p.toolName, input: p.input });
-            toolResults.push({ type: "tool-result", toolCallId: p.toolCallId, toolName: p.toolName, output: { type: "error-text", value: p.errorText || "tool error" } });
+            content.push({ type: "tool-call", toolCallId: p.toolCallId, toolName, input: p.input ?? p.rawInput });
+            toolResults.push({ type: "tool-result", toolCallId: p.toolCallId, toolName, output: { type: "error-text", value: p.errorText || "tool error" } });
           }
           // input-streaming / input-available：跳过，避免产生无结果的悬空 tool-call
         }

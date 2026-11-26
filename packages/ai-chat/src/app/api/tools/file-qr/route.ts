@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const items = listMedia();
+  const items = listMedia().filter((m) => m.kind !== "chat-upload");
   return NextResponse.json({ ok: true, items });
 }
 

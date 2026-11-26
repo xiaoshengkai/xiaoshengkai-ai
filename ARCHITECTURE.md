@@ -55,7 +55,7 @@ ai-engineer-journey/
     │   ├── image-preview.js    # 图片预览压缩：sharp 长边1600+JPEG q85、伴生 .preview.jpg 缓存（预览用，导出用原图）
     │   ├── auth.js             # 登录鉴权：密码校验（data/auth.json 优先，.env 兜底）/ HMAC token 签发校验（含密码指纹）/ 防爆破计数
     │   ├── egress.js           # 内网出口层：白名单域名走反向隧道（SOCKS），其余直连；installEgress 补丁 globalThis.fetch
-    │   ├── media.js            # 媒体库：data/media/<token> + index.json（原子写）；128-bit 随机 token（base64url），addMedia/addLink/getMedia/listMedia/deleteMedia
+    │   ├── media.js            # 媒体库：data/media/<token> + index.json（原子写）；128-bit 随机 token（base64url），addMedia（可选 source 来源标识）/addLink/getMedia/listMedia/deleteMedia/findMediaBySource（source 幂等查 token）
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir / withTimeout（网络调用硬超时兜底）
@@ -73,7 +73,7 @@ ai-engineer-journey/
     │   │   ├── lib/
     │   │   │   ├── core/        # LLM 基础设施：embedding / workflow-model / fetch-interceptors
     │   │   │   ├── strategies/  # chat 路由：chat-strategy + 4 provider strategy（deepseek/glm/minimax/qwen，classifyTask 在 deepseek.ts）
-    │   │   │   ├── multimodal/  # 附件处理：attachment / image / video(仅 stripVideos) / pipeline / preprocess(vision 逐图描述→内联替换消息占位符) / modality-detector / multimodal-config / mime
+    │   │   │   ├── multimodal/  # 附件处理：attachment / image / video(仅 stripVideos) / pipeline / preprocess(vision 逐图描述→内联替换消息占位符，附公网原图 URL：本地图按需注册媒体库 kind=chat-upload，供模型调图生图工具) / modality-detector / multimodal-config / mime
     │   │   │   ├── rag/         # retrieve.ts / vector-store.ts / chroma-server.ts
     │   │   │   ├── settings/    # store / init / dispatcher / types
     │   │   │   ├── services/    # manager.ts：packages/services/* 清单扫描 + 启停/健康检查（服务监控）
@@ -217,7 +217,7 @@ packages/tools/<id>/tool.json        data/media/<token> + index.json（原子写
   → /api/tools/<id> 各工具独立 route   GET /m/<token> 公开服务（Range 流式）
 ```
 
-- **媒体库** `@app/shared/media.js`：`generateToken`（`crypto.randomBytes(16).toString("base64url")`，不可猜测）/ `addMedia`（copyFile + 写索引，token 撞车重生成）/ `addLink`（链接条目：只写索引不落文件，`kind:"url"`+`targetUrl`）/ `getMedia`（isValidToken `^[A-Za-z0-9_-]{16,64}$` 拒绝穿越/注入）/ `listMedia` / `deleteMedia`（硬删文件+索引条目，链接即刻 404；url 类无文件仅删记录）。`MEDIA_DIR` env 可覆盖存储根（测试用）。定位同 capability：webpack cwd=packages/ai-chat（上两级=仓库根）。
+- **媒体库** `@app/shared/media.js`：`generateToken`（`crypto.randomBytes(16).toString("base64url")`，不可猜测）/ `addMedia`（copyFile + 写索引，token 撞车重生成）/ `addLink`（链接条目：只写索引不落文件，`kind:"url"`+`targetUrl`）/ `getMedia`（isValidToken `^[A-Za-z0-9_-]{16,64}$` 拒绝穿越/注入）/ `listMedia` / `deleteMedia`（硬删文件+索引条目，链接即刻 404；url 类无文件仅删记录）。`MEDIA_DIR` env 可覆盖存储根（测试用）。定位同 capability：webpack cwd=packages/ai-chat（上两级=仓库根）。聊天上传图由 preprocess 按需注册（`kind:"chat-upload"` + `source:"chat-upload:<filename>"` 幂等），file-qr 列表过滤该 kind 不混入。
 - **公开路由** `GET /m/<token>`（`app/m/[token]/route.ts`）：token 查表 → Range 流式（`206`/`416`/`Accept-Ranges`，支持 `bytes=start-end`/`start-`/`-suffix` 后缀 Range——浏览器 PDF 查看器依赖后缀 Range 拿 xref 尾部）、`Cache-Control: public, max-age=31536000, immutable`。`proxy.ts` 豁免 `pathname.startsWith("/m/")`（公开，同 `/tasks/*`）；`proxy.cjs` 转发 `req.url.startsWith('/m/')`（否则落到 site/ 静态 404）。
 - **工具边界**：工具是「确定性单步操作」（上传→转码→二维码），无 AI、无状态机，区别于工作流（AI 驱动多步骤有执行状态）。工具菜单是薄框架——列表页扫 `packages/tools/*/tool.json` 自发现，但每个工具的 page/api 是 ai-chat 里独立静态路由（不做运行时动态 import，保持类型安全）。加工具 = 丢一个 tool.json + 一个 page + 一个 api route。
 - **file-qr 工具**：`/api/tools/file-qr`（POST 按 content-type 分流：multipart → 按扩展名分流 `视频(mp4/mov/webm/avi/mkv)→ffmpeg 转 H.264 libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -movflags +faststart`、`图片(png/jpg/jpeg/gif/webp)≤20M`、`PDF≤50M` 直存，MIME 由扩展名查表不信任客户端 content-type；json `{url,title}` → `new URL` 校验 http/https → addLink。返回 `{token,url,title,kind}`，文件类 `url=/m/<token>`、链接类 `url=targetUrl`；GET 列表；DELETE 删）。前端 `/tools/file-qr` 列表入口 + 「新建二维码」弹窗（tab 上传文件/粘贴链接），`window.location.origin` 拼 `/m/<token>`（链接类直接用 targetUrl）并用 `qrcode` 生成二维码（不落盘，确定性可重生成）。临时文件转码后即删。**服务器 ffmpeg**：复用 prod.sh 自动维护的 `data/bin/ffmpeg`（7.0.2-static，含 libx264，PATH 前置），转码直接可用。

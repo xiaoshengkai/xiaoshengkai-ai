@@ -74,9 +74,10 @@ export function isValidToken(token) {
 
 /**
  * 把文件加入媒体库，返回 token。
- * @param {{ filePath: string, mime: string, title?: string, kind?: string }} opts
+ * @param {{ filePath: string, mime: string, title?: string, kind?: string, source?: string }} opts
+ * source：来源标识（如 chat-upload:<filename>），用于 findMediaBySource 幂等复用
  */
-export function addMedia({ filePath, mime, title = "", kind = "file" }) {
+export function addMedia({ filePath, mime, title = "", kind = "file", source = "" }) {
   const dir = mediaRoot();
   fs.mkdirSync(dir, { recursive: true });
   const idx = readIndex();
@@ -92,9 +93,20 @@ export function addMedia({ filePath, mime, title = "", kind = "file" }) {
     kind: String(kind || "file"),
     size,
     createdAt: Date.now(),
+    ...(source ? { source: String(source) } : {}),
   };
   writeIndex(idx);
   return token;
+}
+
+/** 按来源标识查 token（幂等复用），无则 null */
+export function findMediaBySource(source) {
+  if (!source) return null;
+  const idx = readIndex();
+  for (const [token, meta] of Object.entries(idx)) {
+    if (meta.source === source) return token;
+  }
+  return null;
 }
 
 /**

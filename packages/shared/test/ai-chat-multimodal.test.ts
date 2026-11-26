@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, mkdtempSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { processAttachments } from "../../ai-chat/src/lib/multimodal/pipeline";
 import { clearDescriptionCache } from "../../ai-chat/src/lib/multimodal/preprocess";
 import { IMAGE_MISSING_NOTE } from "../../ai-chat/src/lib/multimodal/attachment";
@@ -12,10 +14,13 @@ const image = "test-multimodal.png";
 const largeImage = "test-multimodal-large.png";
 const imagePath = path.join(root, "data", "static", "images", image);
 const largeImagePath = path.join(root, "data", "static", "images", largeImage);
+const mediaDir = mkdtempSync(path.join(tmpdir(), "multimodal-media-"));
 
 test.before(() => {
   mkdirSync(path.dirname(imagePath), { recursive: true });
   writeFileSync(imagePath, Buffer.from("image fixture"));
+  process.env.MEDIA_DIR = mediaDir;
+  process.env.PUBLIC_BASE = "http://test.local";
 });
 
 test.beforeEach(() => {
@@ -25,6 +30,9 @@ test.beforeEach(() => {
 test.after(() => {
   rmSync(imagePath, { force: true });
   rmSync(largeImagePath, { force: true });
+  rmSync(mediaDir, { recursive: true, force: true });
+  delete process.env.MEDIA_DIR;
+  delete process.env.PUBLIC_BASE;
 });
 
 function message(text: string): Message[] {
@@ -191,6 +199,43 @@ test("vision 调用失败降级注记，不阻断对话", async () => {
   });
 
   assert.equal(textOf(result).includes(IMAGE_MISSING_NOTE), true);
+});
+
+test("内联描述附公网原图引用，同图幂等复用 token", async () => {
+  mockVision();
+  const input = { provider: "deepseek", model: "deepseek-v4-pro", messages: message(`改字 [图片:/api/uploads/${image}]`) };
+
+  const first = await processAttachments(input);
+  const match = textOf(first).match(/原图URL[^\]]*: (http:\/\/test\.local\/m\/[A-Za-z0-9_-]+)\]/);
+  assert.ok(match, "应内联公网原图 URL");
+
+  clearDescriptionCache();
+  mockVision();
+  const second = await processAttachments(input);
+  assert.equal(textOf(second).includes(match![1]), true, "同图应复用同一 token");
+});
+
+test("远程图下载成功时引用原 URL", async () => {
+  globalThis.fetch = async (_url, init) => {
+    if (init?.body === undefined) return new Response(Buffer.from("remote-image"));
+    return Response.json({ choices: [{ message: { content: "远程图描述" } }] });
+  };
+
+  const result = await processAttachments({
+    provider: "deepseek",
+    model: "deepseek-v4-pro",
+    messages: message("描述 https://example.com/demo.png"),
+  });
+
+  assert.equal(textOf(result).includes("原图URL"), true);
+  assert.equal(textOf(result).includes("https://example.com/demo.png"), true);
+
+  // 清理 downloadRemoteImage 落盘的缓存文件
+  const hash = createHash("md5").update("https://example.com/demo.png").digest("hex").slice(0, 8);
+  const imagesDir = path.dirname(imagePath);
+  for (const f of readdirSync(imagesDir)) {
+    if (f.includes(hash)) rmSync(path.join(imagesDir, f), { force: true });
+  }
 });
 
 test("视频已不支持，静默丢弃不触发 preprocess", async () => {

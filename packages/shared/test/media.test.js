@@ -16,6 +16,7 @@ const {
   getMedia,
   listMedia,
   deleteMedia,
+  findMediaBySource,
 } = await import("../media.js");
 
 test("generateToken produces valid, unique, unguessable tokens", () => {
@@ -99,6 +100,25 @@ test("addLink stores url entry with no file, deletable", () => {
 
   assert.equal(deleteMedia(token), true);
   assert.equal(deleteMedia(token), false);
+});
+
+test("addMedia source + findMediaBySource 幂等复用", () => {
+  const src = path.join(root, "chat.png");
+  writeFileSync(src, Buffer.from("chat-image"));
+  assert.equal(findMediaBySource("chat-upload:chat.png"), null);
+
+  const token = addMedia({ filePath: src, mime: "image/png", kind: "chat-upload", source: "chat-upload:chat.png" });
+  assert.equal(findMediaBySource("chat-upload:chat.png"), token);
+  assert.equal(getMedia(token).meta.source, "chat-upload:chat.png");
+  assert.equal(findMediaBySource(""), null);
+  assert.equal(findMediaBySource("chat-upload:nope.png"), null);
+
+  // 无 source 的条目不写 source 字段
+  const plain = addMedia({ filePath: src, mime: "image/png" });
+  assert.equal("source" in getMedia(plain).meta, false);
+  deleteMedia(token);
+  deleteMedia(plain);
+  assert.equal(findMediaBySource("chat-upload:chat.png"), null);
 });
 
 test.after(() => {

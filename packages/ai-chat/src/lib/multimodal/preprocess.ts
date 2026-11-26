@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { callMultimodalLLM } from "@app/shared/llm/index.js";
+import { addMedia, findMediaBySource } from "@app/shared/media.js";
+import { publicBase } from "@app/shared/public-base.js";
 import { ATTACHMENT_REGEX, IMAGE_MISSING_NOTE, assertMediaDataSize, downloadRemoteImage } from "./attachment";
 import { parseAttachment } from "./modality-detector";
 import { DEFAULT_CONFIG, isWithinHistoryDepth } from "./multimodal-config";
@@ -66,6 +68,32 @@ interface Item {
   /** 需要独立 vision 调用的 dataUrl；null 表示降级或复用 alias */
   dataUrl: string | null;
   alias?: string;
+}
+
+/**
+ * 原图公网引用（图生图工具 image_url 用）：
+ * 本地上传图按需注册媒体库（source 幂等，历史旧图自动补注册）→ /m/<token>；
+ * 远程图原 URL 本身公网可访问直接复用。失败返回 null 只保留描述，不阻断对话。
+ */
+function publicImageRef(source: string): string | null {
+  const attachment = parseAttachment(source);
+  if (!attachment || attachment.modality !== "image") return null;
+  try {
+    if (!attachment.localPath) return attachment.source;
+    const filePath = path.resolve(ROOT_DIR, "data", "static", "images", attachment.filename);
+    if (!fs.existsSync(filePath)) return null;
+    const sourceKey = `chat-upload:${attachment.filename}`;
+    const token = findMediaBySource(sourceKey) ?? addMedia({
+      filePath,
+      mime: extToMime(path.extname(attachment.filename).slice(1).toLowerCase()),
+      kind: "chat-upload",
+      source: sourceKey,
+    });
+    return `${publicBase()}/m/${token}`;
+  } catch (e) {
+    console.warn(`[preprocess] 原图公网引用生成失败: ${(e as Error).message}`);
+    return null;
+  }
 }
 
 /**
@@ -136,9 +164,15 @@ export async function preprocessAttachmentsDescriptions(messages: Message[]): Pr
 
   const out = new Map<string, string>();
   for (const it of items) {
-    if (it.dataUrl) out.set(it.key, byKey.get(it.key) ?? IMAGE_MISSING_NOTE);
-    else if (it.alias) out.set(it.key, byKey.get(it.alias) ?? IMAGE_MISSING_NOTE);
-    else out.set(it.key, IMAGE_MISSING_NOTE);
+    let text: string;
+    if (it.dataUrl) text = byKey.get(it.key) ?? IMAGE_MISSING_NOTE;
+    else if (it.alias) text = byKey.get(it.alias) ?? IMAGE_MISSING_NOTE;
+    else text = IMAGE_MISSING_NOTE;
+    if (text !== IMAGE_MISSING_NOTE) {
+      const ref = publicImageRef(it.key);
+      if (ref) text += `\n[原图URL（公网可访问，可作为图生图工具 image_url）: ${ref}]`;
+    }
+    out.set(it.key, text);
   }
   return out;
 }

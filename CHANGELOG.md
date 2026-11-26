@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.85 (2026-11-26) — 修复聊天上传图无法图生图：内联描述附公网原图 URL
+
+### 问题
+纯文本 provider（deepseek 系）走 preprocess 时，`[图片:/api/uploads/x.png]` 标记被整体替换为 vision 描述，原图引用丢失；且 `/api/uploads/*` 在鉴权卡口后，外部生图 API 抓不到。模型只能回答"没有原图 URL"，无法调 `generateImageFromImage`。
+
+### 变更
+- **preprocess 附公网原图引用**：描述成功的条目追加 `[原图URL（公网可访问，可作为图生图工具 image_url）: …]`。本地上传图按需注册媒体库（`publicBase()/m/<token>`），远程图复用原 URL；失败只保留描述不阻断。历史旧图自动补注册救活。
+- **media.js**：`addMedia` 支持 `source` 来源标识 + 新增 `findMediaBySource`（幂等复用 token，不重复拷贝）。
+- **file-qr 列表**：过滤 `kind:"chat-upload"`，聊天图不混入二维码工具列表。
+
+### 验证
+- typecheck + test（134+39+9）全绿；新增 media source 幂等 + preprocess 公网引用/远程引用测试。
+
 ## v0.11.84 (2026-11-25) — DeepSeek 成本优化：命中上下文缓存
 
 ### 变更

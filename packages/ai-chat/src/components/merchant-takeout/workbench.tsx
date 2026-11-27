@@ -143,11 +143,11 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
             </div>
             <LocationCostForm
               location={selectedLocation}
-              onChange={(costs) =>
+              onChange={(patch) =>
                 setStore((prev) => ({
                   ...prev,
                   locations: prev.locations.map((l) =>
-                    l.id === selectedLocation.id ? { ...l, costs } : l,
+                    l.id === selectedLocation.id ? { ...l, ...patch } : l,
                   ),
                 }))
               }

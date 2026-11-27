@@ -74,10 +74,7 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
       selected: isFirst,
       costs: defaultLocationCosts(),
     };
-    const next = isFirst
-      ? [loc, ...locationsRef.current]
-      : [...locationsRef.current.map((l) => ({ ...l, selected: false })), loc];
-    onChange(next);
+    onChange([loc, ...locationsRef.current]);
     setCurrentId(loc.id);
   };
 

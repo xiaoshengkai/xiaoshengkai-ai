@@ -27,7 +27,7 @@ export function defaultLocationCosts(): LocationCosts {
 
 interface LocationCostFormProps {
   location: StoreLocation;
-  onChange: (costs: LocationCosts) => void;
+  onChange: (patch: Partial<StoreLocation>) => void;
 }
 
 function NumField({
@@ -85,7 +85,7 @@ const fmt = (n: number) => `¥ ${(Number.isFinite(n) ? n : 0).toLocaleString("zh
 
 export default function LocationCostForm({ location, onChange }: LocationCostFormProps) {
   const c = location.costs;
-  const set = (patch: Partial<LocationCosts>) => onChange({ ...c, ...patch });
+  const set = (patch: Partial<LocationCosts>) => onChange({ costs: { ...c, ...patch } });
 
   const monthlyRent = (c.annualRent || 0) / 12;
   const monthlyWater = (c.waterPrice || 0) * (c.waterUsage || 0);
@@ -141,6 +141,21 @@ export default function LocationCostForm({ location, onChange }: LocationCostFor
           <TextField label="骑手取餐便利说明" value={c.pickupConvenience} onChange={(v) => set({ pickupConvenience: v })} />
           <TextField label="排烟/消防/用电/餐饮经营条件" value={c.conditions} onChange={(v) => set({ conditions: v })} />
         </div>
+      </div>
+
+      {/* 竞店说明 */}
+      <div>
+        <div className="text-xs font-bold text-foreground mb-1.5">竞店说明</div>
+        <label className="text-xs text-muted-foreground block mb-1">
+          代表竞店的月售/评分/价格/活动等说明
+        </label>
+        <textarea
+          value={location.competitors}
+          onChange={(e) => onChange({ competitors: e.target.value })}
+          rows={3}
+          placeholder="如：500m 内一家月售 2000+ 的同品类店，客单价 ¥25，满减活动频繁…"
+          className="w-full px-2 py-1.5 text-sm border-2 border-border bg-card"
+        />
       </div>
 
       {/* 月度成本合计 */}

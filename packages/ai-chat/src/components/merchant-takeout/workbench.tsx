@@ -12,6 +12,8 @@ import {
   Users,
   Package,
   ShoppingBasket,
+  Percent,
+  Gift,
 } from "lucide-react";
 import type { MerchantStore } from "@/lib/merchant-takeout/types";
 import { getReportReadiness } from "@/lib/merchant-takeout/calculate";
@@ -24,6 +26,8 @@ import CostEditor from "./cost-editor";
 import StaffEditor from "./staff-editor";
 import ProductEditor from "./product-editor";
 import BasketEditor from "./basket-editor";
+import PlatformRulesEditor from "./platform-rules-editor";
+import ActivityEditor from "./activity-editor";
 
 const fmtMoney = (n: number) => `¥ ${n.toLocaleString("zh-CN")}`;
 
@@ -217,6 +221,30 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
           baskets={store.baskets}
           products={store.products}
           onChange={(baskets) => setStore((prev) => ({ ...prev, baskets }))}
+        />
+      </div>
+
+      {/* 淘宝闪购规则 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Percent className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">淘宝闪购规则</span>
+        </div>
+        <PlatformRulesEditor
+          rules={store.platformRules}
+          onChange={(platformRules) => setStore((prev) => ({ ...prev, platformRules }))}
+        />
+      </div>
+
+      {/* 活动方案 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Gift className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">活动方案</span>
+        </div>
+        <ActivityEditor
+          activities={store.activities}
+          onChange={(activities) => setStore((prev) => ({ ...prev, activities }))}
         />
       </div>
 

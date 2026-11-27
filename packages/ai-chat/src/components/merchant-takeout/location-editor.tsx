@@ -79,7 +79,11 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
   };
 
   const removeLocation = (id: string) => {
-    const next = locationsRef.current.filter((l) => l.id !== id);
+    const removed = locationsRef.current.find((l) => l.id === id);
+    let next = locationsRef.current.filter((l) => l.id !== id);
+    if (removed?.selected && next.length > 0) {
+      next = next.map((l, i) => (i === 0 ? { ...l, selected: true } : l));
+    }
     if (next.length > 0 && id === currentId) setCurrentId(next[0].id);
     onChange(next);
   };

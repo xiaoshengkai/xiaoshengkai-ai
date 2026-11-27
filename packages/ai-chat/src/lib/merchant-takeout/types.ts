@@ -23,6 +23,27 @@ export interface StoreProfile {
   riskNotes: string; // 风险提示
 }
 
+/** 单个候选地址的成本明细（年租金/押金/转让费/水电燃气/面积楼层等） */
+export interface LocationCosts {
+  annualRent: number; // 年租金（元）
+  deposit: number; // 押金（元）
+  depositRefundable: boolean; // 押金是否可回收
+  transferFee: number; // 转让费（元）
+  propertyFee: number; // 月物业费（元）
+  agencyFee: number; // 中介费（元）
+  renovation: number; // 装修预计费用（元）
+  waterPrice: number; // 水费单价（元/吨）
+  waterUsage: number; // 预计月用水量（吨）
+  electricityPrice: number; // 电费单价（元/度）
+  electricityUsage: number; // 预计月用电量（度）
+  gasPrice: number; // 燃气单价（元/立方米）
+  gasUsage: number; // 预计月用气量（立方米）
+  area: number; // 面积（㎡）
+  floor: string; // 楼层
+  pickupConvenience: string; // 骑手取餐便利说明
+  conditions: string; // 排烟/消防/用电/餐饮经营条件
+}
+
 /** 候选选址（地图搜索 + 点选 + 配送半径 + 周边 POI） */
 export interface StoreLocation {
   id: string;
@@ -34,6 +55,7 @@ export interface StoreLocation {
   poi: string[]; // 周边 POI
   competitors: string; // 周边竞店说明
   selected: boolean; // 是否已选定
+  costs: LocationCosts; // 该候选地址的成本明细
 }
 
 /** 一次性投入（进启动资金/现金流/回本周期，不摊入月利润） */

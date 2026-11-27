@@ -40,7 +40,7 @@ export default function StorePage() {
             <p className="text-sm">店铺不存在或已被删除</p>
           </div>
         ) : store ? (
-          <Workbench store={store} />
+          <Workbench initialStore={store} />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
             <span className="text-3xl">🏪</span>

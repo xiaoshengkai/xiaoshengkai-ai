@@ -1,10 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, AlertTriangle, CheckCircle2, ListChecks } from "lucide-react";
+import { ArrowLeft, AlertTriangle, CheckCircle2, ListChecks, MapPin } from "lucide-react";
 import type { MerchantStore } from "@/lib/merchant-takeout/types";
 import { getReportReadiness } from "@/lib/merchant-takeout/calculate";
+import { BASE } from "@/lib/utils/utils";
 import { STATUS_META, READINESS_TOTAL } from "./meta";
+import { useAutoSave } from "./use-auto-save";
+import LocationEditor from "./location-editor";
+import LocationCostForm from "./location-cost-form";
 
 const fmtMoney = (n: number) => `¥ ${n.toLocaleString("zh-CN")}`;
 
@@ -17,12 +22,26 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
-export default function Workbench({ store }: { store: MerchantStore }) {
+export default function Workbench({ initialStore }: { initialStore: MerchantStore }) {
   const router = useRouter();
+  const [store, setStore] = useState<MerchantStore>(initialStore);
+
+  const save = async (s: MerchantStore) => {
+    const res = await fetch(`${BASE}/api/tools/merchant-takeout?id=${s.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(s),
+    });
+    if (!res.ok) throw new Error("保存失败");
+  };
+  const { status, saveNow, error } = useAutoSave(store, save);
+
   const meta = STATUS_META[store.status] || STATUS_META.simulation;
   const missing = getReportReadiness(store);
   const pct = Math.max(0, Math.round(((READINESS_TOTAL - missing.length) / READINESS_TOTAL) * 100));
   const nextStep = missing[0];
+
+  const selectedLocation = store.locations.find((l) => l.selected) ?? null;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -44,12 +63,29 @@ export default function Workbench({ store }: { store: MerchantStore }) {
               )}
             </div>
           </div>
-          <button
-            onClick={() => router.push("/tools/merchant-takeout")}
-            className="brutal-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-card text-foreground shrink-0"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> 返回列表
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {status === "saving" && (
+              <span className="brutal-chip px-2 py-0.5 text-[11px] bg-blue-soft">保存中…</span>
+            )}
+            {status === "saved" && (
+              <span className="brutal-chip px-2 py-0.5 text-[11px] bg-lime-soft">已保存</span>
+            )}
+            {status === "error" && (
+              <button
+                onClick={() => void saveNow()}
+                title={error || undefined}
+                className="brutal-btn px-2 py-0.5 text-[11px] bg-orange-soft text-foreground"
+              >
+                保存失败·点击重试
+              </button>
+            )}
+            <button
+              onClick={() => router.push("/tools/merchant-takeout")}
+              className="brutal-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-card text-foreground shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> 返回列表
+            </button>
+          </div>
         </div>
       </div>
 
@@ -88,6 +124,36 @@ export default function Workbench({ store }: { store: MerchantStore }) {
       </div>
       <div className="brutal bg-card p-3 text-xs text-muted-foreground">
         💡 月净利润 / 保本单量等经营指标：完成菜单与平台规则后可计算
+      </div>
+
+      {/* 选址 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <MapPin className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">选址</span>
+        </div>
+        <LocationEditor
+          locations={store.locations}
+          onChange={(locations) => setStore((prev) => ({ ...prev, locations }))}
+        />
+        {selectedLocation && (
+          <div className="mt-4">
+            <div className="text-xs font-bold text-foreground mb-2 border-t-2 border-border pt-3">
+              候选地址成本明细（{selectedLocation.name || "当前经营地址"}）
+            </div>
+            <LocationCostForm
+              location={selectedLocation}
+              onChange={(costs) =>
+                setStore((prev) => ({
+                  ...prev,
+                  locations: prev.locations.map((l) =>
+                    l.id === selectedLocation.id ? { ...l, costs } : l,
+                  ),
+                }))
+              }
+            />
+          </div>
+        )}
       </div>
 
       {/* 下一步建议 */}

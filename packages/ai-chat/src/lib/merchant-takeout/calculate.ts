@@ -242,11 +242,14 @@ export function calculateMonth(store: MerchantStore, input: MonthInput): MonthRe
     preTaxProfit,
     store.tax.customBase ?? 0,
   );
-  const tax = baseValue * (store.tax.rate || 0);
+  const tax = Math.max(0, baseValue * (store.tax.rate || 0));
 
   const netProfit = preTaxProfit - tax;
 
-  const breakevenOrders = avgContribution > 0 ? (labor + fixed) / avgContribution : null;
+  const perOrderMargin =
+    avgContribution - (store.loss.orderLossRate || 0) * (store.loss.lossAmountPerOrder || 0);
+  const breakevenOrders =
+    perOrderMargin > 0 ? (labor + fixed) / perOrderMargin : null;
 
   const promotionCostPerOrder =
     input.promotionOrders > 0 ? input.promotionBudget / input.promotionOrders : 0;

@@ -361,6 +361,28 @@ test("一次性投入超四个月回本则 payback 为 null", () => {
   assert.equal(sim.paybackMonths, null);
 });
 
+test("保本单量计入订单损失的手算锚点", () => {
+  const store = makeStore();
+  store.products = [{ id: "p1", name: "x", price: 10, ingredientCost: 0, lossRate: 0, packagingCost: 0, packagingFee: 0 }];
+  store.baskets = [{ id: "b1", name: "b", items: [{ productId: "p1", quantity: 1 }], orderShare: 100 }];
+  store.platformRules = {
+    ...store.platformRules,
+    commissionRate: 0,
+    commissionBase: { includeProduct: false, includePackagingFee: false, includeDeliveryFee: false },
+  };
+  store.staffing = { base: [{ role: "老板", count: 1, monthlySalary: 1000 }], tiers: [] };
+  store.costs.monthlyFixed = { ...store.costs.monthlyFixed, rent: 1000 };
+
+  store.loss = { orderLossRate: 0.1, lossAmountPerOrder: 20 };
+  const withLoss = calculateMonth(store, { naturalOrders: 0, promotionOrders: 0, promotionBudget: 0, activities: store.activities });
+  approx(withLoss.avgContribution, 10);
+  assert.equal(withLoss.breakevenOrders, 250); // 2000 / (10 - 0.1×20)
+
+  store.loss = { orderLossRate: 0, lossAmountPerOrder: 0 };
+  const noLoss = calculateMonth(store, { naturalOrders: 0, promotionOrders: 0, promotionBudget: 0, activities: store.activities });
+  assert.equal(noLoss.breakevenOrders, 200); // 2000 / 10
+});
+
 test("单均贡献 ≤ 0 时保本单量为 null", () => {
   const store = makeStore();
   store.products = [{ id: "p1", name: "x", price: 10, ingredientCost: 10, lossRate: 0, packagingCost: 0, packagingFee: 0 }];

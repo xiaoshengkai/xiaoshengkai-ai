@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, AlertTriangle, CheckCircle2, ListChecks, MapPin } from "lucide-react";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  CheckCircle2,
+  ListChecks,
+  MapPin,
+  Coins,
+  Users,
+  Package,
+  ShoppingBasket,
+} from "lucide-react";
 import type { MerchantStore } from "@/lib/merchant-takeout/types";
 import { getReportReadiness } from "@/lib/merchant-takeout/calculate";
 import { BASE } from "@/lib/utils/utils";
@@ -10,6 +20,10 @@ import { STATUS_META, READINESS_TOTAL } from "./meta";
 import { useAutoSave } from "./use-auto-save";
 import LocationEditor from "./location-editor";
 import LocationCostForm from "./location-cost-form";
+import CostEditor from "./cost-editor";
+import StaffEditor from "./staff-editor";
+import ProductEditor from "./product-editor";
+import BasketEditor from "./basket-editor";
 
 const fmtMoney = (n: number) => `¥ ${n.toLocaleString("zh-CN")}`;
 
@@ -154,6 +168,56 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
             />
           </div>
         )}
+      </div>
+
+      {/* 成本 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Coins className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">成本</span>
+        </div>
+        <CostEditor
+          costs={store.costs}
+          selectedLocation={selectedLocation}
+          onChange={(costs) => setStore((prev) => ({ ...prev, costs }))}
+        />
+      </div>
+
+      {/* 人员与用工 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Users className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">人员与用工</span>
+        </div>
+        <StaffEditor
+          staffing={store.staffing}
+          onChange={(staffing) => setStore((prev) => ({ ...prev, staffing }))}
+        />
+      </div>
+
+      {/* 商品与套餐 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Package className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">商品与套餐</span>
+        </div>
+        <ProductEditor
+          products={store.products}
+          onChange={(products) => setStore((prev) => ({ ...prev, products }))}
+        />
+      </div>
+
+      {/* 典型购物篮 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <ShoppingBasket className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">典型购物篮</span>
+        </div>
+        <BasketEditor
+          baskets={store.baskets}
+          products={store.products}
+          onChange={(baskets) => setStore((prev) => ({ ...prev, baskets }))}
+        />
       </div>
 
       {/* 下一步建议 */}

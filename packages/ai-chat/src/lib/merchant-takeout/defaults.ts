@@ -64,7 +64,7 @@ export function createEmptyStore(name: string): MerchantStore {
     loss: { orderLossRate: 0, lossAmountPerOrder: 0 },
     tax: { rate: 0, base: "preTaxProfit" },
     sales: [],
+    sweep: { minOrders: 500, maxOrders: 3000, step: 100 },
     scenarios: [],
-    snapshots: [],
   };
 }

@@ -206,6 +206,20 @@ function taxBaseValue(
   }
 }
 
+export function buildPhases(store: MerchantStore): SimulationPhase[] {
+  const labels: Record<number, string> = { 1: "第1月", 2: "第2月", 3: "第3月", 4: "稳定期" };
+  return [...store.sales]
+    .sort((a, b) => a.monthIndex - b.monthIndex)
+    .map((p) => ({
+      label: labels[p.monthIndex] ?? `第${p.monthIndex}月`,
+      monthIndex: p.monthIndex,
+      naturalOrders: p.naturalOrders,
+      promotionOrders: p.promotionOrders,
+      promotionBudget: p.promotionBudget,
+      activities: p.activities ?? store.activities,
+    }));
+}
+
 export function calculateMonth(store: MerchantStore, input: MonthInput): MonthResult {
   const totalOrders = input.naturalOrders + input.promotionOrders;
 

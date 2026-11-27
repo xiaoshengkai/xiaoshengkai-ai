@@ -192,6 +192,15 @@ export interface SalesPhase {
   naturalOrders: number; // 自然订单量
   promotionBudget: number; // 推广预算（元）
   promotionOrders: number; // 推广新增订单量
+  activities?: StoreActivities; // 本阶段活动覆盖，缺省沿用全局 store.activities
+  naturalOrdersReference?: string; // AI 参考区间展示用，非计算
+}
+
+/** 敏感性扫描配置：围绕稳定期总订单量做上下限 + 步长推演 */
+export interface SweepConfig {
+  minOrders: number;
+  maxOrders: number;
+  step: number;
 }
 
 /** 经营沙盘：某经营阶段逐档推演结果（第 1~3 月 + 稳定期） */
@@ -217,14 +226,15 @@ export interface AiReport {
   basis: string[]; // 依据
 }
 
-/** 方案快照（生成报告时的计算结果 + 规则来源 + AI 分析，不可变，用于前后比较） */
+/** 方案快照（生成报告时的完整输入 + 沙盘计算结果 + AI 分析，不可变，用于前后比较） */
 export interface StoreSnapshot {
   id: string;
+  storeId: string;
   createdAt: number;
   label: string;
-  report: AiReport;
-  scenarios: StoreScenario[];
-  rules: PlatformRules;
+  input: MerchantStore; // 完整输入快照
+  scenarios: StoreScenario[]; // 经营沙盘计算结果
+  report?: AiReport; // AI 分析（Task 9 填）
 }
 
 export interface MerchantStore {
@@ -243,6 +253,6 @@ export interface MerchantStore {
   loss: StoreLoss;
   tax: StoreTax;
   sales: SalesPhase[];
+  sweep: SweepConfig;
   scenarios: StoreScenario[];
-  snapshots: StoreSnapshot[];
 }

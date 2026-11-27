@@ -14,6 +14,8 @@ import {
   ShoppingBasket,
   Percent,
   Gift,
+  TrendingUp,
+  LineChart,
 } from "lucide-react";
 import type { MerchantStore } from "@/lib/merchant-takeout/types";
 import { getReportReadiness } from "@/lib/merchant-takeout/calculate";
@@ -28,6 +30,8 @@ import ProductEditor from "./product-editor";
 import BasketEditor from "./basket-editor";
 import PlatformRulesEditor from "./platform-rules-editor";
 import ActivityEditor from "./activity-editor";
+import ScenarioEditor from "./scenario-editor";
+import SimulationDashboard from "./simulation-dashboard";
 
 const fmtMoney = (n: number) => `¥ ${n.toLocaleString("zh-CN")}`;
 
@@ -247,6 +251,31 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
           activities={store.activities}
           onChange={(activities) => setStore((prev) => ({ ...prev, activities }))}
         />
+      </div>
+
+      {/* 销量与推广 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">销量与推广</span>
+        </div>
+        <ScenarioEditor
+          sales={store.sales}
+          loss={store.loss}
+          tax={store.tax}
+          sweep={store.sweep}
+          activities={store.activities}
+          onChange={(patch) => setStore((prev) => ({ ...prev, ...patch }))}
+        />
+      </div>
+
+      {/* 经营沙盘 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <LineChart className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">经营沙盘</span>
+        </div>
+        <SimulationDashboard store={store} />
       </div>
 
       {/* 下一步建议 */}

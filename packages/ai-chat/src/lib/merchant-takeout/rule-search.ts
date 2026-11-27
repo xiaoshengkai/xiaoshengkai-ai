@@ -44,14 +44,10 @@ function hostOf(url: string): string {
   }
 }
 
-/** 官方来源判定：域名以阿里系收尾，或 URL 本身含 taobao/tmall */
+/** 官方来源判定：域名恰为阿里系域名或为其子域名（按域名标签边界匹配） */
 export function isOfficial(url: string): boolean {
   const host = hostOf(url).toLowerCase();
-  return (
-    OFFICIAL_SUFFIXES.some((s) => host.endsWith(s)) ||
-    host.includes("taobao") ||
-    host.includes("tmall")
-  );
+  return OFFICIAL_SUFFIXES.some((s) => host === s || host.endsWith("." + s));
 }
 
 /** 确定性排序：官方优先 → 地区越具体越前 → 发布时间越新越前 → 抓取时间越新越前 */
@@ -230,10 +226,12 @@ function parseModelOutput(text: string): RuleReference[] {
         ? r.confidence
         : "low") as Confidence;
 
+      const unit = field === "commissionRate" ? "%" : "元/单";
+
       out.push({
         field,
         value: Number.isFinite(num) ? num : null,
-        unit: typeof r.unit === "string" ? r.unit : undefined,
+        unit,
         sourceUrl,
         sourceTitle: typeof r.sourceTitle === "string" ? r.sourceTitle : undefined,
         publishedAt: typeof r.publishedAt === "string" ? r.publishedAt : undefined,

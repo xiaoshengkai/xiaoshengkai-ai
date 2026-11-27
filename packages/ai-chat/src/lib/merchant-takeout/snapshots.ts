@@ -66,7 +66,7 @@ export function copySnapshotToDraft(snapshotId: string, name: string): MerchantS
   const snapshot = readSnapshot(snapshotId);
   if (!snapshot) return null;
   const store: MerchantStore = {
-    ...snapshot.input,
+    ...structuredClone(snapshot.input),
     id: randomUUID(),
     createdAt: Date.now(),
     updatedAt: Date.now(),

@@ -32,6 +32,7 @@ export default function SimulationDashboard({ store }: { store: MerchantStore })
   );
 
   const stable = store.sales.find((p) => p.monthIndex === 4);
+  const phases = buildPhases(store);
 
   const sweepRows = useMemo(() => {
     if (!computable || !stable) return [];
@@ -87,33 +88,48 @@ export default function SimulationDashboard({ store }: { store: MerchantStore })
                 <tr className="text-muted-foreground text-left">
                   <th className="py-1 pr-3 font-normal">阶段</th>
                   <th className="py-1 pr-3 font-normal text-right">订单量</th>
-                  <th className="py-1 pr-3 font-normal text-right">单均贡献</th>
-                  <th className="py-1 pr-3 font-normal text-right">月贡献</th>
+                  <th className="py-1 pr-3 font-normal text-right">营业额</th>
+                  <th className="py-1 pr-3 font-normal text-right">结算收入</th>
+                  <th className="py-1 pr-3 font-normal text-right">食材</th>
+                  <th className="py-1 pr-3 font-normal text-right">包装</th>
+                  <th className="py-1 pr-3 font-normal text-right">损耗</th>
+                  <th className="py-1 pr-3 font-normal text-right">平台扣点</th>
+                  <th className="py-1 pr-3 font-normal text-right">商家优惠</th>
+                  <th className="py-1 pr-3 font-normal text-right">推广</th>
+                  <th className="py-1 pr-3 font-normal text-right">阶梯人工</th>
                   <th className="py-1 pr-3 font-normal text-right">订单损失</th>
-                  <th className="py-1 pr-3 font-normal text-right">人工</th>
                   <th className="py-1 pr-3 font-normal text-right">税前利润</th>
-                  <th className="py-1 pr-3 font-normal text-right">税费</th>
-                  <th className="py-1 pr-3 font-normal text-right">净利润</th>
-                  <th className="py-1 pr-3 font-normal text-right">现金余额</th>
+                  <th className="py-1 pr-3 font-normal text-right">税后利润</th>
+                  <th className="py-1 pr-3 font-normal text-right">净利润率</th>
                   <th className="py-1 pr-3 font-normal text-right">保本单量</th>
+                  <th className="py-1 pr-3 font-normal text-right">活动订单增量</th>
+                  <th className="py-1 pr-3 font-normal text-right">现金余额</th>
                 </tr>
               </thead>
               <tbody>
                 {sim.months.map((m, i) => {
                   const r = m.result;
+                  const promo = phases[i]?.promotionBudget ?? 0;
                   return (
                     <tr key={m.monthIndex} className="border-t border-border">
                       <td className="py-1 pr-3 text-foreground">{m.label}</td>
                       <td className="py-1 pr-3 text-right">{fmt(r.totalOrders)}</td>
-                      <td className="py-1 pr-3 text-right">{fmt(r.avgContribution)}</td>
-                      <td className="py-1 pr-3 text-right">{fmtSigned(r.monthContribution)}</td>
-                      <td className="py-1 pr-3 text-right">{fmt(r.orderLossCost)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.grossRevenue)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.settlementRevenue)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.foodCost)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.packagingCost)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.lossCost)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.commissionCost)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.merchantDiscountCost)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(promo)}</td>
                       <td className="py-1 pr-3 text-right">{fmt(r.laborCost)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.orderLossCost)}</td>
                       <td className="py-1 pr-3 text-right">{fmtSigned(r.preTaxProfit)}</td>
-                      <td className="py-1 pr-3 text-right">{fmt(r.tax)}</td>
                       <td className="py-1 pr-3 text-right font-bold">{fmtSigned(r.netProfit)}</td>
-                      <td className="py-1 pr-3 text-right">{fmt(sim.cumulativeCash[i])}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(r.netProfitMargin * 100)}%</td>
                       <td className="py-1 pr-3 text-right">{r.breakevenOrders === null ? "—" : fmt(r.breakevenOrders)}</td>
+                      <td className="py-1 pr-3 text-right">{r.activityIncrementalOrders === null ? "—" : fmt(r.activityIncrementalOrders)}</td>
+                      <td className="py-1 pr-3 text-right">{fmt(sim.cumulativeCash[i])}</td>
                     </tr>
                   );
                 })}

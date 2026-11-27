@@ -52,6 +52,17 @@ export interface MonthResult {
   breakevenOrders: number | null;
   promotionCostPerOrder: number;
   promotionMarginalProfit: number;
+  avgGrossProduct: number;
+  avgSettlement: number;
+  grossRevenue: number;
+  settlementRevenue: number;
+  netProfitMargin: number;
+  foodCost: number;
+  packagingCost: number;
+  lossCost: number;
+  commissionCost: number;
+  merchantDiscountCost: number;
+  activityIncrementalOrders: number | null;
 }
 
 export interface SimulationPhase extends MonthInput {
@@ -231,12 +242,30 @@ export function calculateMonth(store: MerchantStore, input: MonthInput): MonthRe
   let avgContribution = 0;
   let avgGrossProduct = 0;
   let avgSettlement = 0;
+  let avgFoodCost = 0;
+  let avgLossCost = 0;
+  let avgPackagingCost = 0;
+  let avgCommission = 0;
+  let avgMerchantDiscountCost = 0;
   results.forEach((r, i) => {
     const w = totalShare > 0 ? (store.baskets[i].orderShare || 0) / totalShare : 0;
     avgContribution += r.contribution * w;
     avgGrossProduct += r.grossProduct * w;
     avgSettlement += r.settlement * w;
+    avgFoodCost += r.foodCost * w;
+    avgLossCost += r.lossCost * w;
+    avgPackagingCost += r.packagingCost * w;
+    avgCommission += r.commission * w;
+    avgMerchantDiscountCost += r.merchantDiscountCost * w;
   });
+
+  const grossRevenue = totalOrders * avgGrossProduct;
+  const settlementRevenue = totalOrders * avgSettlement;
+  const foodCost = totalOrders * avgFoodCost;
+  const lossCost = totalOrders * avgLossCost;
+  const packagingCost = totalOrders * avgPackagingCost;
+  const commissionCost = totalOrders * avgCommission;
+  const merchantDiscountCost = totalOrders * avgMerchantDiscountCost;
 
   const monthContribution = totalOrders * avgContribution - input.promotionBudget;
 
@@ -260,6 +289,19 @@ export function calculateMonth(store: MerchantStore, input: MonthInput): MonthRe
 
   const netProfit = preTaxProfit - tax;
 
+  const netProfitMargin = grossRevenue > 0 ? netProfit / grossRevenue : 0;
+
+  let activityIncrementalOrders: number | null = null;
+  if (input.activities.list.length > 0) {
+    const noActivity = calculateMonth(store, { ...input, activities: { list: [], stackOrder: [] } });
+    const noActivityContribution = noActivity.avgContribution;
+    if (avgContribution > 0 && noActivityContribution > avgContribution) {
+      activityIncrementalOrders = Math.round(
+        (totalOrders * (noActivityContribution - avgContribution)) / avgContribution,
+      );
+    }
+  }
+
   const perOrderMargin =
     avgContribution - (store.loss.orderLossRate || 0) * (store.loss.lossAmountPerOrder || 0);
   const breakevenOrders =
@@ -281,6 +323,17 @@ export function calculateMonth(store: MerchantStore, input: MonthInput): MonthRe
     breakevenOrders,
     promotionCostPerOrder,
     promotionMarginalProfit,
+    avgGrossProduct,
+    avgSettlement,
+    grossRevenue,
+    settlementRevenue,
+    netProfitMargin,
+    foodCost,
+    packagingCost,
+    lossCost,
+    commissionCost,
+    merchantDiscountCost,
+    activityIncrementalOrders,
   };
 }
 

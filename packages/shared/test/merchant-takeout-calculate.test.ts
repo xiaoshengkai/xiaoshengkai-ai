@@ -423,3 +423,26 @@ test("配置完整时 readiness 为空", () => {
   store.sales = [1, 2, 3, 4].map((i) => ({ monthIndex: i, naturalOrders: 100, promotionBudget: 100, promotionOrders: 10 }));
   assert.deepEqual(getReportReadiness(store), []);
 });
+
+test("月度指标：营业额/结算收入/各项成本/活动订单增量", () => {
+  const store = makeStore();
+  const noActivity = calculateMonth(store, { naturalOrders: 100, promotionOrders: 0, promotionBudget: 0, activities: { list: [], stackOrder: [] } });
+  assert.equal(noActivity.avgGrossProduct, 30);
+  assert.equal(noActivity.grossRevenue, 3000);
+  approx(noActivity.avgSettlement, 28);
+  approx(noActivity.settlementRevenue, 2800);
+  assert.equal(noActivity.foodCost, 800);
+  approx(noActivity.lossCost, 80);
+  assert.equal(noActivity.packagingCost, 100);
+  approx(noActivity.commissionCost, 300);
+  assert.equal(noActivity.merchantDiscountCost, 0);
+  assert.equal(noActivity.activityIncrementalOrders, null);
+
+  store.activities = {
+    list: [{ id: "fr1", type: "fullReduction", threshold: 30, reduction: 8, merchantShare: 0.5 }],
+    stackOrder: ["fr1"],
+  };
+  const withActivity = calculateMonth(store, { naturalOrders: 100, promotionOrders: 0, promotionBudget: 0, activities: store.activities });
+  assert.equal(withActivity.merchantDiscountCost, 400);
+  assert.ok(withActivity.activityIncrementalOrders !== null && withActivity.activityIncrementalOrders > 0);
+});

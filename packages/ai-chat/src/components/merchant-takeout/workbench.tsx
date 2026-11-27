@@ -233,6 +233,7 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
         <PlatformRulesEditor
           rules={store.platformRules}
           onChange={(platformRules) => setStore((prev) => ({ ...prev, platformRules }))}
+          city={store.profile.city}
         />
       </div>
 

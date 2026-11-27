@@ -1,6 +1,9 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, Loader2, Globe } from "lucide-react";
+import { toast } from "sonner";
+import { BASE } from "@/lib/utils/utils";
 import type { CommissionBase, PlatformRules } from "@/lib/merchant-takeout/types";
 import { COMMISSION_BASE_LABELS, describeRuleSource } from "@/lib/merchant-takeout/platform";
 
@@ -33,12 +36,40 @@ function NumInput({
 interface PlatformRulesEditorProps {
   rules: PlatformRules;
   onChange: (rules: PlatformRules) => void;
+  city?: string;
 }
 
-export default function PlatformRulesEditor({ rules, onChange }: PlatformRulesEditorProps) {
+export default function PlatformRulesEditor({ rules, onChange, city }: PlatformRulesEditorProps) {
+  const [fetching, setFetching] = useState(false);
   const patch = (p: Partial<PlatformRules>) => onChange({ ...rules, ...p });
   const patchBase = (p: Partial<CommissionBase>) =>
     onChange({ ...rules, commissionBase: { ...rules.commissionBase, ...p } });
+
+  const fetchReferences = async () => {
+    setFetching(true);
+    try {
+      const res = await fetch(`${BASE}/api/tools/merchant-takeout/platform-rules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city, rules }),
+      });
+      const data = await res.json();
+      if (!data.ok || !data.rules) {
+        toast.error(data.error || "联网检索失败");
+        return;
+      }
+      if (!Array.isArray(data.references) || data.references.length === 0) {
+        toast("未找到可靠参考来源，请按商家后台手动填写");
+        return;
+      }
+      onChange(data.rules);
+      toast("已填充 AI 参考规则，请核对商家后台");
+    } catch {
+      toast.error("联网检索失败，请稍后重试");
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const baseKeys = Object.keys(COMMISSION_BASE_LABELS) as (keyof CommissionBase)[];
   const hasSource = !!(
@@ -100,11 +131,22 @@ export default function PlatformRulesEditor({ rules, onChange }: PlatformRulesEd
 
       {/* 来源 */}
       <div className="brutal bg-muted/40 p-3 text-xs">
-        <div className="font-bold text-foreground mb-1">AI 参考来源</div>
+        <div className="font-bold text-foreground mb-1 flex items-center justify-between gap-2">
+          <span>AI 参考来源</span>
+          <button
+            type="button"
+            onClick={fetchReferences}
+            disabled={fetching}
+            className="brutal bg-card px-2 py-1 flex items-center gap-1.5 text-xs font-bold disabled:opacity-50"
+          >
+            {fetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+            {fetching ? "检索中…" : "联网获取参考规则"}
+          </button>
+        </div>
         {hasSource ? (
           <div className="text-muted-foreground break-all">{describeRuleSource(rules.source)}</div>
         ) : (
-          <div className="text-muted-foreground/70">暂无 AI 参考来源（后续可联网拉取）</div>
+          <div className="text-muted-foreground/70">暂无 AI 参考来源（点击右上角联网拉取）</div>
         )}
       </div>
 

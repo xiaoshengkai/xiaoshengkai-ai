@@ -116,29 +116,60 @@ export interface RuleSource {
   conflictNote?: string; // 冲突说明
 }
 
+/** 扣点基数勾选：哪些收入项计入平台扣点 */
+export interface CommissionBase {
+  includeProduct: boolean; // 商品售价
+  includePackagingFee: boolean; // 包装费
+  includeDeliveryFee: boolean; // 配送费
+}
+
 /** 平台规则（第一版仅淘宝闪购）；找不到可靠来源的字段保持空白，确认后才生成正式报告 */
 export interface PlatformRules {
   platform: "taobao-flash"; // 第一版仅淘宝闪购
-  commissionRate?: number; // 平台扣点（%）
+  commissionRate?: number; // 平台扣点（比例 0~1）
   fixedServiceFee?: number; // 平台固定服务费（元/单）
   merchantDeliveryFee?: number; // 商家承担配送费（元/单）
+  customerDeliveryFee?: number; // 向顾客收取的配送费（元/单）
+  commissionBase: CommissionBase; // 扣点基数勾选
+  discountBeforeCommission: boolean; // 优惠是否在扣点前扣除
   confirmed: boolean; // 是否已在商家后台确认
   source: RuleSource; // 规则来源元数据
 }
 
-/** 满减档位（满 X 减 Y） */
-export interface FullReductionRule {
-  threshold: number; // 满 X 元
-  reduction: number; // 减 Y 元
+/** 活动：折扣 / 满减 / 红包（MVP 三类），merchantShare 为商家承担比例（0~1） */
+export type StoreActivity =
+  | { id: string; type: "discount"; rate: number; merchantShare: number } // rate：折扣率 0~1
+  | { id: string; type: "fullReduction"; threshold: number; reduction: number; merchantShare: number } // 满 threshold 减 reduction
+  | { id: string; type: "redPacket"; amount: number; merchantShare: number }; // 红包金额（元）
+
+/** 活动方案：活动列表 + 按 stackOrder 中的活动 id 顺序叠加 */
+export interface StoreActivities {
+  list: StoreActivity[];
+  stackOrder: string[]; // 叠加顺序（活动 id）
 }
 
-/** 活动方案（满减/折扣/红包/承担比例/叠加顺序） */
-export interface StoreActivities {
-  fullReduction: FullReductionRule[]; // 满减档位
-  discount?: number; // 全场折扣（0~1）
-  redPacket?: number; // 红包（元）
-  merchantShare: number; // 商家承担比例（%）
-  stackOrder: string[]; // 叠加顺序
+/** 计税基数：商品营业收入 / 平台结算收入 / 税前利润 / 自定义金额 */
+export type TaxBaseKind = "productRevenue" | "platformSettlement" | "preTaxProfit" | "custom";
+
+/** 订单损失测算参数 */
+export interface StoreLoss {
+  orderLossRate: number; // 订单损失率（0~1）
+  lossAmountPerOrder: number; // 单笔平均损失金额（元）
+}
+
+/** 税费测算参数 */
+export interface StoreTax {
+  rate: number; // 综合税费比例（0~1）
+  base: TaxBaseKind; // 计税基数
+  customBase?: number; // 自定义计税基数（元）
+}
+
+/** 销量与推广：单阶段输入（第 1~3 月 + 稳定期） */
+export interface SalesPhase {
+  monthIndex: number; // 1/2/3，稳定期=4
+  naturalOrders: number; // 自然订单量
+  promotionBudget: number; // 推广预算（元）
+  promotionOrders: number; // 推广新增订单量
 }
 
 /** 经营沙盘：某经营阶段逐档推演结果（第 1~3 月 + 稳定期） */
@@ -187,6 +218,9 @@ export interface MerchantStore {
   baskets: StoreBasket[];
   platformRules: PlatformRules;
   activities: StoreActivities;
+  loss: StoreLoss;
+  tax: StoreTax;
+  sales: SalesPhase[];
   scenarios: StoreScenario[];
   snapshots: StoreSnapshot[];
 }

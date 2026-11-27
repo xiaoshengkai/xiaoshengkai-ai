@@ -52,14 +52,18 @@ export function createEmptyStore(name: string): MerchantStore {
     baskets: [],
     platformRules: {
       platform: "taobao-flash",
+      commissionBase: { includeProduct: true, includePackagingFee: false, includeDeliveryFee: false },
+      discountBeforeCommission: false,
       confirmed: false,
       source: {},
     },
     activities: {
-      fullReduction: [],
-      merchantShare: 0,
+      list: [],
       stackOrder: [],
     },
+    loss: { orderLossRate: 0, lossAmountPerOrder: 0 },
+    tax: { rate: 0, base: "preTaxProfit" },
+    sales: [],
     scenarios: [],
     snapshots: [],
   };

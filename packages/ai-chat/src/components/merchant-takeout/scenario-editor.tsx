@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type {
   SalesPhase,
@@ -47,6 +47,7 @@ function PhaseCard({
   onChange: (phase: SalesPhase) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const uid = useId();
   const custom = phase.activities !== undefined;
   const totalOrders = (phase.naturalOrders || 0) + (phase.promotionOrders || 0);
   const acqCost = phase.promotionOrders > 0 ? (phase.promotionBudget || 0) / phase.promotionOrders : 0;
@@ -70,8 +71,9 @@ function PhaseCard({
 
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <label className="text-[11px] text-muted-foreground block mb-0.5">自然订单量</label>
+          <label htmlFor={`${uid}-natural`} className="text-[11px] text-muted-foreground block mb-0.5">自然订单量</label>
           <input
+            id={`${uid}-natural`}
             type="number"
             min={0}
             value={Number.isFinite(phase.naturalOrders) ? phase.naturalOrders : 0}
@@ -80,8 +82,9 @@ function PhaseCard({
           />
         </div>
         <div>
-          <label className="text-[11px] text-muted-foreground block mb-0.5">推广预算（元）</label>
+          <label htmlFor={`${uid}-budget`} className="text-[11px] text-muted-foreground block mb-0.5">推广预算（元）</label>
           <input
+            id={`${uid}-budget`}
             type="number"
             min={0}
             value={Number.isFinite(phase.promotionBudget) ? phase.promotionBudget : 0}
@@ -90,8 +93,9 @@ function PhaseCard({
           />
         </div>
         <div>
-          <label className="text-[11px] text-muted-foreground block mb-0.5">推广新增订单</label>
+          <label htmlFor={`${uid}-promo`} className="text-[11px] text-muted-foreground block mb-0.5">推广新增订单</label>
           <input
+            id={`${uid}-promo`}
             type="number"
             min={0}
             value={Number.isFinite(phase.promotionOrders) ? phase.promotionOrders : 0}
@@ -146,6 +150,7 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
     onChange({ sales: PHASE_META.map((m) => (m.monthIndex === monthIndex ? next : phases.find((p) => p.monthIndex === m.monthIndex)!)) });
 
   const num = (v: number) => (Number.isFinite(v) ? v : 0);
+  const uid = useId();
 
   return (
     <div className="space-y-4">
@@ -168,8 +173,9 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
         <div className="text-sm font-bold text-foreground">订单损失</div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">订单损失率（%）</label>
+            <label htmlFor={`${uid}-lossRate`} className="text-[11px] text-muted-foreground block mb-0.5">订单损失率（%）</label>
             <input
+              id={`${uid}-lossRate`}
               type="number"
               min={0}
               max={100}
@@ -181,8 +187,9 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
             />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">单笔损失金额（元）</label>
+            <label htmlFor={`${uid}-lossAmount`} className="text-[11px] text-muted-foreground block mb-0.5">单笔损失金额（元）</label>
             <input
+              id={`${uid}-lossAmount`}
               type="number"
               min={0}
               value={num(loss.lossAmountPerOrder)}
@@ -199,8 +206,9 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
         <div className="text-sm font-bold text-foreground">税费</div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">综合税率（%）</label>
+            <label htmlFor={`${uid}-taxRate`} className="text-[11px] text-muted-foreground block mb-0.5">综合税率（%）</label>
             <input
+              id={`${uid}-taxRate`}
               type="number"
               min={0}
               max={100}
@@ -212,8 +220,9 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
             />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">计税基数</label>
+            <label htmlFor={`${uid}-taxBase`} className="text-[11px] text-muted-foreground block mb-0.5">计税基数</label>
             <select
+              id={`${uid}-taxBase`}
               value={tax.base}
               onChange={(e) => onChange({ tax: { ...tax, base: e.target.value as TaxBaseKind } })}
               className="w-full px-2 py-1.5 text-sm border-2 border-border bg-card"
@@ -228,8 +237,9 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
         </div>
         {tax.base === "custom" && (
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">自定义计税基数（元）</label>
+            <label htmlFor={`${uid}-customBase`} className="text-[11px] text-muted-foreground block mb-0.5">自定义计税基数（元）</label>
             <input
+              id={`${uid}-customBase`}
               type="number"
               min={0}
               value={num(tax.customBase ?? 0)}
@@ -246,8 +256,9 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
         <div className="text-sm font-bold text-foreground">敏感性扫描范围（稳定期）</div>
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">最低单量</label>
+            <label htmlFor={`${uid}-minOrders`} className="text-[11px] text-muted-foreground block mb-0.5">最低单量</label>
             <input
+              id={`${uid}-minOrders`}
               type="number"
               min={0}
               value={num(sweep.minOrders)}
@@ -256,8 +267,9 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
             />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">最高单量</label>
+            <label htmlFor={`${uid}-maxOrders`} className="text-[11px] text-muted-foreground block mb-0.5">最高单量</label>
             <input
+              id={`${uid}-maxOrders`}
               type="number"
               min={0}
               value={num(sweep.maxOrders)}
@@ -266,8 +278,9 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
             />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">步长</label>
+            <label htmlFor={`${uid}-step`} className="text-[11px] text-muted-foreground block mb-0.5">步长</label>
             <input
+              id={`${uid}-step`}
               type="number"
               min={1}
               value={num(sweep.step)}

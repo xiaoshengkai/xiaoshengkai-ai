@@ -109,8 +109,9 @@ export default function ActivityEditor({ activities, onChange }: ActivityEditorP
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {a.type === "discount" && (
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-0.5">折扣率（%，90=打9折）</label>
+                    <label htmlFor={`act-discount-${a.id}`} className="text-[11px] text-muted-foreground block mb-0.5">折扣率（%，90=打9折）</label>
                     <input
+                      id={`act-discount-${a.id}`}
                       type="number"
                       min={0}
                       value={Number.isFinite(a.rate) ? a.rate * 100 : 0}
@@ -122,8 +123,9 @@ export default function ActivityEditor({ activities, onChange }: ActivityEditorP
                 {a.type === "fullReduction" && (
                   <>
                     <div>
-                      <label className="text-[11px] text-muted-foreground block mb-0.5">门槛（元）</label>
+                      <label htmlFor={`act-threshold-${a.id}`} className="text-[11px] text-muted-foreground block mb-0.5">门槛（元）</label>
                       <input
+                        id={`act-threshold-${a.id}`}
                         type="number"
                         min={0}
                         value={Number.isFinite(a.threshold) ? a.threshold : 0}
@@ -132,8 +134,9 @@ export default function ActivityEditor({ activities, onChange }: ActivityEditorP
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-muted-foreground block mb-0.5">减免（元）</label>
+                      <label htmlFor={`act-reduction-${a.id}`} className="text-[11px] text-muted-foreground block mb-0.5">减免（元）</label>
                       <input
+                        id={`act-reduction-${a.id}`}
                         type="number"
                         min={0}
                         value={Number.isFinite(a.reduction) ? a.reduction : 0}
@@ -145,8 +148,9 @@ export default function ActivityEditor({ activities, onChange }: ActivityEditorP
                 )}
                 {a.type === "redPacket" && (
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-0.5">红包金额（元）</label>
+                    <label htmlFor={`act-amount-${a.id}`} className="text-[11px] text-muted-foreground block mb-0.5">红包金额（元）</label>
                     <input
+                      id={`act-amount-${a.id}`}
                       type="number"
                       min={0}
                       value={Number.isFinite(a.amount) ? a.amount : 0}
@@ -156,8 +160,9 @@ export default function ActivityEditor({ activities, onChange }: ActivityEditorP
                   </div>
                 )}
                 <div>
-                  <label className="text-[11px] text-muted-foreground block mb-0.5">商家承担（%）</label>
+                  <label htmlFor={`act-share-${a.id}`} className="text-[11px] text-muted-foreground block mb-0.5">商家承担（%）</label>
                   <input
+                    id={`act-share-${a.id}`}
                     type="number"
                     min={0}
                     max={100}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { MapPin, Plus, Search, Trash2, Star, Loader2, Crosshair } from "lucide-react";
 import type { StoreLocation } from "@/lib/merchant-takeout/types";
 import { loadAMap } from "./amap-loader";
@@ -23,6 +23,7 @@ interface LocationEditorProps {
 
 export default function LocationEditor({ locations, onChange }: LocationEditorProps) {
   const [amap, setAmap] = useState<any>(null);
+  const uid = useId();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(
     locations.find((l) => l.selected)?.id ?? locations[0]?.id ?? null,
@@ -242,6 +243,7 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
               value={manualName}
               onChange={(e) => setManualName(e.target.value)}
               placeholder="名称（如：中山公园店）"
+              aria-label="名称"
               className="w-full px-2 py-1.5 text-sm border-2 border-border bg-card"
             />
             <input
@@ -249,6 +251,7 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
               value={manualAddress}
               onChange={(e) => setManualAddress(e.target.value)}
               placeholder="地址"
+              aria-label="地址"
               className="w-full px-2 py-1.5 text-sm border-2 border-border bg-card"
             />
             <input
@@ -256,6 +259,7 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
               value={manualLng}
               onChange={(e) => setManualLng(e.target.value)}
               placeholder="经度 lng"
+              aria-label="经度"
               className="w-full px-2 py-1.5 text-sm font-mono border-2 border-border bg-card"
             />
             <input
@@ -263,6 +267,7 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
               value={manualLat}
               onChange={(e) => setManualLat(e.target.value)}
               placeholder="纬度 lat"
+              aria-label="纬度"
               className="w-full px-2 py-1.5 text-sm font-mono border-2 border-border bg-card"
             />
           </div>
@@ -284,6 +289,7 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
                 if (e.key === "Enter") searchPlace();
               }}
               placeholder="搜索地址关键词（如：中山公园 / 写字楼 / 地铁站）"
+              aria-label="搜索地址关键词"
               className="flex-1 px-2 py-1.5 text-sm border-2 border-border bg-card"
             />
             <button
@@ -363,6 +369,7 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
                   <button
                     onClick={() => markSelected(loc.id)}
                     title="设为当前经营地址"
+                    aria-label="设为当前经营地址"
                     className={`brutal-btn p-1.5 ${loc.selected ? "text-lime" : "text-muted-foreground"}`}
                   >
                     <Star className="w-3.5 h-3.5" fill={loc.selected ? "currentColor" : "none"} />
@@ -370,6 +377,7 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
                   <button
                     onClick={() => removeLocation(loc.id)}
                     title="删除候选地址"
+                    aria-label="删除候选地址"
                     className="brutal-btn p-1.5 text-muted-foreground"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -390,8 +398,9 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
               {current.name || "当前候选地址"}
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-muted-foreground">配送半径</label>
+              <label htmlFor={`${uid}-radius`} className="text-xs text-muted-foreground">配送半径</label>
               <input
+                id={`${uid}-radius`}
                 type="number"
                 min={0.5}
                 step={0.5}

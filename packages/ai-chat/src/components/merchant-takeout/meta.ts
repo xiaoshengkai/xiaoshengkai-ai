@@ -29,5 +29,9 @@ export const STATUS_META: Record<StoreStatus, { label: string; accent: string }>
   closed: { label: "已关闭", accent: "bg-muted" },
 };
 
-/** 与 calculate.getReportReadiness 的检查项数对应，用于「资料完整度」百分比 */
-export const READINESS_TOTAL = 10;
+/**
+ * 与 calculate.getReportReadiness 的检查项数对应，用于「资料完整度」百分比。
+ * 9 而非 10：「未录入购物篮」与「购物篮占比≠100%」互斥（无购物篮时跳过占比检查），
+ * 空店铺 getReportReadiness 最多返回 9 项，故分母取 9 使空店铺显示 0%。
+ */
+export const READINESS_TOTAL = 9;

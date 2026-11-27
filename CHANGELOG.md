@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.87 (2026-11-27) — 外卖开店模拟器：编辑器、财务引擎、联网规则、经营沙盘与 AI 报告
+
+### 变更
+- **分模块编辑器**（`components/merchant-takeout/`）：选址（高德地图点选/关键词搜索/周边 POI + 手动经纬度降级）、地址成本、成本、人员与阶梯用工、商品/套餐、典型购物篮、淘宝闪购平台规则、活动方案（折扣/满减/红包按 stackOrder 叠加）、销量与推广（四阶段 + 订单损失/税费/敏感性扫描范围）。
+- **确定性财务引擎** `lib/merchant-takeout/calculate.ts`：购物篮贡献 → 阶梯人工 → 月利润/保本单量/回本周期/现金流最低点；纯函数、不读环境不调 AI，`getReportReadiness` 输出资料完整度缺失项。
+- **联网检索** `lib/merchant-takeout/rule-search.ts`：检索淘宝闪购参考规则，官方来源 endsWith 判定 + 单位白名单。
+- **经营沙盘**：`simulation-dashboard` 各阶段推演表 + 稳定期敏感性扫描（净利润翻正拐点高亮）；快照 `lib/merchant-takeout/snapshots.ts` 存 `data/merchant-takeout/snapshots/`。
+- **AI 经营报告** `lib/merchant-takeout/report.ts` + `/api/tools/merchant-takeout/report`：确定性数字拼提示词、Zod 校验解析、缺资料不调模型、模型失败降级；前端 `report-view` 区分「缺资料」与「请求失败」两种状态（此前 404 服务器错误误入缺资料黄框）。
+- **整理**：图标按钮补 `aria-label`、表单字段补 `htmlFor`/`id` 程序化关联；删除死代码 `reportReadinessErrors`；`READINESS_TOTAL` 修正为 9（「未录入购物篮」与「占比≠100%」互斥），空店铺完整度由 10% 归 0%。
+
+### 验证
+- typecheck + test（shared/mm/search）+ build 全绿。
+
 ## v0.11.86 (2026-11-27) — 新增外卖开店模拟器：工具入口、领域模型与文件存储
 
 ### 变更

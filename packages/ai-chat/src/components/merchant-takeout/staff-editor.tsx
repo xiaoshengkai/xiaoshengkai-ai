@@ -32,6 +32,7 @@ function MemberRow({
         value={member.role}
         onChange={(e) => onChange({ ...member, role: e.target.value })}
         placeholder="岗位（如：老板/厨师/店员）"
+        aria-label="岗位"
         className="w-full px-2 py-1.5 text-sm border-2 border-border bg-card"
       />
       <input
@@ -40,6 +41,7 @@ function MemberRow({
         value={member.count}
         onChange={(e) => onChange({ ...member, count: e.target.value === "" ? 0 : Number(e.target.value) })}
         placeholder="人数"
+        aria-label="人数"
         className="w-full px-2 py-1.5 text-sm font-mono border-2 border-border bg-card"
       />
       <input
@@ -48,9 +50,10 @@ function MemberRow({
         value={member.monthlySalary}
         onChange={(e) => onChange({ ...member, monthlySalary: e.target.value === "" ? 0 : Number(e.target.value) })}
         placeholder="月薪/人"
+        aria-label="月薪（每人）"
         className="w-full px-2 py-1.5 text-sm font-mono border-2 border-border bg-card"
       />
-      <button onClick={onRemove} className="brutal-btn p-1.5 text-muted-foreground">
+      <button onClick={onRemove} className="brutal-btn p-1.5 text-muted-foreground" aria-label="删除人员">
         <Trash2 className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -140,8 +143,9 @@ export default function StaffEditor({ staffing, onChange }: StaffEditorProps) {
                 <li key={ti} className="brutal bg-card p-2.5 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-muted-foreground">触发月订单量 ≥</label>
+                      <label htmlFor={`tier-orders-${ti}`} className="text-xs text-muted-foreground">触发月订单量 ≥</label>
                       <input
+                        id={`tier-orders-${ti}`}
                         type="number"
                         min={0}
                         value={tier.minMonthlyOrders}
@@ -159,6 +163,7 @@ export default function StaffEditor({ staffing, onChange }: StaffEditorProps) {
                     <button
                       onClick={() => setTiers(tiers.filter((_, j) => j !== ti))}
                       className="brutal-btn p-1.5 text-muted-foreground"
+                      aria-label="删除档位"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

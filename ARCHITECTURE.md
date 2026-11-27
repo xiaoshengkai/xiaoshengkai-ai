@@ -225,6 +225,15 @@ packages/tools/<id>/tool.json        data/media/<token> + index.json（原子写
 - **file-qr 工具**：`/api/tools/file-qr`（POST 按 content-type 分流：multipart → 按扩展名分流 `视频(mp4/mov/webm/avi/mkv)→ffmpeg 转 H.264 libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -movflags +faststart`、`图片(png/jpg/jpeg/gif/webp)≤20M`、`PDF≤50M` 直存，MIME 由扩展名查表不信任客户端 content-type；json `{url,title}` → `new URL` 校验 http/https → addLink。返回 `{token,url,title,kind}`，文件类 `url=/m/<token>`、链接类 `url=targetUrl`；GET 列表；DELETE 删）。前端 `/tools/file-qr` 列表入口 + 「新建二维码」弹窗（tab 上传文件/粘贴链接），`window.location.origin` 拼 `/m/<token>`（链接类直接用 targetUrl）并用 `qrcode` 生成二维码（不落盘，确定性可重生成）。临时文件转码后即删。**服务器 ffmpeg**：复用 prod.sh 自动维护的 `data/bin/ffmpeg`（7.0.2-static，含 libx264，PATH 前置），转码直接可用。
 - **server-status 工具**：`/api/tools/server-status`（GET，纯 Node 零外部命令）——CPU（`os.cpus()` 双采样 ~800ms 差值算使用率，含每核）/ 内存（`os.totalmem/freemem`）/ 磁盘（`fs.statfs('/')` 含 inode）/ Swap（Linux `/proc/meminfo`，非 Linux null）/ 负载（`os.loadavg`）/ 网络吞吐（读 Linux `/proc/net/dev` 双采样差值，非 Linux 返回 null 前端隐藏）/ Node 进程 RSS / 系统信息（hostname/platform/arch/Node 版本）。前端 `/tools/server-status` 轮询 5s + 手动刷新，bento 布局：3 张 hero 大卡（CPU/内存/磁盘，`text-4xl` 数字 + 厚进度条 + 每核竖条）+ 5 张次卡（网络/负载/运行时长/Swap/Node 内存）+ 整行系统信息；进度条 <60% 绿 / 60-85% 黄 / ≥85% 红。
 
+## 外卖开店模拟器（merchant-takeout 工具）
+
+从品类、选址到平台规则的 AI 外卖店数字沙盘。工具卡 `packages/tools/merchant-takeout/tool.json`（name 外卖开店模拟器 / icon store / accent orange）自动出现在 `/tools`；页面 `/tools/merchant-takeout`（列表）+ `/tools/merchant-takeout/[id]`（工作台）在 `packages/ai-chat/src/app/tools/merchant-takeout/`。
+
+- **领域模型** `packages/ai-chat/src/lib/merchant-takeout/`：`types.ts`（`MerchantStore` 及 profile / locations / costs / staffing / products / baskets / platformRules / activities / sales / loss / tax / sweep / snapshots 子模型）；`store.ts`（文件存储，复用 `MERCHANT_TAKEOUT_DIR`，默认 `data/merchant-takeout/stores`，一店一 JSON，原子替换写、UUID 校验拦截路径穿越）；`calculate.ts`（确定性财务引擎——购物篮贡献/阶梯人工/月利润/保本单量/回本周期 + `getReportReadiness` 资料完整度检查）；`snapshots.ts`（经营沙盘快照，存 `data/merchant-takeout/snapshots/`）；`rule-search.ts`（联网检索淘宝闪购参考规则，官方来源 endsWith 判定 + 单位白名单）；`report.ts`（`buildReportContext` 确定性数字拼提示词 + `generateReport` 动态 import 模型，纯函数可独立测试）；`defaults.ts` / `platform.ts`（默认值与来源描述）。
+- **API**（`packages/ai-chat/src/app/api/tools/merchant-takeout/`，自动受 `proxy.ts` 鉴权保护）：`route.ts`（GET 列表 / POST 创建 / GET ?id 读取 / PUT ?id 更新 / DELETE ?id 删除）；`platform-rules/route.ts`（联网检索参考规则）；`report/route.ts`（生成 AI 经营报告，缺资料不调模型、模型失败降级 report=null）；`snapshots/route.ts`（沙盘快照读写）。
+- **前端** `packages/ai-chat/src/components/merchant-takeout/`：分模块编辑器（选址/成本/人员/商品/购物篮/平台规则/活动/销量与推广）+ 经营沙盘 + AI 报告视图 + 自动保存（`use-auto-save` 防抖 PUT）。
+- **高德地图**（选址点选/搜索/周边 POI）：前端 Web 端 JS API，`amap-loader.ts` 动态加载，需要两个浏览器暴露的环境变量 `NEXT_PUBLIC_AMAP_JS_KEY`（Web 端 JS API key）与 `NEXT_PUBLIC_AMAP_SECURITY_CODE`（securityJsCode）。二者为 `NEXT_PUBLIC_` 前缀——**会打进客户端 bundle、公开暴露**，须在高德开放平台配置「Web 端」密钥并开启域名白名单（securityJsCode 仅用于配合域名白名单的代理校验，不能当作保密凭证）；缺 key 时选址模块降级为手动经纬度录入。服务端另有 `AMAP_MCP_KEY`（远程 streamable HTTP，与 Web 端 key 用途不同）。
+
 ## 工作流系统
 
 ### 设计理念

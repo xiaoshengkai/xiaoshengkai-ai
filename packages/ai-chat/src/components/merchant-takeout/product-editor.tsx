@@ -22,12 +22,14 @@ const emptyProduct = (): StoreProduct => ({
 });
 
 function NumInput({
+  id,
   value,
   onChange,
   className,
   placeholder,
   step,
 }: {
+  id?: string;
   value: number;
   onChange: (v: number) => void;
   className?: string;
@@ -36,6 +38,7 @@ function NumInput({
 }) {
   return (
     <input
+      id={id}
       type="number"
       min={0}
       step={step}
@@ -79,36 +82,38 @@ export default function ProductEditor({ products, onChange }: ProductEditorProps
                   value={p.name}
                   onChange={(e) => patch(p.id, { name: e.target.value })}
                   placeholder="名称（如：招牌鸡腿饭 / 双人套餐）"
+                  aria-label="商品名称"
                   className="flex-1 px-2 py-1.5 text-sm font-bold border-2 border-border bg-card"
                 />
-                <button onClick={() => remove(p.id)} className="brutal-btn p-1.5 text-muted-foreground">
+                <button onClick={() => remove(p.id)} className="brutal-btn p-1.5 text-muted-foreground" aria-label="删除商品">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 <div>
-                  <label className="text-[11px] text-muted-foreground block mb-0.5">售价（元）</label>
-                  <NumInput value={p.price} onChange={(v) => patch(p.id, { price: v })} />
+                  <label htmlFor={`product-price-${p.id}`} className="text-[11px] text-muted-foreground block mb-0.5">售价（元）</label>
+                  <NumInput id={`product-price-${p.id}`} value={p.price} onChange={(v) => patch(p.id, { price: v })} />
                 </div>
                 <div>
-                  <label className="text-[11px] text-muted-foreground block mb-0.5">食材总成本（元）</label>
-                  <NumInput value={p.ingredientCost} onChange={(v) => patch(p.id, { ingredientCost: v })} />
+                  <label htmlFor={`product-cost-${p.id}`} className="text-[11px] text-muted-foreground block mb-0.5">食材总成本（元）</label>
+                  <NumInput id={`product-cost-${p.id}`} value={p.ingredientCost} onChange={(v) => patch(p.id, { ingredientCost: v })} />
                 </div>
                 <div>
-                  <label className="text-[11px] text-muted-foreground block mb-0.5">损耗率（%）</label>
+                  <label htmlFor={`product-loss-${p.id}`} className="text-[11px] text-muted-foreground block mb-0.5">损耗率（%）</label>
                   <NumInput
+                    id={`product-loss-${p.id}`}
                     value={p.lossRate * 100}
                     onChange={(v) => patch(p.id, { lossRate: v / 100 })}
                     step={0.1}
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-muted-foreground block mb-0.5">包装成本（元）</label>
-                  <NumInput value={p.packagingCost} onChange={(v) => patch(p.id, { packagingCost: v })} />
+                  <label htmlFor={`product-packcost-${p.id}`} className="text-[11px] text-muted-foreground block mb-0.5">包装成本（元）</label>
+                  <NumInput id={`product-packcost-${p.id}`} value={p.packagingCost} onChange={(v) => patch(p.id, { packagingCost: v })} />
                 </div>
                 <div>
-                  <label className="text-[11px] text-muted-foreground block mb-0.5">顾客包装费（元）</label>
-                  <NumInput value={p.packagingFee} onChange={(v) => patch(p.id, { packagingFee: v })} />
+                  <label htmlFor={`product-packfee-${p.id}`} className="text-[11px] text-muted-foreground block mb-0.5">顾客包装费（元）</label>
+                  <NumInput id={`product-packfee-${p.id}`} value={p.packagingFee} onChange={(v) => patch(p.id, { packagingFee: v })} />
                 </div>
               </div>
             </li>

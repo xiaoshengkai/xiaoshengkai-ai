@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { MapPin } from "lucide-react";
 import type { OneTimeCosts, MonthlyFixedCosts, StoreCosts, StoreLocation } from "@/lib/merchant-takeout/types";
 
@@ -15,10 +16,12 @@ function NumField({
   value: number;
   onChange: (v: number) => void;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="text-xs text-muted-foreground block mb-1">{label}（元）</label>
+      <label htmlFor={id} className="text-xs text-muted-foreground block mb-1">{label}（元）</label>
       <input
+        id={id}
         type="number"
         min={0}
         value={Number.isFinite(value) ? value : 0}

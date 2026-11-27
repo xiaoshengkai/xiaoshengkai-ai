@@ -79,10 +79,12 @@ export default function BasketEditor({ baskets, products, onChange }: BasketEdit
                     value={b.name}
                     onChange={(e) => patch(b.id, { name: e.target.value })}
                     placeholder="购物篮名称（如：一人食 / 家庭聚餐）"
+                    aria-label="购物篮名称"
                     className="flex-1 px-2 py-1.5 text-sm font-bold border-2 border-border bg-card"
                   />
-                  <label className="text-[11px] text-muted-foreground shrink-0">占比</label>
+                  <label htmlFor={`basket-share-${b.id}`} className="text-[11px] text-muted-foreground shrink-0">占比</label>
                   <input
+                    id={`basket-share-${b.id}`}
                     type="number"
                     min={0}
                     value={b.orderShare}
@@ -90,7 +92,7 @@ export default function BasketEditor({ baskets, products, onChange }: BasketEdit
                     className="w-20 px-2 py-1.5 text-sm font-mono border-2 border-border bg-card"
                   />
                   <span className="text-xs text-muted-foreground shrink-0">%</span>
-                  <button onClick={() => remove(b.id)} className="brutal-btn p-1.5 text-muted-foreground">
+                  <button onClick={() => remove(b.id)} className="brutal-btn p-1.5 text-muted-foreground" aria-label="删除购物篮">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -100,6 +102,7 @@ export default function BasketEditor({ baskets, products, onChange }: BasketEdit
                     <div key={ii} className="grid grid-cols-[1fr_64px_28px] gap-2 items-center">
                       <select
                         value={item.productId}
+                        aria-label="商品"
                         onChange={(e) =>
                           patch(b.id, {
                             items: b.items.map((x, i) =>
@@ -118,6 +121,7 @@ export default function BasketEditor({ baskets, products, onChange }: BasketEdit
                       <input
                         type="number"
                         min={0}
+                        aria-label="数量"
                         value={item.quantity}
                         onChange={(e) =>
                           patch(b.id, {
@@ -133,6 +137,7 @@ export default function BasketEditor({ baskets, products, onChange }: BasketEdit
                           patch(b.id, { items: b.items.filter((_, i) => i !== ii) })
                         }
                         className="brutal-btn p-1.5 text-muted-foreground"
+                        aria-label="删除商品"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

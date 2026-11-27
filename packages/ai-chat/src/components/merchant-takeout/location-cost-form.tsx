@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import type { LocationCosts, StoreLocation } from "@/lib/merchant-takeout/types";
 
 /** 零值 LocationCosts，新增候选地址时使用 */
@@ -41,13 +42,15 @@ function NumField({
   value: number;
   onChange: (v: number) => void;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="text-xs text-muted-foreground block mb-1">
+      <label htmlFor={id} className="text-xs text-muted-foreground block mb-1">
         {label}
         {unit ? <span className="text-muted-foreground/60">（{unit}）</span> : null}
       </label>
       <input
+        id={id}
         type="number"
         min={0}
         value={Number.isFinite(value) ? value : 0}
@@ -68,10 +71,12 @@ function TextField({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="text-xs text-muted-foreground block mb-1">{label}</label>
+      <label htmlFor={id} className="text-xs text-muted-foreground block mb-1">{label}</label>
       <input
+        id={id}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -85,6 +90,7 @@ const fmt = (n: number) => `¥ ${(Number.isFinite(n) ? n : 0).toLocaleString("zh
 
 export default function LocationCostForm({ location, onChange }: LocationCostFormProps) {
   const c = location.costs;
+  const competitorsId = useId();
   const set = (patch: Partial<LocationCosts>) => onChange({ costs: { ...c, ...patch } });
 
   const monthlyRent = (c.annualRent || 0) / 12;
@@ -146,10 +152,11 @@ export default function LocationCostForm({ location, onChange }: LocationCostFor
       {/* 竞店说明 */}
       <div>
         <div className="text-xs font-bold text-foreground mb-1.5">竞店说明</div>
-        <label className="text-xs text-muted-foreground block mb-1">
+        <label htmlFor={competitorsId} className="text-xs text-muted-foreground block mb-1">
           代表竞店的月售/评分/价格/活动等说明
         </label>
         <textarea
+          id={competitorsId}
           value={location.competitors}
           onChange={(e) => onChange({ competitors: e.target.value })}
           rows={3}

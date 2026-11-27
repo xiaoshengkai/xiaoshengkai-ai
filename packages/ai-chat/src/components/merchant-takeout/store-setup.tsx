@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BASE } from "@/lib/utils/utils";
 import { toast } from "sonner";
@@ -51,10 +51,12 @@ function MoneyInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="text-xs text-muted-foreground block mb-1">{label}（元）</label>
+      <label htmlFor={id} className="text-xs text-muted-foreground block mb-1">{label}（元）</label>
       <input
+        id={id}
         type="number"
         min={0}
         value={value}
@@ -68,6 +70,7 @@ function MoneyInput({
 
 export default function StoreSetup({ open, onClose }: StoreSetupProps) {
   const router = useRouter();
+  const fieldId = useId();
   const [step, setStep] = useState<1 | 2>(1);
   const [stage, setStage] = useState<StoreStage>("first-time");
   const [name, setName] = useState("");
@@ -169,7 +172,7 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
           <h3 className="text-sm font-bold text-foreground font-heading">创建模拟店铺</h3>
           <div className="flex items-center gap-2">
             <span className="brutal-chip px-2 py-0.5 text-[10px] bg-yellow-soft">步骤 {step}/2</span>
-            <button onClick={close} className="text-muted-foreground/70 hover:text-muted-foreground">
+            <button onClick={close} className="text-muted-foreground/70 hover:text-muted-foreground" aria-label="关闭">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -179,7 +182,7 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
           {step === 1 ? (
             <>
               <div>
-                <label className="text-xs text-muted-foreground block mb-1.5">开店阶段</label>
+                <div className="text-xs text-muted-foreground block mb-1.5">开店阶段</div>
                 <div className="grid grid-cols-3 gap-2">
                   {STAGES.map((s) => (
                     <button
@@ -197,8 +200,9 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">店铺名称 *</label>
+                <label htmlFor={`${fieldId}-name`} className="text-xs text-muted-foreground block mb-1">店铺名称 *</label>
                 <input
+                  id={`${fieldId}-name`}
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -208,7 +212,7 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground block mb-1.5">主营品类</label>
+                <div className="text-xs text-muted-foreground block mb-1.5">主营品类</div>
                 <div className="flex flex-wrap gap-1.5">
                   {CATEGORIES.map((c) => (
                     <button
@@ -226,8 +230,9 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">辅助标签（逗号分隔）</label>
+                <label htmlFor={`${fieldId}-tags`} className="text-xs text-muted-foreground block mb-1">辅助标签（逗号分隔）</label>
                 <input
+                  id={`${fieldId}-tags`}
                   type="text"
                   value={tagsText}
                   onChange={(e) => setTagsText(e.target.value)}
@@ -237,8 +242,9 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">城市</label>
+                <label htmlFor={`${fieldId}-city`} className="text-xs text-muted-foreground block mb-1">城市</label>
                 <input
+                  id={`${fieldId}-city`}
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
@@ -248,7 +254,7 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground block mb-1.5">经营方式</label>
+                <div className="text-xs text-muted-foreground block mb-1.5">经营方式</div>
                 <Toggle
                   options={[
                     { value: true, label: "自营" },
@@ -268,8 +274,9 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">经营经验</label>
+                <label htmlFor={`${fieldId}-experience`} className="text-xs text-muted-foreground block mb-1">经营经验</label>
                 <input
+                  id={`${fieldId}-experience`}
                   type="text"
                   value={experience}
                   onChange={(e) => setExperience(e.target.value)}
@@ -279,7 +286,7 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground block mb-1.5">投入方式</label>
+                <div className="text-xs text-muted-foreground block mb-1.5">投入方式</div>
                 <Toggle
                   options={[
                     { value: true, label: "全职" },
@@ -291,7 +298,7 @@ export default function StoreSetup({ open, onClose }: StoreSetupProps) {
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground block mb-1.5">已有资源</label>
+                <div className="text-xs text-muted-foreground block mb-1.5">已有资源</div>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { value: hasSupply, label: "供应链", set: setHasSupply },

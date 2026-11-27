@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { AlertTriangle, Loader2, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { BASE } from "@/lib/utils/utils";
@@ -10,10 +10,12 @@ import { COMMISSION_BASE_LABELS, describeRuleSource } from "@/lib/merchant-takeo
 const fmtPct = (v?: number) => (Number.isFinite(v) ? (v as number) * 100 : 0);
 
 function NumInput({
+  id,
   value,
   onChange,
   suffix,
 }: {
+  id?: string;
   value: number;
   onChange: (v: number) => void;
   suffix?: string;
@@ -21,6 +23,7 @@ function NumInput({
   return (
     <div className="flex items-center gap-1.5">
       <input
+        id={id}
         type="number"
         min={0}
         value={Number.isFinite(value) ? value : 0}
@@ -41,6 +44,7 @@ interface PlatformRulesEditorProps {
 
 export default function PlatformRulesEditor({ rules, onChange, city }: PlatformRulesEditorProps) {
   const [fetching, setFetching] = useState(false);
+  const uid = useId();
   const patch = (p: Partial<PlatformRules>) => onChange({ ...rules, ...p });
   const patchBase = (p: Partial<CommissionBase>) =>
     onChange({ ...rules, commissionBase: { ...rules.commissionBase, ...p } });
@@ -85,20 +89,20 @@ export default function PlatformRulesEditor({ rules, onChange, city }: PlatformR
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">平台扣点（%）</label>
-          <NumInput value={fmtPct(rules.commissionRate)} onChange={(v) => patch({ commissionRate: v / 100 })} suffix="%" />
+          <label htmlFor={`${uid}-rate`} className="text-xs text-muted-foreground block mb-1">平台扣点（%）</label>
+          <NumInput id={`${uid}-rate`} value={fmtPct(rules.commissionRate)} onChange={(v) => patch({ commissionRate: v / 100 })} suffix="%" />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">平台固定服务费（元/单）</label>
-          <NumInput value={rules.fixedServiceFee ?? 0} onChange={(v) => patch({ fixedServiceFee: v })} suffix="元" />
+          <label htmlFor={`${uid}-fixed`} className="text-xs text-muted-foreground block mb-1">平台固定服务费（元/单）</label>
+          <NumInput id={`${uid}-fixed`} value={rules.fixedServiceFee ?? 0} onChange={(v) => patch({ fixedServiceFee: v })} suffix="元" />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">向顾客收取配送费（元/单）</label>
-          <NumInput value={rules.customerDeliveryFee ?? 0} onChange={(v) => patch({ customerDeliveryFee: v })} suffix="元" />
+          <label htmlFor={`${uid}-customerFee`} className="text-xs text-muted-foreground block mb-1">向顾客收取配送费（元/单）</label>
+          <NumInput id={`${uid}-customerFee`} value={rules.customerDeliveryFee ?? 0} onChange={(v) => patch({ customerDeliveryFee: v })} suffix="元" />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">商家承担配送费（元/单）</label>
-          <NumInput value={rules.merchantDeliveryFee ?? 0} onChange={(v) => patch({ merchantDeliveryFee: v })} suffix="元" />
+          <label htmlFor={`${uid}-merchantFee`} className="text-xs text-muted-foreground block mb-1">商家承担配送费（元/单）</label>
+          <NumInput id={`${uid}-merchantFee`} value={rules.merchantDeliveryFee ?? 0} onChange={(v) => patch({ merchantDeliveryFee: v })} suffix="元" />
         </div>
       </div>
 

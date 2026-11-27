@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileText, Loader2, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import type { AiReport, MerchantStore } from "@/lib/merchant-takeout/types";
-import { calculateSimulation, buildPhases, getReportReadiness } from "@/lib/merchant-takeout/calculate";
+import { calculateSimulation, buildPhases } from "@/lib/merchant-takeout/calculate";
 import { BASE } from "@/lib/utils/utils";
 
 const fmt = (n: number) =>
@@ -17,8 +17,9 @@ const FEASIBILITY_META: Record<AiReport["feasibility"], { label: string; accent:
 };
 
 type Resp =
-  | { ready: false; missing: string[] }
-  | { ready: true; report: AiReport | null; error?: string };
+  | { kind: "missing"; missing: string[] }
+  | { kind: "ready"; report: AiReport | null; error?: string }
+  | { kind: "error"; message: string };
 
 function CompactMetrics({ store }: { store: MerchantStore }) {
   const computable = store.baskets.length > 0 && store.products.length > 0;
@@ -67,7 +68,6 @@ function CompactMetrics({ store }: { store: MerchantStore }) {
 export default function ReportView({ store }: { store: MerchantStore }) {
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState<Resp | null>(null);
-  const readyNow = getReportReadiness(store).length === 0;
 
   const generate = async () => {
     setLoading(true);
@@ -80,14 +80,14 @@ export default function ReportView({ store }: { store: MerchantStore }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setResp({ ready: false, missing: [data?.error || "请求失败"] });
+        setResp({ kind: "error", message: data?.error || "请求失败" });
       } else if (data.ready === false) {
-        setResp({ ready: false, missing: data.missing ?? [] });
+        setResp({ kind: "missing", missing: data.missing ?? [] });
       } else {
-        setResp({ ready: true, report: data.report ?? null, error: data.error });
+        setResp({ kind: "ready", report: data.report ?? null, error: data.error });
       }
     } catch {
-      setResp({ ready: false, missing: ["网络请求失败，请重试"] });
+      setResp({ kind: "error", message: "网络请求失败，请重试" });
     } finally {
       setLoading(false);
     }
@@ -109,7 +109,7 @@ export default function ReportView({ store }: { store: MerchantStore }) {
         </button>
       </div>
 
-      {resp && resp.ready === false && (
+      {resp && resp.kind === "missing" && (
         <div className="brutal bg-yellow-soft p-3">
           <div className="flex items-start gap-2 text-xs text-foreground">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -125,13 +125,25 @@ export default function ReportView({ store }: { store: MerchantStore }) {
         </div>
       )}
 
-      {resp && resp.ready === true && resp.report === null && (
+      {resp && resp.kind === "error" && (
+        <div className="brutal bg-orange-soft p-3">
+          <div className="flex items-start gap-2 text-xs text-foreground">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-bold mb-1">报告生成失败</div>
+              <div>{resp.message}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resp && resp.kind === "ready" && resp.report === null && (
         <div className="brutal bg-muted p-3 text-xs text-foreground">
           AI 分析暂时不可用，请查看下方经营指标。
         </div>
       )}
 
-      {resp && resp.ready === true && resp.report && (
+      {resp && resp.kind === "ready" && resp.report && (
         <ReportCard report={resp.report} />
       )}
 

@@ -1,22 +1,17 @@
 /**
  * 外卖开店模拟器 — AI 经营报告
- * 本文件拆成纯函数（buildReportContext / parseReportJson / reportReadinessErrors）与
+ * 本文件拆成纯函数（buildReportContext / parseReportJson）与
  * 副作用函数（generateReport）。纯函数不读环境、不调 AI，供测试直接 import；
  * generateReport 在函数体内动态 import 模型与 SDK，保持模块级无服务端依赖。
  */
 
 import { z } from "zod";
 import type { AiReport, AiReportRisk, AiReportRecommendation, MerchantStore } from "./types";
-import { calculateSimulation, buildPhases, getReportReadiness } from "./calculate";
+import { calculateSimulation, buildPhases } from "./calculate";
 
 const fmt = (n: number) =>
   `${(Number.isFinite(n) ? n : 0).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
 const fmtSigned = (n: number) => `${n >= 0 ? "+" : ""}${fmt(n)}`;
-
-/** 薄封装：报告就绪度（返回缺失项数组，空数组 = 可生成报告） */
-export function reportReadinessErrors(store: MerchantStore): string[] {
-  return getReportReadiness(store);
-}
 
 /**
  * 用确定性测算结果拼装中文提示词上下文（纯函数，不调 AI）。

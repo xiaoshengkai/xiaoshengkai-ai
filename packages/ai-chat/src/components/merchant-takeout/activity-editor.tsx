@@ -84,6 +84,7 @@ export default function ActivityEditor({ activities, onChange }: ActivityEditorP
                   disabled={i === 0}
                   className="brutal-btn p-1.5 text-muted-foreground disabled:opacity-30"
                   title="上移（先应用）"
+                  aria-label="上移"
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
                 </button>
@@ -92,10 +93,15 @@ export default function ActivityEditor({ activities, onChange }: ActivityEditorP
                   disabled={i === activities.list.length - 1}
                   className="brutal-btn p-1.5 text-muted-foreground disabled:opacity-30"
                   title="下移（后应用）"
+                  aria-label="下移"
                 >
                   <ArrowDown className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={() => remove(a.id)} className="brutal-btn p-1.5 text-muted-foreground">
+                <button
+                  onClick={() => remove(a.id)}
+                  className="brutal-btn p-1.5 text-muted-foreground"
+                  aria-label="删除活动"
+                >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>

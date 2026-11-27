@@ -200,6 +200,15 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
             />
           </div>
         </div>
+        <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={loss.confirmed}
+            onChange={(e) => onChange({ loss: { ...loss, confirmed: e.target.checked } })}
+            className="accent-foreground"
+          />
+          已确认（含 0 值场景）
+        </label>
       </div>
 
       <div className="brutal bg-card p-3 space-y-3">
@@ -250,6 +259,15 @@ export default function ScenarioEditor({ sales, loss, tax, sweep, activities, on
             />
           </div>
         )}
+        <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={tax.confirmed}
+            onChange={(e) => onChange({ tax: { ...tax, confirmed: e.target.checked } })}
+            className="accent-foreground"
+          />
+          已确认（含 0 值场景）
+        </label>
       </div>
 
       <div className="brutal bg-card p-3 space-y-3">

@@ -37,8 +37,8 @@ function makeStore(): MerchantStore {
     source: {},
   };
   store.activities = { list: [], stackOrder: [] };
-  store.loss = { orderLossRate: 0, lossAmountPerOrder: 0 };
-  store.tax = { rate: 0, base: "preTaxProfit" };
+  store.loss = { orderLossRate: 0, lossAmountPerOrder: 0, confirmed: false };
+  store.tax = { rate: 0, base: "preTaxProfit", confirmed: false };
   store.sales = [1, 2, 3, 4].map((m) => ({ monthIndex: m, naturalOrders: 100, promotionBudget: 0, promotionOrders: 0 }));
   return store;
 }
@@ -272,8 +272,8 @@ test("订单损失与税费各扣一次", () => {
   const store = makeStore();
   store.products = [{ id: "p1", name: "x", price: 100, ingredientCost: 10, lossRate: 0, packagingCost: 1, packagingFee: 1 }];
   store.baskets = [{ id: "b1", name: "b", items: [{ productId: "p1", quantity: 1 }], orderShare: 100 }];
-  store.loss = { orderLossRate: 0.05, lossAmountPerOrder: 10 };
-  store.tax = { rate: 0.2, base: "preTaxProfit" };
+  store.loss = { orderLossRate: 0.05, lossAmountPerOrder: 10, confirmed: false };
+  store.tax = { rate: 0.2, base: "preTaxProfit", confirmed: false };
   store.staffing = { base: [{ role: "老板", count: 1, monthlySalary: 5000 }], tiers: [] };
   store.costs.monthlyFixed = { ...store.costs.monthlyFixed, rent: 1000 };
   const m = calculateMonth(store, { naturalOrders: 100, promotionOrders: 0, promotionBudget: 0, activities: store.activities });
@@ -373,12 +373,12 @@ test("保本单量计入订单损失的手算锚点", () => {
   store.staffing = { base: [{ role: "老板", count: 1, monthlySalary: 1000 }], tiers: [] };
   store.costs.monthlyFixed = { ...store.costs.monthlyFixed, rent: 1000 };
 
-  store.loss = { orderLossRate: 0.1, lossAmountPerOrder: 20 };
+  store.loss = { orderLossRate: 0.1, lossAmountPerOrder: 20, confirmed: false };
   const withLoss = calculateMonth(store, { naturalOrders: 0, promotionOrders: 0, promotionBudget: 0, activities: store.activities });
   approx(withLoss.avgContribution, 10);
   assert.equal(withLoss.breakevenOrders, 250); // 2000 / (10 - 0.1×20)
 
-  store.loss = { orderLossRate: 0, lossAmountPerOrder: 0 };
+  store.loss = { orderLossRate: 0, lossAmountPerOrder: 0, confirmed: false };
   const noLoss = calculateMonth(store, { naturalOrders: 0, promotionOrders: 0, promotionBudget: 0, activities: store.activities });
   assert.equal(noLoss.breakevenOrders, 200); // 2000 / 10
 });
@@ -417,8 +417,9 @@ test("购物篮占比不是 100% 时报告未就绪", () => {
 test("配置完整时 readiness 为空", () => {
   const store = makeStore();
   store.locations = [{ id: "l1", name: "x", address: "", lng: 0, lat: 0, deliveryRadius: 0, poi: [], competitors: "", selected: true }];
-  store.loss = { orderLossRate: 0.05, lossAmountPerOrder: 10 };
-  store.tax = { rate: 0.2, base: "preTaxProfit" };
+  store.profile = { ...store.profile, availableCapital: 100000 };
+  store.loss = { orderLossRate: 0.05, lossAmountPerOrder: 10, confirmed: true };
+  store.tax = { rate: 0.2, base: "preTaxProfit", confirmed: true };
   store.staffing = { base: [{ role: "老板", count: 1, monthlySalary: 5000 }], tiers: [] };
   store.sales = [1, 2, 3, 4].map((i) => ({ monthIndex: i, naturalOrders: 100, promotionBudget: 100, promotionOrders: 10 }));
   assert.deepEqual(getReportReadiness(store), []);

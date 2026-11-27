@@ -183,7 +183,7 @@ function laborCost(store: MerchantStore, totalOrders: number): number {
   return top ? base + staffCostTotal(top.members) : base;
 }
 
-// ponytail: 押金可回收，不计入一次性投入
+// ponytail: 押金可回收，不计入一次性投入；但开业初期仍占用现金、此处未体现，经营现金流应自行留意。
 function totalOneTimeCosts(costs: OneTimeCosts): number {
   return (
     costs.renovation +
@@ -304,6 +304,7 @@ export function calculateMonth(store: MerchantStore, input: MonthInput): MonthRe
 
   const perOrderMargin =
     avgContribution - (store.loss.orderLossRate || 0) * (store.loss.lossAmountPerOrder || 0);
+  // ponytail: 保本单量按当前订单档位的人工与固定成本反推，是简化近似（阶梯人工随单量变化、税费/推广预算未计入分母），仅作经营参考。
   const breakevenOrders =
     perOrderMargin > 0 ? (labor + fixed) / perOrderMargin : null;
 
@@ -387,6 +388,7 @@ export function getReportReadiness(store: MerchantStore): string[] {
   }
   if (!store.platformRules.confirmed) missing.push("平台规则未确认");
   if (store.staffing.base.length === 0) missing.push("未填写基础人员与老板工资");
+  if (store.profile.availableCapital <= 0) missing.push("未填写可投入资金");
 
   const phases = store.sales;
   if (phases.length < 4 || phases.some((p) => !(p.naturalOrders > 0))) {
@@ -396,14 +398,8 @@ export function getReportReadiness(store: MerchantStore): string[] {
     missing.push("未填写推广预算及预期新增订单");
   }
 
-  const loss = store.loss;
-  if (!loss || (loss.orderLossRate <= 0 && loss.lossAmountPerOrder <= 0)) {
-    missing.push("未填写订单损失率与单笔损失金额");
-  }
-  const tax = store.tax;
-  if (!tax || tax.rate <= 0) {
-    missing.push("未确认税费参数");
-  }
+  if (!store.loss || !store.loss.confirmed) missing.push("未确认订单损失参数");
+  if (!store.tax || !store.tax.confirmed) missing.push("未确认税费参数");
 
   return missing;
 }

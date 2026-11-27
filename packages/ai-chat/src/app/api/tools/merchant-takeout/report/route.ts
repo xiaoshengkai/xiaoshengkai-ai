@@ -22,11 +22,12 @@ export async function POST(req: NextRequest) {
     const report = await generateReport(store);
     return NextResponse.json({ ok: true, ready: true, report });
   } catch (e) {
+    console.error("[merchant-takeout] report 生成失败", e);
     return NextResponse.json({
       ok: true,
       ready: true,
       report: null,
-      error: String((e as Error)?.message || e),
+      error: "AI 报告生成失败，请稍后重试",
     });
   }
 }

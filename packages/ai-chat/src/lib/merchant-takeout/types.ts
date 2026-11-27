@@ -177,6 +177,7 @@ export type TaxBaseKind = "productRevenue" | "platformSettlement" | "preTaxProfi
 export interface StoreLoss {
   orderLossRate: number; // 订单损失率（0~1）
   lossAmountPerOrder: number; // 单笔平均损失金额（元）
+  confirmed: boolean; // 是否已确认（含 0 值场景）
 }
 
 /** 税费测算参数 */
@@ -184,6 +185,7 @@ export interface StoreTax {
   rate: number; // 综合税费比例（0~1）
   base: TaxBaseKind; // 计税基数
   customBase?: number; // 自定义计税基数（元）
+  confirmed: boolean; // 是否已确认（含 0 值场景）
 }
 
 /** 销量与推广：单阶段输入（第 1~3 月 + 稳定期） */

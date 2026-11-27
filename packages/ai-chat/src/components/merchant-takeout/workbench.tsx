@@ -17,6 +17,7 @@ import {
   TrendingUp,
   LineChart,
   Bot,
+  Camera,
 } from "lucide-react";
 import type { MerchantStore } from "@/lib/merchant-takeout/types";
 import { getReportReadiness } from "@/lib/merchant-takeout/calculate";
@@ -34,6 +35,7 @@ import ActivityEditor from "./activity-editor";
 import ScenarioEditor from "./scenario-editor";
 import SimulationDashboard from "./simulation-dashboard";
 import ReportView from "./report-view";
+import SnapshotPanel from "./snapshot-panel";
 
 const fmtMoney = (n: number) => `¥ ${n.toLocaleString("zh-CN")}`;
 
@@ -287,6 +289,15 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
           <span className="text-sm font-bold text-foreground">AI 经营报告</span>
         </div>
         <ReportView store={store} />
+      </div>
+
+      {/* 方案快照 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Camera className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">方案快照</span>
+        </div>
+        <SnapshotPanel store={store} />
       </div>
 
       {/* 下一步建议 */}

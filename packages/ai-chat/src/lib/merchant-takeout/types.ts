@@ -217,13 +217,27 @@ export interface StoreScenario {
   tax: number; // 预计税费
 }
 
-/** AI 分析报告（可行性等级 + 关键条件 + 依据，不输出伪概率） */
+/** AI 分析报告中的单条风险（标题 + 依据 + 影响，均基于确定性测算，不输出伪概率） */
+export interface AiReportRisk {
+  title: string;
+  evidence: string;
+  impact: string;
+}
+
+/** AI 分析报告中的单条调整建议（动作 + 依据 + 预期影响） */
+export interface AiReportRecommendation {
+  action: string;
+  evidence: string;
+  expectedImpact: string;
+}
+
+/** AI 分析报告（可行性等级 + 摘要 + 成立条件 + 风险 + 调整建议） */
 export interface AiReport {
-  feasibility: string; // 经营可行性等级
-  conditions: string[]; // 关键成立条件
-  risks: string[]; // 风险
-  suggestions: string[]; // 调整建议
-  basis: string[]; // 依据
+  feasibility: "较可行" | "谨慎考虑" | "风险较高" | "信息不足";
+  summary: string;
+  conditions: string[];
+  risks: AiReportRisk[];
+  recommendations: AiReportRecommendation[];
 }
 
 /** 方案快照（生成报告时的完整输入 + 沙盘计算结果 + AI 分析，不可变，用于前后比较） */

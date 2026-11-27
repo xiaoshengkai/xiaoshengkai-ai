@@ -16,6 +16,7 @@ import {
   Gift,
   TrendingUp,
   LineChart,
+  Bot,
 } from "lucide-react";
 import type { MerchantStore } from "@/lib/merchant-takeout/types";
 import { getReportReadiness } from "@/lib/merchant-takeout/calculate";
@@ -32,6 +33,7 @@ import PlatformRulesEditor from "./platform-rules-editor";
 import ActivityEditor from "./activity-editor";
 import ScenarioEditor from "./scenario-editor";
 import SimulationDashboard from "./simulation-dashboard";
+import ReportView from "./report-view";
 
 const fmtMoney = (n: number) => `¥ ${n.toLocaleString("zh-CN")}`;
 
@@ -276,6 +278,15 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
           <span className="text-sm font-bold text-foreground">经营沙盘</span>
         </div>
         <SimulationDashboard store={store} />
+      </div>
+
+      {/* AI 经营报告 */}
+      <div className="brutal bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Bot className="w-4 h-4" />
+          <span className="text-sm font-bold text-foreground">AI 经营报告</span>
+        </div>
+        <ReportView store={store} />
       </div>
 
       {/* 下一步建议 */}

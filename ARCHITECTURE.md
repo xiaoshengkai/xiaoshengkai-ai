@@ -45,7 +45,7 @@ ai-engineer-journey/
 │   ├── log-wrap.js             # 子服务日志包装（spawn 子进程 → stdout/stderr 逐行写按日日志）
 │   ├── proxy.cjs               # 反向代理（serve site/ + 转发 /ai；默认回环、PROXY_BIND 可放开；静态服务带路径穿越防护；博客「需登录路径」按 data/settings/auth-paths.json 校验 Cookie）
 │   └── fix-transformers-mjs.mjs / compress-images.cjs
-├── data/                       # 运行时数据（chroma / tasks / settings / static / workflows / xhs-tasks / exports）
+├── data/                       # 运行时数据（chroma / tasks / settings / static / workflows / xhs-tasks / exports / merchant-takeout）
 ├── logs/                       # 日志（app/ + tasks/ + services/ + workflows/）
 ├── site/                       # 博客静态文件
 └── packages/
@@ -59,7 +59,7 @@ ai-engineer-journey/
     │   ├── logger.js           # 统一日志
     │   ├── network.js          # loadNetworkConfig 共享读取器
     │   ├── utils.js            # sleep / shortId / downloadsDir / withTimeout（网络调用硬超时兜底）
-    │   ├── test/               # 共享测试（auth / capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store / image-preview / media）
+    │   ├── test/               # 共享测试（auth / capability / llm-dispatch / tts-timeout / engine-status / ai-chat-multimodal / comic-workflow / conversations-store / merchant-takeout-store / image-preview / media）
     │   └── llm/                # LLM 共享封装
     │       ├── index.js        # callLLM / generateTTS / generateBGM / generateMusic / generateImage / provider 读取
     │       ├── config.js       # providers.json / selection.json fresh-read（真源，env 兜底）
@@ -76,6 +76,7 @@ ai-engineer-journey/
     │   │   │   ├── multimodal/  # 附件处理：attachment / image / video(仅 stripVideos) / pipeline / preprocess(vision 逐图描述→内联替换消息占位符，附公网原图 URL：本地图按需注册媒体库 kind=chat-upload，供模型调图生图工具) / modality-detector / multimodal-config / mime
     │   │   │   ├── rag/         # retrieve.ts / vector-store.ts / chroma-server.ts
     │   │   │   ├── settings/    # store / init / dispatcher / types
+    │   │   │   ├── merchant-takeout/ # 外卖开店模拟器：types（领域模型）/ defaults（空店铺）/ store（店铺 JSON 文件存储）
     │   │   │   ├── services/    # manager.ts：packages/services/* 清单扫描 + 启停/健康检查（服务监控）
     │   │   │   ├── mcp-client.ts
     │   │   │   ├── modes.ts           # chat/plan/build 模式：MODE_INFO（状态+行为指令）+ WRITE_TOOLS/filterToolsByMode（工具权限）+ buildToolsSection（按模式拼工具清单）
@@ -83,12 +84,12 @@ ai-engineer-journey/
     │   │   └── app/
     │   │       ├── (main)/      # page（对话）/ memory / schedule / workflow（三层：主页类型卡片 → type/[templateId] 类型列表 → execution/[id] 详情）/ logs（日志页）
     │   │       ├── login/       # 登录页（(main) 组外，Neo-Brutalism 居中卡片）
-    │   │       ├── api/         # chat / memory / settings / services / conversations / logs / note / exports / auth(login·logout·change-password) / tools(file-qr·server-status) ... + workflows、tasks 仅 catch-all 挂载点
+    │   │       ├── api/         # chat / memory / settings / services / conversations / logs / note / exports / auth(login·logout·change-password) / tools(file-qr·server-status·merchant-takeout) ... + workflows、tasks 仅 catch-all 挂载点
     │   │       ├── note/[taskId]/page.tsx
     │   │       ├── logs/page.tsx        # 日志页：分组（app/tasks/services/workflows/backup）+ 文件选择 + tail 自动刷新 + 下载
     │   │       ├── preview/[taskId]/route.ts
     │   │       ├── m/[token]/route.ts   # 公开媒体服务（token 查表 → Range 流式；proxy.ts 豁免 /m/*）
-    │   │       ├── tools/               # 工具菜单：page.tsx（列表，扫 packages/tools/*/tool.json）+ file-qr/page.tsx + server-status/page.tsx
+    │   │       ├── tools/               # 工具菜单：page.tsx（列表，扫 packages/tools/*/tool.json）+ file-qr/page.tsx + server-status/page.tsx + merchant-takeout/page.tsx
     │   │       ├── settings/page.tsx
     │   │       └── layout.tsx / globals.css
     │   ├── scripts/             # generate-embeddings / verify-migration
@@ -97,7 +98,8 @@ ai-engineer-journey/
     ├── skills/                  # 技能模块（image-styles / blog / github-gem-seeker / xiaohongshu-note / task）
     ├── tools/                   # 工具菜单（薄框架：每工具自包含 tool.json 元数据 + ai-chat 里独立 page/api 路由）
     │       ├── file-qr/               # 文件转二维码：上传(视频转码/图片·PDF 直存)或粘贴链接 → 媒体库 → 二维码（tool.json + ai-chat 内 page/route）
-    │       └── server-status/         # 服务器状态：监控 CPU/内存/磁盘/负载/网络/系统信息（纯 Node os + fs.statfs + /proc/net/dev）
+    │       ├── server-status/         # 服务器状态：监控 CPU/内存/磁盘/负载/网络/系统信息（纯 Node os + fs.statfs + /proc/net/dev）
+    │       └── merchant-takeout/      # 外卖开店模拟器：数字店铺沙盘（tool.json + ai-chat 内 page/route；领域模型 + data/merchant-takeout/stores JSON 存储）
     ├── services/                # 独立常驻服务（非 npm workspace 内聚目录）
     │   ├── search/              # 联网搜索服务（本地 SearXNG + Firecrawl Cloud 正文抓取）
     │   └── corp-egress/         # 内网出口隧道（Mac 侧常驻：本机 SOCKS5 + ssh -R 反投给服务器，见「内网出口」）

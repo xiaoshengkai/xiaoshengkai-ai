@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.86 (2026-11-27) — 新增外卖开店模拟器：工具入口、领域模型与文件存储
+
+### 变更
+- **工具入口**：`packages/tools/merchant-takeout/tool.json`（name 外卖开店模拟器 / icon store / accent orange），自动出现在 `/tools`；`/tools/merchant-takeout` 页面为占位（头部 + 空态，真实列表 UI 后续任务落地）。
+- **领域模型**：`lib/merchant-takeout/types.ts` 定义 `MerchantStore` 及子模型（profile / locations / costs / staffing / products / baskets / platformRules / activities / scenarios / snapshots）；`status` 为 `simulation | preparing | trial | running | closed`，默认 `simulation`；第一版仅淘宝闪购。
+- **文件存储**：`lib/merchant-takeout/store.ts` 复用 `CONVERSATIONS_DIR` 定位约定（`MERCHANT_TAKEOUT_DIR` 可覆盖，默认 `data/merchant-takeout/stores`），一家店铺一个 JSON 文件，列表扫描 `*.json` 按 `updatedAt` 倒序，写入用临时文件 + `rename` 原子替换，UUID 校验拦截非法 id / 路径穿越；`createStore/readStore/writeStore/listStores/deleteStore`。
+- **API**：`/api/tools/merchant-takeout`（GET 列表 / POST 创建 / GET ?id 读取 / PUT ?id 更新保留 createdAt 刷新 updatedAt / DELETE ?id 删除），自动受 `proxy.ts` 鉴权保护。
+
+### 验证
+- typecheck + test:mm（45/45）全绿；新增 `merchant-takeout-store.test.ts` 覆盖创建/读取/更新（保留 createdAt·刷新 updatedAt）/列表倒序/删除/非法 id 拒绝/路径穿越拒绝。
+
 ## v0.11.85 (2026-11-26) — 修复聊天上传图无法图生图：内联描述附公网原图 URL
 
 ### 问题

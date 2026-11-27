@@ -1,0 +1,192 @@
+/**
+ * 外卖开店模拟器 — 领域模型
+ * 一个数字店铺 = 一个 MerchantStore，各子模型对应数据流中的每一步（创建→品类→选址→成本→商品→购物篮→规则→活动→销量→沙盘→报告→快照）。
+ * 第一版仅淘宝闪购平台，不做多平台 union 抽象；所有字段取自设计文档已确认项，不预铺未描述字段。
+ */
+
+export type StoreStatus = "simulation" | "preparing" | "trial" | "running" | "closed";
+
+/** 开店阶段，对应三类用户入口：第一次准备开店 / 线下转外卖 / 已经营外卖店 */
+export type StoreStage = "first-time" | "offline-to-takeout" | "already-running";
+
+/** 店铺基本信息 + 品类初筛 */
+export interface StoreProfile {
+  name: string; // 店铺名称
+  stage: StoreStage; // 开店阶段
+  category: string; // 主营品类
+  tags: string[]; // 辅助标签
+  city: string; // 城市
+  availableCapital: number; // 可投入资金
+  workingCapital: number; // 周转金
+  targetNetProfit: number; // 目标净利润
+  experience: string; // 经营经验
+  riskNotes: string; // 风险提示
+}
+
+/** 候选选址（地图搜索 + 点选 + 配送半径 + 周边 POI） */
+export interface StoreLocation {
+  id: string;
+  name: string; // 候选名称
+  address: string; // 地址
+  lng: number; // 经度
+  lat: number; // 纬度
+  deliveryRadius: number; // 配送半径（km）
+  poi: string[]; // 周边 POI
+  competitors: string; // 周边竞店说明
+  selected: boolean; // 是否已选定
+}
+
+/** 一次性投入（进启动资金/现金流/回本周期，不摊入月利润） */
+export interface OneTimeCosts {
+  renovation: number; // 装修
+  equipment: number; // 设备
+  franchiseFee: number; // 加盟费
+  transferFee: number; // 转让费
+  agencyFee: number; // 中介费
+  license: number; // 证照
+  initialInventory: number; // 首批原料
+  openingPromotion: number; // 开业推广
+  refundableDeposit: number; // 押金（可回收）
+}
+
+/** 月固定成本（用于月经营利润和保本单量） */
+export interface MonthlyFixedCosts {
+  rent: number; // 房租
+  labor: number; // 人工
+  utilities: number; // 水电气
+  property: number; // 物业
+  network: number; // 网络
+  garbage: number; // 垃圾处理
+  other: number; // 其他
+}
+
+export interface StoreCosts {
+  oneTime: OneTimeCosts;
+  monthlyFixed: MonthlyFixedCosts;
+}
+
+/** 阶梯用工：基础人员 + 按月订单量触发增员档位 */
+export interface StaffMember {
+  role: string; // 岗位
+  count: number; // 人数
+  monthlySalary: number; // 月工资（每人）
+}
+
+export interface StaffingTier {
+  minMonthlyOrders: number; // 触发月订单量
+  members: StaffMember[]; // 该档位累计目标人员结构
+}
+
+export interface StoreStaffing {
+  base: StaffMember[]; // 基础人员（无论销量都需要的岗位，含老板合理工资）
+  tiers: StaffingTier[]; // 增员档位
+}
+
+/** 商品/套餐（不做原料配方，直接填单份食材总成本 + 损耗率 + 包装） */
+export interface StoreProduct {
+  id: string;
+  name: string;
+  price: number; // 售价
+  ingredientCost: number; // 单份食材总成本
+  lossRate: number; // 损耗率（0~1）
+  packagingCost: number; // 包装成本
+  packagingFee: number; // 包装收费
+}
+
+/** 典型购物篮（商品组合 + 订单占比，占比合计 100%） */
+export interface BasketItem {
+  productId: string;
+  quantity: number;
+}
+
+export interface StoreBasket {
+  id: string;
+  name: string;
+  items: BasketItem[];
+  orderShare: number; // 订单占比（%）
+}
+
+/** 平台规则来源元数据（AI 检索默认值，最终以商家后台确认为准） */
+export interface RuleSource {
+  sourceUrl?: string; // 来源链接
+  publishedAt?: string; // 发布时间
+  fetchedAt?: number; // 抓取时间
+  region?: string; // 适用地区
+  confidence?: string; // 可信度
+  conflictNote?: string; // 冲突说明
+}
+
+/** 平台规则（第一版仅淘宝闪购）；找不到可靠来源的字段保持空白，确认后才生成正式报告 */
+export interface PlatformRules {
+  platform: "taobao-flash"; // 第一版仅淘宝闪购
+  commissionRate?: number; // 平台扣点（%）
+  fixedServiceFee?: number; // 平台固定服务费（元/单）
+  merchantDeliveryFee?: number; // 商家承担配送费（元/单）
+  confirmed: boolean; // 是否已在商家后台确认
+  source: RuleSource; // 规则来源元数据
+}
+
+/** 满减档位（满 X 减 Y） */
+export interface FullReductionRule {
+  threshold: number; // 满 X 元
+  reduction: number; // 减 Y 元
+}
+
+/** 活动方案（满减/折扣/红包/承担比例/叠加顺序） */
+export interface StoreActivities {
+  fullReduction: FullReductionRule[]; // 满减档位
+  discount?: number; // 全场折扣（0~1）
+  redPacket?: number; // 红包（元）
+  merchantShare: number; // 商家承担比例（%）
+  stackOrder: string[]; // 叠加顺序
+}
+
+/** 经营沙盘：某经营阶段逐档推演结果（第 1~3 月 + 稳定期） */
+export interface StoreScenario {
+  id: string;
+  label: string; // 阶段名（第1月/第2月/第3月/稳定期）
+  monthIndex: number; // 1/2/3，稳定期=4
+  naturalOrders: number; // 自然订单量
+  promotionOrders: number; // 推广新增订单量
+  totalOrders: number; // 总订单量
+  avgContributionProfit: number; // 平均单笔贡献利润
+  monthlyNetProfit: number; // 月税后净利润
+  breakevenOrders: number; // 保本月单量
+  tax: number; // 预计税费
+}
+
+/** AI 分析报告（可行性等级 + 关键条件 + 依据，不输出伪概率） */
+export interface AiReport {
+  feasibility: string; // 经营可行性等级
+  conditions: string[]; // 关键成立条件
+  risks: string[]; // 风险
+  suggestions: string[]; // 调整建议
+  basis: string[]; // 依据
+}
+
+/** 方案快照（生成报告时的计算结果 + 规则来源 + AI 分析，不可变，用于前后比较） */
+export interface StoreSnapshot {
+  id: string;
+  createdAt: number;
+  label: string;
+  report: AiReport;
+  scenarios: StoreScenario[];
+  rules: PlatformRules;
+}
+
+export interface MerchantStore {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  status: StoreStatus;
+  profile: StoreProfile;
+  locations: StoreLocation[];
+  costs: StoreCosts;
+  staffing: StoreStaffing;
+  products: StoreProduct[];
+  baskets: StoreBasket[];
+  platformRules: PlatformRules;
+  activities: StoreActivities;
+  scenarios: StoreScenario[];
+  snapshots: StoreSnapshot[];
+}

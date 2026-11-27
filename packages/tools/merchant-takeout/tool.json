@@ -1,0 +1,7 @@
+{
+  "id": "merchant-takeout",
+  "name": "外卖开店模拟器",
+  "description": "从品类、选址到平台规则的 AI 外卖店数字沙盘",
+  "icon": "store",
+  "accent": "orange"
+}

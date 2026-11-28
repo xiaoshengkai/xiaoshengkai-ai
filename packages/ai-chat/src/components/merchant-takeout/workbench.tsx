@@ -33,6 +33,7 @@ import BasketEditor from "./basket-editor";
 import PlatformRulesEditor from "./platform-rules-editor";
 import ActivityEditor from "./activity-editor";
 import ScenarioEditor from "./scenario-editor";
+import SalesPredictionPanel from "./sales-prediction-panel";
 import SimulationDashboard from "./simulation-dashboard";
 import ReportView from "./report-view";
 import SnapshotPanel from "./snapshot-panel";
@@ -263,6 +264,10 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-4 h-4" />
           <span className="text-sm font-bold text-foreground">销量与推广</span>
+        </div>
+        <div className="mb-4">
+          <div className="text-xs font-bold text-foreground mb-2">AI 预测销量与推广</div>
+          <SalesPredictionPanel store={store} onUpdate={setStore} />
         </div>
         <ScenarioEditor
           sales={store.sales}

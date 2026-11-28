@@ -19,9 +19,10 @@ const DEFAULT_CENTER: [number, number] = [121.4737, 31.2304]; // 上海
 interface LocationEditorProps {
   locations: StoreLocation[];
   onChange: (locations: StoreLocation[]) => void;
+  city?: string;
 }
 
-export default function LocationEditor({ locations, onChange }: LocationEditorProps) {
+export default function LocationEditor({ locations, onChange, city }: LocationEditorProps) {
   const [amap, setAmap] = useState<any>(null);
   const uid = useId();
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -120,17 +121,22 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
     map.on("click", (e: any) => {
       const lng = e.lnglat.getLng();
       const lat = e.lnglat.getLat();
-      if (!geocoderRef.current) geocoderRef.current = new amap.Geocoder({});
-      geocoderRef.current.getAddress(
-        [lng, lat],
-        (status: string, result: any) => {
-          const addr =
-            status === "complete" && result.regeocode
-              ? result.regeocode.formattedAddress
-              : "地图选点";
-          createLocation({ name: addr, address: addr, lng, lat });
-        },
-      );
+      try {
+        if (!geocoderRef.current) geocoderRef.current = new amap.Geocoder({});
+        geocoderRef.current.getAddress(
+          [lng, lat],
+          (status: string, result: any) => {
+            const addr =
+              status === "complete" && result.regeocode
+                ? result.regeocode.formattedAddress
+                : "地图选点";
+            createLocation({ name: addr, address: addr, lng, lat });
+          },
+        );
+      } catch {
+        // 逆地理编码失败仍允许点选，坐标已足够
+        createLocation({ name: "地图选点", address: `${lng.toFixed(6)}, ${lat.toFixed(6)}`, lng, lat });
+      }
     });
 
     return () => {
@@ -178,15 +184,22 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
   const searchPlace = () => {
     if (!amap || !keyword.trim()) return;
     setSearching(true);
-    const ps = new amap.PlaceSearch({ pageSize: 10 });
-    ps.search(keyword.trim(), (status: string, result: any) => {
+    try {
+      const opts: any = { pageSize: 10 };
+      if (city) opts.city = city;
+      const ps = new amap.PlaceSearch(opts);
+      ps.search(keyword.trim(), (status: string, result: any) => {
+        setSearching(false);
+        if (status === "complete" && result.poiList?.pois) {
+          setSearchResults(result.poiList.pois);
+        } else {
+          setSearchResults([]);
+        }
+      });
+    } catch {
       setSearching(false);
-      if (status === "complete" && result.poiList?.pois) {
-        setSearchResults(result.poiList.pois);
-      } else {
-        setSearchResults([]);
-      }
-    });
+      setSearchResults([]);
+    }
   };
 
   const pickSearchResult = (poi: any) => {
@@ -202,22 +215,26 @@ export default function LocationEditor({ locations, onChange }: LocationEditorPr
   const queryNearbyPoi = () => {
     if (!amap || !current) return;
     setQueryingPoi(true);
-    const center = [current.lng, current.lat];
-    const radius = Math.max(current.deliveryRadius, 0.1) * 1000;
-    const ps = new amap.PlaceSearch({ pageSize: 50 }); // ponytail: 单页 50 条，够 MVP 用
-    ps.searchNearBy("", center, radius, (status: string, result: any) => {
+    try {
+      const center = [current.lng, current.lat];
+      const radius = Math.max(current.deliveryRadius, 0.1) * 1000;
+      const ps = new amap.PlaceSearch({ pageSize: 50 }); // ponytail: 单页 50 条，够 MVP 用
+      ps.searchNearBy("", center, radius, (status: string, result: any) => {
+        setQueryingPoi(false);
+        if (status !== "complete" || !result.poiList?.pois) return;
+        const names: string[] = [];
+        for (const p of result.poiList.pois) {
+          const t: string = p.type || "";
+          const cat = POI_CATEGORIES.find(
+            (c) => t.split(";").includes(c.code) || t.startsWith(c.code),
+          );
+          if (cat && p.name) names.push(`${cat.label}·${p.name}`);
+        }
+        if (names.length) patchLocation(current.id, { poi: names.slice(0, 100) });
+      });
+    } catch {
       setQueryingPoi(false);
-      if (status !== "complete" || !result.poiList?.pois) return;
-      const names: string[] = [];
-      for (const p of result.poiList.pois) {
-        const t: string = p.type || "";
-        const cat = POI_CATEGORIES.find(
-          (c) => t.split(";").includes(c.code) || t.startsWith(c.code),
-        );
-        if (cat && p.name) names.push(`${cat.label}·${p.name}`);
-      }
-      if (names.length) patchLocation(current.id, { poi: names.slice(0, 100) });
-    });
+    }
   };
 
   const addManual = () => {

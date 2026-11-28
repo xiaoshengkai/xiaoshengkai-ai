@@ -5,6 +5,7 @@ import { FileText, Loader2, AlertTriangle, CheckCircle2, Info } from "lucide-rea
 import type { AiReport, MerchantStore } from "@/lib/merchant-takeout/types";
 import { calculateSimulation, buildPhases } from "@/lib/merchant-takeout/calculate";
 import { BASE } from "@/lib/utils/utils";
+import { useMerchantApi } from "./api";
 
 const fmt = (n: number) =>
   `${(Number.isFinite(n) ? n : 0).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
@@ -68,12 +69,13 @@ function CompactMetrics({ store }: { store: MerchantStore }) {
 export default function ReportView({ store }: { store: MerchantStore }) {
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState<Resp | null>(null);
+  const api = useMerchantApi();
 
   const generate = async () => {
     setLoading(true);
     setResp(null);
     try {
-      const res = await fetch(`${BASE}/api/tools/merchant-takeout/report`, {
+      const res = await api(`${BASE}/api/tools/merchant-takeout/report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ storeId: store.id }),

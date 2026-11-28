@@ -28,7 +28,9 @@ test("isOfficial: 淘宝/天猫/阿里系域名判真，其他判假", () => {
   assert.equal(isOfficial("https://rule.tmall.com/x"), true);
   assert.equal(isOfficial("https://www.alibaba.com/"), true);
   assert.equal(isOfficial("https://www.aliyun.com/"), true);
+  assert.equal(isOfficial("https://terms.alicdn.com/legal-agreement/terms/x"), true);
   assert.equal(isOfficial("https://example.com/taobao"), false);
+  assert.equal(isOfficial("https://evil-alicdn.com/"), false);
 });
 
 test("isOfficial: 仿冒域名（evil-taobao.com / taobao.com.evil.com）判假，子域名判真", () => {

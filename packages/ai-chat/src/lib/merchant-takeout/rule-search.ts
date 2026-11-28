@@ -34,7 +34,7 @@ export interface RuleReference {
 
 const FIELDS: RuleField[] = ["commissionRate", "fixedServiceFee", "merchantDeliveryFee", "customerDeliveryFee"];
 
-const OFFICIAL_SUFFIXES = ["taobao.com", "tmall.com", "alibaba.com", "aliyun.com"];
+const OFFICIAL_SUFFIXES = ["taobao.com", "tmall.com", "alibaba.com", "aliyun.com", "alicdn.com"];
 
 function hostOf(url: string): string {
   try {
@@ -125,6 +125,7 @@ export function applyReferencesToRules(refs: RuleReference[], current: PlatformR
 /**
  * 联网检索淘宝闪购平台规则（搜索 + 抓取 + flash 模型抽取）。
  * 任何环节失败一律降级返回 []（绝不抛错）。
+ * 多组查询命中率更高，优先抓取官方来源（terms.alicdn.com / taobao.com 等）。
  */
 export async function searchPlatformRules(input: { city?: string } = {}): Promise<RuleReference[]> {
   try {
@@ -133,18 +134,44 @@ export async function searchPlatformRules(input: { city?: string } = {}): Promis
 
     const network = loadNetworkConfig();
     const base = `http://${network.hosts.local}:${network.ports.searchService}`;
-    const query = `淘宝闪购 商家 扣点 佣金 配送费 规则${input.city ? ` ${input.city}` : ""}`;
+    const city = input.city ? ` ${input.city}` : "";
 
-    const searchUrl = new URL(`${base}/search`);
-    searchUrl.searchParams.set("query", query);
-    searchUrl.searchParams.set("maxResults", "6");
-    searchUrl.searchParams.set("fetchContent", "false");
-    searchUrl.searchParams.set("strategy", "auto");
-    const searchRes = await withTimeout(fetch(searchUrl), 15000, "search");
-    const searchJson = (await searchRes.json()) as { ok?: boolean; results?: { title?: string; url?: string }[] };
-    if (!searchJson.ok || !Array.isArray(searchJson.results) || searchJson.results.length === 0) return [];
+    // 多组精准查询：官方服务费标准 > 商家入驻费率 > 配送/佣金规则
+    const queries = [
+      `淘宝闪购 软件服务费标准 商家 扣点 费率${city}`,
+      `淘宝闪购 商家入驻 佣金 扣点 配送费 规则${city}`,
+      `饿了么 淘宝闪购 商家 服务费率 配送${city}`,
+    ];
 
-    const top = searchJson.results.slice(0, 3);
+    // 合并多组查询结果，按 URL 去重
+    const seen = new Set<string>();
+    const results: { title?: string; url?: string }[] = [];
+    for (const query of queries) {
+      const searchUrl = new URL(`${base}/search`);
+      searchUrl.searchParams.set("query", query);
+      searchUrl.searchParams.set("maxResults", "8");
+      searchUrl.searchParams.set("fetchContent", "false");
+      searchUrl.searchParams.set("strategy", "auto");
+      const searchRes = await withTimeout(fetch(searchUrl), 15000, `search ${query}`);
+      const searchJson = (await searchRes.json()) as { ok?: boolean; results?: { title?: string; url?: string }[] };
+      if (!searchJson.ok || !Array.isArray(searchJson.results)) continue;
+      for (const r of searchJson.results) {
+        if (r.url && !seen.has(r.url)) {
+          seen.add(r.url);
+          results.push(r);
+        }
+      }
+    }
+    if (results.length === 0) return [];
+
+    // 官方来源优先抓取，其余按原顺序补足
+    const ordered = [...results].sort((a, b) => {
+      const oa = isOfficial(a.url || "") ? 0 : 1;
+      const ob = isOfficial(b.url || "") ? 0 : 1;
+      return oa - ob;
+    });
+    const top = ordered.slice(0, 4);
+
     const scraped: { url: string; title?: string; markdown: string }[] = [];
     for (const r of top) {
       if (!r.url) continue;
@@ -154,7 +181,7 @@ export async function searchPlatformRules(input: { city?: string } = {}): Promis
         const res = await withTimeout(fetch(scrapeUrl), 20000, `scrape ${r.url}`);
         const json = (await res.json()) as { ok?: boolean; markdown?: string };
         if (json.ok && json.markdown) {
-          scraped.push({ url: r.url, title: r.title, markdown: json.markdown.slice(0, 4000) });
+          scraped.push({ url: r.url, title: r.title, markdown: json.markdown.slice(0, 6000) });
         }
       } catch {
         // 单页抓取失败不阻断，继续下一源
@@ -172,7 +199,7 @@ export async function searchPlatformRules(input: { city?: string } = {}): Promis
     const prompt = `你是淘宝闪购平台规则解析器。请从以下资料中提取平台对商家的收费规则，只输出 JSON，不要任何解释。
 
 字段定义（值必须来自资料原文，资料没写的字段一律省略，严禁编造）：
-- commissionRate：平台扣点/佣金比例（百分比数值，如 5 表示 5%）
+- commissionRate：平台扣点/佣金/软件服务费率（百分比数值，如 5 表示 5%）
 - fixedServiceFee：平台固定服务费（元/单）
 - merchantDeliveryFee：商家承担配送费（元/单）
 - customerDeliveryFee：向顾客收取配送费（元/单）
@@ -184,6 +211,7 @@ export async function searchPlatformRules(input: { city?: string } = {}): Promis
 - sourceUrl 必须使用资料里给出的来源 URL，不得杜撰。
 - confidence 只能是 high / medium / low。
 - unit 只有 "%" 或 "元/单"。
+- 若某字段在资料里有多处不同取值，以官方来源（terms.alicdn.com / taobao.com / tmall.com）为准，并把差异写进 conditions。
 
 资料：
 ${sources}`;

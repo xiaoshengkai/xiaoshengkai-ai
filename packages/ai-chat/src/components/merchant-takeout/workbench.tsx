@@ -161,6 +161,7 @@ export default function Workbench({ initialStore }: { initialStore: MerchantStor
         <LocationEditor
           locations={store.locations}
           onChange={(locations) => setStore((prev) => ({ ...prev, locations }))}
+          city={store.profile.city}
         />
         {selectedLocation && (
           <div className="mt-4">

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { BASE } from "@/lib/utils/utils";
 import type { CommissionBase, PlatformRules } from "@/lib/merchant-takeout/types";
 import { COMMISSION_BASE_LABELS, describeRuleSource } from "@/lib/merchant-takeout/platform";
+import { useMerchantApi } from "./api";
 
 const fmtPct = (v?: number) => (Number.isFinite(v) ? (v as number) * 100 : 0);
 
@@ -45,6 +46,7 @@ interface PlatformRulesEditorProps {
 export default function PlatformRulesEditor({ rules, onChange, city }: PlatformRulesEditorProps) {
   const [fetching, setFetching] = useState(false);
   const uid = useId();
+  const api = useMerchantApi();
   const patch = (p: Partial<PlatformRules>) => onChange({ ...rules, ...p });
   const patchBase = (p: Partial<CommissionBase>) =>
     onChange({ ...rules, commissionBase: { ...rules.commissionBase, ...p } });
@@ -52,7 +54,7 @@ export default function PlatformRulesEditor({ rules, onChange, city }: PlatformR
   const fetchReferences = async () => {
     setFetching(true);
     try {
-      const res = await fetch(`${BASE}/api/tools/merchant-takeout/platform-rules`, {
+      const res = await api(`${BASE}/api/tools/merchant-takeout/platform-rules`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ city, rules }),

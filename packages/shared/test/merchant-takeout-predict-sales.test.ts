@@ -151,6 +151,41 @@ test("applyBaselinePrediction: 无 prediction 原样返回", () => {
   assert.equal(out, store);
 });
 
+test("applyBaselinePrediction: store.sales 为空时从 prediction 生成四阶段", () => {
+  const store = makeStore();
+  store.sales = [];
+  store.salesPrediction = {
+    id: "p1",
+    createdAt: 1,
+    confidence: "medium",
+    basis: [],
+    sources: [],
+    assumptions: [],
+    missing: [],
+    phases: [1, 2, 3, 4].map((m) => ({
+      monthIndex: m,
+      conservative: m * 100,
+      baseline: m * 100,
+      optimistic: m * 150,
+      promotionBudget: m * 50,
+      promotionOrders: m * 10,
+      notes: [],
+    })),
+  };
+
+  const out = applyBaselinePrediction(store);
+  assert.equal(out.sales.length, 4);
+  assert.deepEqual(
+    out.sales.map((s) => [s.monthIndex, s.naturalOrders, s.promotionBudget, s.promotionOrders]),
+    [
+      [1, 100, 50, 10],
+      [2, 200, 100, 20],
+      [3, 300, 150, 30],
+      [4, 400, 200, 40],
+    ],
+  );
+});
+
 test("applyBaselinePrediction: 写入 baseline/promotionBudget/promotionOrders，保留 activities 与 naturalOrdersReference，不可变", () => {
   const store = makeStore();
   store.sales = [

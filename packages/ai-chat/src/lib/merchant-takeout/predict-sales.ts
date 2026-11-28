@@ -299,14 +299,16 @@ export function applyBaselinePrediction(store: MerchantStore): MerchantStore {
   const pred = store.salesPrediction;
   if (!pred) return store;
 
-  const sales = store.sales.map((s) => {
-    const p = pred.phases.find((ph) => ph.monthIndex === s.monthIndex);
-    if (!p) return s;
+  const existing = new Map(store.sales.map((s) => [s.monthIndex, s]));
+  const sales = pred.phases.map((p) => {
+    const prev = existing.get(p.monthIndex);
     return {
-      ...s,
+      monthIndex: p.monthIndex,
       naturalOrders: p.baseline,
       promotionBudget: p.promotionBudget,
       promotionOrders: p.promotionOrders,
+      activities: prev?.activities,
+      naturalOrdersReference: prev?.naturalOrdersReference,
     };
   });
 

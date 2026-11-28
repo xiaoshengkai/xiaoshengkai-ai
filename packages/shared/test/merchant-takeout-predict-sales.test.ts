@@ -111,6 +111,15 @@ test("baseOrderRange: 竞店月售越高区间越高", () => {
   assert.ok(high.baseline > low.baseline);
 });
 
+test("baseOrderRange: 录入弱竞店后以真实中位数为准（可低于无竞店经验底值）", () => {
+  const none = baseOrderRange(makeStore());
+  assert.equal(none.baseline, 200);
+  const weak = baseOrderRange(
+    makeStore({ locations: [{ ...makeStore().locations[0], competitorList: [comp({ monthlyOrders: 100 })] }] }),
+  );
+  assert.equal(weak.baseline, 80); // 0.8 × 100，真实市场信号优先于经验底值
+});
+
 test("baseOrderRange: POI 数量越多 baseline 越高", () => {
   const few = baseOrderRange(makeStore());
   const many = baseOrderRange(

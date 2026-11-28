@@ -54,6 +54,7 @@ export function baseOrderRange(store: MerchantStore): {
   const poiCount = loc?.poi?.length ?? 0;
   const radius = loc?.deliveryRadius ?? 0;
 
+  // ponytail: 无竞店用经验底值 200；录入真实竞店后以其中位数 80% 为准（可能高于或低于底值）——真实市场信号优先于猜测
   let baseline = med > 0 ? med * 0.8 : 200; // 新店约为竞店中位数 80%，无竞店给经验底值 200
   baseline += poiCount * 40; // 每类 POI 加成
   baseline += Math.max(0, radius - 2) * 30; // 配送半径越大需求越广

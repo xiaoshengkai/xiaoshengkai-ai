@@ -73,6 +73,7 @@ export default function LocationEditor({ locations, onChange, city }: LocationEd
       deliveryRadius: 3,
       poi: [],
       competitors: "",
+      competitorList: [],
       selected: isFirst,
       costs: defaultLocationCosts(),
     };

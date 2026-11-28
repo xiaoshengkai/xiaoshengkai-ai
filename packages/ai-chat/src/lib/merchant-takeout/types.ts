@@ -21,6 +21,7 @@ export interface StoreProfile {
   targetNetProfit: number; // 目标净利润
   experience: string; // 经营经验
   riskNotes: string; // 风险提示
+  promotionBudgetCap: number; // 统一月推广预算上限（元），0 表示未设置/无上限
 }
 
 /** 单个候选地址的成本明细（年租金/押金/转让费/水电燃气/面积楼层等） */
@@ -44,6 +45,43 @@ export interface LocationCosts {
   conditions: string; // 排烟/消防/用电/餐饮经营条件
 }
 
+/** 结构化竞店卡片（单家竞店的公开可观察指标） */
+export interface Competitor {
+  id: string;
+  name: string; // 竞店名称
+  distance: number; // 距离（km）
+  category: string; // 品类
+  monthlyOrders: number; // 月售
+  avgTicket: number; // 客单价（元）
+  rating: number; // 评分 0~5
+  activities: string; // 活动说明
+  hours: string; // 营业时间
+  note: string; // 备注
+}
+
+/** 销量与推广预测：单阶段预测结果（第 1~4 月） */
+export interface SalesPhasePrediction {
+  monthIndex: number; // 1/2/3/4
+  conservative: number; // 保守自然订单
+  baseline: number; // 基准自然订单
+  optimistic: number; // 乐观自然订单
+  promotionBudget: number; // 推荐推广预算（元）
+  promotionOrders: number; // 预计新增订单
+  notes: string[];
+}
+
+/** 销量与推广预测：完整预测结果（先展示不落盘，用户采用后才写回 store.sales） */
+export interface SalesPrediction {
+  id: string;
+  createdAt: number;
+  confidence: "low" | "medium" | "high";
+  basis: string[];
+  sources: string[];
+  assumptions: string[];
+  missing: string[];
+  phases: SalesPhasePrediction[];
+}
+
 /** 候选选址（地图搜索 + 点选 + 配送半径 + 周边 POI） */
 export interface StoreLocation {
   id: string;
@@ -54,6 +92,7 @@ export interface StoreLocation {
   deliveryRadius: number; // 配送半径（km）
   poi: string[]; // 周边 POI
   competitors: string; // 周边竞店说明
+  competitorList: Competitor[]; // 结构化竞店卡片
   selected: boolean; // 是否已选定
   costs: LocationCosts; // 该候选地址的成本明细
 }
@@ -271,4 +310,5 @@ export interface MerchantStore {
   sales: SalesPhase[];
   sweep: SweepConfig;
   scenarios: StoreScenario[];
+  salesPrediction?: SalesPrediction;
 }

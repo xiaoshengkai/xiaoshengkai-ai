@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import type { LocationCosts, StoreLocation } from "@/lib/merchant-takeout/types";
+import CompetitorEditor from "./competitor-editor";
 
 /** 零值 LocationCosts，新增候选地址时使用 */
 export function defaultLocationCosts(): LocationCosts {
@@ -162,6 +163,15 @@ export default function LocationCostForm({ location, onChange }: LocationCostFor
           rows={3}
           placeholder="如：500m 内一家月售 2000+ 的同品类店，客单价 ¥25，满减活动频繁…"
           className="w-full px-2 py-1.5 text-sm border-2 border-border bg-card"
+        />
+      </div>
+
+      {/* 结构化竞店卡片 */}
+      <div>
+        <div className="text-xs font-bold text-foreground mb-1.5">竞店卡片</div>
+        <CompetitorEditor
+          competitors={location.competitorList ?? []}
+          onChange={(list) => onChange({ competitorList: list })}
         />
       </div>
 

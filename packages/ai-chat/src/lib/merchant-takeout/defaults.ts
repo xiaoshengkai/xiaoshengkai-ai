@@ -23,6 +23,7 @@ export function createEmptyStore(name: string): MerchantStore {
       targetNetProfit: 0,
       experience: "",
       riskNotes: "",
+      promotionBudgetCap: 0,
     },
     locations: [],
     costs: {
@@ -66,5 +67,6 @@ export function createEmptyStore(name: string): MerchantStore {
     sales: [],
     sweep: { minOrders: 500, maxOrders: 3000, step: 100 },
     scenarios: [],
+    salesPrediction: undefined,
   };
 }

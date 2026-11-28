@@ -4,11 +4,11 @@
  *
  * Body: { storeId } → 生成预测
  * Body: { storeId, prediction, apply: true } → 采用基准方案并写回 store.sales
- * 返回: { ok: true, prediction, store? }；缺店 404；异常 500（predictSales 内部已降级，极少触发）。
+ * 返回: { ok: true, prediction, store? }；缺店 404；预测数据无效 400；异常 500（predictSales 内部已降级，极少触发）。
  */
 import { NextRequest, NextResponse } from "next/server";
 import { readStore, writeStore } from "@/lib/merchant-takeout/store";
-import { predictSales, applyBaselinePrediction } from "@/lib/merchant-takeout/predict-sales";
+import { predictSales, applyBaselinePrediction, sanitizePrediction } from "@/lib/merchant-takeout/predict-sales";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,11 +17,13 @@ export async function POST(req: NextRequest) {
     const store = readStore(storeId);
     if (!store) return NextResponse.json({ ok: false, error: "店铺不存在" }, { status: 404 });
 
-    const prediction = body?.prediction ?? null;
-    if (body?.apply && prediction) {
-      const withPrediction = { ...store, salesPrediction: prediction };
-      const applied = writeStore(applyBaselinePrediction(withPrediction));
-      return NextResponse.json({ ok: true, prediction, store: applied });
+    if (body?.apply === true) {
+      const pred = sanitizePrediction(body?.prediction, store);
+      if (!pred) return NextResponse.json({ ok: false, error: "预测数据无效" }, { status: 400 });
+      store.salesPrediction = pred;
+      const applied = applyBaselinePrediction(store);
+      writeStore(applied);
+      return NextResponse.json({ ok: true, prediction: pred, store: applied });
     }
 
     const result = await predictSales(store);

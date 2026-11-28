@@ -9,6 +9,7 @@ import {
   clampPromotionBudget,
   applyBaselinePrediction,
   parsePredictionJson,
+  sanitizePrediction,
 } from "../../ai-chat/src/lib/merchant-takeout/predict-sales";
 
 function comp(over: Partial<Competitor> = {}): Competitor {
@@ -290,6 +291,79 @@ test("parsePredictionJson: 阶段数字乱序时用 baseOrderRange 兜底", () =
   const second = out.phases.find((p) => p.monthIndex === 2);
   assert.ok(second);
   assert.equal(second.baseline, 20); // 正常阶段保留
+});
+
+function validPredictionInput(over: Record<string, unknown> = {}) {
+  return {
+    id: "p-123",
+    createdAt: 123456,
+    confidence: "high",
+    basis: ["b1"],
+    sources: ["https://example.com/a"],
+    assumptions: ["a1"],
+    missing: [],
+    phases: [1, 2, 3, 4].map((m) => ({
+      monthIndex: m,
+      conservative: m * 10,
+      baseline: m * 20,
+      optimistic: m * 30,
+      promotionBudget: m * 10,
+      promotionOrders: m * 5,
+      notes: [],
+    })),
+    ...over,
+  };
+}
+
+test("sanitizePrediction: 合法完整预测保留 id/createdAt/confidence", () => {
+  const out = sanitizePrediction(validPredictionInput(), makeStore());
+  assert.ok(out);
+  assert.equal(out.id, "p-123");
+  assert.equal(out.createdAt, 123456);
+  assert.equal(out.confidence, "high");
+  assert.equal(out.phases.length, 4);
+  assert.equal(out.phases[0].baseline, 20);
+});
+
+test("sanitizePrediction: 畸形输入返回 null", () => {
+  const store = makeStore();
+  const valid = validPredictionInput();
+  const { phases: _phases, ...noPhases } = valid;
+  assert.equal(sanitizePrediction(noPhases, store), null);
+  assert.equal(sanitizePrediction({ ...valid, phases: "x" }, store), null);
+  assert.equal(
+    sanitizePrediction(
+      { ...valid, phases: [{ ...valid.phases[0], monthIndex: 5 }] },
+      store,
+    ),
+    null,
+  );
+});
+
+test("sanitizePrediction: conservative > baseline 阶段回退 baseOrderRange", () => {
+  const store = makeStore();
+  const base = baseOrderRange(store);
+  const phases = validPredictionInput().phases.map((p) =>
+    p.monthIndex === 1 ? { ...p, conservative: 200, baseline: 20 } : p,
+  );
+  const out = sanitizePrediction(validPredictionInput({ phases }), store);
+  assert.ok(out);
+  const first = out.phases.find((p) => p.monthIndex === 1);
+  assert.ok(first);
+  assert.equal(first.conservative, base.conservative);
+  assert.equal(first.baseline, base.baseline);
+  assert.equal(first.optimistic, base.optimistic);
+});
+
+test("sanitizePrediction: promotionBudget 超出 cap 被裁剪", () => {
+  const store = makeStore();
+  store.profile = { ...store.profile, promotionBudgetCap: 50 };
+  const phases = validPredictionInput().phases.map((p) =>
+    p.monthIndex === 1 ? { ...p, promotionBudget: 500 } : p,
+  );
+  const out = sanitizePrediction(validPredictionInput({ phases }), store);
+  assert.ok(out);
+  assert.equal(out.phases[0].promotionBudget, 50);
 });
 
 test("parsePredictionJson: 非法 confidence 归 low", () => {

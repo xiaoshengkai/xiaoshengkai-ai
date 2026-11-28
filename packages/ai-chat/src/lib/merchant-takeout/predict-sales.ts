@@ -159,6 +159,27 @@ const predictionInputSchema = z.object({
   phases: z.array(z.unknown()).optional(),
 });
 
+const salesPredictionPhaseSchema = z.object({
+  monthIndex: z.number().int().min(1).max(4),
+  conservative: z.number().finite(),
+  baseline: z.number().finite(),
+  optimistic: z.number().finite(),
+  promotionBudget: z.number().finite(),
+  promotionOrders: z.number().finite(),
+  notes: z.array(z.string()),
+});
+
+const salesPredictionSchema = z.object({
+  id: z.string(),
+  createdAt: z.number(),
+  confidence: z.enum(["low", "medium", "high"]),
+  basis: z.array(z.string()),
+  sources: z.array(z.string()),
+  assumptions: z.array(z.string()),
+  missing: z.array(z.string()),
+  phases: z.array(salesPredictionPhaseSchema),
+});
+
 /**
  * 防御性解析模型返回的 JSON：剥代码围栏/前缀噪声 → JSON.parse → Zod 校验 → 数字钳制。
  * 失败返回 null。返回不含 id/createdAt（由调用方补齐）。
@@ -229,6 +250,48 @@ export function parsePredictionJson(text: string, store: MerchantStore): SalesPr
   } catch {
     return null;
   }
+}
+
+/**
+ * 采用预测前对客户端提交的完整 SalesPrediction 做服务端重校验 + 归一化。
+ * 非法返回 null；合法则逐阶段钳制负数归 0、订单取整、违规三档回退 baseOrderRange、
+ * promotionBudget 经 clampPromotionBudget 裁到上限。
+ */
+export function sanitizePrediction(input: unknown, store: MerchantStore): SalesPrediction | null {
+  const parsed = salesPredictionSchema.safeParse(input);
+  if (!parsed.success) return null;
+
+  const base = baseOrderRange(store);
+  const cap = store.profile.promotionBudgetCap;
+
+  const phases = parsed.data.phases.map((p) => {
+    const conservative = Math.max(0, Math.round(p.conservative));
+    const baseline = Math.max(0, Math.round(p.baseline));
+    const optimistic = Math.max(0, Math.round(p.optimistic));
+    if (!(conservative <= baseline && baseline <= optimistic)) {
+      return fallbackPhase(p.monthIndex, base);
+    }
+    return {
+      monthIndex: p.monthIndex,
+      conservative,
+      baseline,
+      optimistic,
+      promotionBudget: clampPromotionBudget(p.promotionBudget, cap),
+      promotionOrders: Math.max(0, Math.round(p.promotionOrders)),
+      notes: p.notes,
+    };
+  });
+
+  return {
+    id: parsed.data.id,
+    createdAt: parsed.data.createdAt,
+    confidence: parsed.data.confidence,
+    basis: parsed.data.basis,
+    sources: parsed.data.sources,
+    assumptions: parsed.data.assumptions,
+    missing: parsed.data.missing,
+    phases,
+  };
 }
 
 /** 把 salesPrediction.phases 的 baseline/promotionBudget/promotionOrders 写入 store.sales（不可变） */
